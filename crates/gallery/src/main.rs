@@ -363,12 +363,12 @@ fn tools() -> impl IntoElement {
                 div()
                     .flex()
                     .flex_col()
-                    .child(ToolCall::new("t-read", ToolKind::Read, "Read").summary("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
-                    .child(ToolCall::new("t-grep", ToolKind::Search, "Grep").summary("fn hunk_starts").status(ToolStatus::Done).output("crates/beui/src/file_diff.rs:69: fn hunk_starts(header: &str) -> (u32, u32) {"))
-                    .child(ToolCall::new("t-test", ToolKind::Shell, "Bash").summary("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
-                    .child(ToolCall::new("t-run", ToolKind::Shell, "Bash").summary("cargo clippy --workspace").status(ToolStatus::Running))
-                    .child(ToolCall::new("t-fail", ToolKind::Web, "WebFetch").summary("https://beui.dev/docs/theme").status(ToolStatus::Failed).output("error: request timed out after 30s"))
-                    .child(ToolCall::new("t-wait", ToolKind::Shell, "Bash").summary("git push origin main").status(ToolStatus::Pending)),
+                    .child(ToolCall::new("t-read", ToolKind::Custom, "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
+                    .child(ToolCall::new("t-grep", ToolKind::Custom, "Searched code").tool("fn hunk_starts").status(ToolStatus::Done).output("crates/beui/src/file_diff.rs:69: fn hunk_starts(header: &str) -> (u32, u32) {"))
+                    .child(ToolCall::new("t-test", ToolKind::Terminal, "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
+                    .child(ToolCall::new("t-run", ToolKind::Terminal, "Running clippy").tool("cargo clippy --workspace").status(ToolStatus::Running).output("Checking beui v0.1.0\n    Checking beui-gallery v0.1.0"))
+                    .child(ToolCall::new("t-fail", ToolKind::Request, "Fetched theme").tool("https://beui.dev/docs/theme").status(ToolStatus::Failed).output("error: request timed out after 30s"))
+                    .child(ToolCall::new("t-wait", ToolKind::Terminal, "Push to main").tool("git push origin main").status(ToolStatus::Cancelled)),
             ))
             .child(section(
                 "Approval",
@@ -474,13 +474,13 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                     div()
                         .flex()
                         .flex_col()
-                        .child(ToolCall::new("s-read", ToolKind::Read, "Read").summary("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
-                        .child(ToolCall::new("s-grep", ToolKind::Search, "Grep").summary("fn hunk_starts").status(ToolStatus::Done)),
+                        .child(ToolCall::new("s-read", ToolKind::Custom, "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
+                        .child(ToolCall::new("s-grep", ToolKind::Custom, "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
                 )
                 .child(AgentText::new("s-reply", REPLY))
                 .child(TodoList::new("s-plan", sample_plan()))
                 .child(FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF)))
-                .child(ToolCall::new("s-test", ToolKind::Shell, "Bash").summary("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
+                .child(ToolCall::new("s-test", ToolKind::Terminal, "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
                 .child(
                     ToolApproval::new("s-push", "Run a shell command", "git push origin main")
                         .icon(IconName::SquareTerminal)
