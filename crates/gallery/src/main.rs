@@ -4,7 +4,8 @@
 use beui::{
     ActiveTheme, AgentText, Appearance, Badge, Button, ButtonSize, ButtonVariant, CodeBlock, DiffLine, FONT_FAMILY,
     FileDiff, Icon, IconName, Kbd, MONO_FONT_FAMILY, MessageBubble, PromptInput, PromptInputEvent, Spinner, TextSize,
-    Select, Thinking, Todo, TodoList, TodoStatus, ToolApproval, ToolCall, ToolKind, ToolStatus, Tone, pane_header,
+    Select, Thinking, Todo, TodoList, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone,
+    pane_header,
 };
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
@@ -372,12 +373,48 @@ fn tools() -> impl IntoElement {
             ))
             .child(section(
                 "Approval",
-                ToolApproval::new("approve-push", "Run a shell command", "git push origin main")
-                    .icon(IconName::SquareTerminal)
-                    .reason("Push the fix so CI can run the full test suite.")
-                    .detail("Directory", "~/Documents/lathe")
-                    .detail("Command", "git push origin main")
-                    .allow_shortcut("⌘↵"),
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(16.))
+                    .child(
+                        ToolApproval::new("approve-pending", "terminal.run")
+                            .description("The agent wants to run the project test suite in the current workspace.")
+                            .parameter_code("Command", "bun test tests/a11y.test.tsx")
+                            .parameter("Directory", "ui-components")
+                            .default_open(true)
+                            .on_approve(|_, _, _| {})
+                            .on_always_allow(|_, _, _| {})
+                            .on_deny(|_, _, _| {}),
+                    )
+                    .child(
+                        ToolApproval::new("approve-running", "terminal.run")
+                            .title("Terminal access")
+                            .description("The agent wants to run the project test suite in the current workspace.")
+                            .parameter_code("Command", "bun test tests/a11y.test.tsx")
+                            .parameter("Directory", "ui-components")
+                            .status(ToolApprovalStatus::Running),
+                    )
+                    .child(
+                        ToolApproval::new("approve-complete", "terminal.run")
+                            .title("Terminal access")
+                            .description("The agent wants to run the project test suite in the current workspace.")
+                            .parameter_code("Command", "bun test tests/a11y.test.tsx")
+                            .parameter("Directory", "ui-components")
+                            .status(ToolApprovalStatus::Complete),
+                    )
+                    .child(
+                        ToolApproval::new("approve-denied", "terminal.run")
+                            .title("Terminal access")
+                            .description("The agent wants to run the project test suite in the current workspace.")
+                            .status(ToolApprovalStatus::Denied),
+                    )
+                    .child(
+                        ToolApproval::new("approve-error", "terminal.run")
+                            .title("Terminal access")
+                            .description("The test suite could not start.")
+                            .status(ToolApprovalStatus::Error),
+                    ),
             )),
     )
 }
@@ -482,10 +519,13 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                 .child(FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF)))
                 .child(ToolCall::new("s-test", ToolKind::Terminal, "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
                 .child(
-                    ToolApproval::new("s-push", "Run a shell command", "git push origin main")
-                        .icon(IconName::SquareTerminal)
-                        .reason("Push the fix so CI can run the full test suite.")
-                        .detail("Directory", "~/Documents/lathe"),
+                    ToolApproval::new("s-push", "git push origin main")
+                        .description("Push the fix so CI can run the full test suite.")
+                        .parameter("Directory", "~/Documents/lathe")
+                        .default_open(true)
+                        .on_approve(|_, _, _| {})
+                        .on_always_allow(|_, _, _| {})
+                        .on_deny(|_, _, _| {}),
                 )
                 .child(Thinking::new("s-think", "Waiting for approval").elapsed("18s")),
         );
