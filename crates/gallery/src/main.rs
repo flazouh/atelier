@@ -63,6 +63,7 @@ struct Gallery {
     story: Story,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
+    _system: [gpui_kit::Subscription; 2],
 }
 
 impl Gallery {
@@ -81,7 +82,8 @@ impl Gallery {
         for input in [&prompt, &panel_prompt] {
             cx.subscribe(input, |_, _, event: &PromptInputEvent, _| println!("prompt: {event:?}")).detach();
         }
-        Self { story, prompt, panel_prompt }
+        let _system = beui::watch_system(window, cx);
+        Self { story, prompt, panel_prompt, _system }
     }
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -378,7 +380,8 @@ fn tools() -> impl IntoElement {
                     .icon(IconName::Terminal)
                     .reason("Push the fix so CI can run the full test suite.")
                     .detail("Directory", "~/Documents/lathe")
-                    .detail("Command", "git push origin main"),
+                    .detail("Command", "git push origin main")
+                    .allow_shortcut("⌘↵"),
             )),
     )
 }
@@ -391,7 +394,7 @@ const DIFF: &str = "\
  fn hunk_starts(header: &str) -> (u32, u32) {
      let start = |sign: char| {
 -            .map_or(0, |n| n)
-+            .map_or(0, |n| n.saturating_sub(1))
++            .map_or(0, |n| n.saturating_sub(1)) // The header names the first line, so the line before it is one less, and a long comment scrolls sideways.
      };
      (start('-'), start('+'))
  }";
