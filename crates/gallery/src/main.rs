@@ -293,23 +293,17 @@ fn buttons() -> impl IntoElement {
         .child(section(
             "Sizes",
             row()
-                .child(Button::new("size-sm").label("Small").size(ButtonSize::Sm))
-                .child(Button::new("size-md").label("Medium"))
+                .child(Button::new("size-sm").label("Small"))
+                .child(Button::new("size-md").label("Medium").size(ButtonSize::Md))
                 .child(Button::new("size-lg").label("Large").size(ButtonSize::Lg)),
-        ))
-        .child(section(
-            "With a chip: hover to slide the arrow",
-            row()
-                .child(Button::new("chip-md").label("New session").chip(IconName::ArrowRight))
-                .child(Button::new("chip-sm").label("Continue").chip(IconName::ArrowRight).size(ButtonSize::Sm)),
         ))
         .child(section(
             "Icon buttons",
             row()
                 .child(Button::new("i-send").icon(IconName::ArrowUp).size(ButtonSize::Icon))
-                .child(Button::new("i-stop").icon(IconName::Stop).size(ButtonSize::Icon).variant(ButtonVariant::Secondary))
-                .child(Button::new("i-attach").icon(IconName::Attachment).size(ButtonSize::Icon).variant(ButtonVariant::Ghost))
-                .child(Button::new("i-more").icon(IconName::More).size(ButtonSize::Icon).variant(ButtonVariant::Ghost)),
+                .child(Button::new("i-stop").icon(IconName::Square).size(ButtonSize::Icon).variant(ButtonVariant::Secondary))
+                .child(Button::new("i-attach").icon(IconName::Paperclip).size(ButtonSize::Icon).variant(ButtonVariant::Ghost))
+                .child(Button::new("i-more").icon(IconName::Ellipsis).size(ButtonSize::Icon).variant(ButtonVariant::Ghost)),
         ))
         .child(section("Disabled", row().child(Button::new("disabled").label("Send").disabled(true))))
 }
@@ -374,7 +368,7 @@ fn tools() -> impl IntoElement {
             .child(section(
                 "Approval",
                 ToolApproval::new("approve-push", "Run a shell command", "git push origin main")
-                    .icon(IconName::Terminal)
+                    .icon(IconName::SquareTerminal)
                     .reason("Push the fix so CI can run the full test suite.")
                     .detail("Directory", "~/Documents/lathe")
                     .detail("Command", "git push origin main")
@@ -431,7 +425,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
         .child(Badge::new("Sonnet 5"))
         .child(div().flex_1())
         .child(Button::new("p-new").icon(IconName::Plus).variant(ButtonVariant::Ghost).size(ButtonSize::Icon))
-        .child(Button::new("p-more").icon(IconName::More).variant(ButtonVariant::Ghost).size(ButtonSize::Icon));
+        .child(Button::new("p-more").icon(IconName::Ellipsis).variant(ButtonVariant::Ghost).size(ButtonSize::Icon));
 
     let session = div()
         .id("session")
@@ -458,7 +452,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                 .child(ToolCall::new("s-test", ToolKind::Shell, "Bash").summary("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
                 .child(
                     ToolApproval::new("s-push", "Run a shell command", "git push origin main")
-                        .icon(IconName::Terminal)
+                        .icon(IconName::SquareTerminal)
                         .reason("Push the fix so CI can run the full test suite.")
                         .detail("Directory", "~/Documents/lathe"),
                 )
