@@ -2,6 +2,7 @@
 # Screenshots one gallery story on a headless Linux box (Xvfb + Mesa's software Vulkan). Nothing opens on screen.
 # Build first: cargo build -p beui-gallery.
 # Usage: tools/gallery-shot-linux.sh "<story title>" light|dark out.png
+# GALLERY_WAIT=<seconds> sets when the frame is taken; GALLERY_OPEN=1 opens menus on start.
 set -euo pipefail
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
 DISPLAY_NUM=:${GALLERY_DISPLAY:-99}

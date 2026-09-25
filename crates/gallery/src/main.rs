@@ -429,6 +429,7 @@ fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoEl
     div().w(px(260.)).child(
         Select::new("framework", ["Next.js", "Remix", "Astro", "SvelteKit", "Nuxt"])
             .placeholder("Pick a framework")
+            .default_open(std::env::var("GALLERY_OPEN").is_ok())
             .selected(choice)
             .on_change(move |i, _, cx| {
                 gallery.update(cx, |g, cx| {
