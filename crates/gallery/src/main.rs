@@ -96,8 +96,7 @@ impl Gallery {
             .h_full()
             .p(px(12.))
             .gap(px(2.))
-            .border_r_1()
-            .border_color(theme.border)
+            .bg(theme.card)
             .child(
                 div()
                     .px(px(10.))
@@ -117,7 +116,7 @@ impl Gallery {
                     .rounded(beui::theme::radius::LG)
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
-                    .when(selected, |d| d.bg(theme.card).font_weight(FontWeight::MEDIUM))
+                    .when(selected, |d| d.bg(theme.card_strong).font_weight(FontWeight::MEDIUM))
                     .when(!selected, |d| d.text_color(theme.muted_foreground).hover(move |s| s.bg(hover)))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.story = story;
@@ -208,13 +207,12 @@ fn narrow(content: impl IntoElement) -> impl IntoElement {
 
 fn colors(cx: &App) -> impl IntoElement {
     let t = cx.theme();
-    let swatches: [(&str, Hsla); 14] = [
+    let swatches: [(&str, Hsla); 13] = [
         ("background", t.background),
-        ("foreground", t.foreground),
         ("card", t.card),
+        ("card strong", t.card_strong),
+        ("foreground", t.foreground),
         ("muted foreground", t.muted_foreground),
-        ("border", t.border),
-        ("border strong", t.border_strong),
         ("primary", t.primary),
         ("primary foreground", t.primary_foreground),
         ("accent", t.accent),
@@ -224,14 +222,13 @@ fn colors(cx: &App) -> impl IntoElement {
         ("diff added", t.diff_line(true)),
         ("diff removed", t.diff_line(false)),
     ];
-    let border = t.border_strong;
     row().children(swatches.into_iter().map(move |(name, color)| {
         div()
             .flex()
             .flex_col()
             .gap(px(8.))
             .w(px(120.))
-            .child(div().h(px(64.)).rounded(beui::theme::radius::XL).bg(color).border_1().border_color(border))
+            .child(div().h(px(64.)).rounded(beui::theme::radius::XL).bg(color))
             .child(div().text_size(TextSize::Xs.font_size()).child(name))
     }))
 }
@@ -285,7 +282,7 @@ fn icons(cx: &App) -> impl IntoElement {
 
 fn buttons() -> impl IntoElement {
     let variants =
-        [("Primary", ButtonVariant::Primary), ("Secondary", ButtonVariant::Secondary), ("Ghost", ButtonVariant::Ghost), ("Outline", ButtonVariant::Outline)];
+        [("Primary", ButtonVariant::Primary), ("Secondary", ButtonVariant::Secondary), ("Ghost", ButtonVariant::Ghost)];
     div()
         .child(section(
             "Variants",
@@ -312,7 +309,7 @@ fn buttons() -> impl IntoElement {
                 .child(Button::new("i-send").icon(IconName::ArrowUp).size(ButtonSize::Icon))
                 .child(Button::new("i-stop").icon(IconName::Stop).size(ButtonSize::Icon).variant(ButtonVariant::Secondary))
                 .child(Button::new("i-attach").icon(IconName::Attachment).size(ButtonSize::Icon).variant(ButtonVariant::Ghost))
-                .child(Button::new("i-more").icon(IconName::More).size(ButtonSize::Icon).variant(ButtonVariant::Outline)),
+                .child(Button::new("i-more").icon(IconName::More).size(ButtonSize::Icon).variant(ButtonVariant::Ghost)),
         ))
         .child(section("Disabled", row().child(Button::new("disabled").label("Send").disabled(true))))
 }
@@ -472,7 +469,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
         .flex()
         .justify_center()
         .size_full()
-        .bg(theme.card.opacity(0.4))
+        .bg(theme.card)
         .child(
             div()
                 .flex()
@@ -480,9 +477,6 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                 .w(px(560.))
                 .h_full()
                 .bg(theme.background)
-                .border_l_1()
-                .border_r_1()
-                .border_color(theme.border)
                 .child(header)
                 .child(session)
                 .child(div().p(px(12.)).child(prompt.clone())),
