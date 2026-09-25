@@ -2,10 +2,10 @@
 //! `GALLERY_STORY=<title>` opens a story and `GALLERY_THEME=light|dark` overrides the system theme, so a script can screenshot them.
 
 use beui::{
-    ActiveTheme, AgentText, Appearance, Badge, Button, ButtonSize, ButtonVariant, CodeBlock, DiffLine, FONT_FAMILY,
-    FileDiff, Icon, IconName, Kbd, MONO_FONT_FAMILY, MessageBubble, PromptInput, PromptInputEvent, Spinner, TextSize,
-    Select, Thinking, Todo, TodoList, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone,
-    pane_header,
+    ActiveTheme, AgentText, Appearance, Badge, Button, ButtonSize, ButtonVariant, CodeBlock, CodeBlockStatus, DiffLine,
+    FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY, MessageBubble, PromptInput,
+    PromptInputEvent, Spinner, TextSize, Select, Thinking, Todo, TodoList, TodoStatus, ToolApproval,
+    ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, pane_header,
 };
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
@@ -435,6 +435,10 @@ const DIFF: &str = "\
 const CODE: &str = "#[test]\nfn a_hunk_at_line_one_starts_at_one() {\n    let lines = DiffLine::parse(\"@@ -1,1 +1,1 @@\\n a\");\n    assert_eq!(lines[1].number, Some(1));\n}";
 
 fn diffs() -> impl IntoElement {
+    // Mirrors beui's file-diff.preview.tsx (a settled diff with its Copy button, and a still-streaming
+    // one) and code-block.preview.tsx (a highlighted, completed block, and a still-streaming one).
+    let diff_a = DiffLine::parse(DIFF);
+    let diff_a_copy = diff_a.iter().map(|l| l.text.to_string()).collect::<Vec<_>>().join("\n");
     narrow(
         div()
             .flex()
@@ -444,10 +448,44 @@ fn diffs() -> impl IntoElement {
                 div()
                     .flex()
                     .flex_col()
-                    .child(FileDiff::new("diff-a", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF)).default_open(true))
-                    .child(FileDiff::new("diff-b", "crates/beui/src/file_diff/tests.rs", DiffLine::parse("@@ -40,0 +41,6 @@\n+#[test]\n+fn one() {}\n"))),
+                    .gap(px(12.))
+                    .child(
+                        FileDiff::new("diff-a", "crates/beui/src/file_diff.rs", diff_a)
+                            .default_open(true)
+                            .status(FileDiffStatus::Complete)
+                            .copy_text(diff_a_copy),
+                    )
+                    .child(
+                        FileDiff::new(
+                            "diff-b",
+                            "crates/beui/src/file_diff/tests.rs",
+                            DiffLine::parse("@@ -40,0 +41,6 @@\n+#[test]\n+fn one() {}\n"),
+                        )
+                        .status(FileDiffStatus::Streaming)
+                        .max_height(150.),
+                    ),
             ))
-            .child(section("Code block", CodeBlock::new("code", CODE).title("file_diff/tests.rs").language("rust"))),
+            .child(section(
+                "Code block",
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(12.))
+                    .child(
+                        CodeBlock::new("code", CODE)
+                            .title("file_diff/tests.rs")
+                            .language("rust")
+                            .highlight_lines([3, 4])
+                            .max_height(224.),
+                    )
+                    .child(
+                        CodeBlock::new("code-streaming", "pub fn run(task: Task) -> Result<()> {\n    execute(task)")
+                            .title("runner.rs")
+                            .language("rust")
+                            .status(CodeBlockStatus::Streaming)
+                            .max_height(150.),
+                    ),
+            )),
     )
 }
 
@@ -516,7 +554,10 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                 )
                 .child(AgentText::new("s-reply", REPLY))
                 .child(TodoList::new("s-plan", sample_plan()))
-                .child(FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF)))
+                .child(
+                    FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF))
+                        .status(FileDiffStatus::Complete),
+                )
                 .child(ToolCall::new("s-test", ToolKind::Terminal, "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
                 .child(
                     ToolApproval::new("s-push", "git push origin main")
