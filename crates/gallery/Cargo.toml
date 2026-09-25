@@ -1,5 +1,5 @@
 [package]
-name = "gallery"
+name = "beui-gallery"
 description = "A window that shows every beui component in each state."
 version.workspace = true
 edition.workspace = true
