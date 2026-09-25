@@ -71,9 +71,9 @@ impl Gallery {
             .ok()
             .and_then(|name| Story::ALL.into_iter().find(|s| s.title().eq_ignore_ascii_case(&name)))
             .unwrap_or(Story::AgentPanel);
-        let prompt = cx.new(|cx| PromptInput::new(window, cx));
+        let prompt = cx.new(|cx| PromptInput::new("Ask Claude Code", "Sonnet 5", window, cx));
         let panel_prompt = cx.new(|cx| {
-            let mut input = PromptInput::new(window, cx);
+            let mut input = PromptInput::new("Ask Claude Code", "Sonnet 5", window, cx);
             input.set_running(true, cx);
             input
         });
