@@ -2,10 +2,11 @@
 //! `GALLERY_STORY=<title>` opens a story and `GALLERY_THEME=light|dark` overrides the system theme, so a script can screenshot them.
 
 use beui::{
-    ActiveTheme, AgentText, Appearance, Badge, Button, ButtonSize, ButtonVariant, CodeBlock, CodeBlockStatus, DiffLine,
-    FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY, MessageBubble, PromptInput,
-    PromptInputEvent, Spinner, TextSize, Select, Thinking, Todo, TodoList, TodoStatus, ToolApproval,
-    ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, pane_header,
+    ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
+    CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
+    MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
+    PromptInput, PromptInputEvent, Select, Spinner, TextSize, Thinking, Todo, TodoList, TodoStatus, ToolApproval,
+    ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, message_bubble_group, pane_header,
 };
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
@@ -333,14 +334,71 @@ const REPLY: &str = "I found the bug. `parse_hunk` counts the header line as a c
 number after it is off by one.\n\nI will:\n\n1. Skip the `@@` line when counting.\n2. Add a test for a hunk that starts at line 1.\n\n\
 The fix is in `crates/beui/src/file_diff.rs`.";
 
+const SUMMARY: &str = "The release is ready for a focused rollout. The main conversation flow, keyboard \
+navigation, error recovery, and reduced-motion behavior are all covered.\n\nI would keep advanced workflow \
+controls out of this version. They add configuration without improving the first-run experience, and the \
+usage data from this release will give us a better basis for those decisions.\n\nBefore publishing, run the \
+accessibility suite once more and verify the streaming behavior with a long response on a smaller viewport.";
+
 fn messages() -> impl IntoElement {
     narrow(
         div()
             .flex()
             .flex_col()
             .gap(px(16.))
-            .child(section("User", MessageBubble::new("The line numbers in the diff view are off by one. Can you fix it?")))
-            .child(section("Agent", AgentText::new("reply", REPLY)))
+            .child(section(
+                "Tones",
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(MessageBubble::text("tone-solid", "Solid: the user's own turn.").variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End))
+                    .child(MessageBubble::text("tone-soft", "Soft: the default reply.").variant(MessageBubbleVariant::Soft))
+                    .child(MessageBubble::text("tone-tint", "Tint: reads the same as soft here.").variant(MessageBubbleVariant::Tint))
+                    .child(MessageBubble::text("tone-borderless", "Borderless: a card_strong fill stands in for beui's outline border.").variant(MessageBubbleVariant::Borderless))
+                    .child(MessageBubble::text("tone-danger", "Danger: the tool call failed.").variant(MessageBubbleVariant::Danger))
+                    .child(MessageBubble::text("tone-ghost", "Ghost: no fill, stretches to the full row.").variant(MessageBubbleVariant::Ghost)),
+            ))
+            .child(section(
+                "Grouped",
+                message_bubble_group(MessageBubbleGroupSpacing::Compact)
+                    .child(MessageBubble::text("group-a", "Can you turn these notes into a launch update?").variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End))
+                    .child(MessageBubble::text("group-b", "Absolutely. I'll keep it concise and lead with what changed.").align(MessageBubbleAlign::Start))
+                    .child(MessageBubble::text("group-c", "Do you want the tone more technical or more customer-facing?").align(MessageBubbleAlign::Start)),
+            ))
+            .child(section(
+                "Expandable",
+                MessageBubble::new(
+                    "collapsible",
+                    MessageBubbleCollapsible::new(
+                        "collapsible-body",
+                        div().flex().flex_col().gap(px(8.)).children(SUMMARY.split("\n\n").map(|p| div().child(p.to_string()))),
+                    )
+                    .collapsed_lines(4),
+                ),
+            ))
+            .child(section(
+                "Streaming",
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(16.))
+                    .child(AgentText::new("stream-live", "Absolutely. I'll keep it conc").status(AgentTextStatus::Streaming))
+                    .child(
+                        AgentText::new("stream-done", REPLY)
+                            .status(AgentTextStatus::Complete)
+                            .copy_text(REPLY)
+                            .sources(vec![
+                                AgentTextSource::new("Motion for React", "motion.dev"),
+                                AgentTextSource::new("ARIA live regions", "developer.mozilla.org"),
+                            ]),
+                    )
+                    .child(
+                        AgentText::new("stream-error", "The request timed out before a full answer arrived.")
+                            .status(AgentTextStatus::Error)
+                            .copy_text("The request timed out before a full answer arrived."),
+                    ),
+            ))
             .child(section("Working", div().flex().flex_col().child(Thinking::new("think", "Thinking").elapsed("4s")).child(Thinking::new("run", "Running tests")))),
     )
 }
@@ -544,7 +602,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                 .flex()
                 .flex_col()
                 .gap(px(16.))
-                .child(MessageBubble::new("The line numbers in the diff view are off by one. Can you fix it?"))
+                .child(MessageBubble::text("s-user", "The line numbers in the diff view are off by one. Can you fix it?").variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End))
                 .child(
                     div()
                         .flex()
@@ -552,7 +610,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                         .child(ToolCall::new("s-read", ToolKind::Custom, "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
                         .child(ToolCall::new("s-grep", ToolKind::Custom, "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
                 )
-                .child(AgentText::new("s-reply", REPLY))
+                .child(AgentText::new("s-reply", REPLY).status(AgentTextStatus::Complete).copy_text(REPLY))
                 .child(TodoList::new("s-plan", sample_plan()))
                 .child(
                     FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF))
