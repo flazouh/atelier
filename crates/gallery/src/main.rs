@@ -5,8 +5,9 @@ use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
     CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
-    PromptInput, PromptInputEvent, Select, Spinner, TextSize, Thinking, Todo, TodoList, TodoStatus, ToolApproval,
-    ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, message_bubble_group, pane_header,
+    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Spinner, TextSize, Thinking, Todo, TodoList,
+    TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, message_bubble_group,
+    pane_header,
 };
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
@@ -64,11 +65,40 @@ impl Story {
     }
 }
 
+/// beui's preview models: a provider mark per model. The real favicons preview.tsx fetches over the
+/// network have no equivalent here, so every model shows the generic `Bot` mark instead.
+fn preview_models() -> Vec<PromptModel> {
+    vec![
+        PromptModel::new("gpt-5.2", "GPT-5.2").icon(IconName::Bot),
+        PromptModel::new("claude-sonnet-4", "Claude Sonnet 4").icon(IconName::Bot),
+        PromptModel::new("gemini-3.6-flash", "Gemini 3.6 Flash").icon(IconName::Bot),
+        PromptModel::new("grok-4.5", "Grok 4.5").icon(IconName::Bot),
+        PromptModel::new("mistral-large-3", "Mistral Large 3").icon(IconName::Bot),
+    ]
+}
+
+/// beui's preview actions, verbatim.
+fn preview_actions() -> Vec<PromptAction> {
+    vec![
+        PromptAction::new("image", "Attach image")
+            .description("Add a screenshot or visual reference.")
+            .icon(IconName::ImagePlus),
+        PromptAction::new("skill", "Use a skill")
+            .description("Give the agent a specialized workflow.")
+            .icon(IconName::Puzzle),
+        PromptAction::new("context", "Add context")
+            .description("Include a file with supporting details.")
+            .icon(IconName::FileText),
+    ]
+}
+
 struct Gallery {
     story: Story,
     choice: Option<usize>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
+    /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
+    notice: Option<SharedString>,
     _system: [gpui_kit::Subscription; 2],
 }
 
@@ -78,9 +108,21 @@ impl Gallery {
             .ok()
             .and_then(|name| Story::ALL.into_iter().find(|s| s.title().eq_ignore_ascii_case(&name)))
             .unwrap_or(Story::AgentPanel);
-        let prompt = cx.new(|cx| PromptInput::new("Ask Claude Code", "Sonnet 5", window, cx));
+        let prompt = cx.new(|cx| {
+            PromptInput::new(
+                "Ask the agent to do something…",
+                "Review the current implementation and suggest the next improvement.",
+                window,
+                cx,
+            )
+            .models(preview_models())
+            .model("gpt-5.2")
+            .actions(preview_actions())
+        });
         let panel_prompt = cx.new(|cx| {
-            let mut input = PromptInput::new("Ask Claude Code", "Sonnet 5", window, cx);
+            let mut input = PromptInput::new("Ask Claude Code", "", window, cx)
+                .models(vec![PromptModel::new("sonnet-5", "Sonnet 5")])
+                .model("sonnet-5");
             input.set_running(true, cx);
             input
         });
@@ -88,8 +130,21 @@ impl Gallery {
         for input in [&prompt, &panel_prompt] {
             cx.subscribe(input, |_, _, event: &PromptInputEvent, _| println!("prompt: {event:?}")).detach();
         }
+        // Mirrors preview.tsx: a submit or an action pick prints a line under the box.
+        cx.subscribe(&prompt, |this, _, event: &PromptInputEvent, cx| {
+            this.notice = match event {
+                PromptInputEvent::Submit(_) => Some("Prompt sent to the selected model.".into()),
+                PromptInputEvent::Action(value) => preview_actions()
+                    .into_iter()
+                    .find(|a| a.value == *value)
+                    .map(|a| format!("{} selected.", a.label).into()),
+                _ => return,
+            };
+            cx.notify();
+        })
+        .detach();
         let _system = beui::watch_system(window, cx);
-        Self { story, choice: None, prompt, panel_prompt, _system }
+        Self { story, choice: None, prompt, panel_prompt, notice: None, _system }
     }
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -157,7 +212,7 @@ impl Gallery {
             Story::Diffs => diffs().into_any_element(),
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
-            Story::Prompt => narrow(self.prompt.clone()).into_any_element(),
+            Story::Prompt => prompt_story(&self.prompt, self.notice.clone(), cx).into_any_element(),
         }
     }
 }
@@ -555,6 +610,29 @@ fn beui_plan() -> Vec<Todo> {
         Todo::new("Add coverage for edge cases", TodoStatus::Done),
         Todo::new("Run checks and prepare the result", TodoStatus::InProgress).detail("100%"),
     ]
+}
+
+/// beui's `PromptInputPreview`: the box centered in a fixed `h-[360px] max-w-xl`, with the sent-prompt
+/// or picked-action notice on its own `h-8` line underneath.
+fn prompt_story(prompt: &Entity<PromptInput>, notice: Option<SharedString>, cx: &App) -> impl IntoElement {
+    let theme = cx.theme();
+    div()
+        .flex()
+        .h(px(360.))
+        .w_full()
+        .max_w(px(576.))
+        .flex_col()
+        .justify_center()
+        .child(prompt.clone())
+        .child(
+            div()
+                .h(px(32.))
+                .px(px(8.))
+                .pt(px(8.))
+                .text_size(TextSize::Xs.font_size())
+                .text_color(theme.muted_foreground)
+                .children(notice),
+        )
 }
 
 fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoElement {
