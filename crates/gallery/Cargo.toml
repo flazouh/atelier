@@ -1,0 +1,10 @@
+[package]
+name = "gallery"
+description = "A window that shows every beui component in each state."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui-kit.workspace = true
+beui.workspace = true
