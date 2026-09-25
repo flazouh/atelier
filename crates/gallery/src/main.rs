@@ -4,7 +4,7 @@
 use beui::{
     ActiveTheme, AgentText, Appearance, Badge, Button, ButtonSize, ButtonVariant, CodeBlock, DiffLine, FONT_FAMILY,
     FileDiff, Icon, IconName, Kbd, MONO_FONT_FAMILY, MessageBubble, PromptInput, PromptInputEvent, Spinner, TextSize,
-    Thinking, Todo, TodoList, TodoStatus, ToolApproval, ToolCall, ToolKind, ToolStatus, Tone, pane_header,
+    Select, Thinking, Todo, TodoList, TodoStatus, ToolApproval, ToolCall, ToolKind, ToolStatus, Tone, pane_header,
 };
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
@@ -24,11 +24,12 @@ enum Story {
     Tools,
     Diffs,
     Plan,
+    Select,
     Prompt,
 }
 
 impl Story {
-    const ALL: [Story; 11] = [
+    const ALL: [Story; 12] = [
         Story::AgentPanel,
         Story::Colors,
         Story::Typography,
@@ -39,6 +40,7 @@ impl Story {
         Story::Tools,
         Story::Diffs,
         Story::Plan,
+        Story::Select,
         Story::Prompt,
     ];
 
@@ -54,6 +56,7 @@ impl Story {
             Story::Tools => "Tool calls",
             Story::Diffs => "Diffs and code",
             Story::Plan => "Plan",
+            Story::Select => "Select",
             Story::Prompt => "Prompt input",
         }
     }
@@ -61,6 +64,7 @@ impl Story {
 
 struct Gallery {
     story: Story,
+    choice: Option<usize>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     _system: [gpui_kit::Subscription; 2],
@@ -83,7 +87,7 @@ impl Gallery {
             cx.subscribe(input, |_, _, event: &PromptInputEvent, _| println!("prompt: {event:?}")).detach();
         }
         let _system = beui::watch_system(window, cx);
-        Self { story, prompt, panel_prompt, _system }
+        Self { story, choice: None, prompt, panel_prompt, _system }
     }
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -149,7 +153,8 @@ impl Gallery {
             Story::Messages => messages().into_any_element(),
             Story::Tools => tools().into_any_element(),
             Story::Diffs => diffs().into_any_element(),
-            Story::Plan => narrow(TodoList::new("plan", sample_plan())).into_any_element(),
+            Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
+            Story::Select => select_story(self.choice, cx).into_any_element(),
             Story::Prompt => narrow(self.prompt.clone()).into_any_element(),
         }
     }
@@ -406,6 +411,31 @@ fn diffs() -> impl IntoElement {
                     .child(FileDiff::new("diff-b", "crates/beui/src/file_diff/tests.rs", DiffLine::parse("@@ -40,0 +41,6 @@\n+#[test]\n+fn one() {}\n"))),
             ))
             .child(section("Code block", CodeBlock::new("code", CODE).title("file_diff/tests.rs").language("rust"))),
+    )
+}
+
+/// The plan from beui's own todo-list preview, to compare against it.
+fn beui_plan() -> Vec<Todo> {
+    vec![
+        Todo::new("Inspect the current data flow", TodoStatus::Done),
+        Todo::new("Update the response schema", TodoStatus::Done),
+        Todo::new("Add coverage for edge cases", TodoStatus::Done),
+        Todo::new("Run checks and prepare the result", TodoStatus::InProgress).detail("100%"),
+    ]
+}
+
+fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoElement {
+    let gallery = cx.entity().downgrade();
+    div().w(px(260.)).child(
+        Select::new("framework", ["Next.js", "Remix", "Astro", "SvelteKit", "Nuxt"])
+            .placeholder("Pick a framework")
+            .selected(choice)
+            .on_change(move |i, _, cx| {
+                gallery.update(cx, |g, cx| {
+                    g.choice = Some(i);
+                    cx.notify();
+                }).ok();
+            }),
     )
 }
 
