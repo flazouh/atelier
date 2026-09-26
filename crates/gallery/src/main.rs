@@ -605,10 +605,10 @@ fn diffs() -> impl IntoElement {
 /// The plan from beui's own todo-list preview, to compare against it.
 fn beui_plan() -> Vec<Todo> {
     vec![
-        Todo::new("Inspect the current data flow", TodoStatus::Done),
-        Todo::new("Update the response schema", TodoStatus::Done),
-        Todo::new("Add coverage for edge cases", TodoStatus::Done),
-        Todo::new("Run checks and prepare the result", TodoStatus::InProgress).detail("100%"),
+        Todo::new("data-flow", "Inspect the current data flow", TodoStatus::Done),
+        Todo::new("schema", "Update the response schema", TodoStatus::Done),
+        Todo::new("edge-cases", "Add coverage for edge cases", TodoStatus::Done),
+        Todo::new("checks", "Run checks and prepare the result", TodoStatus::InProgress).detail("100%"),
     ]
 }
 
@@ -653,10 +653,10 @@ fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoEl
 
 fn sample_plan() -> Vec<Todo> {
     vec![
-        Todo::new("Find where hunk numbers start", TodoStatus::Done),
-        Todo::new("Fix the off-by-one in hunk_starts", TodoStatus::Done),
-        Todo::new("Add a test for a hunk at line 1", TodoStatus::InProgress),
-        Todo::new("Run the full test suite", TodoStatus::Pending),
+        Todo::new("find", "Find where hunk numbers start", TodoStatus::Done),
+        Todo::new("fix", "Fix the off-by-one in hunk_starts", TodoStatus::Done),
+        Todo::new("test-line-1", "Add a test for a hunk at line 1", TodoStatus::InProgress),
+        Todo::new("suite", "Run the full test suite", TodoStatus::Pending),
     ]
 }
 
