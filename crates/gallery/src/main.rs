@@ -5,7 +5,7 @@ use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
     CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
-    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Spinner, TextSize, Thinking, Todo, TodoList,
+    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Spark, SparkState, Spinner, TextSize, Thinking, Todo, TodoList,
     TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
@@ -21,6 +21,7 @@ enum Story {
     Colors,
     Typography,
     Icons,
+    Spark,
     Buttons,
     Badges,
     Messages,
@@ -32,11 +33,12 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 12] = [
+    const ALL: [Story; 13] = [
         Story::AgentPanel,
         Story::Colors,
         Story::Typography,
         Story::Icons,
+        Story::Spark,
         Story::Buttons,
         Story::Badges,
         Story::Messages,
@@ -53,6 +55,7 @@ impl Story {
             Story::Colors => "Colors",
             Story::Typography => "Typography",
             Story::Icons => "Icons",
+            Story::Spark => "Spark",
             Story::Buttons => "Buttons",
             Story::Badges => "Badges and keys",
             Story::Messages => "Messages",
@@ -205,6 +208,7 @@ impl Gallery {
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
             Story::Icons => icons(cx).into_any_element(),
+            Story::Spark => spark_story(cx).into_any_element(),
             Story::Buttons => buttons().into_any_element(),
             Story::Badges => badges().into_any_element(),
             Story::Messages => messages().into_any_element(),
@@ -339,6 +343,21 @@ fn icons(cx: &App) -> impl IntoElement {
             .w(px(80.))
             .child(Icon::new(name).size(px(22.)))
             .child(div().text_size(px(11.)).text_color(muted).child(name.name()))
+    }))
+}
+
+/// Every spark state at 20px, the largest size the app uses, with its name.
+fn spark_story(cx: &App) -> impl IntoElement {
+    let muted = cx.theme().muted_foreground;
+    row().gap(px(20.)).children(SparkState::ALL.iter().map(move |&state| {
+        div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(px(8.))
+            .w(px(80.))
+            .child(Spark::new(SharedString::from(format!("spark-{}", state.name())), state).size(px(20.)))
+            .child(div().text_size(px(11.)).text_color(muted).child(state.name()))
     }))
 }
 
