@@ -6,7 +6,7 @@ use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
     CodeBlock, CodeBlockStatus, DiffLine, EntranceList, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
-    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, TextSize, Thinking,
+    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, SubagentRow, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
     TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, message_bubble_group,
     pane_header,
@@ -358,7 +358,7 @@ fn typography() -> impl IntoElement {
                 div()
                     .text_size(size.font_size())
                     .line_height(size.line_height())
-                    .child(format!("{name} · Refactor the parser to stream tokens."))
+                    .child(format!("{name}: Refactor the parser to stream tokens."))
             })),
         ))
         .child(section(
@@ -790,7 +790,7 @@ fn session_list(started: Instant, replay: usize, shown: usize) -> EntranceList {
                 .on_deny(|_, _, _| {})
                 .into_any_element(),
         ),
-        ("s-think", Thinking::new("s-think", thinking_for(started, 18)).elapsed("18s").tokens(3_400).into_any_element()),
+        ("s-think", Thinking::new("s-think", thinking_for(started, 18)).elapsed("18s").tokens(3_400).subagents(2).into_any_element()),
     ];
     // The two reads share one row of this list, so once both show it holds one item fewer.
     let rows = if shown >= 3 { shown - 1 } else { shown };
@@ -820,6 +820,17 @@ fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, sh
     let list = session_list(started, replay, shown);
     let session = div().id("session").flex_1().overflow_y_scroll().px(px(20.)).py(px(20.)).child(list);
 
+    // One row per subagent, above the composer. They arrive with the rest of the replay.
+    let subagents = [
+        SubagentRow::new("sa-explore", "Explore", "Find every caller of hunk_starts").elapsed("12s"),
+        SubagentRow::new("sa-test", "Test runner", "Run the diff parser tests").elapsed("5s"),
+        SubagentRow::new("sa-review", "Review", "Check the off-by-one fix").finished(Some(38)),
+    ];
+    let agents = subagents.into_iter().enumerate().filter(|(i, _)| shown >= SESSION_LEN.saturating_sub(3) + i).fold(
+        EntranceList::new(ElementId::NamedInteger("subagents".into(), replay as u64), div().flex().flex_col().gap(px(4.))),
+        |list, (i, row)| list.item(("subagent", i), row),
+    );
+
     div()
         .flex()
         .justify_center()
@@ -834,7 +845,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, sh
                 .bg(theme.background)
                 .child(header)
                 .child(session)
-                .child(div().p(px(12.)).child(prompt.clone())),
+                .child(div().flex().flex_col().gap(px(8.)).p(px(12.)).child(agents).child(prompt.clone())),
         )
 }
 
