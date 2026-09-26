@@ -490,6 +490,7 @@ fn working(started: Instant) -> impl IntoElement {
         .child(Thinking::new("think-breath", thinking_for(started, 16)).style(ThinkingStyle::Breath).elapsed("16s"))
         .child(Thinking::new("sending", ThinkingPhase::Sending))
         .child(Thinking::new("tools", ThinkingPhase::RunningTools).elapsed("31s").tasks(3))
+        .child(Thinking::new("orbit", ThinkingPhase::Thinking { since: started }).elapsed("9s").subagents(2))
         .child(Thinking::new("thought", ThinkingPhase::Thought { seconds: 4 }))
 }
 
