@@ -5,10 +5,13 @@ use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
     CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
-    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Spark, SparkState, Spinner, TextSize, Thinking, Todo, TodoList,
+    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, TextSize, Thinking,
+    ThinkingPhase, ThinkingStyle, Todo, TodoList,
     TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolKind, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
+use std::time::{Duration, Instant};
+
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
     ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div,
@@ -102,6 +105,8 @@ struct Gallery {
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
     notice: Option<SharedString>,
+    /// When the gallery opened: the start of every thinking row, so their labels age like a real turn.
+    started: Instant,
     _system: [gpui_kit::Subscription; 2],
 }
 
@@ -147,7 +152,7 @@ impl Gallery {
         })
         .detach();
         let _system = beui::watch_system(window, cx);
-        Self { story, choice: None, prompt, panel_prompt, notice: None, _system }
+        Self { story, choice: None, prompt, panel_prompt, notice: None, started: Instant::now(), _system }
     }
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -204,14 +209,14 @@ impl Gallery {
 
     fn story(&self, cx: &mut Context<Self>) -> AnyElement {
         match self.story {
-            Story::AgentPanel => agent_panel(&self.panel_prompt, cx).into_any_element(),
+            Story::AgentPanel => agent_panel(&self.panel_prompt, self.started, cx).into_any_element(),
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
             Story::Icons => icons(cx).into_any_element(),
             Story::Spark => spark_story(cx).into_any_element(),
             Story::Buttons => buttons().into_any_element(),
             Story::Badges => badges().into_any_element(),
-            Story::Messages => messages().into_any_element(),
+            Story::Messages => messages(self.started).into_any_element(),
             Story::Tools => tools().into_any_element(),
             Story::Diffs => diffs().into_any_element(),
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
@@ -421,12 +426,36 @@ controls out of this version. They add configuration without improving the first
 usage data from this release will give us a better basis for those decisions.\n\nBefore publishing, run the \
 accessibility suite once more and verify the streaming behavior with a long response on a smaller viewport.";
 
-fn messages() -> impl IntoElement {
+/// Thinking since `ago` before `started`, so a row can show a later label.
+fn thinking_for(started: Instant, ago: u64) -> ThinkingPhase {
+    ThinkingPhase::Thinking { since: started.checked_sub(Duration::from_secs(ago)).unwrap_or(started) }
+}
+
+/// Every status row the agent shows: each shimmer, the breath, the requesting glimmer, a later label,
+/// and a finished thought.
+fn working(started: Instant) -> impl IntoElement {
+    div()
+        .flex()
+        .flex_col()
+        .child(Thinking::new("think", ThinkingPhase::Thinking { since: started }).elapsed("4s").tokens(1_234))
+        .child(
+            Thinking::new("think-stepped", ThinkingPhase::Thinking { since: started })
+                .style(ThinkingStyle::Shimmer(Shimmer::Stepped))
+                .elapsed("4s"),
+        )
+        .child(Thinking::new("think-breath", thinking_for(started, 16)).style(ThinkingStyle::Breath).elapsed("16s"))
+        .child(Thinking::new("sending", ThinkingPhase::Sending))
+        .child(Thinking::new("tools", ThinkingPhase::RunningTools).elapsed("31s").tasks(3))
+        .child(Thinking::new("thought", ThinkingPhase::Thought { seconds: 4 }))
+}
+
+fn messages(started: Instant) -> impl IntoElement {
     narrow(
         div()
             .flex()
             .flex_col()
             .gap(px(16.))
+            .child(section("Working", working(started)))
             .child(section(
                 "Tones",
                 div()
@@ -480,7 +509,6 @@ fn messages() -> impl IntoElement {
                             .copy_text("The request timed out before a full answer arrived."),
                     ),
             ))
-            .child(section("Working", div().flex().flex_col().child(Thinking::new("think", "Thinking").elapsed("4s")).child(Thinking::new("run", "Running tests")))),
     )
 }
 
@@ -687,7 +715,7 @@ fn sample_plan() -> Vec<Todo> {
 }
 
 /// A whole session as the panel will show it, at the panel's width.
-fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
+fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, cx: &App) -> impl IntoElement {
     let theme = cx.theme();
     let header = pane_header("Claude Code", cx)
         .child(Badge::new("Sonnet 5"))
@@ -730,7 +758,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, cx: &App) -> impl IntoElement {
                         .on_always_allow(|_, _, _| {})
                         .on_deny(|_, _, _| {}),
                 )
-                .child(Thinking::new("s-think", "Waiting for approval").elapsed("18s")),
+                .child(Thinking::new("s-think", thinking_for(started, 18)).elapsed("18s").tokens(3_400)),
         );
 
     div()
