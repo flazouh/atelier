@@ -1,9 +1,10 @@
 //! Shows every beui component in each state, in light and dark. Run with `cargo run -p beui-gallery`.
 //! `GALLERY_STORY=<title>` opens a story and `GALLERY_THEME=light|dark` overrides the system theme, so a script can screenshot them.
+//! `GALLERY_REPLAY=1` starts the Agent panel's "Replay session" on launch, so a capture can see the entrances.
 
 use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
-    CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
+    CodeBlock, CodeBlockStatus, DiffLine, EntranceList, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
     PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
@@ -13,9 +14,9 @@ use beui::{
 use std::time::{Duration, Instant};
 
 use gpui_kit::{
-    AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
+    AnyElement, App, AppContext, Bounds, Context, ElementId, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
     ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div,
-    prelude::FluentBuilder, px, size,
+    Task, prelude::FluentBuilder, px, size,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -107,7 +108,19 @@ struct Gallery {
     notice: Option<SharedString>,
     /// When the gallery opened: the start of every thinking row, so their labels age like a real turn.
     started: Instant,
+    /// The Agent panel's "Replay session": `None` shows the whole session.
+    replay: Option<Replay>,
+    /// Counts replays, so each one is a new list whose items all enter again.
+    replays: usize,
     _system: [gpui_kit::Subscription; 2],
+}
+
+/// How often "Replay session" adds the next item.
+const REPLAY_STEP: Duration = Duration::from_millis(400);
+
+struct Replay {
+    shown: usize,
+    _timer: Task<()>,
 }
 
 impl Gallery {
@@ -152,7 +165,35 @@ impl Gallery {
         })
         .detach();
         let _system = beui::watch_system(window, cx);
-        Self { story, choice: None, prompt, panel_prompt, notice: None, started: Instant::now(), _system }
+        let mut gallery =
+            Self { story, choice: None, prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
+        if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
+            gallery.start_replay(cx);
+        }
+        gallery
+    }
+
+    /// Clears the Agent panel, then adds its items back one by one every [`REPLAY_STEP`].
+    fn start_replay(&mut self, cx: &mut Context<Self>) {
+        self.replays += 1;
+        let timer = cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(REPLAY_STEP).await;
+                let more = this
+                    .update(cx, |g, cx| {
+                        let Some(replay) = g.replay.as_mut() else { return false };
+                        replay.shown += 1;
+                        cx.notify();
+                        replay.shown < SESSION_LEN
+                    })
+                    .unwrap_or(false);
+                if !more {
+                    break;
+                }
+            }
+        });
+        self.replay = Some(Replay { shown: 0, _timer: timer });
+        cx.notify();
     }
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -209,7 +250,10 @@ impl Gallery {
 
     fn story(&self, cx: &mut Context<Self>) -> AnyElement {
         match self.story {
-            Story::AgentPanel => agent_panel(&self.panel_prompt, self.started, cx).into_any_element(),
+            Story::AgentPanel => {
+                let shown = self.replay.as_ref().map_or(SESSION_LEN, |r| r.shown);
+                agent_panel(&self.panel_prompt, self.started, self.replays, shown, cx).into_any_element()
+            }
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
             Story::Icons => icons(cx).into_any_element(),
@@ -714,52 +758,67 @@ fn sample_plan() -> Vec<Todo> {
     ]
 }
 
-/// A whole session as the panel will show it, at the panel's width.
-fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, cx: &App) -> impl IntoElement {
-    let theme = cx.theme();
+/// How many items the Agent panel's session holds.
+const SESSION_LEN: usize = 9;
+
+/// The session's first `shown` chat items, as the panel lists them. The two reads stack tight in their
+/// own list, so each still enters on its own.
+fn session_list(started: Instant, replay: usize, shown: usize) -> EntranceList {
+    let tools = [
+        ("s-read", ToolCall::new("s-read", ToolKind::Custom, "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
+        ("s-grep", ToolCall::new("s-grep", ToolKind::Custom, "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
+    ];
+    let tools = tools.into_iter().take(shown.saturating_sub(1)).fold(
+        EntranceList::new(ElementId::NamedInteger("session-tools".into(), replay as u64), div().flex().flex_col()),
+        |list, (id, item)| list.item(id, item),
+    );
+    let items: [(&'static str, AnyElement); SESSION_LEN - 1] = [
+        ("s-user", MessageBubble::text("s-user", "The line numbers in the diff view are off by one. Can you fix it?").variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End).into_any_element()),
+        ("s-tools", tools.into_any_element()),
+        ("s-reply", AgentText::new("s-reply", REPLY).status(AgentTextStatus::Complete).copy_text(REPLY).into_any_element()),
+        ("s-plan", TodoList::new("s-plan", sample_plan()).into_any_element()),
+        ("s-diff", FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF)).status(FileDiffStatus::Complete).into_any_element()),
+        ("s-test", ToolCall::new("s-test", ToolKind::Terminal, "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT).into_any_element()),
+        (
+            "s-push",
+            ToolApproval::new("s-push", "git push origin main")
+                .description("Push the fix so CI can run the full test suite.")
+                .parameter("Directory", "~/Documents/lathe")
+                .default_open(true)
+                .on_approve(|_, _, _| {})
+                .on_always_allow(|_, _, _| {})
+                .on_deny(|_, _, _| {})
+                .into_any_element(),
+        ),
+        ("s-think", Thinking::new("s-think", thinking_for(started, 18)).elapsed("18s").tokens(3_400).into_any_element()),
+    ];
+    // The two reads share one row of this list, so once both show it holds one item fewer.
+    let rows = if shown >= 3 { shown - 1 } else { shown };
+    items.into_iter().take(rows).fold(
+        EntranceList::new(ElementId::NamedInteger("session-list".into(), replay as u64), div().flex().flex_col().gap(px(16.))),
+        |list, (id, item)| list.item(id, item),
+    )
+}
+
+/// A whole session as the panel will show it, at the panel's width. `replay` names the list, so each
+/// replay starts a fresh one; `shown` is how many items it holds so far.
+fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, shown: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
+    let theme = cx.theme().clone();
     let header = pane_header("Claude Code", cx)
         .child(Badge::new("Sonnet 5"))
         .child(div().flex_1())
+        .child(
+            Button::new("p-replay")
+                .label("Replay session")
+                .variant(ButtonVariant::Ghost)
+                .size(ButtonSize::Sm)
+                .on_click(cx.listener(|this, _, _, cx| this.start_replay(cx))),
+        )
         .child(Button::new("p-new").icon(IconName::Plus).variant(ButtonVariant::Ghost).size(ButtonSize::Icon))
         .child(Button::new("p-more").icon(IconName::Ellipsis).variant(ButtonVariant::Ghost).size(ButtonSize::Icon));
 
-    let session = div()
-        .id("session")
-        .flex_1()
-        .overflow_y_scroll()
-        .px(px(20.))
-        .py(px(20.))
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(16.))
-                .child(MessageBubble::text("s-user", "The line numbers in the diff view are off by one. Can you fix it?").variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End))
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .child(ToolCall::new("s-read", ToolKind::Custom, "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
-                        .child(ToolCall::new("s-grep", ToolKind::Custom, "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
-                )
-                .child(AgentText::new("s-reply", REPLY).status(AgentTextStatus::Complete).copy_text(REPLY))
-                .child(TodoList::new("s-plan", sample_plan()))
-                .child(
-                    FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF))
-                        .status(FileDiffStatus::Complete),
-                )
-                .child(ToolCall::new("s-test", ToolKind::Terminal, "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
-                .child(
-                    ToolApproval::new("s-push", "git push origin main")
-                        .description("Push the fix so CI can run the full test suite.")
-                        .parameter("Directory", "~/Documents/lathe")
-                        .default_open(true)
-                        .on_approve(|_, _, _| {})
-                        .on_always_allow(|_, _, _| {})
-                        .on_deny(|_, _, _| {}),
-                )
-                .child(Thinking::new("s-think", thinking_for(started, 18)).elapsed("18s").tokens(3_400)),
-        );
+    let list = session_list(started, replay, shown);
+    let session = div().id("session").flex_1().overflow_y_scroll().px(px(20.)).py(px(20.)).child(list);
 
     div()
         .flex()
