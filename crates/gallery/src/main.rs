@@ -360,6 +360,13 @@ fn buttons() -> impl IntoElement {
                 .child(Button::new("size-lg").label("Large").size(ButtonSize::Lg)),
         ))
         .child(section(
+            "With a chip: hover to slide the arrow",
+            row()
+                .child(Button::new("chip-sm").label("New session").chip(IconName::ArrowRight))
+                .child(Button::new("chip-md").label("Continue").chip(IconName::ArrowRight).size(ButtonSize::Md))
+                .child(Button::new("chip-lg").label("Get started").chip(IconName::ArrowRight).size(ButtonSize::Lg)),
+        ))
+        .child(section(
             "Icon buttons",
             row()
                 .child(Button::new("i-send").icon(IconName::ArrowUp).size(ButtonSize::Icon))
