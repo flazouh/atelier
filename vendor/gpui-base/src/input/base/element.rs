@@ -1392,6 +1392,38 @@ impl<M: InputModeKind> TextElement<M> {
         icon_layout
     }
 
+    /// lathe patch: lays out each row widget at its row's right end, centred on the row, from the
+    /// same layout the text uses. A row scrolled out of view or folded away gets none.
+    fn layout_row_widgets(
+        &self,
+        input_bounds: Bounds<Pixels>,
+        bounds: &Bounds<Pixels>,
+        last_layout: &LastLayout,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Vec<AnyElement> {
+        let widgets = self.state.read(cx).row_widgets().to_vec();
+        if widgets.is_empty() {
+            return vec![];
+        }
+        let rows = last_layout.row_rects(None);
+        let right = input_bounds.origin.x + input_bounds.size.width - RIGHT_MARGIN;
+        widgets
+            .into_iter()
+            .filter_map(|widget| {
+                let (_, top, height) = rows.iter().find(|(row, _, _)| *row == widget.row).copied()?;
+                let mut element = (widget.render)(window, cx);
+                let measured = element.layout_as_root(gpui::AvailableSpace::min_size(), window, cx);
+                let origin = point(
+                    right - measured.width,
+                    bounds.origin.y + top + (height - measured.height).half(),
+                );
+                element.prepaint_at(origin, window, cx);
+                Some(element)
+            })
+            .collect()
+    }
+
     /// Paint fold icons using prepaint hitboxes.
     ///
     /// This handles:
@@ -1726,6 +1758,8 @@ pub(super) struct PrepaintState {
     bounds: Bounds<Pixels>,
     /// Fold icon layout data
     fold_icon_layout: FoldIconLayout,
+    /// lathe patch: the owner's row widgets, laid out for this frame.
+    row_widgets: Vec<AnyElement>,
     // Inline completion rendering data
     /// Shaped ghost lines to paint after cursor row (completion lines 2+)
     ghost_lines: Vec<ShapedLine>,
@@ -2221,6 +2255,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             )));
         let fold_icon_layout =
             self.layout_fold_icons(original_x, &bounds, &last_layout, window, cx);
+        let row_widgets = self.layout_row_widgets(input_bounds, &bounds, &last_layout, window, cx);
         let hitbox = window.insert_hitbox(input_bounds, HitboxBehavior::Normal);
 
         PrepaintState {
@@ -2239,6 +2274,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             document_color_paths,
             indent_guides_path,
             fold_icon_layout,
+            row_widgets,
             ghost_first_line,
             ghost_lines,
             ghost_lines_height,
@@ -2326,6 +2362,24 @@ impl<M: InputModeKind> Element for TextElement<M> {
         } else {
             px(0.)
         };
+
+        // lathe patch: the owner's row washes, under the text. The gutter covers its part below, so
+        // they are painted there again after it.
+        let ghost = prepaint.current_row.map(|row| (row, prepaint.ghost_lines_height));
+        let row_rects = prepaint.last_layout.row_rects(ghost);
+        let row_backgrounds = self.state.read(cx).row_backgrounds().to_vec();
+        let wash_rows = |x: Pixels, width: Pixels, markers: bool, window: &mut Window| {
+            for background in &row_backgrounds {
+                for (_, top, height) in row_rects.iter().filter(|(row, _, _)| background.rows.contains(row)) {
+                    let at = point(x, origin.y + *top);
+                    window.paint_quad(fill(Bounds::new(at, size(width, *height)), background.color));
+                    if let (true, Some(marker)) = (markers, background.marker) {
+                        window.paint_quad(fill(Bounds::new(at, size(px(2.), *height)), marker));
+                    }
+                }
+            }
+        };
+        wash_rows(input_bounds.origin.x, bounds.size.width, false, window);
 
         // Paint glyph backgrounds
         //
@@ -2489,6 +2543,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 editor_paddings,
             );
             window.paint_quad(fill(gutter_bounds, gutter_bg));
+            wash_rows(gutter_bounds.origin.x, gutter_bounds.size.width, true, window);
 
             // Each item is the normal lines.
             for (lines, &buffer_line) in line_numbers
@@ -2531,6 +2586,12 @@ impl<M: InputModeKind> Element for TextElement<M> {
             window,
             cx,
         );
+        // lathe patch: row widgets sit above the text and stay inside the editor.
+        window.with_content_mask(Some(gpui::ContentMask { bounds: input_bounds }), |window| {
+            for widget in prepaint.row_widgets.iter_mut() {
+                widget.paint(window, cx);
+            }
+        });
 
         self.state.update(cx, |state, cx| {
             let geometry_changed = state.last_bounds != Some(bounds)

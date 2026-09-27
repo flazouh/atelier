@@ -33,6 +33,25 @@ pub(super) struct LastLayout {
 }
 
 impl LastLayout {
+    /// lathe patch: every visible buffer row as `(row, top, height)`, the top measured from the text
+    /// origin as the paint pass measures it (`visible_top` included). `extra` adds height after one
+    /// row, which is how inline-completion ghost lines push the rows below them down.
+    pub(super) fn row_rects(&self, extra: Option<(usize, Pixels)>) -> Vec<(usize, Pixels, Pixels)> {
+        let mut top = self.visible_top;
+        let mut rects = Vec::with_capacity(self.lines.len());
+        for (line, &row) in self.lines.iter().zip(self.visible_buffer_lines.iter()) {
+            let height = self.line_height * line.wrapped_lines.len() as f32;
+            rects.push((row, top, height));
+            top += height;
+            if let Some((after, more)) = extra
+                && after == row
+            {
+                top += more;
+            }
+        }
+        rects
+    }
+
     pub(crate) fn line(&self, row: usize) -> Option<&LineLayout> {
         let pos = self.visible_buffer_lines.binary_search(&row).ok()?;
         self.lines.get(pos)

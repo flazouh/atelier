@@ -129,6 +129,23 @@ pub enum InputEvent {
 
 pub(super) const CONTEXT: &str = "Input";
 
+/// lathe patch: a wash over whole buffer rows, with an optional strip at the gutter's left edge, as
+/// Zed marks changed lines. See [`InputBaseState::set_row_backgrounds`].
+/// lathe patch: an element placed at the right end of one buffer row. See
+/// [`InputBaseState::set_row_widgets`].
+#[derive(Clone)]
+pub struct RowWidget {
+    pub row: usize,
+    pub render: Rc<dyn Fn(&mut Window, &mut App) -> gpui::AnyElement>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RowBackground {
+    pub rows: Range<usize>,
+    pub color: gpui::Hsla,
+    pub marker: Option<gpui::Hsla>,
+}
+
 pub(crate) fn init(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("backspace", Backspace, Some(CONTEXT)),
@@ -417,6 +434,10 @@ pub struct InputBaseState<M: InputModeKind> {
     /// colours once and then never see them as unset again, which is the same
     /// freeze in a different place.
     projected_editor_style: InputEditorStyle,
+    /// lathe patch: row washes the owner asked for, such as a review's added and removed rows.
+    row_backgrounds: Vec<RowBackground>,
+    /// lathe patch: elements placed at the end of a row. See `set_row_widgets`.
+    row_widgets: Vec<RowWidget>,
     /// lathe patch: a style the owner pinned. While it is set, `set_editor_style` applies it in place
     /// of whatever it was given, so a wrapper that sets a theme style on every render cannot replace
     /// the owner's.
@@ -740,6 +761,8 @@ impl<M: InputModeKind> InputBaseState<M> {
             editor_style: InputEditorStyle::default(),
             projected_editor_style: InputEditorStyle::default(),
             pinned_editor_style: None,
+            row_backgrounds: Vec::new(),
+            row_widgets: Vec::new(),
             diagnostic_popover: None,
             context_menu_handler: None,
             pending_context_menu: None,
@@ -2874,6 +2897,31 @@ impl<M: InputModeKind> InputBaseState<M> {
     ///
     /// Non-empty ranges expand to character boundaries. Empty ranges remain empty and are
     /// clipped to the preceding character boundary.
+    /// lathe patch: washes whole rows, under the text and across the gutter, where the editor paints
+    /// its current line. An owner that draws its own bands has to guess the editor's padding, row
+    /// height and wrapping, and lands a few pixels off on some platforms; this cannot.
+    pub fn set_row_backgrounds(&mut self, backgrounds: Vec<RowBackground>, cx: &mut Context<Self>) {
+        if self.row_backgrounds != backgrounds {
+            self.row_backgrounds = backgrounds;
+            cx.notify();
+        }
+    }
+
+    pub(super) fn row_backgrounds(&self) -> &[RowBackground] {
+        &self.row_backgrounds
+    }
+
+    /// lathe patch: elements the editor places at the right end of a row, centred on it and laid out
+    /// in the same frame as the text, so they never trail a scroll. A review's Accept and Reject bar
+    /// is one. The owner sets them on every render.
+    pub fn set_row_widgets(&mut self, widgets: Vec<RowWidget>) {
+        self.row_widgets = widgets;
+    }
+
+    pub(super) fn row_widgets(&self) -> &[RowWidget] {
+        &self.row_widgets
+    }
+
     /// lathe patch: every selection as a byte range, in text order.
     pub fn selected_ranges(&self) -> Vec<Range<usize>> {
         let mut ranges: Vec<_> = self.selections.iter().map(|sel| sel.start..sel.end).collect();
