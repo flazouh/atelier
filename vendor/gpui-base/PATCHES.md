@@ -73,3 +73,15 @@ selection was public, and `set_selected_range` dropped the others.
 Test: `test_selected_ranges_round_trip`.
 
 Patches 1 and 4 share `vertical_target_or_edge` in `src/input/base/movement.rs`.
+
+## 8. Row washes and row widgets painted by the editor
+
+An owner that drew its own row bands had to guess the editor's top padding, row height, wrapping and
+scroll. The inline review guessed `row * 20 + scroll`, and on macOS, where gpui-component pads the
+editor, every band and bar sat about 8pt above its row. The editor now does it from its own layout:
+`set_row_backgrounds` washes whole rows under the text and again over the gutter, with an optional
+2px marker at the gutter's left edge, as Zed marks changed lines; `set_row_widgets` places an
+element at a row's right end, centred on the row, laid out in the same frame as the text and clipped
+to the editor. `LastLayout::row_rects` is the one place both read row geometry from.
+Code: `src/input/base/layout.rs`, `src/input/base/state.rs`, `src/input/base/element.rs`.
+Test: `test_row_rects_start_where_each_row_of_text_starts`. Checked on a Retina Mac.

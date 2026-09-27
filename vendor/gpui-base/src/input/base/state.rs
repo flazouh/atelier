@@ -6997,6 +6997,34 @@ mod tests {
         assert_eq!(caret(&mut cx), 9, "no row below: the very end");
     }
 
+    /// lathe patch: the rows an owner washes and the widgets it places start exactly where the text
+    /// of each row starts, padding and scroll included.
+    #[gpui::test]
+    fn test_row_rects_start_where_each_row_of_text_starts(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| {
+                state.set_value("one\ntwo\nthree\nfour", window, cx);
+                state.set_editor_paddings(Edges { top: px(8.), ..Default::default() });
+            });
+        });
+        cx.run_until_parked();
+        view.input.read_with(&cx, |state, _| {
+            let layout = state.last_layout.as_ref().expect("laid out");
+            let text = state.last_bounds.expect("painted");
+            let rects = layout.row_rects(None);
+            assert_eq!(rects.iter().map(|(row, _, _)| *row).collect::<Vec<_>>(), vec![0, 1, 2, 3]);
+            for (row, top, height) in rects {
+                let start = state.text.line_start_offset(row);
+                let glyphs = state.range_to_bounds(&(start..start)).expect("the row is on screen");
+                assert_eq!(text.origin.y + top, glyphs.origin.y, "row {row} starts where its text does");
+                assert_eq!(height, layout.line_height);
+            }
+        });
+    }
+
     /// lathe patch: every selection can be read and put back as byte ranges.
     #[gpui::test]
     fn test_selected_ranges_round_trip(cx: &mut TestAppContext) {
