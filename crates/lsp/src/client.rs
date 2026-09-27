@@ -397,9 +397,15 @@ pub fn path_to_uri(path: &Path) -> Result<Uri, LspError> {
     let mut encoded = String::from("file://");
     for byte in text.bytes() {
         match byte {
-            b'/' | b'-' | b'_' | b'.' | b'~' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => {
-                encoded.push(byte as char)
-            }
+            // Unreserved, RFC 3986 section 2.3.
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~'
+            // Sub-delims, plus the two extra path characters, RFC 3986 section 3.3. A server built
+            // on Rust's `url` crate leaves every one of these raw. We compare URIs byte for byte,
+            // so escaping one here means the server's diagnostics never match the file we asked
+            // about: a path holding `+` waited out the full timeout while the answer sat unread.
+            | b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' | b':'
+            | b'@' | b'/' => encoded.push(byte as char),
+            // Everything else: space, `#`, `?`, `%`, the control bytes, and every non-ASCII byte.
             _ => encoded.push_str(&format!("%{byte:02X}")),
         }
     }

@@ -83,6 +83,33 @@ fn a_path_becomes_a_file_uri_with_its_spaces_encoded() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
+/// The bug this catches: we escaped every byte outside a tiny set, so a path holding `+` went out as
+/// `%2B`. A server built on the `url` crate publishes it raw, `fresh_enough` compares the two URIs
+/// byte for byte, and the caller then waited out its whole timeout while the answer sat unread.
+#[test]
+fn a_path_keeps_the_characters_a_server_leaves_raw() {
+    let dir = std::env::temp_dir().join("lathe+lsp,raw=chars!(one)");
+    std::fs::create_dir_all(&dir).expect("the temp dir is writable");
+    let uri = path_to_uri(&dir).expect("a real path has a uri");
+    let text = uri.as_str();
+    for raw in ["+", ",", "=", "!", "(", ")"] {
+        assert!(text.contains(raw), "{raw} must stay raw, got {text}");
+    }
+    assert!(!text.contains('%'), "nothing in this path needs encoding, got {text}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+/// A percent sign is the escape character itself, so it must always be encoded. Leaving it raw
+/// would turn a real `%2B` in a filename into a `+` at the server.
+#[test]
+fn a_percent_sign_in_a_path_is_always_encoded() {
+    let dir = std::env::temp_dir().join("lathe%2Blsp");
+    std::fs::create_dir_all(&dir).expect("the temp dir is writable");
+    let uri = path_to_uri(&dir).expect("a real path has a uri");
+    assert!(uri.as_str().contains("%252B"), "the percent must be encoded, got {uri:?}");
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 #[test]
 fn a_path_that_does_not_exist_has_no_uri() {
     assert!(path_to_uri(Path::new("/no/such/path/at/all")).is_err());
