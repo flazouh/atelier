@@ -10,3 +10,4 @@ publish = false
 [workspace.dependencies]
 gpui-kit = "0.6.6"
 beui = { path = "crates/beui" }
+lathe-lsp = { path = "crates/lsp" }
