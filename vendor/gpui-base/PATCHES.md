@@ -47,3 +47,10 @@ Test: `test_a_pinned_editor_style_outlasts_a_theme_style`.
   the `on_modifiers_changed` listener in `src/input/base/state.rs`.)
 Test: `test_up_on_the_first_row_and_down_on_the_last_reach_the_ends`. The underline was checked by
 hand under Xvfb.
+
+## 5. A `⋯` chip after a folded line
+
+A fold hid its rows and flipped the gutter chevron, but the text showed nothing. As in Zed, a folded
+line now ends in a small `⋯` chip, and a click on it unfolds the rows. Code: `FoldIconLayout::
+placeholders`, laid out in `layout_fold_icons` and painted in `paint_fold_icons`, in
+`src/input/base/element.rs`. Checked by hand under Xvfb: fold, chip shown, click, rows back.

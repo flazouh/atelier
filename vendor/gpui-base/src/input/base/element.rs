@@ -395,6 +395,8 @@ struct FoldIconLayout {
     line_number_hitbox: Hitbox,
     /// List of (display_row, is_folded, icon_element) pairs for each fold candidate
     icons: Vec<(usize, bool, gpui::AnyElement)>,
+    /// lathe patch: the `⋯` chip after each folded line, which unfolds it on a click.
+    placeholders: Vec<gpui::AnyElement>,
 }
 
 pub(super) struct TextElement<M: InputModeKind> {
@@ -1219,6 +1221,8 @@ impl<M: InputModeKind> TextElement<M> {
             is_folded: bool,
             display_row: usize,
             offset_y: Pixels,
+            /// Where the line's last glyph ends, from the line's own origin.
+            line_end: Option<Point<Pixels>>,
         }
 
         let line_number_hitbox = window.insert_hitbox(
@@ -1232,6 +1236,7 @@ impl<M: InputModeKind> TextElement<M> {
         let mut icon_layout = FoldIconLayout {
             line_number_hitbox,
             icons: vec![],
+            placeholders: vec![],
         };
 
         let fold_infos: Vec<FoldInfo> = {
@@ -1255,6 +1260,9 @@ impl<M: InputModeKind> TextElement<M> {
                         is_folded,
                         display_row: buffer_line,
                         offset_y,
+                        line_end: is_folded
+                            .then(|| line.position_for_index(line.len(), last_layout, false))
+                            .flatten(),
                     });
                 }
 
@@ -1343,6 +1351,42 @@ impl<M: InputModeKind> TextElement<M> {
             icon_layout
                 .icons
                 .push((info.display_row, info.is_folded, icon));
+            // lathe patch: a folded line ends in a `⋯` chip, as in Zed, so the hidden rows are
+            // visible in the text and not only in the gutter. A click on it unfolds them.
+            if let Some(end) = info.line_end {
+                let muted = self.state.read(cx).editor_style.muted_foreground;
+                let chip_height = line_height - px(4.);
+                let origin = bounds.origin
+                    + point(
+                        last_layout.line_number_width + end.x + px(6.),
+                        info.offset_y + end.y + (line_height - chip_height).half(),
+                    );
+                let mut chip = gpui::div()
+                    .id(("fold-placeholder", ix))
+                    .h(chip_height)
+                    .px(px(4.))
+                    .flex()
+                    .items_center()
+                    .rounded(px(3.))
+                    .bg(muted.opacity(0.15))
+                    .text_color(muted)
+                    .cursor_pointer()
+                    .child("⋯")
+                    .on_mouse_down(MouseButton::Left, {
+                        let state = self.state.clone();
+                        let buffer_line = info.buffer_line;
+                        move |_, _: &mut Window, cx: &mut App| {
+                            cx.stop_propagation();
+                            state.update(cx, |state, cx| {
+                                state.display_map.toggle_fold(buffer_line);
+                                cx.notify();
+                            });
+                        }
+                    })
+                    .into_any_element();
+                chip.prepaint_as_root(origin, gpui::AvailableSpace::min_size(), window, cx);
+                icon_layout.placeholders.push(chip);
+            }
         }
 
         icon_layout
@@ -1371,6 +1415,9 @@ impl<M: InputModeKind> TextElement<M> {
             }
 
             icon.paint(window, cx);
+        }
+        for chip in fold_icon_layout.placeholders.iter_mut() {
+            chip.paint(window, cx);
         }
     }
 
