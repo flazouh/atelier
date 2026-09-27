@@ -8,7 +8,7 @@ use beui::{
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
     PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, SubagentRow, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
-    Hunk, HunkReview, HunkState, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
+    CodeEditor, Hunk, HunkReview, HunkState, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
 use std::time::{Duration, Instant};
@@ -33,12 +33,13 @@ enum Story {
     Diffs,
     Plan,
     Hunks,
+    Editor,
     Select,
     Prompt,
 }
 
 impl Story {
-    const ALL: [Story; 14] = [
+    const ALL: [Story; 15] = [
         Story::AgentPanel,
         Story::Colors,
         Story::Typography,
@@ -51,6 +52,7 @@ impl Story {
         Story::Diffs,
         Story::Plan,
         Story::Hunks,
+        Story::Editor,
         Story::Select,
         Story::Prompt,
     ];
@@ -69,6 +71,7 @@ impl Story {
             Story::Diffs => "Diffs and code",
             Story::Plan => "Plan",
             Story::Hunks => "Hunks",
+            Story::Editor => "Editor",
             Story::Select => "Select",
             Story::Prompt => "Prompt input",
         }
@@ -107,6 +110,8 @@ struct Gallery {
     choice: Option<usize>,
     /// The Hunks story's own file, so Accept and Reject really resolve.
     hunks: Vec<Hunk>,
+    /// The Editor story's buffer, which the user can really type into.
+    editor: Entity<gpui_kit::component::input::EditorState>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -171,7 +176,12 @@ impl Gallery {
         .detach();
         let _system = beui::watch_system(window, cx);
         let mut gallery =
-            Self { story, choice: None, hunks: sample_hunks(), prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
+            Self {
+            story,
+            choice: None,
+            hunks: sample_hunks(),
+            editor: CodeEditor::state("file_diff.rs", SAMPLE_RUST, window, cx),
+            prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
         }
@@ -270,6 +280,7 @@ impl Gallery {
             Story::Diffs => diffs().into_any_element(),
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
             Story::Hunks => hunks_story(&self.hunks, cx).into_any_element(),
+            Story::Editor => editor_story(&self.editor).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
             Story::Prompt => prompt_story(&self.prompt, self.notice.clone(), cx).into_any_element(),
         }
@@ -744,6 +755,55 @@ fn prompt_story(prompt: &Entity<PromptInput>, notice: Option<SharedString>, cx: 
                 .text_color(theme.muted_foreground)
                 .children(notice),
         )
+}
+
+const SAMPLE_RUST: &str = r#"//! The line numbers a hunk starts at.
+
+use std::collections::HashMap;
+
+/// Parses `@@ -12,4 +12,5 @@` into the line before each side's first line.
+fn hunk_starts(header: &str) -> (u32, u32) {
+    let start = |sign: char| {
+        header
+            .split_whitespace()
+            .find_map(|part| part.strip_prefix(sign))
+            .and_then(|range| range.split(',').next()?.parse::<u32>().ok())
+            .map_or(0, |n| n.saturating_sub(1))
+    };
+    (start('-'), start('+'))
+}
+
+#[derive(Debug, Default)]
+struct Counts {
+    added: usize,
+    removed: usize,
+    by_file: HashMap<String, usize>,
+}
+
+impl Counts {
+    fn total(&self) -> usize {
+        self.added + self.removed
+    }
+}
+"#;
+
+/// The editable file. Typing, selection, undo and search all come from gpui-base; the skin is ours.
+fn editor_story(state: &Entity<gpui_kit::component::input::EditorState>) -> impl IntoElement {
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .max_w(px(760.))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .text_size(TextSize::Xs.font_size())
+                .child(div().font_family(MONO_FONT_FAMILY).child("crates/beui/src/file_diff.rs"))
+                .child(Badge::new("rust")),
+        )
+        .child(CodeEditor::new(state).height(px(420.)))
 }
 
 /// The agent's edit to one file, as the review shows it. Accept and Reject resolve for real, so the
