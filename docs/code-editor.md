@@ -3,7 +3,8 @@
 The surface where the user reads the agent's edits, accepts or rejects them, and writes code. Three stages,
 each one shippable on its own.
 
-Written at commit `5bd2b0e`. Values are exact; take them from here, not from memory.
+Written at commit `5bd2b0e`. All three stages are built. Values are exact; take them from here, not
+from memory.
 
 ## What already exists, and what we add
 
@@ -17,6 +18,19 @@ gpui-base and gpui-component ship the hard parts, so lathe reskins them rather t
 | Diagnostics model and hover | `gpui_base::input::{Diagnostic, DiagnosticSet, DiagnosticSeverity}`, `DiagnosticPopover` | Feed it from LSP, restyle. |
 | LSP client | nothing | Stage C writes one. `lsp-types` 0.97 is already in the lock. |
 | Agent hunks with accept and reject | nothing | Stage A writes it. |
+
+## What the live server taught us
+
+`cargo run -p lathe-lsp --example probe -- <root> <file>` prints a server's traffic. Two facts came out
+of it, and both are now handled:
+
+- rust-analyzer publishes twice for one document version: an empty set while it indexes, then the real
+  one. An empty set is also how a server says a file is clean, so nothing in the protocol tells them
+  apart. A client that takes the first set reports "nothing is wrong" about text the server has not read
+  yet. `wait_for_diagnostics_at` waits for the first matching set, then keeps taking later ones until
+  600ms passes with none, and returns the last.
+- A `didChange` that carries the same text makes the server publish nothing. Bumping the version there
+  leaves the caller waiting for an answer that never comes, so only changed text is sent.
 
 ## Stage A: the hunk review
 
@@ -76,5 +90,11 @@ A new crate, `crates/lsp`, with no UI.
 - `cargo test --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo build -p beui-gallery`.
 - Gallery stories "Hunks" and "Editor", captured on `hp-agent` in both themes.
 - Stage A resolve: capture at 0, 130 and 260ms and confirm the rows close rather than jump.
-- Stage C: a real `rust-analyzer` run over `crates/beui`, with a screenshot of one true diagnostic and one
-  working go to definition. No claim of LSP support before that screenshot exists.
+- Stage C: `LATHE_REQUIRE_LSP=1 cargo test -p lathe-lsp --test rust_analyzer` on a box with the server,
+  so a missing server fails rather than skipping. Passed on `hp-agent` against rust-analyzer 1.98.1.
+- The Editor story, driven on `hp-agent`: Check reported "2 problems, first: mismatched types, expected
+  `u32`, found `&str`" and the editor underlined the range; Go to definition on `width()` answered
+  "defined on line 5". Both were captured as screenshots.
+- Motion under software Vulkan redraws about 19 times a second, so a 260ms resolve gets 5 frames and
+  reads as a jump in a recording. Use `tools/gallery-record-linux.sh` and count changed frames rather
+  than trusting a tile of screenshots.
