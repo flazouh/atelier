@@ -112,6 +112,8 @@ struct Gallery {
     hunks: Vec<Hunk>,
     /// The Editor story's buffer, which the user can really type into.
     editor: Entity<gpui_kit::component::input::EditorState>,
+    /// The language server behind the Editor story.
+    lsp: LspState,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -134,6 +136,62 @@ struct Replay {
 }
 
 impl Gallery {
+    /// Sends the buffer to the server, then shows whatever it says is wrong. The button is explicit,
+    /// so the gallery never waits on a server while the user reads another story.
+    fn pull_diagnostics(&mut self, cx: &mut Context<Self>) {
+        let (Some(client), Some(file)) = (self.lsp.client.as_mut(), self.lsp.file.clone()) else {
+            return;
+        };
+        let text = self.editor.read(cx).value().to_string();
+        let wait = std::time::Duration::from_secs(20);
+        self.lsp.status = match client
+            .did_change(&file, 2, &text)
+            .and_then(|()| client.wait_for_diagnostics(&file, wait))
+        {
+            Ok(params) => {
+                let found = params.diagnostics.len();
+                let diagnostics = params.diagnostics.clone();
+                let editor = self.editor.clone();
+                cx.defer(move |cx| beui::code_editor::set_diagnostics(&editor, diagnostics, cx));
+                let first = params.diagnostics.first().map(|d| d.message.clone()).unwrap_or_default();
+                match found {
+                    0 => "the server finds nothing wrong".into(),
+                    1 => format!("1 problem: {first}").into(),
+                    n => format!("{n} problems, first: {first}").into(),
+                }
+            }
+            Err(error) => format!("{error}").into(),
+        };
+        cx.notify();
+    }
+
+    /// Asks the server where the symbol under the cursor is defined, and says what came back.
+    fn go_to_definition(&mut self, cx: &mut Context<Self>) {
+        let (Some(client), Some(file)) = (self.lsp.client.as_mut(), self.lsp.file.clone()) else {
+            return;
+        };
+        let position = self.editor.read(cx).cursor_position();
+        let wait = std::time::Duration::from_secs(20);
+        self.lsp.status = match client.definition(&file, position, wait) {
+            Ok(Some(answer)) => {
+                let line = match answer {
+                    lsp_types::GotoDefinitionResponse::Scalar(l) => Some(l.range.start.line),
+                    lsp_types::GotoDefinitionResponse::Array(l) => l.first().map(|l| l.range.start.line),
+                    lsp_types::GotoDefinitionResponse::Link(l) => l.first().map(|l| l.target_range.start.line),
+                };
+                match line {
+                    // A server answer is one-based to a reader, so the line is shown as the editor does.
+                    Some(line) => format!("defined on line {}", line + 1).into(),
+                    None => "the server answered with no location".into(),
+                }
+            }
+            Ok(None) => "the server knows of no definition there".into(),
+            Err(error) => format!("{error}").into(),
+        };
+        cx.notify();
+    }
+
+
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let story = std::env::var("GALLERY_STORY")
             .ok()
@@ -180,7 +238,8 @@ impl Gallery {
             story,
             choice: None,
             hunks: sample_hunks(),
-            editor: CodeEditor::state("file_diff.rs", SAMPLE_RUST, window, cx),
+            editor: CodeEditor::state("lib.rs", SAMPLE_RUST, window, cx),
+            lsp: LspState::start(SAMPLE_RUST),
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
@@ -280,7 +339,7 @@ impl Gallery {
             Story::Diffs => diffs().into_any_element(),
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
             Story::Hunks => hunks_story(&self.hunks, cx).into_any_element(),
-            Story::Editor => editor_story(&self.editor).into_any_element(),
+            Story::Editor => editor_story(&self.editor.clone(), &self.lsp.status.clone(), cx).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
             Story::Prompt => prompt_story(&self.prompt, self.notice.clone(), cx).into_any_element(),
         }
@@ -758,6 +817,17 @@ fn prompt_story(prompt: &Entity<PromptInput>, notice: Option<SharedString>, cx: 
 }
 
 const SAMPLE_RUST: &str = r#"//! The line numbers a hunk starts at.
+//!
+//! `width` below is called by `broken`, which also holds a real type error for the server to find.
+
+pub fn width() -> u32 {
+    7
+}
+
+pub fn broken() -> u32 {
+    let text: u32 = "not a number";
+    text + width()
+}
 
 use std::collections::HashMap;
 
@@ -787,8 +857,59 @@ impl Counts {
 }
 "#;
 
+/// What the language server has said about the open file.
+#[derive(Default)]
+struct LspState {
+    /// The server, once it has started. `None` means it is not installed or it failed.
+    client: Option<lathe_lsp::LspClient>,
+    /// What the status line says: the server's version, an error, or what it last answered.
+    status: SharedString,
+    /// The file on disk the server reads, so its answers are about a real path.
+    file: Option<std::path::PathBuf>,
+}
+
+impl LspState {
+    /// Starts rust-analyzer over a fixture on disk. It degrades to a message, never a panic: the
+    /// gallery must open on a box with no server.
+    fn start(text: &str) -> Self {
+        let dir = std::env::temp_dir().join("lathe-gallery-lsp");
+        let mut state = Self::default();
+        if std::fs::create_dir_all(dir.join("src")).is_err() {
+            state.status = "the fixture directory is not writable".into();
+            return state;
+        }
+        let manifest = "[package]\nname = \"lathe-gallery\"\nversion = \"0.1.0\"\nedition = \"2021\"\n";
+        let file = dir.join("src/lib.rs");
+        if std::fs::write(dir.join("Cargo.toml"), manifest).is_err() || std::fs::write(&file, text).is_err() {
+            state.status = "the fixture could not be written".into();
+            return state;
+        }
+        let ready = std::time::Duration::from_secs(30);
+        match lathe_lsp::LspClient::spawn("rust-analyzer", &[], &dir, ready) {
+            Ok((mut client, init)) => {
+                let version = init.server_info.map(|i| i.name).unwrap_or_else(|| "the server".into());
+                match client.did_open(&file, "rust", 1, text) {
+                    Ok(()) => state.status = format!("{version} is indexing").into(),
+                    Err(error) => state.status = format!("{error}").into(),
+                }
+                state.client = Some(client);
+                state.file = Some(file);
+            }
+            Err(error) => state.status = format!("{error}").into(),
+        }
+        state
+    }
+}
+
 /// The editable file. Typing, selection, undo and search all come from gpui-base; the skin is ours.
-fn editor_story(state: &Entity<gpui_kit::component::input::EditorState>) -> impl IntoElement {
+/// Its diagnostics and its definitions come from a real rust-analyzer when one is installed.
+fn editor_story(
+    state: &Entity<gpui_kit::component::input::EditorState>,
+    lsp_status: &SharedString,
+    cx: &mut Context<Gallery>,
+) -> impl IntoElement {
+    let go = cx.listener(|this, _, _, cx| this.go_to_definition(cx));
+    let check = cx.listener(|this, _, _, cx| this.pull_diagnostics(cx));
     div()
         .flex()
         .flex_col()
@@ -800,10 +921,25 @@ fn editor_story(state: &Entity<gpui_kit::component::input::EditorState>) -> impl
                 .items_center()
                 .gap(px(8.))
                 .text_size(TextSize::Xs.font_size())
-                .child(div().font_family(MONO_FONT_FAMILY).child("crates/beui/src/file_diff.rs"))
-                .child(Badge::new("rust")),
+                .child(div().font_family(MONO_FONT_FAMILY).child("src/lib.rs"))
+                .child(Badge::new("rust"))
+                .child(div().flex_1())
+                .child(Button::new("lsp-check").label("Check").size(ButtonSize::Chip).on_click(check))
+                .child(
+                    Button::new("lsp-go")
+                        .label("Go to definition")
+                        .variant(ButtonVariant::Ghost)
+                        .size(ButtonSize::Chip)
+                        .on_click(go),
+                ),
         )
-        .child(CodeEditor::new(state).height(px(420.)))
+        .child(CodeEditor::new(state).height(px(380.)))
+        .child(
+            div()
+                .text_size(TextSize::Xs.font_size())
+                .text_color(cx.theme().muted_foreground)
+                .child(lsp_status.clone()),
+        )
 }
 
 /// The agent's edit to one file, as the review shows it. Accept and Reject resolve for real, so the

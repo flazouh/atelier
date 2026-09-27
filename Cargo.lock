@@ -576,6 +576,7 @@ dependencies = [
  "core-foundation 0.9.4",
  "core-foundation-sys",
  "gpui-kit",
+ "lsp-types",
  "serde_json",
 ]
 
@@ -585,6 +586,8 @@ version = "0.1.0"
 dependencies = [
  "beui",
  "gpui-kit",
+ "lathe-lsp",
+ "lsp-types",
 ]
 
 [[package]]
