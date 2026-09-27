@@ -1287,36 +1287,48 @@ impl<M: InputModeKind> InputBaseState<M> {
     }
 
     pub(super) fn select_up(&mut self, _: &SelectUp, _: &mut Window, cx: &mut Context<Self>) {
-        if self.is_single_line() {
-            return;
-        }
-        self.undo_manager.break_transaction_coalescing();
-        self.select_all_cursors_to(
-            |s, sel| {
-                let offset = s
-                    .start_of_line_at(sel.cursor_offset(), s.line_end_affinity_for(sel))
-                    .saturating_sub(1);
-                s.previous_boundary(offset)
-            },
-            cx,
-        );
+        self.select_vertical(-1, cx);
     }
 
     pub(super) fn select_down(&mut self, _: &SelectDown, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_vertical(1, cx);
+    }
+
+    /// lathe patch: extends every selection one row up or down at its goal column, as plain Up and
+    /// Down move the caret. It used to land at the edge of the next line instead. Past the first or
+    /// the last row there is no row to land on, so the head goes to the very start or end.
+    fn select_vertical(&mut self, move_lines: isize, cx: &mut Context<Self>) {
         if self.is_single_line() {
             return;
         }
+        self.pause_blink_cursor(cx);
         self.undo_manager.break_transaction_coalescing();
+        M::clear_inline_completion(self, cx);
         let len = self.text.len();
-        self.select_all_cursors_to(
-            |s, sel| {
-                let offset = (s.end_of_line_at(sel.cursor_offset(), s.line_end_affinity_for(sel))
-                    + 1)
-                .min(len);
-                s.next_boundary(offset)
-            },
-            cx,
-        );
+        let new_selections: Vec<CursorSelection> = self
+            .selections
+            .iter()
+            .map(|sel| {
+                let head = sel.cursor_offset();
+                let anchor = sel.column_anchor.or_else(|| self.preferred_column_for(head));
+                let affinity = self.line_end_affinity_for(sel);
+                let (target, _) = self.vertical_target(head, anchor, affinity, move_lines);
+                let target = match target == head {
+                    true if move_lines < 0 => 0,
+                    true => len,
+                    false => self.cursor_boundary(target, Bias::Left),
+                };
+                let mut new_sel = *sel;
+                Self::extend_selection(&mut new_sel, target, None);
+                new_sel.column_anchor = anchor;
+                new_sel
+            })
+            .collect();
+        self.cursor_line_end_affinity = false;
+        self.selections.replace_all(new_selections);
+        self.selections.merge_overlapping();
+        self.scroll_to(self.cursor(), None, cx);
+        cx.notify()
     }
 
     pub(super) fn on_action_select_all(
@@ -6841,6 +6853,41 @@ mod tests {
         );
     }
 
+    /// lathe patch: Shift+Up/Down keep the goal column, and past the edge select to the very start or end.
+    #[gpui::test]
+    fn test_shift_up_and_down_keep_the_goal_column(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        // Rows start at 0, 7, 10 and 17; the second row is short, and the spec ends in a newline, so
+        // the last row is empty.
+        setup_cursors(&mut cx, &view.input, "abcdef\nab\nabc|def");
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| state.focus(window, cx));
+        });
+        let selection = |cx: &mut VisualTestContext| {
+            view.input.read_with(cx, |state, _| (state.selected_range(), state.cursor()))
+        };
+        cx.simulate_keystrokes("shift-up");
+        assert_eq!(selection(&mut cx), (9..13, 9), "the short row clamps to its end");
+        cx.simulate_keystrokes("shift-up");
+        assert_eq!(selection(&mut cx), (3..13, 3), "the goal column survives the short row");
+        cx.simulate_keystrokes("shift-up");
+        assert_eq!(selection(&mut cx), (0..13, 0), "past the first row: the very start");
+        cx.simulate_keystrokes("shift-down shift-down");
+        assert_eq!(selection(&mut cx), (13..13, 13), "back where it began");
+        cx.simulate_keystrokes("shift-down");
+        assert_eq!(selection(&mut cx), (13..17, 17), "the empty last row clamps to its start");
+        // A last row with text: past it, the head goes to the very end, not back to the column.
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| {
+                state.set_value("abcdef\nabcdef", window, cx);
+                state.set_selected_range(10..10, cx);
+            });
+        });
+        cx.simulate_keystrokes("shift-down");
+        assert_eq!(selection(&mut cx), (10..13, 13), "past the last row: the very end");
+    }
     #[gpui::test]
     fn test_alt_drag_selects_a_block_and_replaces_each_row(cx: &mut TestAppContext) {
         cx.update(crate::init);
