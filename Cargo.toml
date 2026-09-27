@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# A patched copy of a dependency, not ours to test: see vendor/gpui-base/PATCHES.md.
+exclude = ["vendor/gpui-base"]
 
 [workspace.package]
 version = "0.1.0"
@@ -11,3 +13,7 @@ publish = false
 gpui-kit = "0.6.6"
 beui = { path = "crates/beui" }
 lathe-lsp = { path = "crates/lsp" }
+
+[patch.crates-io]
+# gpui-base 0.6.6 with the editor fixes in vendor/gpui-base/PATCHES.md.
+gpui-base = { path = "vendor/gpui-base" }
