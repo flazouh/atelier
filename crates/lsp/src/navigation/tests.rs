@@ -13,7 +13,8 @@ fn range(line: u32, from: u32, to: u32) -> Range {
 }
 
 fn target(path: &str, line: u32, from: u32, to: u32) -> Target {
-    Target { uri: uri(path), range: range(line, from, to), line_text: String::new() }
+    let file = path.strip_prefix("file://").map(PathBuf::from);
+    Target { uri: uri(path), path: file, range: range(line, from, to), line_text: String::new() }
 }
 
 #[test]
@@ -53,24 +54,24 @@ fn a_link_answer_keeps_its_own_name_range() {
 
 #[test]
 fn an_empty_answer_has_nowhere_to_go() {
-    assert!(lands_on_itself(&[], &uri("file:///a.rs"), at(0, 3)));
+    assert!(lands_on_itself(&[], Path::new("/a.rs"), at(0, 3)));
 }
 
 #[test]
 fn the_caret_on_the_declaration_lands_on_itself() {
-    let here = uri("file:///a.rs");
+    let here = Path::new("/a.rs");
     let declaration = [target("file:///a.rs", 0, 7, 12)];
-    assert!(lands_on_itself(&declaration, &here, at(0, 9)), "inside the name");
-    assert!(lands_on_itself(&declaration, &here, at(0, 12)), "just after the name");
+    assert!(lands_on_itself(&declaration, here, at(0, 9)), "inside the name");
+    assert!(lands_on_itself(&declaration, here, at(0, 12)), "just after the name");
 }
 
 #[test]
 fn a_definition_elsewhere_is_somewhere_to_go() {
-    let here = uri("file:///a.rs");
-    assert!(!lands_on_itself(&[target("file:///a.rs", 0, 7, 12)], &here, at(6, 9)), "another line");
-    assert!(!lands_on_itself(&[target("file:///b.rs", 0, 7, 12)], &here, at(0, 9)), "another file");
+    let here = Path::new("/a.rs");
+    assert!(!lands_on_itself(&[target("file:///a.rs", 0, 7, 12)], here, at(6, 9)), "another line");
+    assert!(!lands_on_itself(&[target("file:///b.rs", 0, 7, 12)], here, at(0, 9)), "another file");
     let mixed = [target("file:///a.rs", 0, 7, 12), target("file:///b.rs", 3, 0, 4)];
-    assert!(!lands_on_itself(&mixed, &here, at(0, 9)), "one real target is enough");
+    assert!(!lands_on_itself(&mixed, here, at(0, 9)), "one real target is enough");
 }
 
 #[test]
@@ -80,4 +81,16 @@ fn targets_read_by_file_then_position() {
     sort_targets(&mut targets);
     let order: Vec<_> = targets.iter().map(|t| (t.uri.as_str().to_string(), t.range.start.line)).collect();
     assert_eq!(order, [("file:///a.rs".into(), 2), ("file:///a.rs".into(), 9), ("file:///b.rs".into(), 1)]);
+}
+
+#[test]
+fn the_same_file_escaped_differently_is_still_itself() {
+    // typescript-language-server writes `@` as `%40`; the path, not the URI string, decides.
+    let target = Target {
+        uri: uri("file:///work/%40scope/a.ts"),
+        path: Some(PathBuf::from("/work/@scope/a.ts")),
+        range: range(0, 16, 21),
+        line_text: String::new(),
+    };
+    assert!(lands_on_itself(&[target], Path::new("/work/@scope/a.ts"), at(0, 18)));
 }

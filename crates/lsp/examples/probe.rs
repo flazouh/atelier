@@ -40,6 +40,7 @@ fn main() {
             ),
             Ok(ServerMessage::Log(text)) => println!("log: {text}"),
             Ok(ServerMessage::Status { quiescent }) => println!("status: quiescent={quiescent}"),
+            Ok(ServerMessage::Request { method, .. }) => println!("request: {method}"),
             Ok(ServerMessage::Exited) => {
                 println!("the server exited");
                 break;

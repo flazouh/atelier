@@ -9,7 +9,7 @@
 use std::{
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     time::Duration,
 };
 
@@ -19,9 +19,7 @@ use gpui_kit::{
     base::input::{self, DefinitionProvider, HoverProvider, InputEvent, Rope, RopeExt},
     component::input::EditorState,
 };
-use lathe_lsp::{
-    Doc, Found, LspError, LspWorker, Navigation, Reply, Target, find_program, find_root, language_id, server_for,
-};
+use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Target, Workers, canonical, client::uri_to_path};
 use lsp_types::{Diagnostic, Hover, LocationLink, Position, ShowDocumentParams, Uri};
 
 /// How long one question may take. Servers answer in milliseconds once they have indexed.
@@ -36,6 +34,12 @@ const SECONDARY: &str = if cfg!(target_os = "macos") { "⌘" } else { "ctrl" };
 /// The newest answer to a Cmd-hover, Cmd-click or F12, kept so a click can tell one place to jump to
 /// from several to list. The provider writes it off the main thread.
 type LastNavigation = Arc<Mutex<Option<Navigation>>>;
+
+/// Every server the gallery runs: one per (server, project), shared by all its tabs.
+fn workers() -> &'static Workers {
+    static WORKERS: OnceLock<Workers> = OnceLock::new();
+    WORKERS.get_or_init(|| Workers::new(READY, ASK))
+}
 
 /// One file's language server: it starts the server, hands the editor its definitions and hover
 /// cards, keeps the problems current, lists references, and says what it is doing.
@@ -60,6 +64,7 @@ pub struct EditorSession {
 impl EditorSession {
     /// Starts the server for `path`, whose text `editor` holds, and attaches it once it is ready.
     pub fn new(editor: Entity<EditorState>, path: PathBuf, cx: &mut Context<Self>) -> Self {
+        let path = canonical(&path);
         let started = start(path.clone());
         let _start = cx.spawn(async move |this, cx| {
             let started = started.await.unwrap_or_else(|_| Err("the server thread stopped".into()));
@@ -87,9 +92,9 @@ impl EditorSession {
         }
     }
 
-    fn started(&mut self, started: Result<Started, String>, cx: &mut Context<Self>) {
-        let Started { worker, name } = match started {
-            Ok(started) => started,
+    fn started(&mut self, started: Result<LspWorker, String>, cx: &mut Context<Self>) {
+        let worker = match started {
+            Ok(worker) => worker,
             Err(message) => {
                 self.server = message.into();
                 return cx.notify();
@@ -97,22 +102,28 @@ impl EditorSession {
         };
         let session = cx.entity().downgrade();
         let last = self.last.clone();
-        let here = lathe_lsp::client::path_to_uri(&self.path).ok();
+        let here = self.path.clone();
         let show: ShowDocument = Rc::new(move |params: &ShowDocumentParams, cx: &mut App| {
-            let several = last
-                .lock()
-                .ok()
-                .and_then(|last| last.clone())
-                .filter(|n| n.found == Found::References && n.targets.len() > 1);
-            if let Some(navigation) = several {
+            // gpui-base jumps from its own cache of the Cmd-hover answer. `last` is only trusted when
+            // it is that same answer, so a newer hover elsewhere can never decide this click.
+            let clicked = uri_to_path(&params.uri).map(|p| canonical(&p));
+            let start = params.selection.map(|r| r.start);
+            let answer = last.lock().ok().and_then(|last| last.clone()).filter(|n| {
+                n.targets.first().is_some_and(|t| t.path == clicked && Some(t.range.start) == start)
+            });
+            if let Some(navigation) = answer.clone().filter(|n| n.found == Found::References && n.targets.len() > 1) {
                 _ = session.update(cx, |this, cx| this.show_references(navigation.targets, cx));
                 return true;
             }
-            if Some(&params.uri) == here.as_ref() {
+            if clicked.as_deref() == Some(here.as_path()) {
                 return false;
             }
-            let line = params.selection.map(|r| r.start.line + 1).unwrap_or(1);
-            let text = format!("defined in {} on line {line}", file_name(&params.uri));
+            let line = start.map_or(1, |p| p.line + 1);
+            let verb = match answer.map(|n| n.found) {
+                Some(Found::References) => "used in",
+                _ => "defined in",
+            };
+            let text = format!("{verb} {} on line {line}", file_name(&params.uri));
             _ = session.update(cx, |this, cx| {
                 this.server = text.into();
                 cx.notify();
@@ -120,8 +131,8 @@ impl EditorSession {
             true
         });
         attach(&self.editor, &self.path, worker.clone(), self.last.clone(), show, cx);
+        self.server = format!("{} is ready: hold {SECONDARY} and click a symbol, or press F12", worker.name()).into();
         self.worker = Some(worker);
-        self.server = format!("{name} is ready: hold {SECONDARY} and click a symbol, or press F12").into();
         self.check(cx);
     }
 
@@ -151,7 +162,7 @@ impl EditorSession {
 
     /// Moves the caret to one of the listed uses, or names its file when it is elsewhere.
     pub fn open_reference(&mut self, target: &Target, window: &mut Window, cx: &mut Context<Self>) {
-        if lathe_lsp::client::path_to_uri(&self.path).ok().as_ref() != Some(&target.uri) {
+        if target.path.as_deref() != Some(self.path.as_path()) {
             let line = target.range.start.line + 1;
             self.server = format!("used in {} on line {line}", file_name(&target.uri)).into();
             return cx.notify();
@@ -242,30 +253,13 @@ pub fn go_to_definition(editor: &Entity<EditorState>, window: &mut Window, cx: &
     window.dispatch_action(Box::new(input::GoToDefinition), cx);
 }
 
-/// A server that is ready, and the name it gave.
-struct Started {
-    worker: LspWorker,
-    name: String,
-}
-
-/// Finds and starts the server for `path` on a thread, so the window opens at once. Anything that
+/// Finds or starts the server for `path` on a thread, so the window opens at once. Anything that
 /// stops it, such as a language lathe has no server for or one that is not installed, comes back as
 /// the sentence the status line shows.
-fn start(path: PathBuf) -> oneshot::Receiver<Result<Started, String>> {
+fn start(path: PathBuf) -> oneshot::Receiver<Result<LspWorker, String>> {
     let (tx, rx) = oneshot::channel();
-    std::thread::spawn(move || drop(tx.send(start_blocking(&path))));
+    std::thread::spawn(move || drop(tx.send(workers().for_file(&path).map_err(|e| e.to_string()))));
     rx
-}
-
-fn start_blocking(path: &Path) -> Result<Started, String> {
-    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("these");
-    let id = language_id(path).ok_or_else(|| format!("no language server for .{extension} files"))?;
-    let spec = server_for(id).ok_or_else(|| format!("no language server for {id}"))?;
-    let program = find_program(spec.program)
-        .ok_or_else(|| format!("{} is not installed: {}", spec.name, spec.install))?;
-    let root = find_root(path, spec.root_markers);
-    let (worker, name) = LspWorker::start(spec, &program, root, READY, ASK).map_err(|e| e.to_string())?;
-    Ok(Started { worker, name })
 }
 
 /// Sends one question to the worker and waits for its answer off the main thread.
@@ -346,8 +340,10 @@ fn attach(state: &Entity<EditorState>, path: &Path, worker: LspWorker, last: Las
     });
 }
 
-/// The file name in a server's URI, for a status line.
+/// The file name a server's URI names, decoded, for a status line or a list row.
 pub fn file_name(uri: &Uri) -> String {
-    let path = uri.path().as_str();
-    PathBuf::from(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string())
+    match uri_to_path(uri) {
+        Some(path) => path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+        None => uri.as_str().to_string(),
+    }
 }

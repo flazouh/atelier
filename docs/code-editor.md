@@ -141,6 +141,22 @@ locations, each with its line's text for display.
   a click on a row in this file moves the caret, in another file names it in the status line.
 - Shift-F12 asks for references directly.
 
+**Built as specified, plus what the review asked for.**
+
+- `Workers` (`crates/lsp/src/pool.rs`) keeps one worker per (server, project root), shared by every
+  file of that project, and starts a new one when a server has stopped. The live tests prove two files
+  of one crate share a server and another crate gets its own.
+- Files are compared by canonical path, never by URI string: rust-analyzer leaves `@` raw and
+  vscode-uri servers write `%40`.
+- `Published` (`crates/lsp/src/published.rs`) is the one rule for a pushed set: a versioned set is
+  current from its version on, and an unversioned one only until the next change, since every sync
+  forgets the document's set.
+- Requests a server sends are answered: no settings, yes to registrations, the root for workspace
+  folders, and method-not-found for the rest, so no server waits on an answer that never comes.
+- Only the newest navigate, hover and diagnostics question per file runs; older ones are superseded.
+- Java has a registry row and a live test that runs when `jdtls` is installed; it is unproven until then.
+- Not handled yet: Windows paths, and servers whose arguments depend on the root.
+
 **What the servers taught us.**
 
 - typescript-language-server publishes diagnostics only to a client that declares

@@ -2,12 +2,17 @@
 //! the symbol under the caret, turns into the places the symbol is used. Everything here is pure, so
 //! the rule is tested without a server.
 
+use std::path::{Path, PathBuf};
+
 use lsp_types::{GotoDefinitionResponse, Location, LocationLink, Position, Range, Uri};
 
 /// One place an answer points at. `range` counts characters, whatever the server counts.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Target {
     pub uri: Uri,
+    /// The file `uri` names, canonical, for comparing with other paths. `None` for a server's virtual
+    /// document, which has no file.
+    pub path: Option<PathBuf>,
     pub range: Range,
     /// That line's text, trimmed, for a list of places. Empty when the file could not be read.
     pub line_text: String,
@@ -49,11 +54,11 @@ pub fn location_link(location: Location) -> LocationLink {
 }
 
 /// Whether a definition answer has nowhere to go: it is empty, or every target is the symbol at
-/// `position` in `here`. That is the caret already on a declaration, and the answer Zed gives there
-/// is the symbol's uses.
-pub fn lands_on_itself(targets: &[Target], here: &Uri, position: Position) -> bool {
+/// `position` in the file `here`. That is the caret already on a declaration, and the answer Zed
+/// gives there is the symbol's uses.
+pub fn lands_on_itself(targets: &[Target], here: &Path, position: Position) -> bool {
     targets.iter().all(|target| {
-        target.uri == *here && target.range.start <= position && position <= target.range.end
+        target.path.as_deref() == Some(here) && target.range.start <= position && position <= target.range.end
     })
 }
 

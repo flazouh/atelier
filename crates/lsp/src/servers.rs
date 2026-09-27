@@ -1,6 +1,6 @@
 //! Which language server serves which file. This is the only place that names a language or a
 //! server: everything else takes a [`ServerSpec`] and works the same for all of them. Adding a
-//! language is adding a row to [`SERVERS`].
+//! language is adding a row to [`LANGUAGES`] and, if no server already covers it, one to [`SERVERS`].
 
 use std::path::{Path, PathBuf};
 
@@ -90,20 +90,22 @@ fn typescript_options(program: &Path, root: &Path) -> Option<Value> {
     lib.join("tsserver.js").exists().then(|| json!({ "tsserver": { "path": lib } }))
 }
 
+/// The standard LSP language id of each language lathe knows, and the file extensions that are in it.
+pub const LANGUAGES: &[(&str, &[&str])] = &[
+    ("rust", &["rs"]),
+    ("typescript", &["ts", "mts", "cts"]),
+    ("typescriptreact", &["tsx"]),
+    ("javascript", &["js", "mjs", "cjs"]),
+    ("javascriptreact", &["jsx"]),
+    ("python", &["py", "pyi"]),
+    ("go", &["go"]),
+    ("java", &["java"]),
+];
+
 /// The standard LSP language id for a file, by its extension.
 pub fn language_id(path: &Path) -> Option<&'static str> {
     let extension = path.extension()?.to_str()?;
-    Some(match extension {
-        "rs" => "rust",
-        "ts" | "mts" | "cts" => "typescript",
-        "tsx" => "typescriptreact",
-        "js" | "mjs" | "cjs" => "javascript",
-        "jsx" => "javascriptreact",
-        "py" | "pyi" => "python",
-        "go" => "go",
-        "java" => "java",
-        _ => return None,
-    })
+    LANGUAGES.iter().find(|(_, extensions)| extensions.contains(&extension)).map(|(id, _)| *id)
 }
 
 /// The server for a language id, if lathe knows one.

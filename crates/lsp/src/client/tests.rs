@@ -1,4 +1,5 @@
 use super::*;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn a_reply_goes_to_the_request_that_asked() {
@@ -34,8 +35,43 @@ fn a_server_error_reaches_the_waiter_as_an_error() {
 #[test]
 fn a_request_from_the_server_is_not_mistaken_for_a_reply() {
     // It has an id and a method. Routing it as a reply would wake the wrong waiter.
-    let message = json!({"jsonrpc": "2.0", "id": 1, "method": "workspace/configuration", "params": {}});
-    assert!(matches!(classify(&message), Routed::Ignore));
+    let message = json!({"jsonrpc": "2.0", "id": 1, "method": "workspace/configuration", "params": {"items": [{}]}});
+    match classify(&message) {
+        Routed::Server(ServerMessage::Request { id, method, params }) => {
+            assert_eq!((id, method.as_str()), (json!(1), "workspace/configuration"));
+            assert_eq!(params, json!({"items": [{}]}));
+        }
+        other => panic!("a server request must reach the worker to be answered, got {}", name(&other)),
+    }
+}
+
+#[test]
+fn a_request_for_settings_gets_one_empty_answer_per_item() {
+    let answer = answer_for("workspace/configuration", &json!({"items": [{}, {}]}), Path::new("/"));
+    assert_eq!(answer, Ok(json!([null, null])));
+}
+
+#[test]
+fn a_registration_is_accepted_and_an_unknown_request_is_refused() {
+    assert_eq!(answer_for("client/registerCapability", &json!({}), Path::new("/")), Ok(Value::Null));
+    assert_eq!(answer_for("window/workDoneProgress/create", &json!({}), Path::new("/")), Ok(Value::Null));
+    assert!(matches!(answer_for("window/showDocument", &json!({}), Path::new("/")), Err((METHOD_NOT_FOUND, _))));
+}
+
+#[test]
+fn a_request_for_the_workspace_folders_gets_the_root() {
+    let root = std::env::temp_dir();
+    let answer = answer_for("workspace/workspaceFolders", &json!(null), &root).expect("the root exists");
+    assert_eq!(answer[0]["uri"], json!(path_to_uri(&root).unwrap().as_str()));
+}
+
+#[test]
+fn a_uri_escaped_either_way_names_the_same_path() {
+    let plain: Uri = "file:///work/@scope/x%20y.ts".parse().unwrap();
+    let escaped: Uri = "file:///work/%40scope/x%20y.ts".parse().unwrap();
+    assert_eq!(uri_to_path(&plain), Some(PathBuf::from("/work/@scope/x y.ts")));
+    assert_eq!(uri_to_path(&plain), uri_to_path(&escaped), "rust-analyzer and vscode-uri servers escape @ differently");
+    assert_eq!(uri_to_path(&"jdt://contents/x".parse().unwrap()), None, "not a file");
 }
 
 #[test]
@@ -123,36 +159,6 @@ fn name(routed: &Routed) -> &'static str {
     }
 }
 
-fn uri(path: &str) -> Uri {
-    path.parse().expect("a literal uri parses")
-}
-
-#[test]
-fn a_set_for_another_file_is_not_the_one_we_waited_for() {
-    assert!(!fresh_enough(&uri("file:///b.rs"), Some(2), &uri("file:///a.rs"), Some(2)));
-}
-
-#[test]
-fn a_set_the_server_published_before_our_edit_is_stale() {
-    // The empty set from indexing carries version 1; we asked about version 2.
-    assert!(!fresh_enough(&uri("file:///a.rs"), Some(1), &uri("file:///a.rs"), Some(2)));
-}
-
-#[test]
-fn a_set_for_our_edit_or_a_later_one_is_fresh() {
-    assert!(fresh_enough(&uri("file:///a.rs"), Some(2), &uri("file:///a.rs"), Some(2)));
-    assert!(fresh_enough(&uri("file:///a.rs"), Some(3), &uri("file:///a.rs"), Some(2)));
-}
-
-#[test]
-fn a_server_that_sends_no_version_is_taken_at_its_word() {
-    assert!(fresh_enough(&uri("file:///a.rs"), None, &uri("file:///a.rs"), Some(2)));
-}
-
-#[test]
-fn a_caller_that_asks_for_no_version_takes_the_next_set() {
-    assert!(fresh_enough(&uri("file:///a.rs"), Some(1), &uri("file:///a.rs"), None));
-}
 
 #[test]
 fn a_server_status_says_whether_it_is_quiet() {

@@ -63,38 +63,58 @@ fn a_request_the_server_cancelled_is_asked_again() {
 }
 
 #[test]
-fn only_the_newest_diagnostics_request_for_each_document_runs() {
+fn only_the_newest_question_of_each_kind_per_document_runs() {
     let (tx, rx) = std::sync::mpsc::channel();
-    let check = |path: &'static str, name: &'static str| {
+    let doc = |path: &str, text: &str| Doc { path: path.into(), text: text.into() };
+    let told = |name: &'static str| {
         let tx = tx.clone();
-        let doc = Doc { path: path.into(), text: name.into() };
-        Job::Diagnostics { doc, reply: Box::new(move |a| { let _ = tx.send((name, a.is_err())); }) }
+        move |failed: bool| {
+            let _ = tx.send((name, failed));
+        }
     };
-    let doc = Doc { path: "a.rs".into(), text: "h".into() };
-    let hover = Job::Hover { doc, position: Position::default(), reply: Box::new(|_| {}) };
-    let jobs = triage(vec![check("a.rs", "old"), hover, check("b.rs", "other file"), check("a.rs", "newest")]);
+    let check = |path: &str, name: &'static str| {
+        let tell = told(name);
+        Job::Diagnostics { doc: doc(path, name), reply: Box::new(move |a| tell(a.is_err())) }
+    };
+    let hover = |path: &str, name: &'static str| {
+        let tell = told(name);
+        Job::Hover { doc: doc(path, name), position: Position::default(), reply: Box::new(move |a| tell(a.is_err())) }
+    };
+    let find = |path: &str, name: &'static str| {
+        let tell = told(name);
+        Job::References { doc: doc(path, name), position: Position::default(), reply: Box::new(move |a| tell(a.is_err())) }
+    };
+    let batch = vec![
+        check("a.rs", "old check"),
+        hover("a.rs", "old hover"),
+        find("a.rs", "first find"),
+        check("b.rs", "other file"),
+        hover("a.rs", "new hover"),
+        find("a.rs", "second find"),
+        check("a.rs", "new check"),
+    ];
+    let jobs = triage(batch);
     let kept: Vec<_> = jobs
         .iter()
         .map(|job| match job {
-            Job::Diagnostics { doc, .. } => doc.text.as_str(),
-            Job::Hover { .. } => "hover",
-            Job::Navigate { .. } | Job::References { .. } => "other",
+            Job::Diagnostics { doc, .. } | Job::Hover { doc, .. } | Job::References { doc, .. } => doc.text.clone(),
+            Job::Navigate { .. } => "navigate".into(),
         })
         .collect();
-    assert_eq!(kept, ["hover", "other file", "newest"], "other requests keep their order");
+    assert_eq!(kept, ["first find", "other file", "new hover", "second find", "new check"], "order is kept");
     // The kept jobs hold senders too, so they go before the answers are read.
     drop((jobs, tx));
-    let told: Vec<_> = rx.iter().collect();
-    assert_eq!(told, [("old", true)], "only the older check for the same file is superseded");
+    let mut told: Vec<_> = rx.iter().collect();
+    told.sort();
+    assert_eq!(told, [("old check", true), ("old hover", true)], "each dropped question hears it was superseded");
 }
 
 #[test]
-fn a_file_uri_names_its_path_again() {
-    let path = std::env::temp_dir().join("lathe uri test/a%b.rs");
-    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, "").unwrap();
-    let uri = path_to_uri(&path).expect("an existing path has a uri");
-    assert_eq!(uri_to_path(&uri), Some(path.clone()));
-    assert_eq!(uri_to_path(&"https://docs.rs/x".parse().unwrap()), None, "not a file");
-    std::fs::remove_dir_all(path.parent().unwrap()).ok();
+fn a_path_is_canonical_and_a_missing_file_keeps_its_path() {
+    let dir = std::env::temp_dir().join(format!("lathe-canonical-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("a")).unwrap();
+    std::fs::write(dir.join("a/x.rs"), "").unwrap();
+    assert_eq!(canonical(&dir.join("a/../a/x.rs")), std::fs::canonicalize(dir.join("a/x.rs")).unwrap());
+    assert_eq!(canonical(Path::new("/no/such/file.rs")), PathBuf::from("/no/such/file.rs"));
+    std::fs::remove_dir_all(&dir).ok();
 }

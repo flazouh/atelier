@@ -7,7 +7,7 @@
 use std::{
     collections::HashMap,
     io::{BufReader, BufWriter, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Child, ChildStdin, Command, Stdio},
     sync::{
         Arc, Mutex,
@@ -77,6 +77,8 @@ pub enum ServerMessage {
     Diagnostics(PublishDiagnosticsParams),
     /// A log or status line, for the status row.
     Log(String),
+    /// A request the server sent us, which must be answered with [`LspClient::respond`].
+    Request { id: Value, method: String, params: Value },
     /// Whether the server has finished loading and checking (rust-analyzer's
     /// `experimental/serverStatus`). Before it says `true`, its answers can be empty for want of a
     /// loaded workspace rather than because nothing is there.
@@ -281,57 +283,6 @@ impl LspClient {
         }
     }
 
-    /// Waits for the next set of diagnostics for `path`, up to `timeout`. Sets for other files are
-    /// dropped, so a caller watching one file is not woken by its neighbours.
-    pub fn wait_for_diagnostics(
-        &self,
-        path: &Path,
-        timeout: Duration,
-    ) -> Result<PublishDiagnosticsParams, LspError> {
-        self.wait_for_diagnostics_at(path, None, timeout, DEFAULT_SETTLE)
-    }
-
-    /// What the server most recently says is wrong with `path` at document version `version`.
-    ///
-    /// A server publishes more than once for the same text: rust-analyzer sends an empty set while it
-    /// indexes, then the real one. An empty set is also how a server says a file is clean, so nothing
-    /// in the protocol tells the two apart. This waits for the first set that matches, then keeps
-    /// taking later matching sets until `settle` passes with none, and returns the last. That is the
-    /// server's settled answer rather than its first guess.
-    pub fn wait_for_diagnostics_at(
-        &self,
-        path: &Path,
-        version: Option<i32>,
-        timeout: Duration,
-        settle: Duration,
-    ) -> Result<PublishDiagnosticsParams, LspError> {
-        let want = path_to_uri(path)?;
-        let deadline = std::time::Instant::now() + timeout;
-        let mut best: Option<PublishDiagnosticsParams> = None;
-        loop {
-            let left = match &best {
-                // Nothing yet: wait for the whole deadline.
-                None => deadline.saturating_duration_since(std::time::Instant::now()),
-                // We have an answer: wait only for a better one.
-                Some(_) => settle.min(deadline.saturating_duration_since(std::time::Instant::now())),
-            };
-            if left.is_zero() {
-                return best.ok_or(LspError::Timeout);
-            }
-            match self.messages.recv_timeout(left) {
-                Ok(ServerMessage::Diagnostics(params))
-                    if fresh_enough(&params.uri, params.version, &want, version) =>
-                {
-                    best = Some(params);
-                }
-                Ok(ServerMessage::Exited) => return best.ok_or(LspError::Closed),
-                Ok(_) => continue,
-                Err(RecvTimeoutError::Timeout) => return best.ok_or(LspError::Timeout),
-                Err(RecvTimeoutError::Disconnected) => return best.ok_or(LspError::Closed),
-            }
-        }
-    }
-
     /// Asks the server to stop, then waits for it.
     pub fn shutdown(mut self, timeout: Duration) -> Result<(), LspError> {
         let _ = self.request::<lsp_types::request::Shutdown>((), timeout);
@@ -371,6 +322,15 @@ impl LspClient {
         N::Params: serde::Serialize,
     {
         let body = json!({ "jsonrpc": "2.0", "method": N::METHOD, "params": params });
+        self.send(&body)
+    }
+
+    /// Answers a request the server sent: `Ok` is the result, `Err` a code and a message.
+    pub fn respond(&mut self, id: Value, answer: Result<Value, (i64, String)>) -> Result<(), LspError> {
+        let body = match answer {
+            Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+            Err((code, message)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } }),
+        };
         self.send(&body)
     }
 
@@ -424,8 +384,12 @@ enum Routed {
 fn classify(message: &Value) -> Routed {
     if let Some(id) = message.get("id").and_then(Value::as_i64) {
         // A server request also carries a method; only a reply has none.
-        if message.get("method").is_some() {
-            return Routed::Ignore;
+        if let Some(method) = message.get("method").and_then(Value::as_str) {
+            return Routed::Server(ServerMessage::Request {
+                id: message["id"].clone(),
+                method: method.to_string(),
+                params: message.get("params").cloned().unwrap_or(Value::Null),
+            });
         }
         if let Some(error) = message.get("error") {
             let code = error.get("code").and_then(Value::as_i64).unwrap_or(0);
@@ -461,19 +425,6 @@ fn classify(message: &Value) -> Routed {
     }
 }
 
-/// Whether one published set answers what the caller asked for: the right file, and the version we
-/// sent or a later one. A server that sends no version is taken at its word, since there is nothing
-/// better to go on. Pulled out so the staleness rule can be tested without a server.
-fn fresh_enough(uri: &Uri, published: Option<i32>, want_uri: &Uri, want_version: Option<i32>) -> bool {
-    if uri != want_uri {
-        return false;
-    }
-    match (want_version, published) {
-        (None, _) => true,
-        (Some(_), None) => true,
-        (Some(want), Some(published)) => published >= want,
-    }
-}
 
 /// A file path as the `file://` URI every server expects.
 pub fn path_to_uri(path: &Path) -> Result<Uri, LspError> {
@@ -499,3 +450,51 @@ pub fn path_to_uri(path: &Path) -> Result<Uri, LspError> {
 
 #[cfg(test)]
 mod tests;
+
+/// The file a `file://` URI names, with its percent-escapes decoded. `None` for any other scheme,
+/// such as a server's virtual documents. Two servers may escape the same path differently (`@` or
+/// `%40`), so paths, never URI strings, are what the worker compares.
+pub fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
+    if uri.scheme().map(|s| s.as_str()) != Some("file") {
+        return None;
+    }
+    let bytes = uri.path().as_str().as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hex = std::str::from_utf8(bytes.get(i + 1..i + 3)?).ok()?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok().map(PathBuf::from)
+}
+
+/// JSON-RPC's code for a method the receiver does not implement.
+pub const METHOD_NOT_FOUND: i64 = -32601;
+
+/// What lathe answers to a request a server sends. A server that asks for settings gets none, so it
+/// uses its defaults; one that registers a capability or a progress token is told yes; one that asks
+/// for the workspace folders gets the one root. Anything else is not implemented, which a server must
+/// accept rather than hang on an answer that never comes.
+pub fn answer_for(method: &str, params: &Value, root: &Path) -> Result<Value, (i64, String)> {
+    match method {
+        "workspace/configuration" => {
+            let items = params.get("items").and_then(Value::as_array).map_or(0, Vec::len);
+            Ok(Value::Array(vec![Value::Null; items]))
+        }
+        "client/registerCapability" | "client/unregisterCapability" | "window/workDoneProgress/create" => {
+            Ok(Value::Null)
+        }
+        "workspace/workspaceFolders" => {
+            let uri = path_to_uri(root).map_err(|e| (-32603, e.to_string()))?;
+            let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            Ok(json!([{ "uri": uri.as_str(), "name": name }]))
+        }
+        other => Err((METHOD_NOT_FOUND, format!("lathe does not implement {other}"))),
+    }
+}

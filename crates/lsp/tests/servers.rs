@@ -21,7 +21,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, find_program, find_root, language_id, server_for};
+use lathe_lsp::{Doc, Found, LspError, Navigation, Workers, find_program, find_root, language_id, server_for};
 use lsp_types::{DiagnosticSeverity, Position};
 
 /// Servers index a project before they answer, so the waits are generous.
@@ -107,6 +107,53 @@ fn go() {
     check(&GO);
 }
 
+const JAVA: Fixture = Fixture {
+    language: "java",
+    project: &[(
+        "pom.xml",
+        "<project><modelVersion>4.0.0</modelVersion><groupId>f</groupId><artifactId>f</artifactId><version>1</version></project>\n",
+    )],
+    source: (
+        "src/main/java/Fixture.java",
+        "public class Fixture {\n    static int width() {\n        return 7;\n    }\n\n    static int broken() {\n        int text = \"not a number\";\n        return text + \"😀\".length() * 0 + width();\n    }\n}\n",
+    ),
+    declaration_line: 1,
+    error_line: 6,
+    call_line: 7,
+};
+
+#[test]
+fn java() {
+    check(&JAVA);
+}
+
+/// Two files of one project share one server, and a file of another project gets its own.
+#[test]
+fn one_server_per_project() {
+    let spec = server_for("rust").expect("rust has a server");
+    if find_program(spec.program).is_none() {
+        assert!(!required("rust"), "rust is required but {} is not installed", spec.program);
+        eprintln!("skipped: {} is not installed", spec.program);
+        return;
+    }
+    let base = std::env::temp_dir().join(format!("lathe-lsp-pool-{}", std::process::id()));
+    let manifest = "[package]\nname = \"p\"\nversion = \"0.1.0\"\nedition = \"2021\"\n";
+    for project in ["one", "two"] {
+        write(&base.join(project).join("Cargo.toml"), manifest);
+        write(&base.join(project).join("src/lib.rs"), "mod other;\n");
+        write(&base.join(project).join("src/other.rs"), "");
+    }
+    let workers = Workers::new(READY, ASK);
+    let lib = workers.for_file(&base.join("one/src/lib.rs")).expect("a server for the first file");
+    let other = workers.for_file(&base.join("one/src/other.rs")).expect("the same server for its neighbour");
+    let elsewhere = workers.for_file(&base.join("two/src/lib.rs")).expect("a server for the other project");
+    assert!(lib.same_server(&other), "one project, one server");
+    assert!(!lib.same_server(&elsewhere), "another project, another server");
+    assert_eq!(lib.root(), base.join("one").canonicalize().unwrap().as_path());
+    drop((lib, other, elsewhere, workers));
+    fs::remove_dir_all(&base).ok();
+}
+
 /// Whether `LATHE_REQUIRE_LSP` says this language must run.
 fn required(language: &str) -> bool {
     std::env::var("LATHE_REQUIRE_LSP")
@@ -143,11 +190,11 @@ fn once_ready<T: std::fmt::Debug>(what: &str, mut question: impl FnMut() -> Resu
 
 fn check(fixture: &Fixture) {
     let spec = server_for(fixture.language).expect("lathe knows a server for the language");
-    let Some(program) = find_program(spec.program) else {
+    if find_program(spec.program).is_none() {
         assert!(!required(fixture.language), "{} is required but {} is not installed", fixture.language, spec.program);
         eprintln!("skipped: {} is not installed, so {} is unproven here", spec.program, fixture.language);
         return;
-    };
+    }
 
     let dir = std::env::temp_dir().join(format!("lathe-lsp-{}-{}", fixture.language, std::process::id()));
     for (name, text) in fixture.project {
@@ -160,8 +207,9 @@ fn check(fixture: &Fixture) {
     let root = find_root(&path, spec.root_markers);
     assert_eq!(root, dir, "the root is the directory with the project file");
 
-    let (worker, name) = LspWorker::start(spec, &program, root, READY, ASK).expect("the server starts and shakes hands");
-    eprintln!("{}: {name}", fixture.language);
+    let workers = Workers::new(READY, ASK);
+    let worker = workers.for_file(&path).expect("the server starts and shakes hands");
+    eprintln!("{}: {}", fixture.language, worker.name());
     let doc = |text: &str| Doc { path: path.clone(), text: text.to_string() };
     let line = |text: &str, n: u32| text.split('\n').nth(n as usize).unwrap_or("").to_string();
 
@@ -216,7 +264,7 @@ fn check(fixture: &Fixture) {
     );
     assert_eq!(navigation.targets[0].range.start.line, fixture.declaration_line + 2, "the answer is about the edited text");
 
-    drop(worker);
+    drop((worker, workers));
     fs::remove_dir_all(&dir).ok();
 }
 

@@ -20,11 +20,10 @@ fn each_extension_gets_its_standard_language_id() {
 }
 
 #[test]
-fn every_language_id_has_exactly_one_server() {
-    for id in ["rust", "typescript", "typescriptreact", "javascript", "javascriptreact", "python", "go", "java"] {
-        let servers = SERVERS.iter().filter(|s| s.language_ids.contains(&id)).count();
+fn every_language_has_exactly_one_server() {
+    for (id, _) in LANGUAGES {
+        let servers = SERVERS.iter().filter(|s| s.language_ids.contains(id)).count();
         assert_eq!(servers, 1, "{id}");
-        assert!(server_for(id).is_some());
     }
     assert!(server_for("cobol").is_none());
 }
@@ -91,4 +90,13 @@ fn typescript_falls_back_to_the_typescript_beside_the_server() {
     std::fs::write(project.join("node_modules/typescript/lib/tsserver.js"), "").unwrap();
     assert_eq!(options(&program, &project), None, "a project's own TypeScript wins");
     std::fs::remove_dir_all(&base).ok();
+}
+
+#[test]
+fn no_extension_belongs_to_two_languages() {
+    let all: Vec<&str> = LANGUAGES.iter().flat_map(|(_, extensions)| extensions.iter().copied()).collect();
+    let mut unique = all.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(all.len(), unique.len(), "an extension listed twice would pick a language by table order");
 }

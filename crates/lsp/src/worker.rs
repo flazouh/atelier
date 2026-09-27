@@ -17,18 +17,23 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver, Sender},
+    },
     thread,
     time::{Duration, Instant},
 };
 
-use lsp_types::{Diagnostic, Hover, Position, PublishDiagnosticsParams, Range, Uri};
+use lsp_types::{Diagnostic, Hover, Position, Range, Uri};
 
 use crate::{
     DEFAULT_SETTLE, LspClient, LspError, ServerMessage,
-    client::path_to_uri,
+    client::{answer_for, uri_to_path},
     encoding::{Encoding, range_from_server, to_server},
     navigation::{Found, Navigation, Target, definition_links, lands_on_itself, sort_targets},
+    published::Published,
     servers::{ServerSpec, language_id},
 };
 
@@ -40,6 +45,12 @@ pub type Reply<T> = Box<dyn FnOnce(Result<T, LspError>) + Send>;
 pub struct Doc {
     pub path: PathBuf,
     pub text: String,
+}
+
+/// `path` with its links and `..` resolved, so one file is always one key, whatever path a caller or
+/// a server names it by. A file that does not exist keeps the path it was given.
+pub fn canonical(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// What the server has been told about one document.
@@ -82,6 +93,17 @@ enum Job {
 }
 
 impl Job {
+    /// The same job with its document's path made canonical.
+    fn with_canonical_path(self) -> Self {
+        let fix = |doc: Doc| Doc { path: canonical(&doc.path), ..doc };
+        match self {
+            Job::Navigate { doc, position, reply } => Job::Navigate { doc: fix(doc), position, reply },
+            Job::References { doc, position, reply } => Job::References { doc: fix(doc), position, reply },
+            Job::Hover { doc, position, reply } => Job::Hover { doc: fix(doc), position, reply },
+            Job::Diagnostics { doc, reply } => Job::Diagnostics { doc: fix(doc), reply },
+        }
+    }
+
     /// Answers the job with `error` instead of running it.
     fn fail(self, error: LspError) {
         match self {
@@ -98,41 +120,56 @@ impl Job {
 pub struct LspWorker {
     jobs: Sender<Job>,
     root: PathBuf,
+    name: String,
+    /// Cleared when the server stops, so whoever keeps workers can start a new one.
+    alive: Arc<AtomicBool>,
 }
 
 impl LspWorker {
     /// Starts `program` as the server `spec` describes, for the project at `root`, and moves it onto
     /// its own thread once it has shaken hands. It blocks for the handshake, so call it off the UI
-    /// thread. Returns the name the server gave. `ready` bounds the handshake, `ask` each request.
-    pub fn start(
-        spec: &ServerSpec,
-        program: &Path,
-        root: PathBuf,
-        ready: Duration,
-        ask: Duration,
-    ) -> Result<(Self, String), LspError> {
+    /// thread. `ready` bounds the handshake, `ask` each request.
+    pub fn start(spec: &ServerSpec, program: &Path, root: PathBuf, ready: Duration, ask: Duration) -> Result<Self, LspError> {
         let options = (spec.initialization_options)(program, &root);
         let (client, init) = LspClient::spawn(&program.to_string_lossy(), spec.args, &root, options, ready)?;
         let name = init.server_info.map(|i| i.name).unwrap_or_else(|| spec.name.to_string());
         let capabilities = init.capabilities;
+        let alive = Arc::new(AtomicBool::new(true));
         let session = Session {
             client,
+            root: root.clone(),
+            alive: alive.clone(),
             ask,
             encoding: Encoding::negotiated(capabilities.position_encoding.as_ref()),
             pulls: capabilities.diagnostic_provider.is_some(),
             documents: HashMap::new(),
-            published: HashMap::new(),
+            published: Published::default(),
             quiescent: None,
             exited: false,
         };
         let (jobs, queue) = mpsc::channel();
         thread::spawn(move || run(session, queue));
-        Ok((Self { jobs, root }, name))
+        Ok(Self { jobs, root, name, alive })
     }
 
     /// The project this worker serves.
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// The name the server gave itself.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Whether its server is still running.
+    pub fn is_alive(&self) -> bool {
+        self.alive.load(Ordering::Relaxed)
+    }
+
+    /// Whether `other` talks to the same server process.
+    pub fn same_server(&self, other: &LspWorker) -> bool {
+        Arc::ptr_eq(&self.alive, &other.alive)
     }
 
     /// Where a Cmd-click at `position` goes: the definition, or the symbol's uses when the caret is
@@ -168,13 +205,15 @@ impl LspWorker {
 /// What the worker's thread owns: the server, and what it knows about it.
 struct Session {
     client: LspClient,
+    root: PathBuf,
+    alive: Arc<AtomicBool>,
     ask: Duration,
     encoding: Encoding,
     /// Whether the server answers `textDocument/diagnostic`.
     pulls: bool,
     documents: HashMap<PathBuf, DocumentSync>,
-    /// The newest set the server published for each document.
-    published: HashMap<Uri, PublishDiagnosticsParams>,
+    /// What the server published on its own, for a server that does not answer pulls.
+    published: Published,
     /// `None` until the server says; a server that never does is taken as ready.
     quiescent: Option<bool>,
     /// Set once the server has stopped, so later jobs fail at once instead of timing out.
@@ -189,27 +228,29 @@ fn run(mut session: Session, queue: Receiver<Job>) {
             session.run(job);
         }
     }
+    session.alive.store(false, Ordering::Relaxed);
     let _ = session.client.shutdown(Duration::from_secs(2));
 }
 
-/// The jobs worth running from a batch, in order. Every diagnostics request but the newest for its
-/// document is answered `Superseded` and dropped.
+/// The jobs worth running from a batch, in order. A newer question of the same kind about the same
+/// document makes an older one moot: the text or the pointer it was about has moved on. So only the
+/// newest navigate, hover and diagnostics job per document runs, and the rest are answered
+/// `Superseded`. References, which the user asked for by name, always run.
 fn triage(batch: Vec<Job>) -> Vec<Job> {
-    let newest = |path: &Path| batch.iter().rposition(|job| matches!(job, Job::Diagnostics { doc, .. } if doc.path == path));
-    let keep_index: Vec<bool> = batch
-        .iter()
-        .enumerate()
-        .map(|(index, job)| match job {
-            Job::Diagnostics { doc, .. } => newest(&doc.path) == Some(index),
-            _ => true,
-        })
-        .collect();
+    let key = |job: &Job| match job {
+        Job::Navigate { doc, .. } => Some((0, doc.path.clone())),
+        Job::Hover { doc, .. } => Some((1, doc.path.clone())),
+        Job::Diagnostics { doc, .. } => Some((2, doc.path.clone())),
+        Job::References { .. } => None,
+    };
+    let keys: Vec<_> = batch.iter().map(key).collect();
     let mut keep = Vec::with_capacity(batch.len());
-    for (job, kept) in batch.into_iter().zip(keep_index) {
-        if kept {
-            keep.push(job);
-        } else {
+    for (index, job) in batch.into_iter().enumerate() {
+        let newer = keys[index].as_ref().is_some_and(|k| keys[index + 1..].iter().any(|later| later.as_ref() == Some(k)));
+        if newer {
             job.fail(LspError::Superseded);
+        } else {
+            keep.push(job);
         }
     }
     keep
@@ -221,6 +262,7 @@ impl Session {
         if self.exited {
             return job.fail(LspError::Closed);
         }
+        let job = job.with_canonical_path();
         match job {
             Job::Navigate { doc, position, reply } => reply(self.navigate(&doc, position)),
             Job::References { doc, position, reply } => reply(self.references(&doc, position)),
@@ -237,11 +279,13 @@ impl Session {
                 let id = language_id(&doc.path).unwrap_or("plaintext");
                 self.client.did_open(&doc.path, id, 1, &doc.text)?;
                 self.documents.insert(doc.path.clone(), DocumentSync::opened(doc.text.clone()));
+                self.published.synced(&doc.path);
             }
             Some(document) => {
                 if let Some(version) = document.next(&doc.text) {
                     self.client.did_change(&doc.path, version, &doc.text)?;
                     document.sent(&doc.text, version);
+                    self.published.synced(&doc.path);
                 }
             }
         }
@@ -256,7 +300,7 @@ impl Session {
             .into_iter()
             .map(|link| self.target(doc, link.target_uri, link.target_selection_range))
             .collect();
-        if !lands_on_itself(&targets, &path_to_uri(&doc.path)?, position) {
+        if !lands_on_itself(&targets, &doc.path, position) {
             return Ok(Navigation { found: Found::Definition, targets });
         }
         Ok(Navigation { found: Found::References, targets: self.references(doc, position)? })
@@ -305,11 +349,8 @@ impl Session {
     /// such set, then keeps taking newer ones until [`DEFAULT_SETTLE`] passes with none: a server can
     /// publish a quick guess before its real answer.
     fn published_for(&mut self, doc: &Doc) -> Result<Vec<Diagnostic>, LspError> {
-        let uri = path_to_uri(&doc.path)?;
-        let version = self.documents.get(&doc.path).map_or(1, DocumentSync::version);
-        let current = |session: &Session| {
-            session.published.get(&uri).filter(|set| set.version.is_none_or(|v| v >= version)).cloned()
-        };
+        let version = self.documents[&doc.path].version();
+        let current = |session: &Session| session.published.current(&doc.path, version).map(<[Diagnostic]>::to_vec);
         let deadline = Instant::now() + self.ask;
         let mut settle_until = current(self).map(|_| Instant::now() + DEFAULT_SETTLE);
         loop {
@@ -320,7 +361,8 @@ impl Session {
             }
             match self.client.messages.recv_timeout(left) {
                 Ok(message) => {
-                    let about_us = matches!(&message, ServerMessage::Diagnostics(set) if set.uri == uri);
+                    let about_us = matches!(&message, ServerMessage::Diagnostics(set)
+                        if uri_to_path(&set.uri).map(|p| canonical(&p)).as_deref() == Some(doc.path.as_path()));
                     self.note(message);
                     if about_us && current(self).is_some() {
                         settle_until = Some(Instant::now() + DEFAULT_SETTLE);
@@ -329,19 +371,19 @@ impl Session {
                 Err(_) => break,
             }
         }
-        current(self).map(|set| set.diagnostics).ok_or(LspError::Timeout)
+        current(self).ok_or(LspError::Timeout)
     }
 
     /// Where an answer points, with its range in characters and its line's text. The document's own
     /// text is used for itself, and a file on disk for any other; a file that cannot be read keeps the
     /// server's columns and no line text.
     fn target(&self, doc: &Doc, uri: Uri, range: Range) -> Target {
-        let here = path_to_uri(&doc.path).ok();
+        let path = uri_to_path(&uri).map(|p| canonical(&p));
         let disk;
-        let text = if Some(&uri) == here.as_ref() {
+        let text = if path.as_deref() == Some(doc.path.as_path()) {
             Some(doc.text.as_str())
         } else {
-            disk = uri_to_path(&uri).and_then(|path| std::fs::read_to_string(path).ok());
+            disk = path.as_deref().and_then(|p| std::fs::read_to_string(p).ok());
             disk.as_deref()
         };
         match text {
@@ -349,8 +391,9 @@ impl Session {
                 range: range_from_server(text, range, self.encoding),
                 line_text: text.split('\n').nth(range.start.line as usize).unwrap_or("").trim().to_string(),
                 uri,
+                path,
             },
-            None => Target { uri, range, line_text: String::new() },
+            None => Target { uri, path, range, line_text: String::new() },
         }
     }
 
@@ -364,12 +407,18 @@ impl Session {
     fn note(&mut self, message: ServerMessage) {
         match message {
             ServerMessage::Status { quiescent } => self.quiescent = Some(quiescent),
-            ServerMessage::Exited => self.exited = true,
+            ServerMessage::Exited => {
+                self.exited = true;
+                self.alive.store(false, Ordering::Relaxed);
+            }
             ServerMessage::Diagnostics(set) => {
-                let newer = self.published.get(&set.uri).is_none_or(|old| set.version >= old.version);
-                if newer {
-                    self.published.insert(set.uri.clone(), set);
+                if let Some(path) = uri_to_path(&set.uri) {
+                    self.published.store(canonical(&path), set.version, set.diagnostics);
                 }
+            }
+            ServerMessage::Request { id, method, params } => {
+                // A server that waits on an answer can stall; a failed send shows up on the next job.
+                let _ = self.client.respond(id, answer_for(&method, &params, &self.root));
             }
             ServerMessage::Log(_) => {}
         }
@@ -386,33 +435,6 @@ impl Session {
             }
         }
     }
-}
-
-/// The file a `file://` URI names. `None` for any other scheme, such as a server's virtual docs.
-fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
-    if uri.scheme().map(|s| s.as_str()) != Some("file") {
-        return None;
-    }
-    let path = uri.path().as_str();
-    let decoded = percent_decode(path)?;
-    Some(PathBuf::from(decoded))
-}
-
-fn percent_decode(text: &str) -> Option<String> {
-    let bytes = text.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' {
-            let hex = std::str::from_utf8(bytes.get(i + 1..i + 3)?).ok()?;
-            out.push(u8::from_str_radix(hex, 16).ok()?);
-            i += 3;
-        } else {
-            out.push(bytes[i]);
-            i += 1;
-        }
-    }
-    String::from_utf8(out).ok()
 }
 
 /// The code a server answers with when the text changed under a request, which LSP 3.17 names

@@ -12,10 +12,13 @@ pub mod client;
 pub mod encoding;
 pub mod framing;
 pub mod navigation;
+pub mod pool;
+pub mod published;
 pub mod servers;
 pub mod worker;
 
 pub use client::{DEFAULT_SETTLE, LspClient, LspError, ServerMessage};
 pub use navigation::{Found, Navigation, Target, definition_links};
-pub use servers::{SERVERS, ServerSpec, find_program, find_root, language_id, server_for};
-pub use worker::{CONTENT_MODIFIED, Doc, DocumentSync, LspWorker, Reply, SERVER_CANCELLED, until_settled};
+pub use pool::{NoServer, Workers};
+pub use servers::{LANGUAGES, SERVERS, ServerSpec, find_program, find_root, language_id, server_for};
+pub use worker::{CONTENT_MODIFIED, Doc, DocumentSync, LspWorker, Reply, SERVER_CANCELLED, canonical, until_settled};
