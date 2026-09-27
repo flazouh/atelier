@@ -97,6 +97,55 @@ A new crate, `crates/lsp`, with no UI.
   no answer, the status row says so; it never guesses a location.
 - The crate states plainly what it cannot do: no completion, no rename, no code actions yet.
 
+## Stage D: any language, and references
+
+The editor must work the same way for Rust, TypeScript, JavaScript, Python, Go and Java, and for a
+new language by adding data, not code. Nothing below the registry may name a language or a server.
+
+**Registry (`crates/lsp/src/servers.rs`, data only).** One `ServerSpec` per server: a name, the LSP
+language ids it serves, the program and its arguments, the files that mark a project root, and the
+install hint the status line shows when the program is missing. Built in:
+
+| Language ids | Server | Root markers |
+|---|---|---|
+| `rust` | `rust-analyzer` | `Cargo.toml` |
+| `typescript`, `typescriptreact`, `javascript`, `javascriptreact` | `typescript-language-server --stdio` | `tsconfig.json`, `jsconfig.json`, `package.json` |
+| `python` | `pyright-langserver --stdio` | `pyproject.toml`, `setup.py`, `requirements.txt`, `pyrightconfig.json` |
+| `go` | `gopls` | `go.mod` |
+| `java` | `jdtls` | `pom.xml`, `build.gradle`, `settings.gradle` |
+
+- `language_id(path)` maps a file extension to its standard LSP language id.
+- `find_program` looks in `PATH`, then in `~/.cargo/bin`, `~/.local/bin`, `~/go/bin`,
+  `/opt/homebrew/bin` and `/usr/local/bin`, since an app opened from the Finder has almost no `PATH`.
+- `find_root` walks up from the file to the nearest root marker; with none, the file's directory.
+
+**Worker, one per (server, root).** It keeps many documents open: a request carries its path and text,
+and a path the server has not seen is opened with `didOpen` and its language id. It reads the
+server's capabilities once and adapts:
+
+- Diagnostics are pulled when the server offers `diagnosticProvider`, and otherwise taken from the
+  newest published set for the document's current version, waited for with the settle rule above.
+- Positions: the client offers UTF-32 and UTF-16. The worker converts at its boundary, so every
+  position it takes or returns counts characters, which is what gpui-base uses. A caller never sees
+  the encoding.
+- rust-analyzer's `serverStatus` is read when sent and ignored otherwise.
+
+**Go to definition, then references, as Zed does.** One worker question, `navigate(path, text,
+position)`, asks `textDocument/definition`. If the answer is empty or only the symbol under the caret,
+it asks `textDocument/references` without the declaration. The answer says which kind it is and lists
+locations, each with its line's text for display.
+
+- Cmd-hover underlines the symbol whenever the answer is not empty, so a definition is clickable too.
+- One location: Cmd-click and F12 move the caret there.
+- Several: a references list under the editor, one row per location (file, line, the line's text);
+  a click on a row in this file moves the caret, in another file names it in the status line.
+- Shift-F12 asks for references directly.
+
+**Proof.** A live test per server, skipped when its program is missing unless `LATHE_REQUIRE_LSP` names
+it (`LATHE_REQUIRE_LSP=rust,typescript,python,go`): from a call, definition lands on the declaration;
+on the declaration, the fallback lands on the call; a type error is reported; hover names the symbol.
+The gallery's Editor story has a tab per language with a fixture project on disk.
+
 ## Checks
 
 - `tools/check.sh` on `hp-agent`: the workspace tests with a live rust-analyzer, clippy, the gallery
