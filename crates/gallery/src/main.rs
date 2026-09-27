@@ -8,7 +8,7 @@ use beui::{
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
     PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, SubagentRow, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
-    TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
+    StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
 use std::time::{Duration, Instant};
@@ -322,7 +322,7 @@ fn narrow(content: impl IntoElement) -> impl IntoElement {
 
 fn colors(cx: &App) -> impl IntoElement {
     let t = cx.theme();
-    let swatches: [(&str, Hsla); 13] = [
+    let swatches: [(&str, Hsla); 19] = [
         ("background", t.background),
         ("card", t.card),
         ("card strong", t.card_strong),
@@ -331,9 +331,15 @@ fn colors(cx: &App) -> impl IntoElement {
         ("primary", t.primary),
         ("primary foreground", t.primary_foreground),
         ("accent", t.accent),
+        ("info", t.info),
         ("danger", t.danger),
         ("success", t.success),
         ("warning", t.warning),
+        ("mark running", t.status_tone(StatusTone::Running)),
+        ("mark done", t.status_tone(StatusTone::Done)),
+        ("mark failed", t.status_tone(StatusTone::Failed)),
+        ("mark pending", t.status_tone(StatusTone::Pending)),
+        ("mark cancelled", t.status_tone(StatusTone::Cancelled)),
         ("diff added", t.diff_line(true)),
         ("diff removed", t.diff_line(false)),
     ];
