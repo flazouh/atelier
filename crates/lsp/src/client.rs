@@ -205,6 +205,20 @@ impl LspClient {
         path: &Path,
         timeout: Duration,
     ) -> Result<PublishDiagnosticsParams, LspError> {
+        self.wait_for_diagnostics_at(path, None, timeout)
+    }
+
+    /// The same, but only a set the server published for document version `version` or later.
+    ///
+    /// A server publishes an empty set while it indexes. That set sits in the queue, so a caller that
+    /// took the first set after an edit would read "nothing is wrong" about text the server had not
+    /// seen yet. Asking for the version we sent skips those.
+    pub fn wait_for_diagnostics_at(
+        &self,
+        path: &Path,
+        version: Option<i32>,
+        timeout: Duration,
+    ) -> Result<PublishDiagnosticsParams, LspError> {
         let want = path_to_uri(path)?;
         let deadline = std::time::Instant::now() + timeout;
         loop {
@@ -213,7 +227,11 @@ impl LspClient {
                 return Err(LspError::Timeout);
             }
             match self.messages.recv_timeout(left) {
-                Ok(ServerMessage::Diagnostics(params)) if params.uri == want => return Ok(params),
+                Ok(ServerMessage::Diagnostics(params))
+                    if fresh_enough(&params.uri, params.version, &want, version) =>
+                {
+                    return Ok(params);
+                }
                 Ok(ServerMessage::Exited) => return Err(LspError::Closed),
                 Ok(_) => continue,
                 Err(RecvTimeoutError::Timeout) => return Err(LspError::Timeout),
@@ -342,6 +360,20 @@ fn classify(message: &Value) -> Routed {
             Routed::Server(ServerMessage::Log(text))
         }
         _ => Routed::Ignore,
+    }
+}
+
+/// Whether one published set answers what the caller asked for: the right file, and the version we
+/// sent or a later one. A server that sends no version is taken at its word, since there is nothing
+/// better to go on. Pulled out so the staleness rule can be tested without a server.
+fn fresh_enough(uri: &Uri, published: Option<i32>, want_uri: &Uri, want_version: Option<i32>) -> bool {
+    if uri != want_uri {
+        return false;
+    }
+    match (want_version, published) {
+        (None, _) => true,
+        (Some(_), None) => true,
+        (Some(want), Some(published)) => published >= want,
     }
 }
 

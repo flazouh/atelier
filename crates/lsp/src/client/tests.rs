@@ -95,3 +95,34 @@ fn name(routed: &Routed) -> &'static str {
         Routed::Ignore => "an ignored message",
     }
 }
+
+fn uri(path: &str) -> Uri {
+    path.parse().expect("a literal uri parses")
+}
+
+#[test]
+fn a_set_for_another_file_is_not_the_one_we_waited_for() {
+    assert!(!fresh_enough(&uri("file:///b.rs"), Some(2), &uri("file:///a.rs"), Some(2)));
+}
+
+#[test]
+fn a_set_the_server_published_before_our_edit_is_stale() {
+    // The empty set from indexing carries version 1; we asked about version 2.
+    assert!(!fresh_enough(&uri("file:///a.rs"), Some(1), &uri("file:///a.rs"), Some(2)));
+}
+
+#[test]
+fn a_set_for_our_edit_or_a_later_one_is_fresh() {
+    assert!(fresh_enough(&uri("file:///a.rs"), Some(2), &uri("file:///a.rs"), Some(2)));
+    assert!(fresh_enough(&uri("file:///a.rs"), Some(3), &uri("file:///a.rs"), Some(2)));
+}
+
+#[test]
+fn a_server_that_sends_no_version_is_taken_at_its_word() {
+    assert!(fresh_enough(&uri("file:///a.rs"), None, &uri("file:///a.rs"), Some(2)));
+}
+
+#[test]
+fn a_caller_that_asks_for_no_version_takes_the_next_set() {
+    assert!(fresh_enough(&uri("file:///a.rs"), Some(1), &uri("file:///a.rs"), None));
+}

@@ -144,9 +144,13 @@ impl Gallery {
         };
         let text = self.editor.read(cx).value().to_string();
         let wait = std::time::Duration::from_secs(20);
+        // A new version each time, so a set the server published while indexing is not mistaken for
+        // an answer about this text.
+        self.lsp.version += 1;
+        let version = self.lsp.version;
         self.lsp.status = match client
-            .did_change(&file, 2, &text)
-            .and_then(|()| client.wait_for_diagnostics(&file, wait))
+            .did_change(&file, version, &text)
+            .and_then(|()| client.wait_for_diagnostics_at(&file, Some(version), wait))
         {
             Ok(params) => {
                 let found = params.diagnostics.len();
@@ -866,6 +870,8 @@ struct LspState {
     status: SharedString,
     /// The file on disk the server reads, so its answers are about a real path.
     file: Option<std::path::PathBuf>,
+    /// The document version last sent, so a stale set of diagnostics is skipped.
+    version: i32,
 }
 
 impl LspState {
@@ -894,6 +900,7 @@ impl LspState {
                 }
                 state.client = Some(client);
                 state.file = Some(file);
+                state.version = 1;
             }
             Err(error) => state.status = format!("{error}").into(),
         }
