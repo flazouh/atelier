@@ -415,6 +415,10 @@ pub struct InputBaseState<M: InputModeKind> {
     /// colours once and then never see them as unset again, which is the same
     /// freeze in a different place.
     projected_editor_style: InputEditorStyle,
+    /// lathe patch: a style the owner pinned. While it is set, `set_editor_style` applies it in place
+    /// of whatever it was given, so a wrapper that sets a theme style on every render cannot replace
+    /// the owner's.
+    pinned_editor_style: Option<InputEditorStyle>,
 
     /// The mask pattern for formatting the input text
     pub(crate) mask_pattern: MaskPattern,
@@ -733,6 +737,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             mask_pattern_set: false,
             editor_style: InputEditorStyle::default(),
             projected_editor_style: InputEditorStyle::default(),
+            pinned_editor_style: None,
             diagnostic_popover: None,
             context_menu_handler: None,
             pending_context_menu: None,
@@ -821,8 +826,19 @@ impl<M: InputModeKind> InputBaseState<M> {
     }
 
     pub fn set_editor_style(&mut self, style: InputEditorStyle) {
+        let style = self.pinned_editor_style.clone().unwrap_or(style);
         self.editor_style = style.clone();
         self.projected_editor_style = style;
+    }
+
+    /// lathe patch: pins `style`, so every later `set_editor_style` applies it instead of its own
+    /// argument. `None` unpins. gpui-component's `Input` sets a theme style on every render, after
+    /// its owner has set one, so without a pin an owner's style never reaches the screen.
+    pub fn pin_editor_style(&mut self, style: Option<InputEditorStyle>) {
+        self.pinned_editor_style = style.clone();
+        if let Some(style) = style {
+            self.set_editor_style(style);
+        }
     }
 
     /// Set presentation padding for multi-line text and its scrollbar layout.
@@ -6858,6 +6874,26 @@ mod tests {
             actual_cursors, expected_cursors,
             "Cursor mismatch:\nExpected: {expected_cursors:?}\nActual:   {actual_cursors:?}"
         );
+    }
+
+    /// lathe patch: a pinned style survives a later `set_editor_style`, and unpinning lets one through.
+    #[gpui::test]
+    fn test_a_pinned_editor_style_outlasts_a_theme_style(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        let ours = InputEditorStyle { caret: gpui::red(), ..Default::default() };
+        let theirs = InputEditorStyle { caret: gpui::blue(), ..Default::default() };
+        cx.update(|_, cx| {
+            view.input.update(cx, |state, _| {
+                state.pin_editor_style(Some(ours.clone()));
+                state.set_editor_style(theirs.clone());
+                assert_eq!(state.editor_style.caret, gpui::red(), "the pinned style stays");
+                state.pin_editor_style(None);
+                state.set_editor_style(theirs.clone());
+                assert_eq!(state.editor_style.caret, gpui::blue(), "unpinned, the next style applies");
+            });
+        });
     }
 
     /// lathe patch: select next occurrence selects the word, then each next match, wrapping.

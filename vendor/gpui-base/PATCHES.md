@@ -26,3 +26,12 @@ and skipping matches already selected. A selection that is exactly a word matche
 Code: `select_next_occurrence`, `next_occurrence` and `word_at_caret` in `src/input/base/selection.rs`,
 the binding and the listener in `src/input/base/state.rs`.
 Tests: `test_select_next_occurrence_adds_each_match_in_turn` and `next_occurrence_tests`.
+
+## 3. A pinned editor style
+
+gpui-component's `Input` calls `set_editor_style` with its theme's colours on every render, after
+the owner has set its own, so an owner's style never reached the screen: lathe's selection, current
+line, fill and diagnostic colours were all replaced. `pin_editor_style(Some(style))` makes every later
+`set_editor_style` apply the pinned style instead; `None` unpins.
+Code: `pinned_editor_style`, `set_editor_style`, `pin_editor_style` in `src/input/base/state.rs`.
+Test: `test_a_pinned_editor_style_outlasts_a_theme_style`.

@@ -124,6 +124,10 @@ struct Gallery {
     inline: Entity<gpui_kit::component::input::EditorState>,
     /// The hunks still waiting in that buffer.
     inline_hunks: Vec<InlineHunk>,
+    /// That buffer's text as the hunks last matched it, so an edit can move them with the rows.
+    inline_text: String,
+    /// Moves the hunks whenever the user edits that buffer.
+    _inline_edits: gpui_kit::Subscription,
     /// The Editor story's buffer, which the user can really type into.
     editor: Entity<gpui_kit::component::input::EditorState>,
     /// The language server behind the Editor story.
@@ -275,13 +279,28 @@ impl Gallery {
         })
         .detach();
         let _system = beui::watch_system(window, cx);
+        let inline = CodeEditor::state("config.rs", INLINE_FILE, window, cx);
+        // The user can type anywhere, so the hunks follow the rows they describe.
+        let _inline_edits = cx.subscribe(&inline, |this, state, event: &InputEvent, cx| {
+            if !matches!(event, InputEvent::Change) {
+                return;
+            }
+            let text = state.read(cx).value().to_string();
+            if text != this.inline_text {
+                this.inline_hunks = beui::inline_review::track_edit(&this.inline_hunks, &this.inline_text, &text);
+                this.inline_text = text;
+                cx.notify();
+            }
+        });
         let mut gallery =
             Self {
             story,
             choice: None,
             hunks: sample_hunks(),
-            inline: CodeEditor::state("config.rs", INLINE_FILE, window, cx),
+            inline,
             inline_hunks: inline_fixture(),
+            inline_text: INLINE_FILE.to_string(),
+            _inline_edits,
             editor: CodeEditor::state("lib.rs", SAMPLE_RUST, window, cx),
             lsp: LspState { status: "rust-analyzer is starting".into(), ..LspState::default() },
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
@@ -994,6 +1013,8 @@ fn inline_story(
             let closed = hunk.closing(*decision);
             beui::inline_review::apply(&this.inline, &[(hunk, *decision)], window, cx);
             this.inline_hunks = beui::inline_review::shift_after(&this.inline_hunks, id, &closed);
+            // The decision already moved the hunks; the edit it made must not move them again.
+            this.inline_text = this.inline.read(cx).value().to_string();
             cx.notify();
         },
     );
@@ -1016,9 +1037,9 @@ fn inline_story(
         .child(
             InlineReview::new("inline", state, hunks.to_vec())
                 .height(px(260.))
-                // The first hunk is the keyboard's, so its bar stays up without a pointer. That is
-                // also the only way a headless screenshot can show one.
-                .current("field")
+                // The first hunk left is the current one, so its bar stays up without a pointer. That
+                // is also the only way a headless screenshot can show one.
+                .when_some(hunks.first(), |review, hunk| review.current(hunk.id.clone()))
                 .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx)),
         )
 }
