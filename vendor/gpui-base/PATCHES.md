@@ -35,3 +35,15 @@ line, fill and diagnostic colours were all replaced. `pin_editor_style(Some(styl
 `set_editor_style` apply the pinned style instead; `None` unpins.
 Code: `pinned_editor_style`, `set_editor_style`, `pin_editor_style` in `src/input/base/state.rs`.
 Test: `test_a_pinned_editor_style_outlasts_a_theme_style`.
+
+## 4. Vertical moves at the edges, and the Cmd underline on release
+
+- Up on the first row goes to the very start of the text, and Down on the last row to the very end,
+  as in Zed. The goal column survives the trip. (`move_vertical` in `src/input/base/movement.rs`.)
+- A caret placed by `set_selected_range` had no column anchor, so the next Up or Down landed in
+  column 0. It now uses its own column. (Same place.)
+- Letting go of Cmd drops the definition underline instead of leaving it until the pointer moves.
+  (`clear_hover_definition` in `src/input/base/kind.rs` and `src/input/editor/mod.rs`, called from
+  the `on_modifiers_changed` listener in `src/input/base/state.rs`.)
+Test: `test_up_on_the_first_row_and_down_on_the_last_reach_the_ends`. The underline was checked by
+hand under Xvfb.

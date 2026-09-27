@@ -238,7 +238,9 @@ impl<M: InputModeKind> InputBaseState<M> {
                 let (effective, anchor, affinity) = if sel.is_empty() || !collapse {
                     (
                         sel.cursor_offset(),
-                        sel.column_anchor,
+                        // lathe patch: a caret placed by `set_selected_range` has no anchor, and
+                        // without one the move landed in column 0. Its own column is the goal.
+                        sel.column_anchor.or_else(|| s.preferred_column_for(sel.cursor_offset())),
                         s.line_end_affinity_for(sel),
                     )
                 } else if move_lines < 0 {
@@ -249,7 +251,13 @@ impl<M: InputModeKind> InputBaseState<M> {
                     (e, s.preferred_column_for(e), false)
                 };
                 let (offset, affinity) = s.vertical_target(effective, anchor, affinity, move_lines);
-                (offset, anchor, affinity)
+                // lathe patch: with no row left to move to, go to the very start or end, as Zed does.
+                // The anchor stays, so the goal column comes back on the way out.
+                match offset == effective {
+                    true if move_lines < 0 => (0, anchor, false),
+                    true => (s.text.len(), anchor, false),
+                    false => (offset, anchor, affinity),
+                }
             },
             Some(direction),
             window,

@@ -89,6 +89,15 @@ impl InputModeKind for EditorMode {
     ) {
         state.clear_hover_state(cx);
     }
+    fn clear_hover_definition(
+        state: &mut InputBaseState<Self>,
+        cx: &mut gpui::Context<InputBaseState<Self>>,
+    ) {
+        if !state.extras.hover_definition.is_empty() {
+            state.extras.hover_definition.clear();
+            cx.notify();
+        }
+    }
 
     fn on_text_typed(
         state: &mut InputBaseState<Self>,

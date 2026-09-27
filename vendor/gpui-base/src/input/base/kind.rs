@@ -242,6 +242,12 @@ pub trait InputModeKind: sealed::Sealed + Sized + 'static {
         _cx: &mut gpui::Context<InputBaseState<Self>>,
     ) {
     }
+    /// lathe patch: drops the Cmd-hover definition underline once Cmd is let go.
+    fn clear_hover_definition(
+        _state: &mut InputBaseState<Self>,
+        _cx: &mut gpui::Context<InputBaseState<Self>>,
+    ) {
+    }
 
     /// Offers freshly typed text to the completion engine.
     fn on_text_typed(

@@ -4282,7 +4282,13 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
             .on_mouse_move(window.listener_for(&entity, InputBaseState::on_mouse_move))
             .on_scroll_wheel(window.listener_for(&entity, InputBaseState::on_scroll_wheel))
             .when(self.is_multi_line() && !self.disabled, |this| {
-                this.on_modifiers_changed(cx.listener(|_, _, _, cx| cx.notify()))
+                this.on_modifiers_changed(cx.listener(|this, event: &gpui::ModifiersChangedEvent, _, cx| {
+                    // lathe patch: letting go of Cmd drops the definition underline, as in Zed.
+                    if !event.modifiers.secondary() {
+                        M::clear_hover_definition(this, cx);
+                    }
+                    cx.notify()
+                }))
             })
             .when(!self.disabled, |this| {
                 if self.is_multi_line() && window.modifiers().alt {
@@ -6894,6 +6900,31 @@ mod tests {
                 assert_eq!(state.editor_style.caret, gpui::blue(), "unpinned, the next style applies");
             });
         });
+    }
+
+    /// lathe patch: Up on the first row goes to the very start, Down on the last to the very end, and
+    /// the goal column survives the trip.
+    #[gpui::test]
+    fn test_up_on_the_first_row_and_down_on_the_last_reach_the_ends(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| {
+                state.set_value("abcd\nabcd", window, cx);
+                state.set_selected_range(7..7, cx);
+                state.focus(window, cx);
+            });
+        });
+        let caret = |cx: &mut VisualTestContext| view.input.read_with(cx, |state, _| state.cursor());
+        cx.simulate_keystrokes("up");
+        assert_eq!(caret(&mut cx), 2, "up a row, same column");
+        cx.simulate_keystrokes("up");
+        assert_eq!(caret(&mut cx), 0, "no row above: the very start");
+        cx.simulate_keystrokes("down");
+        assert_eq!(caret(&mut cx), 7, "the goal column came back");
+        cx.simulate_keystrokes("down");
+        assert_eq!(caret(&mut cx), 9, "no row below: the very end");
     }
 
     /// lathe patch: select next occurrence selects the word, then each next match, wrapping.
