@@ -16,3 +16,13 @@ column. They now share `select_vertical`, which uses `vertical_target` and the s
 `column_anchor`, as `move_vertical` does for plain Up and Down. Past the first or last row the head
 goes to the very start or end of the text, as in Zed.
 Test: `test_shift_up_and_down_keep_the_goal_column` (fails on 0.6.6 with `(8..13, 8)`).
+
+## 2. Select next occurrence (cmd-d, ctrl-d on Linux and Windows)
+
+gpui-base had multi-cursor but no way to add a selection at the next match. A new action,
+`SelectNextOccurrence`, works as Zed's: from a bare caret it selects the word the caret stands in or
+just after; from a selection it adds a selection at the next match of its text, wrapping to the top
+and skipping matches already selected. A selection that is exactly a word matches whole words only.
+Code: `select_next_occurrence`, `next_occurrence` and `word_at_caret` in `src/input/base/selection.rs`,
+the binding and the listener in `src/input/base/state.rs`.
+Tests: `test_select_next_occurrence_adds_each_match_in_turn` and `next_occurrence_tests`.

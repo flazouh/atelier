@@ -91,6 +91,7 @@ actions!(
         MovePageDown,
         AddCursorAbove,
         AddCursorBelow,
+        SelectNextOccurrence,
         SelectAll,
         SelectToStartOfLine,
         SelectToEndOfLine,
@@ -210,6 +211,11 @@ pub(crate) fn init(cx: &mut App) {
         KeyBinding::new("ctrl-alt-down", AddCursorBelow, Some(CONTEXT)),
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         KeyBinding::new("shift-alt-down", AddCursorBelow, Some(CONTEXT)),
+        // lathe patch: Zed's select next occurrence.
+        #[cfg(target_os = "macos")]
+        KeyBinding::new("cmd-d", SelectNextOccurrence, Some(CONTEXT)),
+        #[cfg(not(target_os = "macos"))]
+        KeyBinding::new("ctrl-d", SelectNextOccurrence, Some(CONTEXT)),
         KeyBinding::new("home", MoveHome, Some(CONTEXT)),
         KeyBinding::new("end", MoveEnd, Some(CONTEXT)),
         #[cfg(not(target_os = "macos"))]
@@ -4222,6 +4228,7 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
                     .on_action(window.listener_for(&entity, InputBaseState::page_down))
                     .on_action(window.listener_for(&entity, InputBaseState::add_cursor_above))
                     .on_action(window.listener_for(&entity, InputBaseState::add_cursor_below))
+                    .on_action(window.listener_for(&entity, InputBaseState::select_next_occurrence))
             })
             .on_action(window.listener_for(&entity, InputBaseState::on_action_select_all))
             .on_action(window.listener_for(&entity, InputBaseState::select_to_start_of_line))
@@ -6851,6 +6858,37 @@ mod tests {
             actual_cursors, expected_cursors,
             "Cursor mismatch:\nExpected: {expected_cursors:?}\nActual:   {actual_cursors:?}"
         );
+    }
+
+    /// lathe patch: select next occurrence selects the word, then each next match, wrapping.
+    #[gpui::test]
+    fn test_select_next_occurrence_adds_each_match_in_turn(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        // `ab` sits at 0, 7 and 14; `abc` at 3 only counts as text, not as the word `ab`.
+        setup_cursors(&mut cx, &view.input, "ab abc ab|\nab");
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| state.focus(window, cx));
+        });
+        let ranges = |cx: &mut VisualTestContext| {
+            view.input.read_with(cx, |state, _| {
+                let mut all: Vec<_> = state.selections.iter().map(|s| s.start..s.end).collect();
+                all.sort_by_key(|r| r.start);
+                all
+            })
+        };
+        let key = if cfg!(target_os = "macos") { "cmd-d" } else { "ctrl-d" };
+        cx.simulate_keystrokes(key);
+        assert_eq!(ranges(&mut cx), vec![7..9], "first press: the word at the caret");
+        cx.simulate_keystrokes(key);
+        assert_eq!(ranges(&mut cx), vec![7..9, 10..12], "then the next whole word, not part of abc");
+        cx.simulate_keystrokes(key);
+        assert_eq!(ranges(&mut cx), vec![0..2, 7..9, 10..12], "then it wraps to the top");
+        cx.simulate_keystrokes(key);
+        assert_eq!(ranges(&mut cx), vec![0..2, 7..9, 10..12], "and stops once every match is taken");
+        cx.simulate_keystrokes("x");
+        assert_cursors(&mut cx, &view.input, "x| abc x|\nx|");
     }
 
     /// lathe patch: Shift+Up/Down keep the goal column, and past the edge select to the very start or end.
