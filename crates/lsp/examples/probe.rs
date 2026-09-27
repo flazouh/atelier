@@ -39,6 +39,7 @@ fn main() {
                 params.diagnostics.iter().map(|d| d.message.as_str()).collect::<Vec<_>>()
             ),
             Ok(ServerMessage::Log(text)) => println!("log: {text}"),
+            Ok(ServerMessage::Status { quiescent }) => println!("status: quiescent={quiescent}"),
             Ok(ServerMessage::Exited) => {
                 println!("the server exited");
                 break;

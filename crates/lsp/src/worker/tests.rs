@@ -96,3 +96,14 @@ fn a_server_that_never_settles_gives_up_by_the_deadline() {
     assert!(matches!(answer, Err(LspError::Server { code: CONTENT_MODIFIED, .. })));
     assert!(started.elapsed() < Duration::from_millis(600), "it stops near the deadline");
 }
+
+#[test]
+fn a_request_the_server_cancelled_is_asked_again() {
+    let mut calls = 0;
+    let answer = until_settled(Duration::from_secs(5), || {
+        calls += 1;
+        if calls < 2 { Err(LspError::Server { code: SERVER_CANCELLED, message: "busy".into() }) } else { Ok(()) }
+    });
+    assert!(answer.is_ok());
+    assert_eq!(calls, 2);
+}

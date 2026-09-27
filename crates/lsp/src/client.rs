@@ -19,9 +19,9 @@ use std::{
 };
 
 use lsp_types::{
-    ClientCapabilities, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, InitializeParams, InitializeResult,
-    PartialResultParams, Position, PublishDiagnosticsParams, TextDocumentContentChangeEvent,
+    ClientCapabilities, Diagnostic, DiagnosticClientCapabilities, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, InitializeParams, InitializeResult,
+    PartialResultParams, Position, PublishDiagnosticsParams, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
     TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri, VersionedTextDocumentIdentifier,
     WorkDoneProgressParams, request::Request,
 };
@@ -74,6 +74,10 @@ pub enum ServerMessage {
     Diagnostics(PublishDiagnosticsParams),
     /// A log or status line, for the status row.
     Log(String),
+    /// Whether the server has finished loading and checking (rust-analyzer's
+    /// `experimental/serverStatus`). Before it says `true`, its answers can be empty for want of a
+    /// loaded workspace rather than because nothing is there.
+    Status { quiescent: bool },
     /// The server stopped.
     Exited,
 }
@@ -131,7 +135,17 @@ impl LspClient {
         #[allow(deprecated)] // `root_uri` is the field every server still reads.
         let params = InitializeParams {
             root_uri: Some(uri),
-            capabilities: ClientCapabilities::default(),
+            capabilities: ClientCapabilities {
+                // Saying we pull diagnostics is what makes rust-analyzer answer a pull with its full
+                // checks; without it the answer is empty.
+                text_document: Some(TextDocumentClientCapabilities {
+                    diagnostic: Some(DiagnosticClientCapabilities::default()),
+                    ..Default::default()
+                }),
+                // rust-analyzer then says when it has loaded the workspace. Other servers ignore it.
+                experimental: Some(json!({ "serverStatusNotification": true })),
+                ..Default::default()
+            },
             ..Default::default()
         };
         let result: InitializeResult = self.request::<lsp_types::request::Initialize>(params, timeout)?;
@@ -200,6 +214,33 @@ impl LspClient {
             work_done_progress_params: WorkDoneProgressParams::default(),
         };
         self.request::<lsp_types::request::HoverRequest>(params, timeout)
+    }
+
+    /// What is wrong with `path` now, worked out by the server when asked (LSP 3.17 pull diagnostics).
+    /// Unlike a published set, the answer is always about the text the server has at that moment, so
+    /// there is nothing to wait out. rust-analyzer answers with its own checks; `cargo check` results
+    /// still arrive only as published sets.
+    pub fn pull_diagnostics(&mut self, path: &Path, timeout: Duration) -> Result<Vec<Diagnostic>, LspError> {
+        let params = DocumentDiagnosticParams {
+            text_document: TextDocumentIdentifier { uri: path_to_uri(path)? },
+            identifier: None,
+            previous_result_id: None,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        match self.request::<lsp_types::request::DocumentDiagnosticRequest>(params, timeout)? {
+            DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(report)) => {
+                Ok(report.full_document_diagnostic_report.items)
+            }
+            // We never name an earlier report, so "unchanged" or a partial answer means the server did
+            // not follow the protocol.
+            DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Unchanged(_)) => {
+                Err(LspError::Protocol("the server said unchanged, but no earlier report was named".into()))
+            }
+            DocumentDiagnosticReportResult::Partial(_) => {
+                Err(LspError::Protocol("the server sent a partial report nobody asked for".into()))
+            }
+        }
     }
 
     /// Waits for the next set of diagnostics for `path`, up to `timeout`. Sets for other files are
@@ -361,6 +402,12 @@ fn classify(message: &Value) -> Routed {
             match serde_json::from_value(message.get("params").cloned().unwrap_or(Value::Null)) {
                 Ok(params) => Routed::Server(ServerMessage::Diagnostics(params)),
                 Err(_) => Routed::Ignore,
+            }
+        }
+        Some("experimental/serverStatus") => {
+            match message.get("params").and_then(|p| p.get("quiescent")).and_then(Value::as_bool) {
+                Some(quiescent) => Routed::Server(ServerMessage::Status { quiescent }),
+                None => Routed::Ignore,
             }
         }
         Some("window/logMessage") | Some("window/showMessage") => {

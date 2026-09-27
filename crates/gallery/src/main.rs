@@ -18,6 +18,8 @@ use std::{
 
 mod editor_lsp;
 
+use gpui_kit::base::input::InputEvent;
+
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, ElementId, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
     ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div,
@@ -148,34 +150,49 @@ struct Replay {
 }
 
 impl Gallery {
-    /// Sends the buffer to the server, then shows whatever it says is wrong. The button is explicit,
-    /// so the gallery never asks a server while the user reads another story. The answer arrives off
-    /// the main thread, so the window keeps drawing while the server thinks.
-    fn pull_diagnostics(&mut self, cx: &mut Context<Self>) {
+    /// Sends the buffer to the server and shows what it says is wrong. `announce` is the Check button:
+    /// it says so in the status line. An edit refreshes quietly. A set lands only if the buffer still
+    /// holds the text it was worked out for, so an underline never sits on the wrong line.
+    fn pull_diagnostics(&mut self, announce: bool, cx: &mut Context<Self>) {
         let Some(worker) = self.lsp.worker.clone() else { return };
         let text = self.editor.read(cx).value().to_string();
-        let answer = editor_lsp::ask(cx, |reply| worker.diagnostics(text, reply));
-        self.lsp.status = "checking…".into();
-        self.lsp.pending = cx.spawn(async move |this, cx| {
+        let answer = editor_lsp::ask(cx, |reply| worker.diagnostics(text.clone(), reply));
+        if announce {
+            self.lsp.status = "checking…".into();
+        }
+        self.lsp.checking = cx.spawn(async move |this, cx| {
             let answer = answer.await;
             _ = this.update(cx, |this, cx| {
-                this.lsp.status = match answer {
-                    Ok(params) => {
-                        let first = params.diagnostics.first().map(|d| d.message.clone()).unwrap_or_default();
-                        let status = match params.diagnostics.len() {
+                if this.editor.read(cx).value().as_ref() != text {
+                    return;
+                }
+                match answer {
+                    Ok(diagnostics) => {
+                        let first = diagnostics.first().map(|d| d.message.clone()).unwrap_or_default();
+                        this.lsp.status = match diagnostics.len() {
                             0 => "the server finds nothing wrong".into(),
                             1 => format!("1 problem: {first}").into(),
                             n => format!("{n} problems, first: {first}").into(),
                         };
-                        beui::code_editor::set_diagnostics(&this.editor, params.diagnostics, cx);
-                        status
+                        beui::code_editor::set_diagnostics(&this.editor, diagnostics, cx);
                     }
-                    Err(error) => format!("{error}").into(),
-                };
+                    Err(error) => this.lsp.status = format!("{error}").into(),
+                }
                 cx.notify();
             });
         });
         cx.notify();
+    }
+
+    /// Checks the buffer again once typing pauses for [`RECHECK_AFTER`], as Zed does.
+    fn schedule_recheck(&mut self, cx: &mut Context<Self>) {
+        if self.lsp.worker.is_none() {
+            return;
+        }
+        self.lsp.recheck = cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(RECHECK_AFTER).await;
+            _ = this.update(cx, |this, cx| this.pull_diagnostics(false, cx));
+        });
     }
 
     /// Asks the server where the symbol under the caret is defined and moves the caret there, as F12
@@ -294,6 +311,12 @@ impl Gallery {
                         });
                         editor_lsp::attach(&this.editor, worker.clone(), elsewhere, cx);
                         this.lsp.worker = Some(worker);
+                        this.lsp.edits = Some(cx.subscribe(&this.editor, |this, _, event: &InputEvent, cx| {
+                            if matches!(event, InputEvent::Change) {
+                                this.schedule_recheck(cx);
+                            }
+                        }));
+                        this.pull_diagnostics(false, cx);
                         this.lsp.status = format!("{name} is ready: hold {SECONDARY} and click a symbol, or press F12").into();
                     }
                     Err(error) => this.lsp.status = error.into(),
@@ -922,11 +945,27 @@ struct LspState {
     status: SharedString,
     /// The one question in flight from a button or F12. A newer one replaces it.
     pending: Task<()>,
+    /// The diagnostics request in flight. A newer one replaces it.
+    checking: Task<()>,
+    /// The timer that re-checks once typing pauses.
+    recheck: Task<()>,
+    /// Watches the buffer for edits, once the server is ready.
+    edits: Option<gpui_kit::Subscription>,
 }
+
+/// How long typing must pause before the buffer is checked again. docs/code-editor.md sets 150ms.
+const RECHECK_AFTER: Duration = Duration::from_millis(150);
 
 impl Default for LspState {
     fn default() -> Self {
-        Self { worker: None, status: SharedString::default(), pending: Task::ready(()) }
+        Self {
+            worker: None,
+            status: SharedString::default(),
+            pending: Task::ready(()),
+            checking: Task::ready(()),
+            recheck: Task::ready(()),
+            edits: None,
+        }
     }
 }
 
@@ -990,7 +1029,7 @@ fn editor_story(
     cx: &mut Context<Gallery>,
 ) -> impl IntoElement {
     let go = cx.listener(|this, _, window, cx| this.go_to_definition(window, cx));
-    let check = cx.listener(|this, _, _, cx| this.pull_diagnostics(cx));
+    let check = cx.listener(|this, _, _, cx| this.pull_diagnostics(true, cx));
     div()
         .flex()
         .flex_col()

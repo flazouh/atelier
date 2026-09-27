@@ -153,3 +153,15 @@ fn a_server_that_sends_no_version_is_taken_at_its_word() {
 fn a_caller_that_asks_for_no_version_takes_the_next_set() {
     assert!(fresh_enough(&uri("file:///a.rs"), Some(1), &uri("file:///a.rs"), None));
 }
+
+#[test]
+fn a_server_status_says_whether_it_is_quiet() {
+    let routed = classify(&json!({
+        "jsonrpc": "2.0",
+        "method": "experimental/serverStatus",
+        "params": { "health": "ok", "quiescent": false, "message": "Loading" }
+    }));
+    assert!(matches!(routed, Routed::Server(ServerMessage::Status { quiescent: false })));
+    let without = classify(&json!({ "jsonrpc": "2.0", "method": "experimental/serverStatus", "params": {} }));
+    assert_eq!(name(&without), "an ignored message", "a status with no quiescent field tells us nothing");
+}

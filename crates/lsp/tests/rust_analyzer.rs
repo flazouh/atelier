@@ -152,12 +152,21 @@ fn the_worker_answers_off_the_callers_thread_and_about_the_latest_text() {
     // answer about the old text would still say line 0.
     let edited = format!("// one\n// two\n{text}");
     let column = edited.lines().nth(8).expect("line 8 exists").find("width").expect("the call is there") as u32;
-    let (tx, rx) = std::sync::mpsc::channel();
+    let at = Position { line: 8, character: column + 1 };
     let asked = std::time::Instant::now();
-    worker.definition(edited.clone(), Position { line: 8, character: column + 1 }, Box::new(move |a| drop(tx.send(a))));
+    let (tx, rx) = std::sync::mpsc::channel();
+    worker.definition(edited.clone(), at, Box::new(move |a| drop(tx.send(a))));
     assert!(asked.elapsed() < Duration::from_millis(50), "asking never waits on the server");
-    let answer = rx.recv_timeout(ASK).expect("the worker replies").expect("the server answers");
-    assert_eq!(first_line(&definition_links(answer)), Some(2), "the answer is about the edited text");
+    drop(rx);
+    // Right after an edit the server may answer `null` while it re-reads the file: not ready, not
+    // wrong. An answer about the old text would say line 0.
+    let links = once_indexed(|| {
+        let (tx, rx) = std::sync::mpsc::channel();
+        worker.definition(edited.clone(), at, Box::new(move |a| drop(tx.send(a))));
+        let answer = rx.recv_timeout(ASK).map_err(|_| LspError::Timeout)??;
+        Ok(Some(definition_links(answer)).filter(|links| !links.is_empty()))
+    });
+    assert_eq!(first_line(&links), Some(2), "the answer is about the edited text");
 
     let (tx, rx) = std::sync::mpsc::channel();
     worker.hover(edited.clone(), Position { line: 8, character: column + 1 }, Box::new(move |a| drop(tx.send(a))));
@@ -165,18 +174,18 @@ fn the_worker_answers_off_the_callers_thread_and_about_the_latest_text() {
     let shown = format!("{:?}", hover.expect("rust-analyzer describes width").contents);
     assert!(shown.contains("width"), "the hover names the function: {shown}");
 
-    // Asking again about text the server has already checked answers at once, not after a timeout.
-    let (tx, rx) = std::sync::mpsc::channel();
-    worker.diagnostics(edited.clone(), Box::new(move |a| drop(tx.send(a))));
-    let first = rx.recv_timeout(ASK).expect("the worker replies").expect("the server settles");
-    let error = first.diagnostics.iter().find(|d| d.severity == Some(DiagnosticSeverity::ERROR));
-    assert_eq!(error.map(|d| d.range.start.line), Some(7), "the type error moved down two lines with the edit");
-    let (tx, rx) = std::sync::mpsc::channel();
-    let again = std::time::Instant::now();
-    worker.diagnostics(edited, Box::new(move |a| drop(tx.send(a))));
-    let second = rx.recv_timeout(ASK).expect("the worker replies").expect("a known set comes back");
-    assert!(again.elapsed() < Duration::from_secs(1), "a repeat answers from what is known");
-    assert_eq!(first.diagnostics, second.diagnostics);
+    // Diagnostics are pulled for the text the worker sends, so each answer is about that text and
+    // no other. Three more lines on top move the type error from line 5 to line 8.
+    let error_line = |text: String| {
+        let (tx, rx) = std::sync::mpsc::channel();
+        worker.diagnostics(text, Box::new(move |a| drop(tx.send(a))));
+        let found = rx.recv_timeout(ASK).expect("the worker replies").expect("the server answers");
+        found.iter().find(|d| d.severity == Some(DiagnosticSeverity::ERROR)).map(|d| d.range.start.line)
+    };
+    let moved = format!("// three\n{edited}");
+    assert_eq!(error_line(moved.clone()), Some(8), "the pulled set is about the text just sent");
+    assert_eq!(error_line(text.clone()), Some(5), "and going back is about the old text again");
+    assert_eq!(error_line(moved), Some(8));
 
     drop(worker);
     fs::remove_dir_all(&dir).ok();

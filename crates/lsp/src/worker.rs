@@ -4,18 +4,22 @@
 //! seen before it asks, so an answer is always about what the user sees. Answers come back through a
 //! callback on the worker's thread; the caller moves them wherever it needs them.
 //!
+//! Diagnostics are pulled (LSP 3.17 `textDocument/diagnostic`), not waited for. A published set can
+//! be about older text: under load rust-analyzer tags a stale result with the newest version. A
+//! pulled one is worked out on the text the server has when it answers.
+//!
 //! The server stops when the last [`LspWorker`] handle is dropped.
 
 use std::{
     path::{Path, PathBuf},
-    sync::mpsc::{self, Receiver, Sender, TryRecvError},
+    sync::mpsc::{self, Receiver, Sender},
     thread,
     time::Duration,
 };
 
-use lsp_types::{GotoDefinitionResponse, Hover, LocationLink, Position, PublishDiagnosticsParams};
+use lsp_types::{Diagnostic, GotoDefinitionResponse, Hover, LocationLink, Position};
 
-use crate::{DEFAULT_SETTLE, LspClient, LspError, ServerMessage};
+use crate::{LspClient, LspError, ServerMessage};
 
 /// Where an answer goes. It runs on the worker's thread.
 pub type Reply<T> = Box<dyn FnOnce(Result<T, LspError>) + Send>;
@@ -75,7 +79,7 @@ pub fn first_line(links: &[LocationLink]) -> Option<u32> {
 enum Job {
     Definition { text: String, position: Position, reply: Reply<Option<GotoDefinitionResponse>> },
     Hover { text: String, position: Position, reply: Reply<Option<Hover>> },
-    Diagnostics { text: String, reply: Reply<PublishDiagnosticsParams> },
+    Diagnostics { text: String, reply: Reply<Vec<Diagnostic>> },
 }
 
 /// A cheap handle to the thread that owns the server. Clone it for each place that asks.
@@ -87,7 +91,7 @@ pub struct LspWorker {
 
 impl LspWorker {
     /// Moves `client` onto its own thread. `path` is the one open document, which the server already
-    /// has as `opened`. `ask` bounds each request and each wait for diagnostics.
+    /// has as `opened`. `ask` bounds each request.
     pub fn start(client: LspClient, path: PathBuf, opened: DocumentSync, ask: Duration) -> Self {
         let (jobs, queue) = mpsc::channel();
         let thread_path = path.clone();
@@ -110,8 +114,8 @@ impl LspWorker {
         self.send(Job::Hover { text, position, reply });
     }
 
-    /// What the server says is wrong with `text`, once it has settled.
-    pub fn diagnostics(&self, text: String, reply: Reply<PublishDiagnosticsParams>) {
+    /// What the server says is wrong with `text`.
+    pub fn diagnostics(&self, text: String, reply: Reply<Vec<Diagnostic>>) {
         self.send(Job::Diagnostics { text, reply });
     }
 
@@ -129,10 +133,10 @@ impl LspWorker {
 }
 
 fn run(mut client: LspClient, path: &Path, mut document: DocumentSync, ask: Duration, queue: Receiver<Job>) {
-    // The last settled set, so asking twice about the same text answers at once. A server says
-    // nothing new about text it has already checked.
-    let mut settled: Option<PublishDiagnosticsParams> = None;
+    // `None` until the server says; a server that never does is taken as ready.
+    let mut quiescent: Option<bool> = None;
     for job in queue {
+        heard(&client, &mut quiescent);
         match job {
             Job::Definition { text, position, reply } => reply(
                 sync(&mut client, path, &mut document, &text)
@@ -142,27 +146,47 @@ fn run(mut client: LspClient, path: &Path, mut document: DocumentSync, ask: Dura
                 sync(&mut client, path, &mut document, &text)
                     .and_then(|()| until_settled(ask, || client.hover(path, position, ask))),
             ),
-            Job::Diagnostics { text, reply } => {
-                let answer = sync(&mut client, path, &mut document, &text).and_then(|()| {
-                    let version = document.version();
-                    let known = settled.clone().filter(|s| s.version == Some(version));
-                    let fresh = match known {
-                        Some(known) => Ok(newest(&client, known)),
-                        None => client.wait_for_diagnostics_at(path, Some(version), ask, DEFAULT_SETTLE),
-                    }?;
-                    settled = Some(fresh.clone());
-                    Ok(fresh)
-                });
-                reply(answer)
-            }
+            Job::Diagnostics { text, reply } => reply(sync(&mut client, path, &mut document, &text).and_then(|()| {
+                // An empty answer from a server still loading would read as a clean file.
+                wait_until_quiet(&client, &mut quiescent, ask);
+                until_settled(ask, || client.pull_diagnostics(path, ask))
+            })),
         }
     }
     let _ = client.shutdown(Duration::from_secs(2));
 }
 
+/// Reads what the server said on its own since the last look. Only its status matters here:
+/// published diagnostics are replaced by pulled ones.
+fn heard(client: &LspClient, quiescent: &mut Option<bool>) {
+    while let Ok(message) = client.messages.try_recv() {
+        if let ServerMessage::Status { quiescent: quiet } = message {
+            *quiescent = Some(quiet);
+        }
+    }
+}
+
+/// Waits, up to `ask`, for a server that said it is busy to say it is done.
+fn wait_until_quiet(client: &LspClient, quiescent: &mut Option<bool>, ask: Duration) {
+    heard(client, quiescent);
+    let deadline = std::time::Instant::now() + ask;
+    while *quiescent == Some(false) {
+        let left = deadline.saturating_duration_since(std::time::Instant::now());
+        match client.messages.recv_timeout(left) {
+            Ok(ServerMessage::Status { quiescent: quiet }) => *quiescent = Some(quiet),
+            Ok(_) => {}
+            Err(_) => return,
+        }
+    }
+}
+
 /// The code a server answers with when the text changed under a request, which LSP 3.17 names
 /// `ContentModified`. rust-analyzer sends it for a request that arrives just after a `didChange`.
 pub const CONTENT_MODIFIED: i64 = -32801;
+
+/// The code for a request the server dropped and wants asked again, which LSP 3.17 names
+/// `ServerCancelled`. A pull for diagnostics can get it while the server is busy.
+pub const SERVER_CANCELLED: i64 = -32802;
 
 /// Asks again while the server says the text moved under it, as the spec tells a client to, backing
 /// off a little each time. Any other answer, and the last one once `ask` has passed, goes back as is.
@@ -171,7 +195,9 @@ pub fn until_settled<T>(ask: Duration, mut request: impl FnMut() -> Result<T, Ls
     let mut pause = Duration::from_millis(50);
     loop {
         match request() {
-            Err(LspError::Server { code: CONTENT_MODIFIED, .. }) if std::time::Instant::now() + pause < deadline => {
+            Err(LspError::Server { code: CONTENT_MODIFIED | SERVER_CANCELLED, .. })
+                if std::time::Instant::now() + pause < deadline =>
+            {
                 thread::sleep(pause);
                 pause = (pause * 2).min(Duration::from_millis(800));
             }
@@ -184,20 +210,6 @@ fn sync(client: &mut LspClient, path: &Path, document: &mut DocumentSync, text: 
     match document.change(text) {
         Some(version) => client.did_change(path, version, text),
         None => Ok(()),
-    }
-}
-
-/// `known`, or a later set for the same file and version the server has sent since.
-fn newest(client: &LspClient, known: PublishDiagnosticsParams) -> PublishDiagnosticsParams {
-    let mut best = known;
-    loop {
-        match client.messages.try_recv() {
-            Ok(ServerMessage::Diagnostics(params)) if params.uri == best.uri && params.version >= best.version => {
-                best = params
-            }
-            Ok(_) => continue,
-            Err(TryRecvError::Empty | TryRecvError::Disconnected) => return best,
-        }
     }
 }
 
