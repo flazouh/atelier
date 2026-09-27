@@ -54,3 +54,21 @@ A fold hid its rows and flipped the gutter chevron, but the text showed nothing.
 line now ends in a small `⋯` chip, and a click on it unfolds the rows. Code: `FoldIconLayout::
 placeholders`, laid out in `layout_fold_icons` and painted in `paint_fold_icons`, in
 `src/input/base/element.rs`. Checked by hand under Xvfb: fold, chip shown, click, rows back.
+
+## 6. F12 goes to definition from the caret
+
+`GoToDefinition` only reused the location a Cmd-hover had cached, so with the pointer elsewhere it
+did nothing, and nothing bound it. With no cached answer for the caret it now asks the
+`DefinitionProvider` at the caret and jumps through the same `go_to_definition` path a Cmd-click
+takes, `show_document` included. F12 is bound to it.
+Code: `on_action_go_to_definition` in `src/input/editor/lsp/definitions.rs`, the binding in
+`src/input/base/state.rs`. Checked by hand under Xvfb.
+
+## 7. Every selection, readable and settable
+
+`selected_ranges()` returns every selection in text order, and `set_selected_ranges(&[..])` replaces
+them all, so an owner's multi-cursor command can put every cursor back. Before, only the active
+selection was public, and `set_selected_range` dropped the others.
+Test: `test_selected_ranges_round_trip`.
+
+Patches 1 and 4 share `vertical_target_or_edge` in `src/input/base/movement.rs`.

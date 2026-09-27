@@ -114,15 +114,25 @@ impl InputBaseState<EditorMode> {
     ) {
         let offset = self.cursor();
         if let Some((symbol_range, locations)) = self.extras.hover_definition.last_location.clone()
+            && (symbol_range.start..=symbol_range.end).contains(&offset)
+            && let Some(location) = locations.first().cloned()
         {
-            if !(symbol_range.start..=symbol_range.end).contains(&offset) {
-                return;
-            }
-
-            if let Some(location) = locations.first().cloned() {
-                self.go_to_definition(&location, window, cx);
-            }
+            self.go_to_definition(&location, window, cx);
+            return;
         }
+        // lathe patch: with no Cmd-hover answer for the caret, ask the provider, as F12 does in
+        // Zed. It used to do nothing unless the pointer had hovered the symbol first.
+        let Some(provider) = self.extras.lsp.definition_provider.clone() else {
+            return;
+        };
+        let task = provider.definitions(&self.text, offset, window, cx);
+        self.extras.lsp._hover_task = cx.spawn_in(window, async move |editor, cx| {
+            let locations = task.await?;
+            if let Some(location) = locations.first().cloned() {
+                editor.update_in(cx, |editor, window, cx| editor.go_to_definition(&location, window, cx))?;
+            }
+            Ok(())
+        });
     }
 
     /// Return true if handled.

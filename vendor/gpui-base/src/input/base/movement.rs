@@ -95,6 +95,23 @@ impl<M: InputModeKind> InputBaseState<M> {
         cx.notify()
     }
 
+    /// lathe patch: [`Self::vertical_target`], except that with no row left to move to it lands on
+    /// the very start (up) or end (down) of the text, as Zed does.
+    pub(super) fn vertical_target_or_edge(
+        &self,
+        offset: usize,
+        column_anchor: Option<(Pixels, usize)>,
+        line_end_affinity: bool,
+        move_lines: isize,
+    ) -> (usize, bool) {
+        let (target, affinity) = self.vertical_target(offset, column_anchor, line_end_affinity, move_lines);
+        match target == offset {
+            true if move_lines < 0 => (0, false),
+            true => (self.text.len(), false),
+            false => (target, affinity),
+        }
+    }
+
     /// Compute the target offset when moving a cursor at `offset` vertically by
     /// `move_lines`, honoring the remembered `column_anchor`. Wrap/fold-aware.
     ///
@@ -250,14 +267,9 @@ impl<M: InputModeKind> InputBaseState<M> {
                     let e = s.next_boundary(sel.end.saturating_sub(1));
                     (e, s.preferred_column_for(e), false)
                 };
-                let (offset, affinity) = s.vertical_target(effective, anchor, affinity, move_lines);
-                // lathe patch: with no row left to move to, go to the very start or end, as Zed does.
-                // The anchor stays, so the goal column comes back on the way out.
-                match offset == effective {
-                    true if move_lines < 0 => (0, anchor, false),
-                    true => (s.text.len(), anchor, false),
-                    false => (offset, anchor, affinity),
-                }
+                let (offset, affinity) = s.vertical_target_or_edge(effective, anchor, affinity, move_lines);
+                // The anchor stays, so the goal column comes back on the way out of an edge.
+                (offset, anchor, affinity)
             },
             Some(direction),
             window,

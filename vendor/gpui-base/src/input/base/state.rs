@@ -298,6 +298,8 @@ pub(crate) fn init(cx: &mut App) {
         KeyBinding::new("cmd-.", ToggleCodeActions, Some(CONTEXT)),
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("ctrl-.", ToggleCodeActions, Some(CONTEXT)),
+        // lathe patch: go to definition from the caret, as in Zed.
+        KeyBinding::new("f12", GoToDefinition, Some(CONTEXT)),
         #[cfg(target_os = "macos")]
         KeyBinding::new("cmd-f", Search, Some(CONTEXT)),
         #[cfg(not(target_os = "macos"))]
@@ -1326,7 +1328,6 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.pause_blink_cursor(cx);
         self.undo_manager.break_transaction_coalescing();
         M::clear_inline_completion(self, cx);
-        let len = self.text.len();
         let new_selections: Vec<CursorSelection> = self
             .selections
             .iter()
@@ -1334,12 +1335,8 @@ impl<M: InputModeKind> InputBaseState<M> {
                 let head = sel.cursor_offset();
                 let anchor = sel.column_anchor.or_else(|| self.preferred_column_for(head));
                 let affinity = self.line_end_affinity_for(sel);
-                let (target, _) = self.vertical_target(head, anchor, affinity, move_lines);
-                let target = match target == head {
-                    true if move_lines < 0 => 0,
-                    true => len,
-                    false => self.cursor_boundary(target, Bias::Left),
-                };
+                let (target, _) = self.vertical_target_or_edge(head, anchor, affinity, move_lines);
+                let target = self.cursor_boundary(target, Bias::Left);
                 let mut new_sel = *sel;
                 Self::extend_selection(&mut new_sel, target, None);
                 new_sel.column_anchor = anchor;
@@ -2877,6 +2874,31 @@ impl<M: InputModeKind> InputBaseState<M> {
     ///
     /// Non-empty ranges expand to character boundaries. Empty ranges remain empty and are
     /// clipped to the preceding character boundary.
+    /// lathe patch: every selection as a byte range, in text order.
+    pub fn selected_ranges(&self) -> Vec<Range<usize>> {
+        let mut ranges: Vec<_> = self.selections.iter().map(|sel| sel.start..sel.end).collect();
+        ranges.sort_by_key(|range| range.start);
+        ranges
+    }
+
+    /// lathe patch: replaces every selection with `ranges`, each with its caret at its end, so a
+    /// command that edits many selections can put them all back. The first becomes the active one.
+    /// An empty slice changes nothing.
+    pub fn set_selected_ranges(&mut self, ranges: &[Range<usize>], cx: &mut Context<Self>) {
+        let selections: Vec<CursorSelection> = ranges
+            .iter()
+            .map(|range| {
+                let start = self.text.clip_offset(range.start, Bias::Left);
+                let end = self.text.clip_offset(range.end, Bias::Right).max(start);
+                CursorSelection::new(self.selections.generate_id(), start, end)
+            })
+            .collect();
+        self.selections.replace_all(selections);
+        self.selections.merge_overlapping();
+        self.scroll_to(self.cursor(), None, cx);
+        cx.notify();
+    }
+
     pub fn set_selected_range(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
         let end_bias = if range.start == range.end {
             Bias::Left
@@ -6925,6 +6947,27 @@ mod tests {
         assert_eq!(caret(&mut cx), 7, "the goal column came back");
         cx.simulate_keystrokes("down");
         assert_eq!(caret(&mut cx), 9, "no row below: the very end");
+    }
+
+    /// lathe patch: every selection can be read and put back as byte ranges.
+    #[gpui::test]
+    fn test_selected_ranges_round_trip(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| {
+                state.set_value("one\ntwo\nthree", window, cx);
+                state.set_selected_ranges(&[8..13, 0..3, 5..5], cx);
+                assert_eq!(state.selected_ranges(), vec![0..3, 5..5, 8..13]);
+                state.focus(window, cx);
+            });
+        });
+        cx.simulate_keystrokes("x");
+        view.input.read_with(&cx, |state, _| {
+            assert_eq!(state.value().as_ref(), "x\ntxwo\nx", "each selection took the key");
+            assert_eq!(state.selected_ranges(), vec![1..1, 4..4, 8..8]);
+        });
     }
 
     /// lathe patch: select next occurrence selects the word, then each next match, wrapping.
