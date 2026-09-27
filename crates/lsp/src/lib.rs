@@ -11,4 +11,4 @@
 pub mod client;
 pub mod framing;
 
-pub use client::{LspClient, LspError, ServerMessage};
+pub use client::{DEFAULT_SETTLE, LspClient, LspError, ServerMessage};

@@ -30,6 +30,10 @@ use serde_json::{Value, json};
 
 use crate::framing::{read_message, write_message};
 
+/// How long to keep listening for a better set of diagnostics once one has arrived. rust-analyzer's
+/// empty indexing set and its real answer land within a few hundred milliseconds of each other.
+pub const DEFAULT_SETTLE: Duration = Duration::from_millis(600);
+
 /// What went wrong. Each one says which side failed, so a caller can tell a missing server from a
 /// server that answered badly.
 #[derive(Debug)]
@@ -205,37 +209,46 @@ impl LspClient {
         path: &Path,
         timeout: Duration,
     ) -> Result<PublishDiagnosticsParams, LspError> {
-        self.wait_for_diagnostics_at(path, None, timeout)
+        self.wait_for_diagnostics_at(path, None, timeout, DEFAULT_SETTLE)
     }
 
-    /// The same, but only a set the server published for document version `version` or later.
+    /// What the server most recently says is wrong with `path` at document version `version`.
     ///
-    /// A server publishes an empty set while it indexes. That set sits in the queue, so a caller that
-    /// took the first set after an edit would read "nothing is wrong" about text the server had not
-    /// seen yet. Asking for the version we sent skips those.
+    /// A server publishes more than once for the same text: rust-analyzer sends an empty set while it
+    /// indexes, then the real one. An empty set is also how a server says a file is clean, so nothing
+    /// in the protocol tells the two apart. This waits for the first set that matches, then keeps
+    /// taking later matching sets until `settle` passes with none, and returns the last. That is the
+    /// server's settled answer rather than its first guess.
     pub fn wait_for_diagnostics_at(
         &self,
         path: &Path,
         version: Option<i32>,
         timeout: Duration,
+        settle: Duration,
     ) -> Result<PublishDiagnosticsParams, LspError> {
         let want = path_to_uri(path)?;
         let deadline = std::time::Instant::now() + timeout;
+        let mut best: Option<PublishDiagnosticsParams> = None;
         loop {
-            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            let left = match &best {
+                // Nothing yet: wait for the whole deadline.
+                None => deadline.saturating_duration_since(std::time::Instant::now()),
+                // We have an answer: wait only for a better one.
+                Some(_) => settle.min(deadline.saturating_duration_since(std::time::Instant::now())),
+            };
             if left.is_zero() {
-                return Err(LspError::Timeout);
+                return best.ok_or(LspError::Timeout);
             }
             match self.messages.recv_timeout(left) {
                 Ok(ServerMessage::Diagnostics(params))
                     if fresh_enough(&params.uri, params.version, &want, version) =>
                 {
-                    return Ok(params);
+                    best = Some(params);
                 }
-                Ok(ServerMessage::Exited) => return Err(LspError::Closed),
+                Ok(ServerMessage::Exited) => return best.ok_or(LspError::Closed),
                 Ok(_) => continue,
-                Err(RecvTimeoutError::Timeout) => return Err(LspError::Timeout),
-                Err(RecvTimeoutError::Disconnected) => return Err(LspError::Closed),
+                Err(RecvTimeoutError::Timeout) => return best.ok_or(LspError::Timeout),
+                Err(RecvTimeoutError::Disconnected) => return best.ok_or(LspError::Closed),
             }
         }
     }

@@ -144,14 +144,19 @@ impl Gallery {
         };
         let text = self.editor.read(cx).value().to_string();
         let wait = std::time::Duration::from_secs(20);
-        // A new version each time, so a set the server published while indexing is not mistaken for
-        // an answer about this text.
-        self.lsp.version += 1;
+        // Only tell the server about text it has not seen. A no-op change makes it publish nothing,
+        // so bumping the version there would leave us waiting for an answer that never comes.
+        let sent = if text == self.lsp.sent {
+            Ok(())
+        } else {
+            self.lsp.version += 1;
+            self.lsp.sent = text.clone();
+            client.did_change(&file, self.lsp.version, &text)
+        };
         let version = self.lsp.version;
-        self.lsp.status = match client
-            .did_change(&file, version, &text)
-            .and_then(|()| client.wait_for_diagnostics_at(&file, Some(version), wait))
-        {
+        self.lsp.status = match sent.and_then(|()| {
+            client.wait_for_diagnostics_at(&file, Some(version), wait, lathe_lsp::DEFAULT_SETTLE)
+        }) {
             Ok(params) => {
                 let found = params.diagnostics.len();
                 let diagnostics = params.diagnostics.clone();
@@ -872,6 +877,8 @@ struct LspState {
     file: Option<std::path::PathBuf>,
     /// The document version last sent, so a stale set of diagnostics is skipped.
     version: i32,
+    /// The text last sent, so an unchanged buffer is not sent again.
+    sent: String,
 }
 
 impl LspState {
@@ -901,6 +908,7 @@ impl LspState {
                 state.client = Some(client);
                 state.file = Some(file);
                 state.version = 1;
+                state.sent = text.to_string();
             }
             Err(error) => state.status = format!("{error}").into(),
         }
