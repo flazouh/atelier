@@ -4360,13 +4360,8 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
                     cx.notify()
                 }))
             })
-            .when(!self.disabled, |this| {
-                if self.is_multi_line() && window.modifiers().alt {
-                    this.cursor_crosshair()
-                } else {
-                    this.cursor_text()
-                }
-            })
+            // lathe patch: the pointer is set by the text element, over the text only; see
+            // `TextElement::paint`. Set here, it covered the gutter and every control on top.
             .flex_1()
             .when(self.is_multi_line(), |this| this.h_full())
             .flex_grow_1()

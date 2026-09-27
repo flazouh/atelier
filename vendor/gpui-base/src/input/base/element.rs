@@ -1326,6 +1326,7 @@ impl<M: InputModeKind> TextElement<M> {
             let mut icon = gpui::div()
                 .id(("fold", ix))
                 .size(FOLD_ICON_WIDTH)
+                .cursor_pointer()
                 .child(child)
                 .on_mouse_down(MouseButton::Left, {
                     let state = self.state.clone();
@@ -1760,6 +1761,8 @@ pub(super) struct PrepaintState {
     fold_icon_layout: FoldIconLayout,
     /// lathe patch: the owner's row widgets, laid out for this frame.
     row_widgets: Vec<AnyElement>,
+    /// lathe patch: the text area, right of the gutter, where the pointer is an I-beam.
+    text_hitbox: Hitbox,
     // Inline completion rendering data
     /// Shaped ghost lines to paint after cursor row (completion lines 2+)
     ghost_lines: Vec<ShapedLine>,
@@ -2256,6 +2259,14 @@ impl<M: InputModeKind> Element for TextElement<M> {
         let fold_icon_layout =
             self.layout_fold_icons(original_x, &bounds, &last_layout, window, cx);
         let row_widgets = self.layout_row_widgets(input_bounds, &bounds, &last_layout, window, cx);
+        let gutter_width = last_layout.line_number_width;
+        let text_hitbox = window.insert_hitbox(
+            Bounds::from_corners(
+                point(original_x + gutter_width, input_bounds.origin.y),
+                input_bounds.bottom_right(),
+            ),
+            HitboxBehavior::Normal,
+        );
         let hitbox = window.insert_hitbox(input_bounds, HitboxBehavior::Normal);
 
         PrepaintState {
@@ -2275,6 +2286,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             indent_guides_path,
             fold_icon_layout,
             row_widgets,
+            text_hitbox,
             ghost_first_line,
             ghost_lines,
             ghost_lines_height,
@@ -2291,6 +2303,18 @@ impl<M: InputModeKind> Element for TextElement<M> {
         window: &mut Window,
         cx: &mut App,
     ) {
+        // lathe patch: the I-beam belongs to the text, and the gutter keeps the arrow, as in Zed.
+        // Everything painted after this sets its own pointer over them: fold chevrons, the fold
+        // chip, an owner's row widgets, a Cmd-hovered link.
+        if !self.state.read(cx).disabled {
+            let text_pointer = if self.state.read(cx).is_multi_line() && window.modifiers().alt {
+                gpui::CursorStyle::Crosshair
+            } else {
+                gpui::CursorStyle::IBeam
+            };
+            window.set_cursor_style(text_pointer, &prepaint.text_hitbox);
+            window.set_cursor_style(gpui::CursorStyle::Arrow, &prepaint.fold_icon_layout.line_number_hitbox);
+        }
         let (focus_handle, show_cursor, disabled, selected_range, editor_style, editor_paddings) = {
             let state = self.state.read(cx);
             (
