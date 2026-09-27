@@ -11,7 +11,12 @@ use beui::{
     CodeEditor, Decision, Hunk, HunkReview, HunkState, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
-use std::time::{Duration, Instant};
+use std::{
+    rc::Rc,
+    time::{Duration, Instant},
+};
+
+mod editor_lsp;
 
 use gpui_kit::{
     AnyElement, App, AppContext, Bounds, Context, ElementId, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
@@ -144,69 +149,73 @@ struct Replay {
 
 impl Gallery {
     /// Sends the buffer to the server, then shows whatever it says is wrong. The button is explicit,
-    /// so the gallery never waits on a server while the user reads another story.
+    /// so the gallery never asks a server while the user reads another story. The answer arrives off
+    /// the main thread, so the window keeps drawing while the server thinks.
     fn pull_diagnostics(&mut self, cx: &mut Context<Self>) {
-        let (Some(client), Some(file)) = (self.lsp.client.as_mut(), self.lsp.file.clone()) else {
-            return;
-        };
+        let Some(worker) = self.lsp.worker.clone() else { return };
         let text = self.editor.read(cx).value().to_string();
-        let wait = std::time::Duration::from_secs(20);
-        // Only tell the server about text it has not seen. A no-op change makes it publish nothing,
-        // so bumping the version there would leave us waiting for an answer that never comes.
-        let sent = if text == self.lsp.sent {
-            Ok(())
-        } else {
-            self.lsp.version += 1;
-            self.lsp.sent = text.clone();
-            client.did_change(&file, self.lsp.version, &text)
-        };
-        let version = self.lsp.version;
-        self.lsp.status = match sent.and_then(|()| {
-            client.wait_for_diagnostics_at(&file, Some(version), wait, lathe_lsp::DEFAULT_SETTLE)
-        }) {
-            Ok(params) => {
-                let found = params.diagnostics.len();
-                let diagnostics = params.diagnostics.clone();
-                let editor = self.editor.clone();
-                cx.defer(move |cx| beui::code_editor::set_diagnostics(&editor, diagnostics, cx));
-                let first = params.diagnostics.first().map(|d| d.message.clone()).unwrap_or_default();
-                match found {
-                    0 => "the server finds nothing wrong".into(),
-                    1 => format!("1 problem: {first}").into(),
-                    n => format!("{n} problems, first: {first}").into(),
-                }
-            }
-            Err(error) => format!("{error}").into(),
-        };
-        cx.notify();
-    }
-
-    /// Asks the server where the symbol under the cursor is defined, and says what came back.
-    fn go_to_definition(&mut self, cx: &mut Context<Self>) {
-        let (Some(client), Some(file)) = (self.lsp.client.as_mut(), self.lsp.file.clone()) else {
-            return;
-        };
-        let position = self.editor.read(cx).cursor_position();
-        let wait = std::time::Duration::from_secs(20);
-        self.lsp.status = match client.definition(&file, position, wait) {
-            Ok(Some(answer)) => {
-                let line = match answer {
-                    lsp_types::GotoDefinitionResponse::Scalar(l) => Some(l.range.start.line),
-                    lsp_types::GotoDefinitionResponse::Array(l) => l.first().map(|l| l.range.start.line),
-                    lsp_types::GotoDefinitionResponse::Link(l) => l.first().map(|l| l.target_range.start.line),
+        let answer = editor_lsp::ask(cx, |reply| worker.diagnostics(text, reply));
+        self.lsp.status = "checking…".into();
+        self.lsp.pending = cx.spawn(async move |this, cx| {
+            let answer = answer.await;
+            _ = this.update(cx, |this, cx| {
+                this.lsp.status = match answer {
+                    Ok(params) => {
+                        let first = params.diagnostics.first().map(|d| d.message.clone()).unwrap_or_default();
+                        let status = match params.diagnostics.len() {
+                            0 => "the server finds nothing wrong".into(),
+                            1 => format!("1 problem: {first}").into(),
+                            n => format!("{n} problems, first: {first}").into(),
+                        };
+                        beui::code_editor::set_diagnostics(&this.editor, params.diagnostics, cx);
+                        status
+                    }
+                    Err(error) => format!("{error}").into(),
                 };
-                match line {
-                    // A server answer is one-based to a reader, so the line is shown as the editor does.
-                    Some(line) => format!("defined on line {}", line + 1).into(),
-                    None => "the server answered with no location".into(),
-                }
-            }
-            Ok(None) => "the server knows of no definition there".into(),
-            Err(error) => format!("{error}").into(),
-        };
+                cx.notify();
+            });
+        });
         cx.notify();
     }
 
+    /// Asks the server where the symbol under the caret is defined and moves the caret there, as F12
+    /// does in Zed. A definition in another file is named in the status line; the editor never jumps
+    /// to a line of the wrong file.
+    fn go_to_definition(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(worker) = self.lsp.worker.clone() else { return };
+        let here = editor_lsp::document_uri(&worker);
+        let (text, position) = {
+            let state = self.editor.read(cx);
+            (state.value().to_string(), state.cursor_position())
+        };
+        let answer = editor_lsp::ask(cx, |reply| worker.definition(text, position, reply));
+        self.lsp.status = "looking…".into();
+        self.lsp.pending = cx.spawn_in(window, async move |this, cx| {
+            let answer = answer.await;
+            _ = this.update_in(cx, |this, window, cx| {
+                this.lsp.status = match answer.map(lathe_lsp::definition_links) {
+                    Ok(links) => match links.first() {
+                        Some(link) if Some(&link.target_uri) == here.as_ref() => {
+                            let start = link.target_selection_range.start;
+                            this.editor.update(cx, |state, cx| state.set_cursor_position(start, window, cx));
+                            // A server answer is one-based to a reader, so the line is shown as the editor does.
+                            format!("defined on line {}", start.line + 1).into()
+                        }
+                        Some(link) => format!(
+                            "defined in {} on line {}",
+                            editor_lsp::display_path(&link.target_uri),
+                            link.target_selection_range.start.line + 1
+                        )
+                        .into(),
+                        None => "the server knows of no definition there".into(),
+                    },
+                    Err(error) => format!("{error}").into(),
+                };
+                cx.notify();
+            });
+        });
+        cx.notify();
+    }
 
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let story = std::env::var("GALLERY_STORY")
@@ -257,12 +266,41 @@ impl Gallery {
             inline: CodeEditor::state("config.rs", INLINE_FILE, window, cx),
             inline_hunks: inline_fixture(),
             editor: CodeEditor::state("lib.rs", SAMPLE_RUST, window, cx),
-            lsp: LspState::start(SAMPLE_RUST),
+            lsp: LspState { status: "rust-analyzer is starting".into(), ..LspState::default() },
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
         }
+        gallery.start_lsp(cx);
         gallery
+    }
+
+    /// Starts the Editor story's server without holding the window, then hands it to the editor.
+    fn start_lsp(&mut self, cx: &mut Context<Self>) {
+        let started = editor_lsp::start(SAMPLE_RUST.to_string());
+        self.lsp.pending = cx.spawn(async move |this, cx| {
+            let started = started.await.unwrap_or_else(|_| Err("the server thread stopped".into()));
+            _ = this.update(cx, |this, cx| {
+                match started {
+                    Ok(editor_lsp::Started { worker, name }) => {
+                        let gallery = cx.entity().downgrade();
+                        let elsewhere: editor_lsp::Elsewhere = Rc::new(move |params: &lsp_types::ShowDocumentParams, cx: &mut App| {
+                            let line = params.selection.map(|r| r.start.line + 1).unwrap_or(1);
+                            let status = format!("defined in {} on line {line}", editor_lsp::display_path(&params.uri));
+                            _ = gallery.update(cx, |this, cx| {
+                                this.lsp.status = status.into();
+                                cx.notify();
+                            });
+                        });
+                        editor_lsp::attach(&this.editor, worker.clone(), elsewhere, cx);
+                        this.lsp.worker = Some(worker);
+                        this.lsp.status = format!("{name} is ready: hold {SECONDARY} and click a symbol, or press F12").into();
+                    }
+                    Err(error) => this.lsp.status = error.into(),
+                }
+                cx.notify();
+            });
+        });
     }
 
     /// Clears the Agent panel, then adds its items back one by one every [`REPLAY_STEP`].
@@ -876,55 +914,24 @@ impl Counts {
 }
 "#;
 
-/// What the language server has said about the open file.
-#[derive(Default)]
+/// The Editor story's language server.
 struct LspState {
-    /// The server, once it has started. `None` means it is not installed or it failed.
-    client: Option<lathe_lsp::LspClient>,
-    /// What the status line says: the server's version, an error, or what it last answered.
+    /// The server, once it has started. `None` means it is starting, not installed, or failed.
+    worker: Option<lathe_lsp::LspWorker>,
+    /// What the status line says: the server's name, an error, or what it last answered.
     status: SharedString,
-    /// The file on disk the server reads, so its answers are about a real path.
-    file: Option<std::path::PathBuf>,
-    /// The document version last sent, so a stale set of diagnostics is skipped.
-    version: i32,
-    /// The text last sent, so an unchanged buffer is not sent again.
-    sent: String,
+    /// The one question in flight from a button or F12. A newer one replaces it.
+    pending: Task<()>,
 }
 
-impl LspState {
-    /// Starts rust-analyzer over a fixture on disk. It degrades to a message, never a panic: the
-    /// gallery must open on a box with no server.
-    fn start(text: &str) -> Self {
-        let dir = std::env::temp_dir().join("lathe-gallery-lsp");
-        let mut state = Self::default();
-        if std::fs::create_dir_all(dir.join("src")).is_err() {
-            state.status = "the fixture directory is not writable".into();
-            return state;
-        }
-        let manifest = "[package]\nname = \"lathe-gallery\"\nversion = \"0.1.0\"\nedition = \"2021\"\n";
-        let file = dir.join("src/lib.rs");
-        if std::fs::write(dir.join("Cargo.toml"), manifest).is_err() || std::fs::write(&file, text).is_err() {
-            state.status = "the fixture could not be written".into();
-            return state;
-        }
-        let ready = std::time::Duration::from_secs(30);
-        match lathe_lsp::LspClient::spawn("rust-analyzer", &[], &dir, ready) {
-            Ok((mut client, init)) => {
-                let version = init.server_info.map(|i| i.name).unwrap_or_else(|| "the server".into());
-                match client.did_open(&file, "rust", 1, text) {
-                    Ok(()) => state.status = format!("{version} is indexing").into(),
-                    Err(error) => state.status = format!("{error}").into(),
-                }
-                state.client = Some(client);
-                state.file = Some(file);
-                state.version = 1;
-                state.sent = text.to_string();
-            }
-            Err(error) => state.status = format!("{error}").into(),
-        }
-        state
+impl Default for LspState {
+    fn default() -> Self {
+        Self { worker: None, status: SharedString::default(), pending: Task::ready(()) }
     }
 }
+
+/// The key a Zed user holds to follow a symbol.
+const SECONDARY: &str = if cfg!(target_os = "macos") { "⌘" } else { "ctrl" };
 
 /// The editable file. Typing, selection, undo and search all come from gpui-base; the skin is ours.
 /// Its diagnostics and its definitions come from a real rust-analyzer when one is installed.
@@ -982,7 +989,7 @@ fn editor_story(
     lsp_status: &SharedString,
     cx: &mut Context<Gallery>,
 ) -> impl IntoElement {
-    let go = cx.listener(|this, _, _, cx| this.go_to_definition(cx));
+    let go = cx.listener(|this, _, window, cx| this.go_to_definition(window, cx));
     let check = cx.listener(|this, _, _, cx| this.pull_diagnostics(cx));
     div()
         .flex()
@@ -1007,7 +1014,11 @@ fn editor_story(
                         .on_click(go),
                 ),
         )
-        .child(CodeEditor::new(state).height(px(380.)))
+        .child(
+            div()
+                .on_action(cx.listener(|this, _: &GoToDefinition, window, cx| this.go_to_definition(window, cx)))
+                .child(CodeEditor::new(state).height(px(380.))),
+        )
         .child(
             div()
                 .text_size(TextSize::Xs.font_size())
@@ -1215,9 +1226,15 @@ fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, sh
         )
 }
 
+gpui_kit::actions!(gallery, [
+    /// F12: jump from the caret to where the symbol under it is defined.
+    GoToDefinition
+]);
+
 fn main() {
     gpui_kit::application().with_assets(beui::Assets).run(|cx| {
         beui::init(cx);
+        cx.bind_keys([gpui_kit::KeyBinding::new("f12", GoToDefinition, Some("Input"))]);
         match std::env::var("GALLERY_THEME").as_deref() {
             Ok("dark") => beui::theme::set_appearance(Appearance::Dark, cx),
             Ok("light") => beui::theme::set_appearance(Appearance::Light, cx),

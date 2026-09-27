@@ -584,7 +584,9 @@ dependencies = [
 name = "beui-gallery"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "beui",
+ "futures-channel",
  "gpui-kit",
  "lathe-lsp",
  "lsp-types",

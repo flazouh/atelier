@@ -10,3 +10,5 @@ gpui-kit.workspace = true
 beui.workspace = true
 lathe-lsp.workspace = true
 lsp-types = "0.97"
+anyhow = "1"
+futures-channel = "0.3"
