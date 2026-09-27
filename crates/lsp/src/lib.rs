@@ -9,7 +9,9 @@
 //! guesses an answer a server did not give.
 
 pub mod client;
+pub mod encoding;
 pub mod framing;
+pub mod servers;
 pub mod worker;
 
 pub use client::{DEFAULT_SETTLE, LspClient, LspError, ServerMessage};

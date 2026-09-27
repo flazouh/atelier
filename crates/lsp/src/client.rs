@@ -145,10 +145,10 @@ impl LspClient {
                     diagnostic: Some(DiagnosticClientCapabilities::default()),
                     ..Default::default()
                 }),
-                // Positions count characters, as gpui-base's do, not LSP's default UTF-16 units, so a
-                // character outside the BMP earlier on a line does not shift them.
+                // Characters first, as gpui-base counts them; UTF-16, which every server supports,
+                // second. The worker converts whatever the server picks (see `encoding`).
                 general: Some(GeneralClientCapabilities {
-                    position_encodings: Some(vec![PositionEncodingKind::UTF32]),
+                    position_encodings: Some(vec![PositionEncodingKind::UTF32, PositionEncodingKind::UTF16]),
                     ..Default::default()
                 }),
                 // rust-analyzer then says when it has loaded the workspace. Other servers ignore it.
@@ -211,6 +211,27 @@ impl LspClient {
             partial_result_params: PartialResultParams::default(),
         };
         self.request::<lsp_types::request::GotoDefinition>(params, timeout)
+    }
+
+    /// Every place the symbol at `position` is used, without its declaration when
+    /// `include_declaration` is false. `None` means the server had no answer.
+    pub fn references(
+        &mut self,
+        path: &Path,
+        position: Position,
+        include_declaration: bool,
+        timeout: Duration,
+    ) -> Result<Option<Vec<lsp_types::Location>>, LspError> {
+        let params = lsp_types::ReferenceParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: path_to_uri(path)? },
+                position,
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+            context: lsp_types::ReferenceContext { include_declaration },
+        };
+        self.request::<lsp_types::request::References>(params, timeout)
     }
 
     /// What the symbol at `position` is.
