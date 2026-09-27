@@ -82,6 +82,11 @@ fn rust_analyzer_reports_a_real_type_error_and_finds_a_definition() {
         init.capabilities.definition_provider.is_some(),
         "a server that cannot answer definition is no use here"
     );
+    assert_eq!(
+        init.capabilities.position_encoding,
+        Some(lsp_types::PositionEncodingKind::UTF32),
+        "positions count characters, as the editor does"
+    );
 
     client.did_open(&file, "rust", 1, &text).expect("the file opens");
 

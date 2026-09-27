@@ -31,6 +31,18 @@ of it, and both are now handled:
   600ms passes with none, and returns the last.
 - A `didChange` that carries the same text makes the server publish nothing. Bumping the version there
   leaves the caller waiting for an answer that never comes, so only changed text is sent.
+- A request that lands just after a `didChange` can get `ContentModified` (-32801), and a busy server
+  answers `ServerCancelled` (-32802). `until_settled` asks again with a short backoff.
+- Under load, rust-analyzer republished an old result, and `cargo check` results for the file on disk,
+  tagged with the newest version, then sent nothing more. So the editor pulls diagnostics
+  (`textDocument/diagnostic`), which the server works out on the text it has. It answers a pull fully
+  only when the client says it pulls, and while it loads the workspace it answers empty or `null`; the
+  worker waits for `experimental/serverStatus` to say `quiescent` before it pulls.
+- Positions are negotiated as UTF-32, so they count characters as gpui-base does.
+
+The editor story wires it the way Zed does: Cmd-hover underlines, Cmd-click and F12 jump, a hover card
+rests on a symbol, and problems are pulled on open and 150ms after typing pauses. `LspWorker` owns the
+server on its own thread, so no request blocks the window, and a newer check replaces a queued one.
 
 ## Stage A: the hunk review
 
@@ -87,7 +99,8 @@ A new crate, `crates/lsp`, with no UI.
 
 ## Checks
 
-- `cargo test --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo build -p beui-gallery`.
+- `tools/check.sh` on `hp-agent`: the workspace tests with a live rust-analyzer, clippy, the gallery
+  build, and the tests of the patched `vendor/gpui-base`, which the workspace excludes.
 - Gallery stories "Hunks" and "Editor", captured on `hp-agent` in both themes.
 - Stage A resolve: capture at 0, 130 and 260ms and confirm the rows close rather than jump.
 - Stage C: `LATHE_REQUIRE_LSP=1 cargo test -p lathe-lsp --test rust_analyzer` on a box with the server,

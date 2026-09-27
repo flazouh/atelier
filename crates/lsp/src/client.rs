@@ -19,7 +19,7 @@ use std::{
 };
 
 use lsp_types::{
-    ClientCapabilities, Diagnostic, DiagnosticClientCapabilities, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    ClientCapabilities, Diagnostic, GeneralClientCapabilities, PositionEncodingKind, DiagnosticClientCapabilities, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, InitializeParams, InitializeResult,
     PartialResultParams, Position, PublishDiagnosticsParams, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
     TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri, VersionedTextDocumentIdentifier,
@@ -50,6 +50,8 @@ pub enum LspError {
     Timeout,
     /// The server has already stopped.
     Closed,
+    /// A newer request made this one moot, so it was never sent.
+    Superseded,
 }
 
 impl std::fmt::Display for LspError {
@@ -61,6 +63,7 @@ impl std::fmt::Display for LspError {
             Self::Server { code, message } => write!(f, "the language server refused: {message} ({code})"),
             Self::Timeout => write!(f, "the language server did not answer in time"),
             Self::Closed => write!(f, "the language server has stopped"),
+            Self::Superseded => write!(f, "a newer request replaced this one"),
         }
     }
 }
@@ -140,6 +143,12 @@ impl LspClient {
                 // checks; without it the answer is empty.
                 text_document: Some(TextDocumentClientCapabilities {
                     diagnostic: Some(DiagnosticClientCapabilities::default()),
+                    ..Default::default()
+                }),
+                // Positions count characters, as gpui-base's do, not LSP's default UTF-16 units, so a
+                // character outside the BMP earlier on a line does not shift them.
+                general: Some(GeneralClientCapabilities {
+                    position_encodings: Some(vec![PositionEncodingKind::UTF32]),
                     ..Default::default()
                 }),
                 // rust-analyzer then says when it has loaded the workspace. Other servers ignore it.

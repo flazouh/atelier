@@ -11,18 +11,20 @@ fn range(line: u32, from: u32, to: u32) -> Range {
 
 #[test]
 fn text_the_server_already_has_is_not_sent_again() {
-    let mut document = DocumentSync::opened("fn a() {}");
-    assert_eq!(document.change("fn a() {}"), None);
+    let document = DocumentSync::opened("fn a() {}");
+    assert_eq!(document.next("fn a() {}"), None);
     assert_eq!(document.version(), 1);
 }
 
 #[test]
-fn each_new_text_goes_out_as_the_next_version() {
+fn each_new_text_goes_out_as_the_next_version_once_it_is_sent() {
     let mut document = DocumentSync::opened("a");
-    assert_eq!(document.change("ab"), Some(2));
-    assert_eq!(document.change("ab"), None, "the same text twice is one change");
-    assert_eq!(document.change("a"), Some(3), "going back is still a change");
-    assert_eq!(document.version(), 3);
+    assert_eq!(document.next("ab"), Some(2));
+    assert_eq!(document.next("ab"), Some(2), "nothing is recorded until the send worked");
+    document.sent("ab", 2);
+    assert_eq!(document.next("ab"), None, "the same text twice is one change");
+    assert_eq!(document.next("a"), Some(3), "going back is still a change");
+    assert_eq!(document.version(), 2);
 }
 
 #[test]
@@ -106,4 +108,28 @@ fn a_request_the_server_cancelled_is_asked_again() {
     });
     assert!(answer.is_ok());
     assert_eq!(calls, 2);
+}
+
+#[test]
+fn only_the_newest_diagnostics_request_in_a_batch_runs() {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let check = |name: &'static str| {
+        let tx = tx.clone();
+        Job::Diagnostics { text: name.into(), reply: Box::new(move |a| { let _ = tx.send((name, a.is_err())); }) }
+    };
+    let hover = Job::Hover { text: "h".into(), position: Position::default(), reply: Box::new(|_| {}) };
+    let jobs = triage(vec![check("old"), hover, check("older"), check("newest")]);
+    let kept: Vec<_> = jobs
+        .iter()
+        .map(|job| match job {
+            Job::Diagnostics { text, .. } => text.as_str(),
+            Job::Hover { .. } => "hover",
+            Job::Definition { .. } => "definition",
+        })
+        .collect();
+    assert_eq!(kept, ["hover", "newest"], "other requests keep their order");
+    // The kept jobs hold senders too, so they go before the answers are read.
+    drop((jobs, tx));
+    let told: Vec<_> = rx.iter().collect();
+    assert_eq!(told, [("old", true), ("older", true)], "each dropped request hears it was superseded");
 }

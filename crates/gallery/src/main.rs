@@ -11,10 +11,8 @@ use beui::{
     CodeEditor, Decision, Hunk, HunkReview, HunkState, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
-use std::{
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
+
 
 mod editor_lsp;
 
@@ -126,12 +124,14 @@ struct Gallery {
     inline_hunks: Vec<InlineHunk>,
     /// That buffer's text as the hunks last matched it, so an edit can move them with the rows.
     inline_text: String,
+    /// The review before and after each decision, so undo and redo bring its hunks back too.
+    inline_history: beui::inline_review::DecisionHistory,
     /// Moves the hunks whenever the user edits that buffer.
     _inline_edits: gpui_kit::Subscription,
     /// The Editor story's buffer, which the user can really type into.
     editor: Entity<gpui_kit::component::input::EditorState>,
     /// The language server behind the Editor story.
-    lsp: LspState,
+    editor_session: Entity<editor_lsp::EditorSession>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -154,90 +154,6 @@ struct Replay {
 }
 
 impl Gallery {
-    /// Sends the buffer to the server and shows what it says is wrong. `announce` is the Check button:
-    /// it says so in the status line. An edit refreshes quietly. A set lands only if the buffer still
-    /// holds the text it was worked out for, so an underline never sits on the wrong line.
-    fn pull_diagnostics(&mut self, announce: bool, cx: &mut Context<Self>) {
-        let Some(worker) = self.lsp.worker.clone() else { return };
-        let text = self.editor.read(cx).value().to_string();
-        let answer = editor_lsp::ask(cx, |reply| worker.diagnostics(text.clone(), reply));
-        if announce {
-            self.lsp.status = "checking…".into();
-        }
-        self.lsp.checking = cx.spawn(async move |this, cx| {
-            let answer = answer.await;
-            _ = this.update(cx, |this, cx| {
-                if this.editor.read(cx).value().as_ref() != text {
-                    return;
-                }
-                match answer {
-                    Ok(diagnostics) => {
-                        let first = diagnostics.first().map(|d| d.message.clone()).unwrap_or_default();
-                        this.lsp.status = match diagnostics.len() {
-                            0 => "the server finds nothing wrong".into(),
-                            1 => format!("1 problem: {first}").into(),
-                            n => format!("{n} problems, first: {first}").into(),
-                        };
-                        beui::code_editor::set_diagnostics(&this.editor, diagnostics, cx);
-                    }
-                    Err(error) => this.lsp.status = format!("{error}").into(),
-                }
-                cx.notify();
-            });
-        });
-        cx.notify();
-    }
-
-    /// Checks the buffer again once typing pauses for [`RECHECK_AFTER`], as Zed does.
-    fn schedule_recheck(&mut self, cx: &mut Context<Self>) {
-        if self.lsp.worker.is_none() {
-            return;
-        }
-        self.lsp.recheck = cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(RECHECK_AFTER).await;
-            _ = this.update(cx, |this, cx| this.pull_diagnostics(false, cx));
-        });
-    }
-
-    /// Asks the server where the symbol under the caret is defined and moves the caret there, as F12
-    /// does in Zed. A definition in another file is named in the status line; the editor never jumps
-    /// to a line of the wrong file.
-    fn go_to_definition(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(worker) = self.lsp.worker.clone() else { return };
-        let here = editor_lsp::document_uri(&worker);
-        let (text, position) = {
-            let state = self.editor.read(cx);
-            (state.value().to_string(), state.cursor_position())
-        };
-        let answer = editor_lsp::ask(cx, |reply| worker.definition(text, position, reply));
-        self.lsp.status = "looking…".into();
-        self.lsp.pending = cx.spawn_in(window, async move |this, cx| {
-            let answer = answer.await;
-            _ = this.update_in(cx, |this, window, cx| {
-                this.lsp.status = match answer.map(lathe_lsp::definition_links) {
-                    Ok(links) => match links.first() {
-                        Some(link) if Some(&link.target_uri) == here.as_ref() => {
-                            let start = link.target_selection_range.start;
-                            this.editor.update(cx, |state, cx| state.set_cursor_position(start, window, cx));
-                            // A server answer is one-based to a reader, so the line is shown as the editor does.
-                            format!("defined on line {}", start.line + 1).into()
-                        }
-                        Some(link) => format!(
-                            "defined in {} on line {}",
-                            editor_lsp::display_path(&link.target_uri),
-                            link.target_selection_range.start.line + 1
-                        )
-                        .into(),
-                        None => "the server knows of no definition there".into(),
-                    },
-                    Err(error) => format!("{error}").into(),
-                };
-                cx.notify();
-            });
-        });
-        cx.notify();
-    }
-
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let story = std::env::var("GALLERY_STORY")
             .ok()
@@ -287,11 +203,17 @@ impl Gallery {
             }
             let text = state.read(cx).value().to_string();
             if text != this.inline_text {
-                this.inline_hunks = beui::inline_review::track_edit(&this.inline_hunks, &this.inline_text, &text);
+                this.inline_hunks = match this.inline_history.hunks_for(&text) {
+                    Some(hunks) => hunks,
+                    None => beui::inline_review::track_edit(&this.inline_hunks, &this.inline_text, &text),
+                };
                 this.inline_text = text;
                 cx.notify();
             }
         });
+        let editor = CodeEditor::state("lib.rs", SAMPLE_RUST, window, cx);
+        let editor_session = cx.new(|cx| editor_lsp::EditorSession::new(editor.clone(), SAMPLE_RUST, cx));
+        cx.observe(&editor_session, |_, _, cx| cx.notify()).detach();
         let mut gallery =
             Self {
             story,
@@ -300,49 +222,15 @@ impl Gallery {
             inline,
             inline_hunks: inline_fixture(),
             inline_text: INLINE_FILE.to_string(),
+            inline_history: Default::default(),
             _inline_edits,
-            editor: CodeEditor::state("lib.rs", SAMPLE_RUST, window, cx),
-            lsp: LspState { status: "rust-analyzer is starting".into(), ..LspState::default() },
+            editor,
+            editor_session,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
         }
-        gallery.start_lsp(cx);
         gallery
-    }
-
-    /// Starts the Editor story's server without holding the window, then hands it to the editor.
-    fn start_lsp(&mut self, cx: &mut Context<Self>) {
-        let started = editor_lsp::start(SAMPLE_RUST.to_string());
-        self.lsp.pending = cx.spawn(async move |this, cx| {
-            let started = started.await.unwrap_or_else(|_| Err("the server thread stopped".into()));
-            _ = this.update(cx, |this, cx| {
-                match started {
-                    Ok(editor_lsp::Started { worker, name }) => {
-                        let gallery = cx.entity().downgrade();
-                        let elsewhere: editor_lsp::Elsewhere = Rc::new(move |params: &lsp_types::ShowDocumentParams, cx: &mut App| {
-                            let line = params.selection.map(|r| r.start.line + 1).unwrap_or(1);
-                            let status = format!("defined in {} on line {line}", editor_lsp::display_path(&params.uri));
-                            _ = gallery.update(cx, |this, cx| {
-                                this.lsp.status = status.into();
-                                cx.notify();
-                            });
-                        });
-                        editor_lsp::attach(&this.editor, worker.clone(), elsewhere, cx);
-                        this.lsp.worker = Some(worker);
-                        this.lsp.edits = Some(cx.subscribe(&this.editor, |this, _, event: &InputEvent, cx| {
-                            if matches!(event, InputEvent::Change) {
-                                this.schedule_recheck(cx);
-                            }
-                        }));
-                        this.pull_diagnostics(false, cx);
-                        this.lsp.status = format!("{name} is ready: hold {SECONDARY} and click a symbol, or press F12").into();
-                    }
-                    Err(error) => this.lsp.status = error.into(),
-                }
-                cx.notify();
-            });
-        });
     }
 
     /// Clears the Agent panel, then adds its items back one by one every [`REPLAY_STEP`].
@@ -438,7 +326,7 @@ impl Gallery {
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
             Story::Hunks => hunks_story(&self.hunks, cx).into_any_element(),
             Story::Inline => inline_story(&self.inline, &self.inline_hunks, cx).into_any_element(),
-            Story::Editor => editor_story(&self.editor.clone(), &self.lsp.status.clone(), cx).into_any_element(),
+            Story::Editor => editor_story(&self.editor.clone(), &self.editor_session.clone(), cx).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
             Story::Prompt => prompt_story(&self.prompt, self.notice.clone(), cx).into_any_element(),
         }
@@ -956,43 +844,6 @@ impl Counts {
 }
 "#;
 
-/// The Editor story's language server.
-struct LspState {
-    /// The server, once it has started. `None` means it is starting, not installed, or failed.
-    worker: Option<lathe_lsp::LspWorker>,
-    /// What the status line says: the server's name, an error, or what it last answered.
-    status: SharedString,
-    /// The one question in flight from a button or F12. A newer one replaces it.
-    pending: Task<()>,
-    /// The diagnostics request in flight. A newer one replaces it.
-    checking: Task<()>,
-    /// The timer that re-checks once typing pauses.
-    recheck: Task<()>,
-    /// Watches the buffer for edits, once the server is ready.
-    edits: Option<gpui_kit::Subscription>,
-}
-
-/// How long typing must pause before the buffer is checked again. docs/code-editor.md sets 150ms.
-const RECHECK_AFTER: Duration = Duration::from_millis(150);
-
-impl Default for LspState {
-    fn default() -> Self {
-        Self {
-            worker: None,
-            status: SharedString::default(),
-            pending: Task::ready(()),
-            checking: Task::ready(()),
-            recheck: Task::ready(()),
-            edits: None,
-        }
-    }
-}
-
-/// The key a Zed user holds to follow a symbol.
-const SECONDARY: &str = if cfg!(target_os = "macos") { "⌘" } else { "ctrl" };
-
-/// The editable file. Typing, selection, undo and search all come from gpui-base; the skin is ours.
-/// Its diagnostics and its definitions come from a real rust-analyzer when one is installed.
 /// Both sides of two hunks, as real text in one buffer. Rows 1 and 8 are the old code; rows 2 to 3
 /// and row 9 are the agent's. Nothing is virtual, which is why the buffer stays writable.
 const INLINE_FILE: &str = "pub struct Config {\n    pub width: u32,\n    pub width: u32,\n    pub height: u32,\n}\n\nimpl Config {\n    pub fn new() -> Self {\n        Self { width: 80 }\n        Self { width: 80, height: 24 }\n    }\n}\n";
@@ -1011,10 +862,12 @@ fn inline_story(
         |this: &mut Gallery, (id, decision): &(SharedString, Decision), window: &mut Window, cx| {
             let Some(hunk) = this.inline_hunks.iter().find(|h| &h.id == id).cloned() else { return };
             let closed = hunk.closing(*decision);
+            let before = (this.inline_text.clone(), this.inline_hunks.clone());
             beui::inline_review::apply(&this.inline, &[(hunk, *decision)], window, cx);
             this.inline_hunks = beui::inline_review::shift_after(&this.inline_hunks, id, &closed);
             // The decision already moved the hunks; the edit it made must not move them again.
             this.inline_text = this.inline.read(cx).value().to_string();
+            this.inline_history.record(before, (this.inline_text.clone(), this.inline_hunks.clone()));
             cx.notify();
         },
     );
@@ -1044,13 +897,21 @@ fn inline_story(
         )
 }
 
+/// The editable file. Typing, selection, undo and search all come from gpui-base; the skin is ours.
+/// Its problems, definitions and hover cards come from a real rust-analyzer when one is installed.
 fn editor_story(
     state: &Entity<gpui_kit::component::input::EditorState>,
-    lsp_status: &SharedString,
+    session: &Entity<editor_lsp::EditorSession>,
     cx: &mut Context<Gallery>,
 ) -> impl IntoElement {
-    let go = cx.listener(|this, _, window, cx| this.go_to_definition(window, cx));
-    let check = cx.listener(|this, _, _, cx| this.pull_diagnostics(true, cx));
+    let go = {
+        let state = state.clone();
+        move |_: &_, window: &mut Window, cx: &mut App| editor_lsp::go_to_definition(&state, window, cx)
+    };
+    let check = {
+        let session = session.clone();
+        move |_: &_, _: &mut Window, cx: &mut App| session.update(cx, |session, cx| session.check(cx))
+    };
     div()
         .flex()
         .flex_col()
@@ -1074,16 +935,12 @@ fn editor_story(
                         .on_click(go),
                 ),
         )
-        .child(
-            div()
-                .on_action(cx.listener(|this, _: &GoToDefinition, window, cx| this.go_to_definition(window, cx)))
-                .child(CodeEditor::new(state).height(px(380.))),
-        )
+        .child(CodeEditor::new(state).height(px(380.)))
         .child(
             div()
                 .text_size(TextSize::Xs.font_size())
                 .text_color(cx.theme().muted_foreground)
-                .child(lsp_status.clone()),
+                .child(session.read(cx).status()),
         )
 }
 
@@ -1286,15 +1143,9 @@ fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, sh
         )
 }
 
-gpui_kit::actions!(gallery, [
-    /// F12: jump from the caret to where the symbol under it is defined.
-    GoToDefinition
-]);
-
 fn main() {
     gpui_kit::application().with_assets(beui::Assets).run(|cx| {
         beui::init(cx);
-        cx.bind_keys([gpui_kit::KeyBinding::new("f12", GoToDefinition, Some("Input"))]);
         match std::env::var("GALLERY_THEME").as_deref() {
             Ok("dark") => beui::theme::set_appearance(Appearance::Dark, cx),
             Ok("light") => beui::theme::set_appearance(Appearance::Light, cx),
