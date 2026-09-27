@@ -4352,10 +4352,17 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
             .on_mouse_move(window.listener_for(&entity, InputBaseState::on_mouse_move))
             .on_scroll_wheel(window.listener_for(&entity, InputBaseState::on_scroll_wheel))
             .when(self.is_multi_line() && !self.disabled, |this| {
-                this.on_modifiers_changed(cx.listener(|this, event: &gpui::ModifiersChangedEvent, _, cx| {
-                    // lathe patch: letting go of Cmd drops the definition underline, as in Zed.
+                this.on_modifiers_changed(cx.listener(|this, event: &gpui::ModifiersChangedEvent, window, cx| {
+                    // lathe patch: letting go of Cmd drops the definition underline, and pressing it
+                    // with the pointer already on a symbol looks it up at once, as in Zed. Before, the
+                    // underline waited for the pointer to move.
+                    let position = window.mouse_position();
+                    let over_text = this.last_bounds.as_ref().is_some_and(|b| b.contains(&position));
                     if !event.modifiers.secondary() {
                         M::clear_hover_definition(this, cx);
+                    } else if over_text && !event.modifiers.alt {
+                        let (offset, _) = this.index_for_mouse_position(position);
+                        M::on_hover_definition(this, offset, window, cx);
                     }
                     cx.notify()
                 }))

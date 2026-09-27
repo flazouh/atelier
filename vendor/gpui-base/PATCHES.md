@@ -96,3 +96,10 @@ Fold chevrons show a hand. Code: `TextElement::paint` and `text_hitbox` in
 `src/input/base/element.rs`; the root's `cursor_text` is gone from `src/input/base/state.rs`.
 Checked under Xvfb by reading the X cursor image (XFixes): I-beam over text and blank text, arrow
 over the gutter and the page, hand over buttons, chevrons, the fold chip and a Ctrl-hovered symbol.
+
+## 10. Cmd pressed over a symbol shows the link at once
+
+The definition underline was looked up only on a mouse move with Cmd held, so pressing Cmd with the
+pointer already on a symbol showed nothing until the pointer moved. The `on_modifiers_changed`
+listener in `src/input/base/state.rs` now runs the same lookup when Cmd goes down over the text.
+Checked by hand under Xvfb.
