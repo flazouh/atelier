@@ -85,3 +85,14 @@ element at a row's right end, centred on the row, laid out in the same frame as 
 to the editor. `LastLayout::row_rects` is the one place both read row geometry from.
 Code: `src/input/base/layout.rs`, `src/input/base/state.rs`, `src/input/base/element.rs`.
 Test: `test_row_rects_start_where_each_row_of_text_starts`. Checked on a Retina Mac.
+
+## 9. The I-beam over the text only
+
+The editor root asked for the I-beam over its whole area, so the gutter, the fold chevrons and any
+control on top of the text showed it too. The text element now sets the I-beam (the crosshair with
+Alt held) over the text area only and the arrow over the gutter, before it paints anything else, so
+fold chevrons, the fold chip, row widgets and a Cmd-hovered link set their own pointer over them.
+Fold chevrons show a hand. Code: `TextElement::paint` and `text_hitbox` in
+`src/input/base/element.rs`; the root's `cursor_text` is gone from `src/input/base/state.rs`.
+Checked under Xvfb by reading the X cursor image (XFixes): I-beam over text and blank text, arrow
+over the gutter and the page, hand over buttons, chevrons, the fold chip and a Ctrl-hovered symbol.

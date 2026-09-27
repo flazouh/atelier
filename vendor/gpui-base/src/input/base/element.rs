@@ -1413,16 +1413,13 @@ impl<M: InputModeKind> TextElement<M> {
             .into_iter()
             .filter_map(|widget| {
                 let (_, top, height) = rows.iter().find(|(row, _, _)| *row == widget.row).copied()?;
-                // Measured from one render, then placed as a root of its own, as the fold icons are:
-                // an element placed with `prepaint_at` after `layout_as_root` took no mouse input.
-                let measured =
-                    (widget.render)(window, cx).layout_as_root(gpui::AvailableSpace::min_size(), window, cx);
+                let mut element = (widget.render)(window, cx);
+                let measured = element.layout_as_root(gpui::AvailableSpace::min_size(), window, cx);
                 let origin = point(
                     right - measured.width,
                     bounds.origin.y + top + (height - measured.height).half(),
                 );
-                let mut element = (widget.render)(window, cx);
-                element.prepaint_as_root(origin, gpui::AvailableSpace::min_size(), window, cx);
+                element.prepaint_at(origin, window, cx);
                 Some(element)
             })
             .collect()
