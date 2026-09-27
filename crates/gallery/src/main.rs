@@ -970,6 +970,9 @@ fn inline_story(
         .child(
             InlineReview::new("inline", state, hunks.to_vec())
                 .height(px(260.))
+                // The first hunk is the keyboard's, so its bar stays up without a pointer. That is
+                // also the only way a headless screenshot can show one.
+                .current("field")
                 .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx)),
         )
 }
