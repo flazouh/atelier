@@ -8,7 +8,7 @@ use beui::{
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
     PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, SubagentRow, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
-    CodeEditor, Hunk, HunkReview, HunkState, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
+    CodeEditor, Decision, Hunk, HunkReview, HunkState, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
 use std::time::{Duration, Instant};
@@ -33,13 +33,14 @@ enum Story {
     Diffs,
     Plan,
     Hunks,
+    Inline,
     Editor,
     Select,
     Prompt,
 }
 
 impl Story {
-    const ALL: [Story; 15] = [
+    const ALL: [Story; 16] = [
         Story::AgentPanel,
         Story::Colors,
         Story::Typography,
@@ -52,6 +53,7 @@ impl Story {
         Story::Diffs,
         Story::Plan,
         Story::Hunks,
+        Story::Inline,
         Story::Editor,
         Story::Select,
         Story::Prompt,
@@ -71,6 +73,7 @@ impl Story {
             Story::Diffs => "Diffs and code",
             Story::Plan => "Plan",
             Story::Hunks => "Hunks",
+            Story::Inline => "Inline review",
             Story::Editor => "Editor",
             Story::Select => "Select",
             Story::Prompt => "Prompt input",
@@ -110,6 +113,10 @@ struct Gallery {
     choice: Option<usize>,
     /// The Hunks story's own file, so Accept and Reject really resolve.
     hunks: Vec<Hunk>,
+    /// The Inline review story's buffer: both sides of every hunk, as real text.
+    inline: Entity<gpui_kit::component::input::EditorState>,
+    /// The hunks still waiting in that buffer.
+    inline_hunks: Vec<InlineHunk>,
     /// The Editor story's buffer, which the user can really type into.
     editor: Entity<gpui_kit::component::input::EditorState>,
     /// The language server behind the Editor story.
@@ -247,6 +254,8 @@ impl Gallery {
             story,
             choice: None,
             hunks: sample_hunks(),
+            inline: CodeEditor::state("config.rs", INLINE_FILE, window, cx),
+            inline_hunks: inline_fixture(),
             editor: CodeEditor::state("lib.rs", SAMPLE_RUST, window, cx),
             lsp: LspState::start(SAMPLE_RUST),
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
@@ -348,6 +357,7 @@ impl Gallery {
             Story::Diffs => diffs().into_any_element(),
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
             Story::Hunks => hunks_story(&self.hunks, cx).into_any_element(),
+            Story::Inline => inline_story(&self.inline, &self.inline_hunks, cx).into_any_element(),
             Story::Editor => editor_story(&self.editor.clone(), &self.lsp.status.clone(), cx).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
             Story::Prompt => prompt_story(&self.prompt, self.notice.clone(), cx).into_any_element(),
@@ -918,6 +928,52 @@ impl LspState {
 
 /// The editable file. Typing, selection, undo and search all come from gpui-base; the skin is ours.
 /// Its diagnostics and its definitions come from a real rust-analyzer when one is installed.
+/// Both sides of two hunks, as real text in one buffer. Rows 1 and 8 are the old code; rows 2 to 3
+/// and row 9 are the agent's. Nothing is virtual, which is why the buffer stays writable.
+const INLINE_FILE: &str = "pub struct Config {\n    pub width: u32,\n    pub width: u32,\n    pub height: u32,\n}\n\nimpl Config {\n    pub fn new() -> Self {\n        Self { width: 80 }\n        Self { width: 80, height: 24 }\n    }\n}\n";
+
+fn inline_fixture() -> Vec<InlineHunk> {
+    vec![InlineHunk::new("field", 1..2, 2..4), InlineHunk::new("ctor", 8..9, 9..10)]
+}
+
+fn inline_story(
+    state: &Entity<gpui_kit::component::input::EditorState>,
+    hunks: &[InlineHunk],
+    cx: &mut Context<Gallery>,
+) -> impl IntoElement {
+    let left = beui::inline_review::pending_count(hunks, &[]);
+    let decide = cx.listener(
+        |this: &mut Gallery, (id, decision): &(SharedString, Decision), window: &mut Window, cx| {
+            let Some(hunk) = this.inline_hunks.iter().find(|h| &h.id == id).cloned() else { return };
+            let closed = hunk.closing(*decision);
+            beui::inline_review::apply(&this.inline, &[(hunk, *decision)], window, cx);
+            this.inline_hunks = beui::inline_review::shift_after(&this.inline_hunks, id, &closed);
+            cx.notify();
+        },
+    );
+    div()
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .max_w(px(760.))
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .text_size(TextSize::Xs.font_size())
+                .child(div().font_family(MONO_FONT_FAMILY).child("src/config.rs"))
+                .child(Badge::new(format!("{left} left")))
+                .child(div().flex_1())
+                .child(div().text_color(cx.theme().muted_foreground).child("type anywhere; it stays writable")),
+        )
+        .child(
+            InlineReview::new("inline", state, hunks.to_vec())
+                .height(px(260.))
+                .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx)),
+        )
+}
+
 fn editor_story(
     state: &Entity<gpui_kit::component::input::EditorState>,
     lsp_status: &SharedString,
