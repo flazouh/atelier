@@ -10,5 +10,7 @@
 
 pub mod client;
 pub mod framing;
+pub mod worker;
 
 pub use client::{DEFAULT_SETTLE, LspClient, LspError, ServerMessage};
+pub use worker::{CONTENT_MODIFIED, DocumentSync, LspWorker, Reply, definition_links, first_line, until_settled};
