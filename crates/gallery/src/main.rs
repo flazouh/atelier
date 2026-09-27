@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 
 
 mod editor_lsp;
+mod editor_story;
 
 use gpui_kit::base::input::InputEvent;
 
@@ -128,10 +129,8 @@ struct Gallery {
     inline_history: beui::inline_review::DecisionHistory,
     /// Moves the hunks whenever the user edits that buffer.
     _inline_edits: gpui_kit::Subscription,
-    /// The Editor story's buffer, which the user can really type into.
-    editor: Entity<gpui_kit::component::input::EditorState>,
-    /// The language server behind the Editor story.
-    editor_session: Entity<editor_lsp::EditorSession>,
+    /// The Editor story's tabs: a real file per language, each with its language server.
+    editors: editor_story::EditorTabs,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -211,9 +210,7 @@ impl Gallery {
                 cx.notify();
             }
         });
-        let editor = CodeEditor::state("lib.rs", SAMPLE_RUST, window, cx);
-        let editor_session = cx.new(|cx| editor_lsp::EditorSession::new(editor.clone(), SAMPLE_RUST, cx));
-        cx.observe(&editor_session, |_, _, cx| cx.notify()).detach();
+        let editors = editor_story::EditorTabs::new(window, cx);
         let mut gallery =
             Self {
             story,
@@ -224,9 +221,11 @@ impl Gallery {
             inline_text: INLINE_FILE.to_string(),
             inline_history: Default::default(),
             _inline_edits,
-            editor,
-            editor_session,
+            editors,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
+        if gallery.story == Story::Editor {
+            gallery.editors.open(cx);
+        }
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
         }
@@ -290,6 +289,9 @@ impl Gallery {
                     .when(!selected, |d| d.text_color(theme.muted_foreground).hover(move |s| s.bg(hover)))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.story = story;
+                        if story == Story::Editor {
+                            this.editors.open(cx);
+                        }
                         cx.notify();
                     }))
                     .child(story.title())
@@ -326,7 +328,7 @@ impl Gallery {
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
             Story::Hunks => hunks_story(&self.hunks, cx).into_any_element(),
             Story::Inline => inline_story(&self.inline, &self.inline_hunks, cx).into_any_element(),
-            Story::Editor => editor_story(&self.editor.clone(), &self.editor_session.clone(), cx).into_any_element(),
+            Story::Editor => editor_story::editor_story(self, cx).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
             Story::Prompt => prompt_story(&self.prompt, self.notice.clone(), cx).into_any_element(),
         }
@@ -803,46 +805,6 @@ fn prompt_story(prompt: &Entity<PromptInput>, notice: Option<SharedString>, cx: 
         )
 }
 
-const SAMPLE_RUST: &str = r#"//! The line numbers a hunk starts at.
-//!
-//! `width` below is called by `broken`, which also holds a real type error for the server to find.
-
-pub fn width() -> u32 {
-    7
-}
-
-pub fn broken() -> u32 {
-    let text: u32 = "not a number";
-    text + width()
-}
-
-use std::collections::HashMap;
-
-/// Parses `@@ -12,4 +12,5 @@` into the line before each side's first line.
-fn hunk_starts(header: &str) -> (u32, u32) {
-    let start = |sign: char| {
-        header
-            .split_whitespace()
-            .find_map(|part| part.strip_prefix(sign))
-            .and_then(|range| range.split(',').next()?.parse::<u32>().ok())
-            .map_or(0, |n| n.saturating_sub(1))
-    };
-    (start('-'), start('+'))
-}
-
-#[derive(Debug, Default)]
-struct Counts {
-    added: usize,
-    removed: usize,
-    by_file: HashMap<String, usize>,
-}
-
-impl Counts {
-    fn total(&self) -> usize {
-        self.added + self.removed
-    }
-}
-"#;
 
 /// Both sides of two hunks, as real text in one buffer. Rows 1 and 8 are the old code; rows 2 to 3
 /// and row 9 are the agent's. Nothing is virtual, which is why the buffer stays writable.
@@ -894,53 +856,6 @@ fn inline_story(
                 // is also the only way a headless screenshot can show one.
                 .when_some(hunks.first(), |review, hunk| review.current(hunk.id.clone()))
                 .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx)),
-        )
-}
-
-/// The editable file. Typing, selection, undo and search all come from gpui-base; the skin is ours.
-/// Its problems, definitions and hover cards come from a real rust-analyzer when one is installed.
-fn editor_story(
-    state: &Entity<gpui_kit::component::input::EditorState>,
-    session: &Entity<editor_lsp::EditorSession>,
-    cx: &mut Context<Gallery>,
-) -> impl IntoElement {
-    let go = {
-        let state = state.clone();
-        move |_: &_, window: &mut Window, cx: &mut App| editor_lsp::go_to_definition(&state, window, cx)
-    };
-    let check = {
-        let session = session.clone();
-        move |_: &_, _: &mut Window, cx: &mut App| session.update(cx, |session, cx| session.check(cx))
-    };
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(10.))
-        .max_w(px(760.))
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .text_size(TextSize::Xs.font_size())
-                .child(div().font_family(MONO_FONT_FAMILY).child("src/lib.rs"))
-                .child(Badge::new("rust"))
-                .child(div().flex_1())
-                .child(Button::new("lsp-check").label("Check").size(ButtonSize::Chip).on_click(check))
-                .child(
-                    Button::new("lsp-go")
-                        .label("Go to definition")
-                        .variant(ButtonVariant::Ghost)
-                        .size(ButtonSize::Chip)
-                        .on_click(go),
-                ),
-        )
-        .child(CodeEditor::new(state).height(px(380.)))
-        .child(
-            div()
-                .text_size(TextSize::Xs.font_size())
-                .text_color(cx.theme().muted_foreground)
-                .child(session.read(cx).status()),
         )
 }
 

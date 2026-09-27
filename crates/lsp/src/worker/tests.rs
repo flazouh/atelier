@@ -1,13 +1,4 @@
 use super::*;
-use lsp_types::{Location, Range, Uri};
-
-fn uri(path: &str) -> Uri {
-    path.parse().expect("a valid uri")
-}
-
-fn range(line: u32, from: u32, to: u32) -> Range {
-    Range { start: Position { line, character: from }, end: Position { line, character: to } }
-}
 
 #[test]
 fn text_the_server_already_has_is_not_sent_again() {
@@ -25,45 +16,6 @@ fn each_new_text_goes_out_as_the_next_version_once_it_is_sent() {
     assert_eq!(document.next("ab"), None, "the same text twice is one change");
     assert_eq!(document.next("a"), Some(3), "going back is still a change");
     assert_eq!(document.version(), 2);
-}
-
-#[test]
-fn no_answer_is_no_links() {
-    assert!(definition_links(None).is_empty());
-    assert_eq!(first_line(&[]), None);
-}
-
-#[test]
-fn a_plain_location_becomes_a_link_that_selects_its_range() {
-    let location = Location { uri: uri("file:///a.rs"), range: range(4, 7, 12) };
-    let links = definition_links(Some(GotoDefinitionResponse::Scalar(location)));
-    assert_eq!(links.len(), 1);
-    assert_eq!(links[0].target_selection_range, range(4, 7, 12));
-    assert_eq!(links[0].origin_selection_range, None, "we never invent which word was clicked");
-    assert_eq!(first_line(&links), Some(4));
-}
-
-#[test]
-fn every_location_in_a_list_is_kept_in_order() {
-    let locations = vec![
-        Location { uri: uri("file:///a.rs"), range: range(1, 0, 1) },
-        Location { uri: uri("file:///b.rs"), range: range(9, 0, 1) },
-    ];
-    let links = definition_links(Some(GotoDefinitionResponse::Array(locations)));
-    assert_eq!(links.iter().map(|l| l.target_uri.as_str()).collect::<Vec<_>>(), ["file:///a.rs", "file:///b.rs"]);
-}
-
-#[test]
-fn a_link_answer_keeps_its_own_name_range() {
-    let link = LocationLink {
-        origin_selection_range: Some(range(6, 4, 9)),
-        target_uri: uri("file:///a.rs"),
-        target_range: range(0, 0, 30),
-        target_selection_range: range(0, 7, 12),
-    };
-    let links = definition_links(Some(GotoDefinitionResponse::Link(vec![link.clone()])));
-    assert_eq!(links, vec![link]);
-    assert_eq!(first_line(&links), Some(0));
 }
 
 fn modified() -> LspError {
@@ -111,25 +63,38 @@ fn a_request_the_server_cancelled_is_asked_again() {
 }
 
 #[test]
-fn only_the_newest_diagnostics_request_in_a_batch_runs() {
+fn only_the_newest_diagnostics_request_for_each_document_runs() {
     let (tx, rx) = std::sync::mpsc::channel();
-    let check = |name: &'static str| {
+    let check = |path: &'static str, name: &'static str| {
         let tx = tx.clone();
-        Job::Diagnostics { text: name.into(), reply: Box::new(move |a| { let _ = tx.send((name, a.is_err())); }) }
+        let doc = Doc { path: path.into(), text: name.into() };
+        Job::Diagnostics { doc, reply: Box::new(move |a| { let _ = tx.send((name, a.is_err())); }) }
     };
-    let hover = Job::Hover { text: "h".into(), position: Position::default(), reply: Box::new(|_| {}) };
-    let jobs = triage(vec![check("old"), hover, check("older"), check("newest")]);
+    let doc = Doc { path: "a.rs".into(), text: "h".into() };
+    let hover = Job::Hover { doc, position: Position::default(), reply: Box::new(|_| {}) };
+    let jobs = triage(vec![check("a.rs", "old"), hover, check("b.rs", "other file"), check("a.rs", "newest")]);
     let kept: Vec<_> = jobs
         .iter()
         .map(|job| match job {
-            Job::Diagnostics { text, .. } => text.as_str(),
+            Job::Diagnostics { doc, .. } => doc.text.as_str(),
             Job::Hover { .. } => "hover",
-            Job::Definition { .. } => "definition",
+            Job::Navigate { .. } | Job::References { .. } => "other",
         })
         .collect();
-    assert_eq!(kept, ["hover", "newest"], "other requests keep their order");
+    assert_eq!(kept, ["hover", "other file", "newest"], "other requests keep their order");
     // The kept jobs hold senders too, so they go before the answers are read.
     drop((jobs, tx));
     let told: Vec<_> = rx.iter().collect();
-    assert_eq!(told, [("old", true), ("older", true)], "each dropped request hears it was superseded");
+    assert_eq!(told, [("old", true)], "only the older check for the same file is superseded");
+}
+
+#[test]
+fn a_file_uri_names_its_path_again() {
+    let path = std::env::temp_dir().join("lathe uri test/a%b.rs");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, "").unwrap();
+    let uri = path_to_uri(&path).expect("an existing path has a uri");
+    assert_eq!(uri_to_path(&uri), Some(path.clone()));
+    assert_eq!(uri_to_path(&"https://docs.rs/x".parse().unwrap()), None, "not a file");
+    std::fs::remove_dir_all(path.parent().unwrap()).ok();
 }

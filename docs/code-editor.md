@@ -141,6 +141,17 @@ locations, each with its line's text for display.
   a click on a row in this file moves the caret, in another file names it in the status line.
 - Shift-F12 asks for references directly.
 
+**What the servers taught us.**
+
+- typescript-language-server publishes diagnostics only to a client that declares
+  `textDocument.publishDiagnostics`; declaring only pull support got it to send none at all.
+- It runs the project's own TypeScript and refuses to start without one, so a project with no
+  `node_modules/typescript` gets `tsserver.path` pointed at the TypeScript installed beside the server.
+  TypeScript 7 ships no `tsserver.js`, so that fallback needs TypeScript 5.
+- pyright, gopls and typescript-language-server count columns in UTF-16 and only publish
+  diagnostics; rust-analyzer takes UTF-32 and answers pulls. The worker covers both, and the live tests
+  put an emoji before the call to prove the conversion.
+
 **Proof.** A live test per server, skipped when its program is missing unless `LATHE_REQUIRE_LSP` names
 it (`LATHE_REQUIRE_LSP=rust,typescript,python,go`): from a call, definition lands on the declaration;
 on the declaration, the fallback lands on the call; a type error is reported; hover names the symbol.
@@ -148,7 +159,8 @@ The gallery's Editor story has a tab per language with a fixture project on disk
 
 ## Checks
 
-- `tools/check.sh` on `hp-agent`: the workspace tests with a live rust-analyzer, clippy, the gallery
+- `tools/check.sh` on `hp-agent`: the workspace tests with live rust-analyzer, typescript-language-server,
+  pyright and gopls, clippy, the gallery
   build, and the tests of the patched `vendor/gpui-base`, which the workspace excludes.
 - Gallery stories "Hunks" and "Editor", captured on `hp-agent` in both themes.
 - Stage A resolve: capture at 0, 130 and 260ms and confirm the rows close rather than jump.

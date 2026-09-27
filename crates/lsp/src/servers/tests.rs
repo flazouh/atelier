@@ -26,7 +26,7 @@ fn every_language_id_has_exactly_one_server() {
         assert_eq!(servers, 1, "{id}");
         assert!(server_for(id).is_some());
     }
-    assert_eq!(server_for("cobol"), None);
+    assert!(server_for("cobol").is_none());
 }
 
 #[test]
@@ -63,5 +63,32 @@ fn the_root_is_the_nearest_directory_with_a_marker() {
     std::fs::write(base.join("app/go.mod"), "").unwrap();
     assert_eq!(find_root(&file, &["go.mod"]), base.join("app"), "the nearest one wins");
     assert_eq!(find_root(&file, &["pom.xml"]), base.join("app/src/deep"), "no marker: the file's directory");
+    std::fs::remove_dir_all(&base).ok();
+}
+
+#[cfg(unix)]
+#[test]
+fn typescript_falls_back_to_the_typescript_beside_the_server() {
+    let base = std::env::temp_dir().join(format!("lathe-ts-{}", std::process::id()));
+    let modules = base.join("prefix/lib/node_modules");
+    let cli = modules.join("typescript-language-server/lib/cli.mjs");
+    std::fs::create_dir_all(cli.parent().unwrap()).unwrap();
+    std::fs::write(&cli, "").unwrap();
+    std::fs::create_dir_all(modules.join("typescript/lib")).unwrap();
+    std::fs::write(modules.join("typescript/lib/tsserver.js"), "").unwrap();
+    let program = base.join("prefix/bin/typescript-language-server");
+    std::fs::create_dir_all(program.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(&cli, &program).unwrap();
+    let options = server_for("typescript").unwrap().initialization_options;
+
+    let bare = base.join("bare");
+    std::fs::create_dir_all(&bare).unwrap();
+    let lib = std::fs::canonicalize(modules.join("typescript/lib")).unwrap();
+    assert_eq!(options(&program, &bare), Some(json!({ "tsserver": { "path": lib } })), "no TypeScript of its own");
+
+    let project = base.join("project");
+    std::fs::create_dir_all(project.join("node_modules/typescript/lib")).unwrap();
+    std::fs::write(project.join("node_modules/typescript/lib/tsserver.js"), "").unwrap();
+    assert_eq!(options(&program, &project), None, "a project's own TypeScript wins");
     std::fs::remove_dir_all(&base).ok();
 }

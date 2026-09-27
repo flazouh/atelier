@@ -1,0 +1,39 @@
+//! The line numbers a hunk starts at.
+//!
+//! `width` below is called by `broken`, which also holds a real type error for the server to find.
+
+pub fn width() -> u32 {
+    7
+}
+
+pub fn broken() -> u32 {
+    let text: u32 = "not a number";
+    text + width()
+}
+
+use std::collections::HashMap;
+
+/// Parses `@@ -12,4 +12,5 @@` into the line before each side's first line.
+fn hunk_starts(header: &str) -> (u32, u32) {
+    let start = |sign: char| {
+        header
+            .split_whitespace()
+            .find_map(|part| part.strip_prefix(sign))
+            .and_then(|range| range.split(',').next()?.parse::<u32>().ok())
+            .map_or(0, |n| n.saturating_sub(1))
+    };
+    (start('-'), start('+'))
+}
+
+#[derive(Debug, Default)]
+struct Counts {
+    added: usize,
+    removed: usize,
+    by_file: HashMap<String, usize>,
+}
+
+impl Counts {
+    fn total(&self) -> usize {
+        self.added + self.removed
+    }
+}

@@ -103,6 +103,7 @@ impl LspClient {
         program: &str,
         args: &[&str],
         root: &Path,
+        options: Option<Value>,
         timeout: Duration,
     ) -> Result<(Self, InitializeResult), LspError> {
         let mut child = Command::new(program)
@@ -129,20 +130,27 @@ impl LspClient {
             pending,
             messages,
         };
-        let result = client.initialize(root, timeout)?;
+        let result = client.initialize(root, options, timeout)?;
         Ok((client, result))
     }
 
-    fn initialize(&mut self, root: &Path, timeout: Duration) -> Result<InitializeResult, LspError> {
+    fn initialize(&mut self, root: &Path, options: Option<Value>, timeout: Duration) -> Result<InitializeResult, LspError> {
         let uri = path_to_uri(root)?;
         #[allow(deprecated)] // `root_uri` is the field every server still reads.
         let params = InitializeParams {
             root_uri: Some(uri),
+            initialization_options: options,
             capabilities: ClientCapabilities {
                 // Saying we pull diagnostics is what makes rust-analyzer answer a pull with its full
                 // checks; without it the answer is empty.
                 text_document: Some(TextDocumentClientCapabilities {
                     diagnostic: Some(DiagnosticClientCapabilities::default()),
+                    // A server that does not answer pulls publishes instead, and some, such as
+                    // typescript-language-server, publish only to a client that says it reads them.
+                    publish_diagnostics: Some(lsp_types::PublishDiagnosticsClientCapabilities {
+                        version_support: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }),
                 // Characters first, as gpui-base counts them; UTF-16, which every server supports,

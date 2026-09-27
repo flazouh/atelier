@@ -1,10 +1,17 @@
-//! The Editor story's language server, wired into the editor the way Zed does it: hold ⌘ (ctrl on
-//! Linux) over a symbol to underline it and click to jump there; rest the pointer on a symbol for its
-//! hover card; F12 jumps from the caret; problems are checked on open and again whenever typing
-//! pauses. Nothing here blocks the window. Every answer comes from [`LspWorker`], which owns the
-//! server on a thread of its own.
+//! A file's language server, wired into the editor the way Zed does it: hold ⌘ (ctrl on Linux) over
+//! a symbol to underline it and click to go to its definition, or to its uses when it is the
+//! definition; F12 does the same from the caret and ⇧F12 lists the uses; rest the pointer on a symbol
+//! for its hover card; problems are checked on open and again whenever typing pauses.
+//!
+//! Nothing here names a language: the file's path picks the server from `lathe_lsp::servers`, and
+//! [`LspWorker`] runs it on a thread of its own, so no answer ever holds the window.
 
-use std::{path::PathBuf, rc::Rc, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    rc::Rc,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use futures_channel::oneshot;
 use gpui_kit::{
@@ -12,53 +19,69 @@ use gpui_kit::{
     base::input::{self, DefinitionProvider, HoverProvider, InputEvent, Rope, RopeExt},
     component::input::EditorState,
 };
-use lathe_lsp::{DocumentSync, LspClient, LspError, LspWorker, Reply, definition_links};
-use lsp_types::{Diagnostic, Hover, LocationLink, ShowDocumentParams, Uri};
+use lathe_lsp::{
+    Doc, Found, LspError, LspWorker, Navigation, Reply, Target, find_program, find_root, language_id, server_for,
+};
+use lsp_types::{Diagnostic, Hover, LocationLink, Position, ShowDocumentParams, Uri};
 
-/// How long one question may take. rust-analyzer answers in milliseconds once it has indexed.
+/// How long one question may take. Servers answer in milliseconds once they have indexed.
 const ASK: Duration = Duration::from_secs(20);
-/// How long the server may take to start and shake hands.
-const READY: Duration = Duration::from_secs(30);
+/// How long a server may take to start and shake hands.
+const READY: Duration = Duration::from_secs(60);
 /// How long typing must pause before the buffer is checked again. docs/code-editor.md sets 150ms.
 const RECHECK_AFTER: Duration = Duration::from_millis(150);
 /// The key a Zed user holds to follow a symbol.
 const SECONDARY: &str = if cfg!(target_os = "macos") { "⌘" } else { "ctrl" };
 
-/// One editor's language server: it starts the server, hands the editor its definitions and hover
-/// cards, keeps the problems current, and says what it is doing.
+/// The newest answer to a Cmd-hover, Cmd-click or F12, kept so a click can tell one place to jump to
+/// from several to list. The provider writes it off the main thread.
+type LastNavigation = Arc<Mutex<Option<Navigation>>>;
+
+/// One file's language server: it starts the server, hands the editor its definitions and hover
+/// cards, keeps the problems current, lists references, and says what it is doing.
 pub struct EditorSession {
     editor: Entity<EditorState>,
+    path: PathBuf,
     worker: Option<LspWorker>,
     /// The server's state, or where the last definition outside this file is.
     server: SharedString,
     /// What the last check found.
     problems: SharedString,
+    /// The uses of a symbol, when there is more than one to choose from.
+    references: Vec<Target>,
+    last: LastNavigation,
     checking: Task<()>,
     recheck: Task<()>,
+    finding: Task<()>,
     _start: Task<()>,
     _edits: Subscription,
 }
 
 impl EditorSession {
-    /// Starts rust-analyzer over `text` and attaches it to `editor` once it is ready.
-    pub fn new(editor: Entity<EditorState>, text: &str, cx: &mut Context<Self>) -> Self {
-        let started = start(text.to_string());
+    /// Starts the server for `path`, whose text `editor` holds, and attaches it once it is ready.
+    pub fn new(editor: Entity<EditorState>, path: PathBuf, cx: &mut Context<Self>) -> Self {
+        let started = start(path.clone());
         let _start = cx.spawn(async move |this, cx| {
             let started = started.await.unwrap_or_else(|_| Err("the server thread stopped".into()));
             _ = this.update(cx, |this, cx| this.started(started, cx));
         });
         let _edits = cx.subscribe(&editor, |this, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
+                this.references.clear();
                 this.schedule_recheck(cx);
             }
         });
         Self {
             editor,
+            path,
             worker: None,
-            server: "rust-analyzer is starting".into(),
+            server: "starting the language server".into(),
             problems: SharedString::default(),
+            references: Vec::new(),
+            last: LastNavigation::default(),
             checking: Task::ready(()),
             recheck: Task::ready(()),
+            finding: Task::ready(()),
             _start,
             _edits,
         }
@@ -67,21 +90,36 @@ impl EditorSession {
     fn started(&mut self, started: Result<Started, String>, cx: &mut Context<Self>) {
         let Started { worker, name } = match started {
             Ok(started) => started,
-            Err(error) => {
-                self.server = error.into();
+            Err(message) => {
+                self.server = message.into();
                 return cx.notify();
             }
         };
         let session = cx.entity().downgrade();
-        let elsewhere: Elsewhere = Rc::new(move |params: &ShowDocumentParams, cx: &mut App| {
+        let last = self.last.clone();
+        let here = lathe_lsp::client::path_to_uri(&self.path).ok();
+        let show: ShowDocument = Rc::new(move |params: &ShowDocumentParams, cx: &mut App| {
+            let several = last
+                .lock()
+                .ok()
+                .and_then(|last| last.clone())
+                .filter(|n| n.found == Found::References && n.targets.len() > 1);
+            if let Some(navigation) = several {
+                _ = session.update(cx, |this, cx| this.show_references(navigation.targets, cx));
+                return true;
+            }
+            if Some(&params.uri) == here.as_ref() {
+                return false;
+            }
             let line = params.selection.map(|r| r.start.line + 1).unwrap_or(1);
-            let text = format!("defined in {} on line {line}", display_path(&params.uri));
+            let text = format!("defined in {} on line {line}", file_name(&params.uri));
             _ = session.update(cx, |this, cx| {
                 this.server = text.into();
                 cx.notify();
             });
+            true
         });
-        attach(&self.editor, worker.clone(), elsewhere, cx);
+        attach(&self.editor, &self.path, worker.clone(), self.last.clone(), show, cx);
         self.worker = Some(worker);
         self.server = format!("{name} is ready: hold {SECONDARY} and click a symbol, or press F12").into();
         self.check(cx);
@@ -95,13 +133,67 @@ impl EditorSession {
         }
     }
 
+    /// The uses to list under the editor. Empty when there is nothing to choose between.
+    pub fn references(&self) -> &[Target] {
+        &self.references
+    }
+
+    fn show_references(&mut self, targets: Vec<Target>, cx: &mut Context<Self>) {
+        self.references = targets;
+        cx.notify();
+    }
+
+    /// Closes the references list.
+    pub fn close_references(&mut self, cx: &mut Context<Self>) {
+        self.references.clear();
+        cx.notify();
+    }
+
+    /// Moves the caret to one of the listed uses, or names its file when it is elsewhere.
+    pub fn open_reference(&mut self, target: &Target, window: &mut Window, cx: &mut Context<Self>) {
+        if lathe_lsp::client::path_to_uri(&self.path).ok().as_ref() != Some(&target.uri) {
+            let line = target.range.start.line + 1;
+            self.server = format!("used in {} on line {line}", file_name(&target.uri)).into();
+            return cx.notify();
+        }
+        let start = target.range.start;
+        self.editor.update(cx, |state, cx| state.set_cursor_position(start, window, cx));
+    }
+
+    /// Lists every use of the symbol at the caret, as ⇧F12 does.
+    pub fn find_references(&mut self, cx: &mut Context<Self>) {
+        let Some(worker) = self.worker.clone() else { return };
+        let (doc, position) = self.doc_and_caret(cx);
+        let answer = ask(cx, |reply| worker.references(doc, position, reply));
+        self.finding = cx.spawn(async move |this, cx| {
+            let answer = answer.await;
+            _ = this.update(cx, |this, cx| match answer {
+                Ok(targets) if targets.is_empty() => {
+                    this.server = "no uses found".into();
+                    cx.notify();
+                }
+                Ok(targets) => this.show_references(targets, cx),
+                Err(error) => {
+                    this.server = format!("{error}").into();
+                    cx.notify();
+                }
+            });
+        });
+    }
+
+    fn doc_and_caret(&self, cx: &App) -> (Doc, Position) {
+        let state = self.editor.read(cx);
+        (Doc { path: self.path.clone(), text: state.value().to_string() }, state.cursor_position())
+    }
+
     /// Asks the server what is wrong with the buffer and underlines it. A set lands only if the
     /// buffer still holds the text it was worked out for, so an underline never sits on the wrong
     /// line; a newer check covers the rest.
     pub fn check(&mut self, cx: &mut Context<Self>) {
         let Some(worker) = self.worker.clone() else { return };
-        let text = self.editor.read(cx).value().to_string();
-        let answer = ask(cx, |reply| worker.diagnostics(text.clone(), reply));
+        let (doc, _) = self.doc_and_caret(cx);
+        let text = doc.text.clone();
+        let answer = ask(cx, |reply| worker.diagnostics(doc, reply));
         self.checking = cx.spawn(async move |this, cx| {
             let answer = answer.await;
             _ = this.update(cx, |this, cx| {
@@ -156,40 +248,24 @@ struct Started {
     name: String,
 }
 
-/// Writes `text` into a one-file crate on disk and starts rust-analyzer over it, on a thread, so the
-/// gallery opens at once. The answer is a message rather than a panic: the gallery must open on a box
-/// with no server.
-fn start(text: String) -> oneshot::Receiver<Result<Started, String>> {
+/// Finds and starts the server for `path` on a thread, so the window opens at once. Anything that
+/// stops it, such as a language lathe has no server for or one that is not installed, comes back as
+/// the sentence the status line shows.
+fn start(path: PathBuf) -> oneshot::Receiver<Result<Started, String>> {
     let (tx, rx) = oneshot::channel();
-    std::thread::spawn(move || drop(tx.send(start_blocking(&text))));
+    std::thread::spawn(move || drop(tx.send(start_blocking(&path))));
     rx
 }
 
-fn start_blocking(text: &str) -> Result<Started, String> {
-    let dir = std::env::temp_dir().join("lathe-gallery-lsp");
-    std::fs::create_dir_all(dir.join("src")).map_err(|_| "the fixture directory is not writable".to_string())?;
-    let manifest = "[package]\nname = \"lathe-gallery\"\nversion = \"0.1.0\"\nedition = \"2021\"\n";
-    let file = dir.join("src/lib.rs");
-    std::fs::write(dir.join("Cargo.toml"), manifest)
-        .and_then(|()| std::fs::write(&file, text))
-        .map_err(|_| "the fixture could not be written".to_string())?;
-    let program = server_program();
-    let (mut client, init) = LspClient::spawn(&program, &[], &dir, READY).map_err(|e| e.to_string())?;
-    client.did_open(&file, "rust", 1, text).map_err(|e| e.to_string())?;
-    let name = init.server_info.map(|i| i.name).unwrap_or_else(|| "the server".into());
-    Ok(Started { worker: LspWorker::start(client, file, DocumentSync::opened(text), ASK), name })
-}
-
-/// rust-analyzer from `PATH`, or from `~/.cargo/bin` where rustup puts it. An app opened from the
-/// Finder or over SSH often has no `~/.cargo/bin` in its `PATH`.
-fn server_program() -> String {
-    let on_path = std::env::var_os("PATH")
-        .is_some_and(|paths| std::env::split_paths(&paths).any(|dir| dir.join("rust-analyzer").is_file()));
-    let home = std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cargo/bin/rust-analyzer"));
-    match home {
-        Some(path) if !on_path && path.is_file() => path.to_string_lossy().into_owned(),
-        _ => "rust-analyzer".into(),
-    }
+fn start_blocking(path: &Path) -> Result<Started, String> {
+    let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("these");
+    let id = language_id(path).ok_or_else(|| format!("no language server for .{extension} files"))?;
+    let spec = server_for(id).ok_or_else(|| format!("no language server for {id}"))?;
+    let program = find_program(spec.program)
+        .ok_or_else(|| format!("{} is not installed: {}", spec.name, spec.install))?;
+    let root = find_root(path, spec.root_markers);
+    let (worker, name) = LspWorker::start(spec, &program, root, READY, ASK).map_err(|e| e.to_string())?;
+    Ok(Started { worker, name })
 }
 
 /// Sends one question to the worker and waits for its answer off the main thread.
@@ -202,9 +278,19 @@ fn ask<T: Send + 'static>(cx: &App, send: impl FnOnce(Reply<T>)) -> Task<Result<
 /// The editor's view of the server.
 struct EditorLsp {
     worker: LspWorker,
+    path: PathBuf,
+    last: LastNavigation,
+}
+
+impl EditorLsp {
+    fn doc(&self, text: &Rope) -> Doc {
+        Doc { path: self.path.clone(), text: text.to_string() }
+    }
 }
 
 impl DefinitionProvider for EditorLsp {
+    /// Where a Cmd-click goes. The answer is also kept in `last`, so the click can list several
+    /// uses instead of jumping to the first.
     fn definitions(
         &self,
         text: &Rope,
@@ -212,47 +298,56 @@ impl DefinitionProvider for EditorLsp {
         _window: &mut Window,
         cx: &mut App,
     ) -> Task<anyhow::Result<Vec<LocationLink>>> {
-        let (text, position) = (text.to_string(), text.offset_to_position(offset));
-        let (tx, rx) = oneshot::channel();
-        self.worker.definition(text, position, Box::new(move |answer| drop(tx.send(answer.map(definition_links)))));
-        cx.background_spawn(async move { Ok(rx.await.unwrap_or(Err(LspError::Closed))?) })
+        let (doc, position) = (self.doc(text), text.offset_to_position(offset));
+        let answer = ask(cx, |reply| self.worker.navigate(doc, position, reply));
+        let last = self.last.clone();
+        cx.background_spawn(async move {
+            let navigation = answer.await?;
+            let links = navigation.targets.iter().map(link).collect();
+            if let Ok(mut last) = last.lock() {
+                *last = Some(navigation);
+            }
+            Ok(links)
+        })
     }
 }
 
 impl HoverProvider for EditorLsp {
     fn hover(&self, text: &Rope, offset: usize, _window: &mut Window, cx: &mut App) -> Task<anyhow::Result<Option<Hover>>> {
-        let (text, position) = (text.to_string(), text.offset_to_position(offset));
-        let answer = ask(cx, |reply| self.worker.hover(text, position, reply));
+        let (doc, position) = (self.doc(text), text.offset_to_position(offset));
+        let answer = ask(cx, |reply| self.worker.hover(doc, position, reply));
         cx.background_spawn(async move { Ok(answer.await?) })
     }
 }
 
-/// What to do with a definition in another file.
-type Elsewhere = Rc<dyn Fn(&ShowDocumentParams, &mut App)>;
+/// A target as gpui-base's link, which selects the target's name when it jumps there.
+fn link(target: &Target) -> LocationLink {
+    LocationLink {
+        origin_selection_range: None,
+        target_uri: target.uri.clone(),
+        target_range: target.range,
+        target_selection_range: target.range,
+    }
+}
 
-/// Gives `state` the server's definitions and hover cards. A definition in this file moves the caret
-/// there, as gpui-base does by itself. One in another file goes to `elsewhere`, since the story has
-/// only one file to show; the editor never jumps to a line of the wrong file.
-fn attach(state: &Entity<EditorState>, worker: LspWorker, elsewhere: Elsewhere, cx: &mut App) {
-    let here = lathe_lsp::client::path_to_uri(worker.path()).ok();
-    let provider = Rc::new(EditorLsp { worker });
+/// What to do when gpui-base is about to jump: `true` means it was handled here.
+type ShowDocument = Rc<dyn Fn(&ShowDocumentParams, &mut App) -> bool>;
+
+/// Gives `state` the server's definitions and hover cards. `show` decides each jump first: it lists
+/// several uses, names a file the story cannot show, or lets gpui-base move the caret.
+fn attach(state: &Entity<EditorState>, path: &Path, worker: LspWorker, last: LastNavigation, show: ShowDocument, cx: &mut App) {
+    let provider = Rc::new(EditorLsp { worker, path: path.to_path_buf(), last });
     state.update(cx, |state, cx| {
         let lsp = state.lsp_mut();
         lsp.definition_provider = Some(provider.clone());
         lsp.hover_provider = Some(provider);
-        lsp.show_document = Some(Rc::new(move |params: &ShowDocumentParams, _: &mut Window, cx: &mut App| {
-            if Some(&params.uri) == here.as_ref() {
-                return false;
-            }
-            elsewhere(params, cx);
-            true
-        }));
+        lsp.show_document = Some(Rc::new(move |params: &ShowDocumentParams, _: &mut Window, cx: &mut App| show(params, cx)));
         state.refresh(cx);
     });
 }
 
-/// Where a path from a server answer lives, for a status line.
-fn display_path(uri: &Uri) -> String {
+/// The file name in a server's URI, for a status line.
+pub fn file_name(uri: &Uri) -> String {
     let path = uri.path().as_str();
     PathBuf::from(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string())
 }

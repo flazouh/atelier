@@ -4,8 +4,10 @@
 
 use std::path::{Path, PathBuf};
 
+use serde_json::{Value, json};
+
 /// How to run one language server, and for which files.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct ServerSpec {
     /// What the status line calls it.
     pub name: &'static str,
@@ -17,6 +19,13 @@ pub struct ServerSpec {
     pub root_markers: &'static [&'static str],
     /// How to install it, for the status line when it is missing.
     pub install: &'static str,
+    /// The `initializationOptions` to send, from where the program is and the project root.
+    pub initialization_options: fn(program: &Path, root: &Path) -> Option<Value>,
+}
+
+/// For a server that needs no options.
+fn no_options(_: &Path, _: &Path) -> Option<Value> {
+    None
 }
 
 /// The servers lathe knows how to run.
@@ -28,6 +37,7 @@ pub const SERVERS: &[ServerSpec] = &[
         language_ids: &["rust"],
         root_markers: &["Cargo.toml"],
         install: "rustup component add rust-analyzer",
+        initialization_options: no_options,
     },
     ServerSpec {
         name: "typescript-language-server",
@@ -35,7 +45,8 @@ pub const SERVERS: &[ServerSpec] = &[
         args: &["--stdio"],
         language_ids: &["typescript", "typescriptreact", "javascript", "javascriptreact"],
         root_markers: &["tsconfig.json", "jsconfig.json", "package.json"],
-        install: "npm install -g typescript typescript-language-server",
+        install: "npm install -g typescript@5 typescript-language-server",
+        initialization_options: typescript_options,
     },
     ServerSpec {
         name: "pyright",
@@ -44,6 +55,7 @@ pub const SERVERS: &[ServerSpec] = &[
         language_ids: &["python"],
         root_markers: &["pyproject.toml", "setup.py", "requirements.txt", "pyrightconfig.json"],
         install: "npm install -g pyright",
+        initialization_options: no_options,
     },
     ServerSpec {
         name: "gopls",
@@ -52,6 +64,7 @@ pub const SERVERS: &[ServerSpec] = &[
         language_ids: &["go"],
         root_markers: &["go.mod"],
         install: "go install golang.org/x/tools/gopls@latest",
+        initialization_options: no_options,
     },
     ServerSpec {
         name: "jdtls",
@@ -60,8 +73,22 @@ pub const SERVERS: &[ServerSpec] = &[
         language_ids: &["java"],
         root_markers: &["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle"],
         install: "brew install jdtls",
+        initialization_options: no_options,
     },
 ];
+
+/// typescript-language-server runs the project's own TypeScript, from `node_modules`. A project
+/// without one, such as a single file, would make it refuse to start, so it is pointed at the
+/// TypeScript installed beside the server itself, as editors do.
+fn typescript_options(program: &Path, root: &Path) -> Option<Value> {
+    if root.join("node_modules/typescript/lib/tsserver.js").exists() {
+        return None;
+    }
+    let installed = std::fs::canonicalize(program).ok()?;
+    let modules = installed.ancestors().find(|dir| dir.file_name().is_some_and(|n| n == "node_modules"))?;
+    let lib = modules.join("typescript/lib");
+    lib.join("tsserver.js").exists().then(|| json!({ "tsserver": { "path": lib } }))
+}
 
 /// The standard LSP language id for a file, by its extension.
 pub fn language_id(path: &Path) -> Option<&'static str> {
