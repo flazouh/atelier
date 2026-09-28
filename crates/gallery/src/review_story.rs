@@ -346,7 +346,7 @@ impl Render for ReviewStory {
             .flex()
             .flex_col()
             .w_full()
-            .max_w(px(1000.))
+            .min_w_0()
             .overflow_hidden()
             .rounded(radius::XL)
             .bg(theme.background)
@@ -354,7 +354,7 @@ impl Render for ReviewStory {
             .child(
                 div()
                     .flex()
-                    .child(div().flex_none().w(px(250.)).h(px(560.)).bg(theme.card).rounded(radius::LG).child(tree))
+                    .child(div().flex_none().w(px(220.)).h(px(560.)).bg(theme.card).rounded(radius::LG).child(tree))
                     .child(div().flex_1().min_w_0().child(review)),
             );
         handlers.keys(pane)
