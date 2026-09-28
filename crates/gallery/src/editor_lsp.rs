@@ -244,6 +244,12 @@ impl EditorSession {
         }
     }
 
+    /// Puts `text` in the status line where the server's state goes.
+    pub fn say(&mut self, text: String, cx: &mut Context<Self>) {
+        self.server = text.into();
+        cx.notify();
+    }
+
     /// The uses to list under the editor. Empty when there is nothing to choose between.
     pub fn references(&self) -> &[Target] {
         &self.references

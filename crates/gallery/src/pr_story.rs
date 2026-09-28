@@ -280,7 +280,7 @@ impl PrStory {
             let uses = session.read(cx).references().to_vec();
             if !uses.is_empty() {
                 session.update(cx, |s, cx| s.close_references(cx));
-                story.open_lookup(Command::Uses, window, cx);
+                story.open_finder(Command::Uses, window, cx);
                 story.fill_uses(uses, cx);
             }
             cx.notify();
@@ -300,7 +300,15 @@ impl PrStory {
 
     /// Follows a jump out of the file on screen: to another changed file, or Brought In.
     fn jump(&mut self, jump: Jump, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(relative) = self.fixture.relative(&canonical(&jump.path)) else { return };
+        let Some(relative) = self.fixture.relative(&canonical(&jump.path)) else {
+            // The toolchain's own sources, say: named, not opened.
+            let name = jump.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            let line = jump.position.line + 1;
+            if let Some(session) = &self.session {
+                session.update(cx, |s, cx| s.say(format!("defined in {name} on line {line}, outside this repository"), cx));
+            }
+            return;
+        };
         let caret = self.editor.read(cx).cursor_position();
         self.back.push((self.place.clone(), caret));
         let (place, position) = match self.fixture.changed_at(&relative) {
@@ -331,7 +339,15 @@ impl PrStory {
         }
     }
 
+    /// Opens the lookup for `command` and asks for its rows.
     fn open_lookup(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_finder(command, window, cx);
+        self.ask(command, cx);
+        cx.notify();
+    }
+
+    /// Opens the lookup for `command`, empty.
+    fn open_finder(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         let (title, placeholder, filter) = match command {
             Command::Uses => ("Uses", "Filter the uses", Filter::Here),
             Command::FileNames => ("Names in this file", "Filter the names", Filter::Here),
@@ -350,6 +366,11 @@ impl PrStory {
         });
         finder.read(cx).focus_handle(cx).focus(window, cx);
         self.lookup = Some(Lookup { command, finder, leads: Vec::new(), asking: Task::ready(()), _events: events });
+        cx.notify();
+    }
+
+    /// Fills the open lookup for `command`: from the server, or from the repository's files.
+    fn ask(&mut self, command: Command, cx: &mut Context<Self>) {
         let Some(session) = self.session.clone() else { return self.note("The language server is not ready", cx) };
         match command {
             Command::Uses => match session.read(cx).uses(cx) {
@@ -371,7 +392,6 @@ impl PrStory {
                 self.set_rows(items, leads, cx);
             }
         }
-        cx.notify();
     }
 
     /// "changed" for a file the pull request changed, nothing for the rest.
