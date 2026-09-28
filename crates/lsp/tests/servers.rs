@@ -5,6 +5,7 @@
 //! - On the declaration, it falls back to the uses and lands on the call.
 //! - The type error in the program is reported on its line.
 //! - Hover on the call names the function.
+//! - For Rust, the file's names come in order, and a typed part of a name finds it in the project.
 //! - After two lines are added on top, the answers move down with the text.
 //!
 //! The call line holds an emoji before the call, so a server that counts UTF-16 units would put the
@@ -290,6 +291,25 @@ fn check(fixture: &Fixture) {
     let hover = ask(|r| worker.hover(doc(&text), call, r)).expect("the server answers hover");
     let shown = format!("{:?}", hover.expect("the server describes width").contents);
     assert!(shown.contains("width"), "the hover names the function: {shown}");
+
+    // Names: the pull request view's server is rust-analyzer, so these run for Rust.
+    if fixture.language == "rust" {
+        let names = once_ready(
+            "names in the file",
+            || ask(|r| worker.symbols(doc(&text), r)),
+            |found: &Vec<lathe_lsp::Symbol>| found.len() >= 2,
+        );
+        let listed: Vec<(&str, u32)> = names.iter().map(|s| (s.name.as_str(), s.range.start.line)).collect();
+        assert_eq!(listed, [("width", 0), ("broken", 4)], "the file's functions, in order, on their lines");
+        let found = once_ready(
+            "go to name",
+            || ask(|r| worker.project_symbols(doc(&text), "wid".into(), r)),
+            |found: &Vec<lathe_lsp::Symbol>| found.iter().any(|s| s.name == "width"),
+        );
+        let width = found.iter().find(|s| s.name == "width").unwrap();
+        assert!(width.uri.as_str().ends_with("src/lib.rs"), "{}", width.uri.as_str());
+        assert_eq!(width.range.start, Position { line: 0, character: 7 }, "on the name, in characters");
+    }
 
     // Two lines on top: every answer moves down with the text.
     let comment = match fixture.language {

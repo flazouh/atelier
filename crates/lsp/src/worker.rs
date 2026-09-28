@@ -35,6 +35,7 @@ use crate::{
     navigation::{Found, Navigation, Target, definition_links, lands_on_itself, sort_targets},
     published::Published,
     servers::{ServerSpec, language_id},
+    symbols::{self, Symbol},
 };
 
 /// Where an answer goes. It runs on the worker's thread.
@@ -90,6 +91,9 @@ enum Job {
     References { doc: Doc, position: Position, reply: Reply<Vec<Target>> },
     Hover { doc: Doc, position: Position, reply: Reply<Option<Hover>> },
     Diagnostics { doc: Doc, reply: Reply<Vec<Diagnostic>> },
+    Symbols { doc: Doc, reply: Reply<Vec<Symbol>> },
+    /// Needs a document only to open the project's server on it.
+    ProjectSymbols { doc: Doc, query: String, reply: Reply<Vec<Symbol>> },
 }
 
 impl Job {
@@ -101,6 +105,8 @@ impl Job {
             Job::References { doc, position, reply } => Job::References { doc: fix(doc), position, reply },
             Job::Hover { doc, position, reply } => Job::Hover { doc: fix(doc), position, reply },
             Job::Diagnostics { doc, reply } => Job::Diagnostics { doc: fix(doc), reply },
+            Job::Symbols { doc, reply } => Job::Symbols { doc: fix(doc), reply },
+            Job::ProjectSymbols { doc, query, reply } => Job::ProjectSymbols { doc: fix(doc), query, reply },
         }
     }
 
@@ -111,6 +117,8 @@ impl Job {
             Job::References { reply, .. } => reply(Err(error)),
             Job::Hover { reply, .. } => reply(Err(error)),
             Job::Diagnostics { reply, .. } => reply(Err(error)),
+            Job::Symbols { reply, .. } => reply(Err(error)),
+            Job::ProjectSymbols { reply, .. } => reply(Err(error)),
         }
     }
 }
@@ -192,6 +200,17 @@ impl LspWorker {
         self.send(Job::Diagnostics { doc, reply });
     }
 
+    /// The names the document writes down, in text order: "Names in this file".
+    pub fn symbols(&self, doc: Doc, reply: Reply<Vec<Symbol>>) {
+        self.send(Job::Symbols { doc, reply });
+    }
+
+    /// The names anywhere in the project that match `query`: "Go to name". `doc` is a file of the
+    /// project, opened first so the server knows the project.
+    pub fn project_symbols(&self, doc: Doc, query: String, reply: Reply<Vec<Symbol>>) {
+        self.send(Job::ProjectSymbols { doc, query, reply });
+    }
+
     fn send(&self, job: Job) {
         // The thread only stops once every handle is gone, so a failed send means it panicked. The
         // caller still hears back rather than waiting forever.
@@ -232,13 +251,16 @@ fn run(mut session: Session, queue: Receiver<Job>) {
 
 /// The jobs worth running from a batch, in order. A newer question of the same kind about the same
 /// document makes an older one moot: the text or the pointer it was about has moved on. So only the
-/// newest navigate, hover and diagnostics job per document runs, and the rest are answered
-/// `Superseded`. References, which the user asked for by name, always run.
+/// newest navigate, hover, diagnostics and symbols job per document runs, and only the newest query
+/// for project names, as the user types it; the rest are answered `Superseded`. References, which the
+/// user asked for by name, always run.
 fn triage(batch: Vec<Job>) -> Vec<Job> {
     let key = |job: &Job| match job {
         Job::Navigate { doc, .. } => Some((0, doc.path.clone())),
         Job::Hover { doc, .. } => Some((1, doc.path.clone())),
         Job::Diagnostics { doc, .. } => Some((2, doc.path.clone())),
+        Job::Symbols { doc, .. } => Some((3, doc.path.clone())),
+        Job::ProjectSymbols { .. } => Some((4, PathBuf::new())),
         Job::References { .. } => None,
     };
     let keys: Vec<_> = batch.iter().map(key).collect();
@@ -266,6 +288,8 @@ impl Session {
             Job::References { doc, position, reply } => reply(self.references(&doc, position)),
             Job::Hover { doc, position, reply } => reply(self.hover(&doc, position)),
             Job::Diagnostics { doc, reply } => reply(self.diagnostics(&doc)),
+            Job::Symbols { doc, reply } => reply(self.symbols(&doc)),
+            Job::ProjectSymbols { doc, query, reply } => reply(self.project_symbols(&doc, &query)),
         }
     }
 
@@ -312,6 +336,54 @@ impl Session {
             answer.unwrap_or_default().into_iter().map(|l| self.target(doc, l.uri, l.range)).collect();
         sort_targets(&mut targets);
         Ok(targets)
+    }
+
+    fn symbols(&mut self, doc: &Doc) -> Result<Vec<Symbol>, LspError> {
+        self.sync(doc)?;
+        let ask = self.ask;
+        let found = match until_settled(ask, || self.client.document_symbols(&doc.path, ask))? {
+            Some(lsp_types::DocumentSymbolResponse::Nested(tree)) => {
+                symbols::flatten(&crate::client::path_to_uri(&doc.path)?, tree)
+            }
+            Some(lsp_types::DocumentSymbolResponse::Flat(list)) => symbols::from_information(list),
+            None => Vec::new(),
+        };
+        Ok(found.into_iter().map(|s| self.symbol_in_characters(doc, s)).collect())
+    }
+
+    fn project_symbols(&mut self, doc: &Doc, query: &str) -> Result<Vec<Symbol>, LspError> {
+        self.sync(doc)?;
+        let ask = self.ask;
+        let found = match until_settled(ask, || self.client.workspace_symbols(query, ask))? {
+            Some(lsp_types::WorkspaceSymbolResponse::Flat(list)) => symbols::from_information(list),
+            Some(lsp_types::WorkspaceSymbolResponse::Nested(list)) => symbols::from_information(
+                list.into_iter()
+                    .filter_map(|s| match s.location {
+                        lsp_types::OneOf::Left(location) => {
+                            #[allow(deprecated)]
+                            Some(lsp_types::SymbolInformation {
+                                name: s.name,
+                                kind: s.kind,
+                                tags: s.tags,
+                                deprecated: None,
+                                location,
+                                container_name: s.container_name,
+                            })
+                        }
+                        // A symbol with no range needs a second request to place it; none of ours send one.
+                        lsp_types::OneOf::Right(_) => None,
+                    })
+                    .collect(),
+            ),
+            None => Vec::new(),
+        };
+        Ok(found.into_iter().map(|s| self.symbol_in_characters(doc, s)).collect())
+    }
+
+    /// `symbol` with its range counted in characters, read against the text it is in.
+    fn symbol_in_characters(&self, doc: &Doc, symbol: Symbol) -> Symbol {
+        let target = self.target(doc, symbol.uri.clone(), symbol.range);
+        Symbol { range: target.range, ..symbol }
     }
 
     fn hover(&mut self, doc: &Doc, position: Position) -> Result<Option<Hover>, LspError> {

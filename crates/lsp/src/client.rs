@@ -155,6 +155,11 @@ impl LspClient {
                         version_support: Some(true),
                         ..Default::default()
                     }),
+                    // A tree, so "Names in this file" can say what each name sits inside.
+                    document_symbol: Some(lsp_types::DocumentSymbolClientCapabilities {
+                        hierarchical_document_symbol_support: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }),
                 // Characters first, as gpui-base counts them; UTF-16, which every server supports,
@@ -247,6 +252,34 @@ impl LspClient {
     }
 
     /// What the symbol at `position` is.
+    /// The names `path` writes down: its functions, types and fields.
+    pub fn document_symbols(
+        &mut self,
+        path: &Path,
+        timeout: Duration,
+    ) -> Result<Option<lsp_types::DocumentSymbolResponse>, LspError> {
+        let params = lsp_types::DocumentSymbolParams {
+            text_document: TextDocumentIdentifier { uri: path_to_uri(path)? },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        self.request::<lsp_types::request::DocumentSymbolRequest>(params, timeout)
+    }
+
+    /// Every name in the project that matches `query`, as the server matches it.
+    pub fn workspace_symbols(
+        &mut self,
+        query: &str,
+        timeout: Duration,
+    ) -> Result<Option<lsp_types::WorkspaceSymbolResponse>, LspError> {
+        let params = lsp_types::WorkspaceSymbolParams {
+            query: query.to_string(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        self.request::<lsp_types::request::WorkspaceSymbolRequest>(params, timeout)
+    }
+
     pub fn hover(&mut self, path: &Path, position: Position, timeout: Duration) -> Result<Option<Hover>, LspError> {
         let params = HoverParams {
             text_document_position_params: TextDocumentPositionParams {
