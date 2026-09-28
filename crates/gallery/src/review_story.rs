@@ -377,12 +377,16 @@ impl Render for ReviewStory {
 
         // The tree and the diff each sit in the same card, under the bar.
         let card = || div().h(px(body)).bg(theme.card).rounded(radius::LG).p(px(6.));
+        // The story's width, less the gallery's sidebar (220) and its padding (2 x 40), so the bar fits
+        // to the pane rather than the pane growing to the bar. Review mode takes the window, less 32.
+        let viewport = window.viewport_size().width;
+        let width = if self.review_mode { viewport - px(32.) } else { viewport - px(300.) };
         let pane = div()
             .id("review-pane")
             .flex()
             .flex_col()
             .gap(px(8.))
-            .w_full()
+            .w(width)
             .min_w_0()
             .overflow_hidden()
             .child(ReviewBar::new("review-bar", self.progress(), handlers.clone()))
