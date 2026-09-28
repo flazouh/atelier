@@ -443,6 +443,8 @@ impl Render for Gallery {
                 div()
                     .id("story")
                     .flex_1()
+                    // A flex child is as wide as its content by default; this one is the window's.
+                    .min_w_0()
                     .h_full()
                     .when(!panel, |d| {
                         d.overflow_y_scroll().p(px(40.)).child(

@@ -5,7 +5,11 @@
 //! The pull request: a left rail (unsent comments, checks, the conversation, the box for the whole pull
 //! request, the verdict, the commits) and a right pane (the seen bar, the changed file tree, and the
 //! diff on its card with a thread in place). GitQuiet's keys work while no box has focus: `s` and `w`
-//! move between files, `x` marks one seen, `r` is review mode, ⌘B folds the rail and ⌘⇧B the files.
+//! move between files, `x` marks one seen, `r` is review mode, ⌘B folds the rail and ⌘⇧B the tree.
+//!
+//! It fits any pane from an 1100px window up ([`fit`]): the rail and the right pane share the width,
+//! the tree folds away first when the diff would get too narrow, then the rail narrows. ⌘⇧B brings the
+//! tree back, and the choice holds until the next ⌘⇧B.
 
 use std::collections::HashSet;
 
@@ -159,7 +163,10 @@ pub struct PrStory {
     seen: HashSet<SharedString>,
     focus: FocusHandle,
     details: bool,
-    files_pane: bool,
+    /// The tree as ⌘⇧B last left it; `None` lets the width decide.
+    tree: Option<bool>,
+    /// The pane's width in the last frame.
+    width: f32,
     review_mode: bool,
     unsent: usize,
     composer: Entity<CommentComposer>,
@@ -192,7 +199,8 @@ impl PrStory {
             seen,
             focus: cx.focus_handle(),
             details: true,
-            files_pane: true,
+            tree: None,
+            width: f32::MAX,
             review_mode: false,
             unsent: 2,
             composer,
@@ -258,13 +266,49 @@ impl PrStory {
                 cx.notify();
             }))
             .on_toggle_files(with(|s, _, cx| {
-                s.files_pane = !s.files_pane;
+                let shown = s.fit().tree;
+                s.tree = Some(!shown);
                 cx.notify();
             }))
             .on_put_back(with(|s, _, cx| {
                 s.seen.clear();
                 cx.notify();
             }))
+    }
+}
+
+/// The rail's widest and narrowest, the tree's width, and the least the diff card may have.
+const RAIL_MAX: f32 = 380.;
+const RAIL_MIN: f32 = 300.;
+const TREE: f32 = 240.;
+const DIFF_MIN: f32 = 460.;
+/// The pane's padding on both sides, the gap after the rail, and the gap after the tree.
+const PADDING: f32 = 16.;
+const RAIL_GAP: f32 = 12.;
+const TREE_GAP: f32 = 8.;
+
+/// How the pane splits its width.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Fit {
+    /// The rail's width, or `None` when it is folded.
+    pub rail: Option<f32>,
+    pub tree: bool,
+}
+
+/// The split for a pane `width` wide: the tree shows while the diff keeps [`DIFF_MIN`] beside a full
+/// rail, unless ⌘⇧B chose (`tree`); then the rail takes what the diff leaves, from [`RAIL_MAX`] down to
+/// [`RAIL_MIN`].
+pub fn fit(width: f32, rail: bool, tree: Option<bool>) -> Fit {
+    let rail_space = if rail { RAIL_MAX + RAIL_GAP } else { 0. };
+    let tree = tree.unwrap_or(width >= PADDING + rail_space + TREE + TREE_GAP + DIFF_MIN);
+    let tree_space = if tree { TREE + TREE_GAP } else { 0. };
+    let rail = rail.then(|| (width - PADDING - RAIL_GAP - tree_space - DIFF_MIN).clamp(RAIL_MIN, RAIL_MAX));
+    Fit { rail, tree }
+}
+
+impl PrStory {
+    fn fit(&self) -> Fit {
+        fit(self.width, self.details && !self.review_mode, self.tree)
     }
 }
 
@@ -285,12 +329,13 @@ impl Render for PrStory {
         let (threads, remarks) = conversation();
         let unsent = self.unsent;
 
+        let layout = self.fit();
         let rail = div()
             .id("pr-rail")
             .flex()
             .flex_col()
             .flex_none()
-            .w(px(380.))
+            .w(px(layout.rail.unwrap_or(RAIL_MAX)))
             .h(px(height - 16.))
             .gap(px(8.))
             .overflow_y_scroll()
@@ -333,14 +378,16 @@ impl Render for PrStory {
             .flex_1()
             .min_w_0()
             .gap(px(8.))
-            .child(
-                card().flex_none().w(px(240.)).child(
-                    ChangedFileTree::new("pr-tree", changed.clone())
-                        .reviewed(self.seen.clone())
-                        .current(file.path.clone())
-                        .on_open(move |path, window, cx| open(path, window, cx)),
-                ),
-            )
+            .when(layout.tree, |d| {
+                d.child(
+                    card().flex_none().w(px(TREE)).child(
+                        ChangedFileTree::new("pr-tree", changed.clone())
+                            .reviewed(self.seen.clone())
+                            .current(file.path.clone())
+                            .on_open(move |path, window, cx| open(path, window, cx)),
+                    ),
+                )
+            })
             .child(
                 card().flex_1().min_w_0().flex().flex_col().child(ReviewFileHeader::new("pr-file", file.path.clone(), file.added, file.removed, ReviewHandlers::default())).child(
                     InlineReview::new("pr-diff", &self.editor, (PR_FILES[self.current].hunks)())
@@ -363,15 +410,38 @@ impl Render for PrStory {
                     .next_primary(true)
                     .review_mode(self.review_mode),
             )
-            .when(self.files_pane, |d| d.child(files));
+            .child(files);
 
+        // The pane's width after layout; a change that moves the split draws again.
+        let this = cx.entity().downgrade();
+        let measure = gpui_kit::canvas(
+            move |bounds, _, cx| {
+                let width = f32::from(bounds.size.width);
+                this.update(cx, |s, cx| {
+                    if (s.width - width).abs() > 0.5 {
+                        let before = s.fit();
+                        s.width = width;
+                        if s.fit() != before {
+                            cx.notify();
+                        }
+                    }
+                })
+                .ok();
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .inset_0();
         let pane = div()
+            .relative()
             .flex()
             .size_full()
-            .gap(px(12.))
-            .p(px(8.))
+            .min_w_0()
+            .gap(px(RAIL_GAP))
+            .p(px(PADDING / 2.))
             .bg(theme.background)
-            .when(self.details && !self.review_mode, |d| d.child(rail))
+            .child(measure)
+            .when(layout.rail.is_some(), |d| d.child(rail))
             .child(right);
         handlers.keys(pane, &self.focus)
     }
@@ -418,3 +488,6 @@ pub fn pull_requests() -> impl IntoElement {
 pub fn element(story: &Entity<PrStory>) -> AnyElement {
     story.clone().into_any_element()
 }
+
+#[cfg(test)]
+mod tests;
