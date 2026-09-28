@@ -389,7 +389,7 @@ impl Render for ReviewStory {
             .w(width)
             .min_w_0()
             .overflow_hidden()
-            .child(ReviewBar::new("review-bar", self.progress(), handlers.clone()))
+            .child(ReviewBar::new("review-bar", self.progress(), handlers.clone()).review_mode(self.review_mode))
             .child(
                 div()
                     .flex()
