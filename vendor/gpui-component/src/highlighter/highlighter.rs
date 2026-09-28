@@ -1325,11 +1325,13 @@ impl SyntaxHighlighter {
             },
             old_tree,
             Some(options),
-        )?;
+        );
+        // A parse stopped by the budget returns nothing, so the flag is read before the result.
         if timed_out {
             *timed_out_any = true;
             return None;
         }
+        let new_tree = new_tree?;
 
         let byte_range = bounding_byte_range(&ranges)?;
         Some(InjectionLayer {
