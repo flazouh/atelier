@@ -70,8 +70,8 @@ in a chat message.
 
 A new crate, `crates/lsp`, with no UI.
 
-- One `LspClient` per server, talking JSON-RPC over stdio to `rust-analyzer` (and later `tsgo` or
-  `typescript-language-server`). `lsp-types` 0.97 supplies the wire types.
+- One `LspClient` per server, talking JSON-RPC over stdio to `rust-analyzer`, `tsgo`, `ty` and the
+  others in the table below. `lsp-types` 0.97 supplies the wire types.
 - It handles `initialize`, `initialized`, `textDocument/didOpen`, `didChange`, `didSave`, and
   `shutdown`; it reads `textDocument/publishDiagnostics` and answers `textDocument/definition` and
   `textDocument/hover`.
@@ -93,8 +93,8 @@ install hint the status line shows when the program is missing. Built in:
 | Language ids | Server | Root markers |
 |---|---|---|
 | `rust` | `rust-analyzer` | `Cargo.toml` |
-| `typescript`, `typescriptreact`, `javascript`, `javascriptreact` | `typescript-language-server --stdio` | `tsconfig.json`, `jsconfig.json`, `package.json` |
-| `python` | `pyright-langserver --stdio` | `pyproject.toml`, `setup.py`, `requirements.txt`, `pyrightconfig.json` |
+| `typescript`, `typescriptreact`, `javascript`, `javascriptreact` | `tsgo --lsp --stdio` (TypeScript 7, native) | `tsconfig.json`, `jsconfig.json`, `package.json` |
+| `python` | `ty server` (Astral, Rust) | `pyproject.toml`, `ty.toml`, `setup.py`, `requirements.txt` |
 | `go` | `gopls` | `go.mod` |
 | `java` | `jdtls` | `pom.xml`, `build.gradle`, `settings.gradle` |
 
@@ -143,13 +143,17 @@ locations, each with its line's text for display.
 
 **What the servers taught us.**
 
-- typescript-language-server publishes diagnostics only to a client that declares
-  `textDocument.publishDiagnostics`; declaring only pull support got it to send none at all.
-- It runs the project's own TypeScript and refuses to start without one, so a project with no
-  `node_modules/typescript` gets `tsserver.path` pointed at the TypeScript installed beside the server.
-  TypeScript 7 ships no `tsserver.js`, so that fallback needs TypeScript 5.
-- pyright, gopls and typescript-language-server count columns in UTF-16 and only publish
-  diagnostics; rust-analyzer takes UTF-32 and answers pulls. The worker covers both, and the live tests
+- The fastest server per language, chosen on 2026-09-28. TypeScript 7 (`typescript@7.0.2`) is the
+  native Go compiler, and it serves LSP itself, so there is no Node.js and no tsserver. For Python,
+  ty 0.0.84 and pyrefly 1.3.1 were timed on `hp-agent` with a full `check`: ty took 0.17s on `rich`
+  against 0.28s, and 1.58s on `django` against pyrefly's 1.72s at its `default` preset. ty is still
+  0.0.x, so it can change under us.
+- tsgo sends its own requests with string ids (`"ts1"`) and answers nothing until it hears back. The
+  read loop answers every server request itself, because the worker may be blocked on tsgo's answer.
+  When the worker answered, the first question after startup waited out the 60s timeout.
+- tsgo refuses a diagnostic pull that carries `"identifier": null`, which `lsp-types` 0.97 writes for
+  an unset field, so lathe sends its own params with only the document.
+- gopls and tsgo count columns in UTF-16; rust-analyzer takes UTF-32. The worker covers both, and the live tests
   put an emoji before the call to prove the conversion.
 
 **Proof.** A live test per server, skipped when its program is missing unless `LATHE_REQUIRE_LSP` names
@@ -177,15 +181,14 @@ pinned; a file that does not match is deleted and the server reports it as a fai
 | Server | Download | Runs as |
 |---|---|---|
 | `rust-analyzer` | the `.gz` binary for the platform from its GitHub release | the binary |
-| `typescript-language-server` | its npm tarball, and TypeScript 5's | lathe's Node.js with `lib/cli.mjs` |
-| `pyright` | its npm tarball | lathe's Node.js with `langserver.index.js` |
+| `tsgo` | the platform's `@typescript/typescript-<platform>` npm tarball | `lib/tsc --lsp --stdio` |
+| `ty` | the platform's tarball from its GitHub release | `ty server` |
 | `gopls` | `go install` with `GOBIN` in lathe's folder | the binary; needs Go, which a Go project has |
 | `jdtls` | not downloaded yet: it needs a Java runtime too | the install hint |
 
-- lathe's own Node.js (v24, the current LTS) is one more pinned download, shared by every npm server.
-  The npm servers have no required dependencies, so lathe unpacks their tarballs and needs no npm.
-- TypeScript sits beside the server in the same `node_modules`, so the rule that points
-  `tsserver.path` at the TypeScript installed beside the server needs no change.
+- A user's `tsc` on the PATH is most often TypeScript 5, which has no `--lsp`, so lathe looks for
+  `tsgo`, the name the native preview installed it under, and otherwise downloads TypeScript 7.
+- No server needs Node.js now. The Node.js pin and the npm install path stay for a future npm server.
 - Downloads use the system's `curl`, `tar` and `gzip`, which macOS and Linux both ship. The checksum is
   computed in Rust.
 - Platforms: `aarch64` and `x86_64` on macOS and Linux. Anywhere else the install hint shows.
@@ -196,13 +199,14 @@ pinned; a file that does not match is deleted and the server reports it as a fai
 **Proof.** Unit tests serve fixtures from `file://` URLs: a binary and a Node server install and run,
 a wrong checksum leaves nothing behind, a finished copy is used without any download, offline stops
 before the network, and a server on the search path wins. A live test, run when
-`LATHE_TEST_DOWNLOADS=1`, downloads the real rust-analyzer, Node.js, typescript-language-server and
-pyright into an empty folder and asks each one for a definition.
+`LATHE_TEST_DOWNLOADS=1`, downloads the real rust-analyzer, tsgo, ty and gopls into an empty folder
+and runs every live check on each. It searches only Go's own folder for `go`, never a shared one such
+as `~/.local/bin`, which would hold installed servers.
 
 ## Checks
 
-- `tools/check.sh` on `hp-agent`: the workspace tests with live rust-analyzer, typescript-language-server,
-  pyright and gopls, clippy, the gallery
+- `tools/check.sh` on `hp-agent`: the workspace tests with live rust-analyzer, tsgo, ty and gopls,
+  clippy, the gallery
   build, and the tests of the patched `vendor/gpui-base`, which the workspace excludes.
 - Gallery stories "Hunks" and "Editor", captured on `hp-agent` in both themes.
 - Stage C: `LATHE_REQUIRE_LSP=1 cargo test -p lathe-lsp --test rust_analyzer` on a box with the server,
