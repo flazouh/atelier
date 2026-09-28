@@ -6,7 +6,7 @@
 use std::time::Instant;
 
 use beui::{
-    ActiveTheme, AgentText, AgentTextStatus, Badge, Button, ButtonSize, ButtonVariant, ChangedFiles, Checks, DiffLine,
+    ActiveTheme, AgentText, AgentTextStatus, ModelBadge, Button, ButtonSize, ButtonVariant, ChangedFiles, Checks, DiffLine,
     EntranceList, FileDiff, FileDiffStatus, IconName, MessageBubble, MessageBubbleAlign, MessageBubbleVariant,
     PrCard, ReviewState, SubagentStrip, Thinking, Todo, TodoList, TodoStatus, ToolApproval, ToolCall, ToolStatus,
     pane_header,
@@ -100,7 +100,7 @@ pub fn agent_panel(
 ) -> impl IntoElement {
     let theme = cx.theme().clone();
     let header = pane_header("Claude Code", cx)
-        .child(Badge::new("Sonnet 5"))
+        .child(ModelBadge::new("Opus 5.5").mark("p-model", crate::agent_parts::anthropic()))
         .child(div().flex_1())
         .child(
             Button::new("p-replay")

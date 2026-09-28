@@ -11,8 +11,8 @@ use beui::{
     PrChipData, PrState, ReviewState, SubagentCard, SubagentRow, SubagentStrip, ToolCall, ToolStatus,
     AgentText, AgentTextStatus,
 };
-use gpui_kit::{Context, IntoElement, ParentElement, SharedString, Styled, div, px};
-use lathe_agents::claude;
+use gpui_kit::{Context, IntoElement, ParentElement, Styled, div, px};
+use lathe_agents::{claude, coding_agents::CodingAgent, labs::Lab};
 
 use super::{Gallery, narrow, row, section};
 
@@ -101,7 +101,8 @@ pub fn strip_rows(tick: usize) -> Vec<SubagentRow> {
 /// A running subagent card at `tick`.
 pub fn running_card(id: &'static str, tick: usize) -> SubagentCard {
     SubagentCard::new(id, claude::look(), "Explore", "Find every caller of hunk_starts")
-        .model("Haiku 4.5")
+        .model("Opus 5.5")
+        .model_mark(anthropic())
         .elapsed(format!("{}s", 12 + tick % LOOP))
         .tool_calls(12 + (tick % LOOP) as u64)
         .live_tool(live_tool(tick, 0))
@@ -150,6 +151,7 @@ pub fn changed_files_story(tick: usize, playing: bool, cx: &mut Context<Gallery>
 pub fn subagent_card_story(tick: usize, playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     let done = SubagentCard::new("sc-done", claude::look(), "Review", "Check the off-by-one fix")
         .model("Opus 5.5")
+        .model_mark(anthropic())
         .tool_calls(12)
         .finished(Some(38))
         .calls(sample_calls());
@@ -159,7 +161,7 @@ pub fn subagent_card_story(tick: usize, playing: bool, cx: &mut Context<Gallery>
         .child(section("Done", narrow(done)))
         .child(section(
             "Before its first tool call",
-            narrow(SubagentCard::new("sc-new", claude::look(), "Plan", "Split the review into steps").model("Sonnet 5").elapsed("1s")),
+            narrow(SubagentCard::new("sc-new", claude::look(), "Plan", "Split the review into steps").model("Sonnet 5").model_mark(anthropic()).elapsed("1s")),
         ))
 }
 
@@ -203,18 +205,37 @@ pub fn pr_chip_story() -> impl IntoElement {
         ))
 }
 
+/// The Anthropic mark, for Claude's models.
+pub fn anthropic() -> beui::BrandMark {
+    Lab::Anthropic.mark().expect("Anthropic has a mark")
+}
+
+/// A badge for `label`, with the mark when there is one and a monogram when there is not.
+fn badge(id: &'static str, label: &'static str, mark: Option<beui::BrandMark>) -> ModelBadge {
+    match mark {
+        Some(mark) => ModelBadge::new(label).mark(id, mark),
+        None => ModelBadge::new(label).monogram(id),
+    }
+}
+
 pub fn model_badge_story() -> impl IntoElement {
-    let label: [SharedString; 3] = ["Opus 5.5".into(), "Sonnet 5".into(), "Haiku 4.5".into()];
+    let models = ["Opus 5.5", "GPT-5.2", "Grok 4.5", "Auto", "Copilot", "Local 7B"];
+    let labs = Lab::ALL.iter().zip(models).map(|(lab, model)| {
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(6.))
+            .w(px(110.))
+            .child(badge(lab.name(), model, lab.mark()))
+            .child(div().text_size(px(11.)).opacity(0.6).child(lab.name()))
+    });
+    let agents = CodingAgent::ALL.iter().map(|agent| badge(agent.name(), agent.name(), agent.mark()));
     div()
-        .child(section("Models", row().children(label.into_iter().map(ModelBadge::new))))
+        .child(section("Labs: grey at rest, in colour under the pointer", row().children(labs)))
+        .child(section("Agents", row().children(agents)))
+        .child(section("No mark: a monogram", row().child(ModelBadge::new("Local 7B").monogram("mono"))))
         .child(section(
             "In a turn header",
-            div()
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .text_size(px(13.))
-                .child("Claude")
-                .child(ModelBadge::new("Opus 5.5")),
+            div().flex().items_center().gap(px(8.)).text_size(px(13.)).child("Claude").child(badge("turn", "Opus 5.5", Some(anthropic()))),
         ))
 }

@@ -3,5 +3,7 @@
 
 mod assets;
 pub mod claude;
+pub mod coding_agents;
+pub mod labs;
 
 pub use assets::Assets;
