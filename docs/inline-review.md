@@ -45,7 +45,7 @@ does. Nothing is hidden and nothing is virtual.
 
 A buffer row cannot shrink, but a gap above one can. The vendored editor's `set_row_gaps` paints empty
 space above a row, and `set_row_covers` paints a fill over rows, text included. The resolve uses both,
-on `ease::MORPH`, in 290ms, inside the 300ms limit:
+on `ease::MORPH`, in 290ms in all:
 
 1. The fade, `duration::RESOLVE_FADE` (100ms). A cover in the editor's background colour thickens over
    the closing rows, so their text and wash fade together. The surviving rows lose their wash.
