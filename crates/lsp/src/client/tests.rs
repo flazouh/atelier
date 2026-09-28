@@ -37,7 +37,7 @@ fn a_server_request_with_a_string_id_is_still_a_request() {
     // tsgo numbers its own requests "ts1", "ts2", ... and waits for the answer before it serves.
     let message = json!({"jsonrpc": "2.0", "id": "ts1", "method": "workspace/configuration", "params": {"items": [{}]}});
     match classify(&message) {
-        Routed::Server(ServerMessage::Request { id, method, .. }) => {
+        Routed::Request { id, method, .. } => {
             assert_eq!(id, json!("ts1"), "the answer must carry the id as it came");
             assert_eq!(method, "workspace/configuration");
         }
@@ -50,7 +50,7 @@ fn a_request_from_the_server_is_not_mistaken_for_a_reply() {
     // It has an id and a method. Routing it as a reply would wake the wrong waiter.
     let message = json!({"jsonrpc": "2.0", "id": 1, "method": "workspace/configuration", "params": {"items": [{}]}});
     match classify(&message) {
-        Routed::Server(ServerMessage::Request { id, method, params }) => {
+        Routed::Request { id, method, params } => {
             assert_eq!((id, method.as_str()), (json!(1), "workspace/configuration"));
             assert_eq!(params, json!({"items": [{}]}));
         }
@@ -167,6 +167,7 @@ fn a_path_that_does_not_exist_has_no_uri() {
 fn name(routed: &Routed) -> &'static str {
     match routed {
         Routed::Reply(..) => "a reply",
+        Routed::Request { .. } => "a server request",
         Routed::Server(..) => "a server message",
         Routed::Ignore => "an ignored message",
     }
@@ -191,4 +192,23 @@ fn a_diagnostic_pull_leaves_out_the_fields_it_does_not_set() {
     let uri: lsp_types::Uri = "file:///tmp/a.ts".parse().unwrap();
     let params = serde_json::to_value(PullDiagnosticsParams { text_document: TextDocumentIdentifier { uri } }).unwrap();
     assert_eq!(params, json!({ "textDocument": { "uri": "file:///tmp/a.ts" } }));
+}
+
+#[test]
+fn the_read_loop_answers_a_server_request_itself() {
+    // tsgo asks for its configuration and answers nothing until it hears back. The worker may be
+    // blocked waiting on tsgo, so the reader, which never blocks on the worker, must answer.
+    let mut input = Vec::new();
+    let request = json!({"jsonrpc": "2.0", "id": "ts1", "method": "workspace/configuration", "params": {"items": [{}, {}]}});
+    crate::framing::write_message(&mut input, &serde_json::to_vec(&request).unwrap()).unwrap();
+    let written = Arc::new(Mutex::new(Vec::new()));
+    let (tx, rx) = mpsc::channel();
+    read_loop(std::io::Cursor::new(input), Pending::default(), tx, Arc::clone(&written), PathBuf::from("/tmp"));
+
+    let written = written.lock().unwrap().clone();
+    let body = crate::framing::read_message(&mut std::io::Cursor::new(written)).unwrap().expect("one answer went out");
+    let answer: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(answer, json!({"jsonrpc": "2.0", "id": "ts1", "result": [null, null]}));
+    assert!(matches!(rx.try_recv(), Ok(ServerMessage::Log(line)) if line.contains("workspace/configuration")));
+    assert!(matches!(rx.try_recv(), Ok(ServerMessage::Exited)));
 }

@@ -30,7 +30,7 @@ use lsp_types::{Diagnostic, Hover, Position, Range, Uri};
 
 use crate::{
     DEFAULT_SETTLE, Launch, LspClient, LspError, ServerMessage,
-    client::{answer_for, uri_to_path},
+    client::uri_to_path,
     encoding::{Encoding, range_from_server, to_server},
     navigation::{Found, Navigation, Target, definition_links, lands_on_itself, sort_targets},
     published::Published,
@@ -137,7 +137,6 @@ impl LspWorker {
         let alive = Arc::new(AtomicBool::new(true));
         let session = Session {
             client,
-            root: root.clone(),
             alive: alive.clone(),
             ask,
             encoding: Encoding::negotiated(capabilities.position_encoding.as_ref()),
@@ -205,7 +204,6 @@ impl LspWorker {
 /// What the worker's thread owns: the server, and what it knows about it.
 struct Session {
     client: LspClient,
-    root: PathBuf,
     alive: Arc<AtomicBool>,
     ask: Duration,
     encoding: Encoding,
@@ -415,10 +413,6 @@ impl Session {
                 if let Some(path) = uri_to_path(&set.uri) {
                     self.published.store(canonical(&path), set.version, set.diagnostics);
                 }
-            }
-            ServerMessage::Request { id, method, params } => {
-                // A server that waits on an answer can stall; a failed send shows up on the next job.
-                let _ = self.client.respond(id, answer_for(&method, &params, &self.root));
             }
             ServerMessage::Log(_) => {}
         }

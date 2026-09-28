@@ -77,8 +77,6 @@ pub enum ServerMessage {
     Diagnostics(PublishDiagnosticsParams),
     /// A log or status line, for the status row.
     Log(String),
-    /// A request the server sent us, which must be answered with [`LspClient::respond`].
-    Request { id: Value, method: String, params: Value },
     /// Whether the server has finished loading and checking (rust-analyzer's
     /// `experimental/serverStatus`). Before it says `true`, its answers can be empty for want of a
     /// loaded workspace rather than because nothing is there.
@@ -89,9 +87,12 @@ pub enum ServerMessage {
 
 type Pending = Arc<Mutex<HashMap<i64, Sender<Result<Value, LspError>>>>>;
 
+/// The pipe into the server. The client sends its requests on it, and the read loop its answers.
+type Writer<W> = Arc<Mutex<W>>;
+
 pub struct LspClient {
     child: Child,
-    stdin: BufWriter<ChildStdin>,
+    stdin: Writer<BufWriter<ChildStdin>>,
     next_id: AtomicI64,
     pending: Pending,
     /// What the server says on its own. The caller drains it.
@@ -120,14 +121,15 @@ impl LspClient {
         let stdin = child.stdin.take().expect("stdin was piped");
         let pending: Pending = Arc::default();
         let (tx, messages) = mpsc::channel();
+        let stdin = Arc::new(Mutex::new(BufWriter::new(stdin)));
         thread::spawn({
-            let pending = Arc::clone(&pending);
-            move || read_loop(BufReader::new(stdout), pending, tx)
+            let (pending, stdin, root) = (Arc::clone(&pending), Arc::clone(&stdin), root.to_path_buf());
+            move || read_loop(BufReader::new(stdout), pending, tx, stdin, root)
         });
 
         let mut client = Self {
             child,
-            stdin: BufWriter::new(stdin),
+            stdin,
             next_id: AtomicI64::new(1),
             pending,
             messages,
@@ -319,20 +321,17 @@ impl LspClient {
         self.send(&body)
     }
 
-    /// Answers a request the server sent: `Ok` is the result, `Err` a code and a message.
-    pub fn respond(&mut self, id: Value, answer: Result<Value, (i64, String)>) -> Result<(), LspError> {
-        let body = match answer {
-            Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
-            Err((code, message)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } }),
-        };
-        self.send(&body)
-    }
-
     fn send(&mut self, body: &Value) -> Result<(), LspError> {
-        let bytes = serde_json::to_vec(body).map_err(|e| LspError::Protocol(e.to_string()))?;
-        write_message(&mut self.stdin, &bytes).map_err(LspError::Transport)?;
-        self.stdin.flush().map_err(LspError::Transport)
+        send_on(&self.stdin, body)
     }
+}
+
+/// Writes one message whole, so the client's requests and the read loop's answers never interleave.
+fn send_on(writer: &Writer<impl Write>, body: &Value) -> Result<(), LspError> {
+    let bytes = serde_json::to_vec(body).map_err(|e| LspError::Protocol(e.to_string()))?;
+    let mut out = writer.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    write_message(&mut *out, &bytes).map_err(LspError::Transport)?;
+    out.flush().map_err(LspError::Transport)
 }
 
 impl Drop for LspClient {
@@ -343,11 +342,32 @@ impl Drop for LspClient {
     }
 }
 
-/// Reads every message until the server closes, routing replies to the waiters.
-fn read_loop(mut input: impl std::io::BufRead, pending: Pending, out: Sender<ServerMessage>) {
+/// Reads every message until the server closes, routing replies to the waiters and answering the
+/// server's own requests on the spot. Some servers (tsgo) answer nothing until they hear back, while
+/// the worker may be blocked waiting on one of those answers, so the answer cannot wait for the worker.
+fn read_loop(
+    mut input: impl std::io::BufRead,
+    pending: Pending,
+    out: Sender<ServerMessage>,
+    writer: Writer<impl Write>,
+    root: PathBuf,
+) {
     while let Ok(Some(body)) = read_message(&mut input) {
         let Ok(message) = serde_json::from_slice::<Value>(&body) else { continue };
         match classify(&message) {
+            Routed::Request { id, method, params } => {
+                let body = match answer_for(&method, &params, &root) {
+                    Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+                    Err((code, message)) => {
+                        json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
+                    }
+                };
+                // A failed write means the server is gone, which the end of this loop reports.
+                let _ = send_on(&writer, &body);
+                if out.send(ServerMessage::Log(format!("answered the server's {method}"))).is_err() {
+                    break;
+                }
+            }
             Routed::Reply(id, result) => {
                 if let Some(waiter) = pending.lock().expect("the pending map is not poisoned").remove(&id) {
                     let _ = waiter.send(result);
@@ -368,7 +388,9 @@ fn read_loop(mut input: impl std::io::BufRead, pending: Pending, out: Sender<Ser
 enum Routed {
     /// A reply to the request with this id.
     Reply(i64, Result<Value, LspError>),
-    /// Something the server started.
+    /// A request the server sent, which the read loop answers.
+    Request { id: Value, method: String, params: Value },
+    /// Something the server said on its own.
     Server(ServerMessage),
     /// A request from the server we do not answer.
     Ignore,
@@ -395,11 +417,11 @@ fn classify(message: &Value) -> Routed {
     // A server request carries an id and a method; only a reply has no method. The server picks the
     // id, and it may be a string (tsgo's are "ts1", "ts2", ...), so it is sent back as it came.
     if let (Some(id), Some(method)) = (message.get("id"), message.get("method").and_then(Value::as_str)) {
-        return Routed::Server(ServerMessage::Request {
+        return Routed::Request {
             id: id.clone(),
             method: method.to_string(),
             params: message.get("params").cloned().unwrap_or(Value::Null),
-        });
+        };
     }
     // Replies answer lathe's own requests, which it numbers.
     if let Some(id) = message.get("id").and_then(Value::as_i64) {
