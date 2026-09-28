@@ -5,6 +5,11 @@
 //!
 //! Nothing here names a language: the file's path picks the server from `lathe_lsp::servers`, and
 //! [`LspWorker`] runs it on a thread of its own, so no answer ever holds the window.
+//!
+//! A pull request's diff shows removed rows the file does not have. Its session holds a [`RowMap`]:
+//! the server reads the file without them, and every row in this file is mapped across at this
+//! boundary, so everything else here counts shown rows. A jump into another file goes to the owner
+//! ([`Elsewhere`]) when there is one; otherwise the status line names the place.
 
 use std::{
     path::{Path, PathBuf},
@@ -15,12 +20,13 @@ use std::{
 
 use futures_channel::{mpsc, oneshot};
 use futures_util::StreamExt;
+use beui::RowMap;
 use gpui_kit::{
     App, AppContext, Context, Entity, SharedString, Subscription, Task, Window,
     base::input::{self, DefinitionProvider, HoverProvider, InputEvent, Rope, RopeExt},
     component::input::EditorState,
 };
-use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Store, Target, Workers, canonical, client::uri_to_path};
+use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Store, Symbol, Target, Workers, canonical, client::uri_to_path};
 use lsp_types::{Diagnostic, Hover, LocationLink, Position, ShowDocumentParams, Uri};
 
 /// How long one question may take. Servers answer in milliseconds once they have indexed.
@@ -43,6 +49,56 @@ fn workers() -> &'static Workers {
     WORKERS.get_or_init(|| Workers::new(Store::from_env(), READY, ASK))
 }
 
+/// A jump out of this file: the file, and the place in it, in that file's own rows.
+#[derive(Clone, Debug)]
+pub struct Jump {
+    pub path: PathBuf,
+    pub position: Position,
+}
+
+/// What the owner does with a jump out of the file.
+pub type Elsewhere = Rc<dyn Fn(Jump, &mut Window, &mut App)>;
+
+/// The file's rows as shown: which the server's rows are, and back.
+#[derive(Clone)]
+struct Rows {
+    path: PathBuf,
+    map: Arc<RowMap>,
+}
+
+impl Rows {
+    fn to_head(&self, position: Position) -> Option<Position> {
+        Some(Position { line: self.map.to_head(position.line as usize)? as u32, ..position })
+    }
+
+    fn to_view(&self, position: Position) -> Position {
+        Position { line: self.map.to_view(position.line as usize) as u32, ..position }
+    }
+
+    fn range_to_view(&self, range: lsp_types::Range) -> lsp_types::Range {
+        lsp_types::Range { start: self.to_view(range.start), end: self.to_view(range.end) }
+    }
+
+    /// `target` in shown rows when it is in this file.
+    fn target(&self, target: Target) -> Target {
+        if target.path.as_deref() != Some(self.path.as_path()) {
+            return target;
+        }
+        Target { range: self.range_to_view(target.range), ..target }
+    }
+
+    fn symbol(&self, symbol: Symbol) -> Symbol {
+        match uri_to_path(&symbol.uri).map(|p| canonical(&p)) {
+            Some(path) if path == self.path => Symbol { range: self.range_to_view(symbol.range), ..symbol },
+            _ => symbol,
+        }
+    }
+
+    fn doc(&self, shown: &str) -> Doc {
+        Doc { path: self.path.clone(), text: self.map.head_text(shown) }
+    }
+}
+
 /// What the thread that starts a server says, in order: any downloads, then the result.
 enum Starting {
     Downloading(String),
@@ -54,6 +110,8 @@ enum Starting {
 pub struct EditorSession {
     editor: Entity<EditorState>,
     path: PathBuf,
+    rows: Rows,
+    elsewhere: Option<Elsewhere>,
     worker: Option<LspWorker>,
     /// The server's state, or where the last definition outside this file is.
     server: SharedString,
@@ -72,7 +130,20 @@ pub struct EditorSession {
 impl EditorSession {
     /// Starts the server for `path`, whose text `editor` holds, and attaches it once it is ready.
     pub fn new(editor: Entity<EditorState>, path: PathBuf, cx: &mut Context<Self>) -> Self {
+        Self::for_review(editor, path, RowMap::default(), None, cx)
+    }
+
+    /// The same for a buffer that shows `rows` over the file, as a pull request's diff does, with
+    /// jumps into other files handed to `elsewhere`.
+    pub fn for_review(
+        editor: Entity<EditorState>,
+        path: PathBuf,
+        rows: RowMap,
+        elsewhere: Option<Elsewhere>,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let path = canonical(&path);
+        let rows = Rows { path: path.clone(), map: Arc::new(rows) };
         let mut starting = start(path.clone());
         let _start = cx.spawn(async move |this, cx| {
             loop {
@@ -100,6 +171,8 @@ impl EditorSession {
         Self {
             editor,
             path,
+            rows,
+            elsewhere,
             worker: None,
             server: "starting the language server".into(),
             problems: SharedString::default(),
@@ -124,7 +197,8 @@ impl EditorSession {
         let session = cx.entity().downgrade();
         let last = self.last.clone();
         let here = self.path.clone();
-        let show: ShowDocument = Rc::new(move |params: &ShowDocumentParams, cx: &mut App| {
+        let elsewhere = self.elsewhere.clone();
+        let show: ShowDocument = Rc::new(move |params: &ShowDocumentParams, window: &mut Window, cx: &mut App| {
             // gpui-base jumps from its own cache of the Cmd-hover answer. `last` is only trusted when
             // it is that same answer, so a newer hover elsewhere can never decide this click.
             let clicked = uri_to_path(&params.uri).map(|p| canonical(&p));
@@ -139,6 +213,10 @@ impl EditorSession {
             if clicked.as_deref() == Some(here.as_path()) {
                 return false;
             }
+            if let (Some(elsewhere), Some(path)) = (&elsewhere, clicked.clone()) {
+                elsewhere(Jump { path, position: start.unwrap_or_default() }, window, cx);
+                return true;
+            }
             let line = start.map_or(1, |p| p.line + 1);
             let verb = match answer.map(|n| n.found) {
                 Some(Found::References) => "used in",
@@ -151,7 +229,7 @@ impl EditorSession {
             });
             true
         });
-        attach(&self.editor, &self.path, worker.clone(), self.last.clone(), show, cx);
+        attach(&self.editor, &self.rows, worker.clone(), self.last.clone(), show, cx);
         self.server = format!("{} is ready: hold {SECONDARY} and click a symbol, or press F12", worker.name()).into();
         self.worker = Some(worker);
         self.check(cx);
@@ -182,9 +260,13 @@ impl EditorSession {
         cx.notify();
     }
 
-    /// Moves the caret to one of the listed uses, or names its file when it is elsewhere.
+    /// Moves the caret to one of the listed uses, or hands it to the owner, or names its file, when it
+    /// is elsewhere.
     pub fn open_reference(&mut self, target: &Target, window: &mut Window, cx: &mut Context<Self>) {
         if target.path.as_deref() != Some(self.path.as_path()) {
+            if let (Some(elsewhere), Some(path)) = (self.elsewhere.clone(), target.path.clone()) {
+                return elsewhere(Jump { path, position: target.range.start }, window, cx);
+            }
             let line = target.range.start.line + 1;
             self.server = format!("used in {} on line {line}", file_name(&target.uri)).into();
             return cx.notify();
@@ -193,11 +275,42 @@ impl EditorSession {
         self.editor.update(cx, |state, cx| state.set_cursor_position(start, window, cx));
     }
 
+    /// The uses of the name at the caret, this file's in shown rows. `None` before the server is
+    /// ready, or on a removed row, which the file does not have.
+    pub fn uses(&self, cx: &App) -> Option<Task<Result<Vec<Target>, LspError>>> {
+        let worker = self.worker.clone()?;
+        let (doc, position) = self.doc_and_caret(cx)?;
+        let answer = ask(cx, |reply| worker.references(doc, position, reply));
+        let rows = self.rows.clone();
+        Some(cx.background_spawn(async move { Ok(answer.await?.into_iter().map(|t| rows.target(t)).collect()) }))
+    }
+
+    /// The names this file writes down, in text order and shown rows.
+    pub fn names(&self, cx: &App) -> Option<Task<Result<Vec<Symbol>, LspError>>> {
+        let worker = self.worker.clone()?;
+        let doc = self.rows.doc(&self.editor.read(cx).value());
+        let answer = ask(cx, |reply| worker.symbols(doc, reply));
+        let rows = self.rows.clone();
+        Some(cx.background_spawn(async move { Ok(answer.await?.into_iter().map(|s| rows.symbol(s)).collect()) }))
+    }
+
+    /// The names anywhere in the project that match `query`.
+    pub fn project_names(&self, query: &str, cx: &App) -> Option<Task<Result<Vec<Symbol>, LspError>>> {
+        let worker = self.worker.clone()?;
+        let doc = self.rows.doc(&self.editor.read(cx).value());
+        let answer = ask(cx, |reply| worker.project_symbols(doc, query.to_string(), reply));
+        let rows = self.rows.clone();
+        Some(cx.background_spawn(async move { Ok(answer.await?.into_iter().map(|s| rows.symbol(s)).collect()) }))
+    }
+
+    /// The file this session serves, canonical.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// Lists every use of the symbol at the caret, as ⇧F12 does.
     pub fn find_references(&mut self, cx: &mut Context<Self>) {
-        let Some(worker) = self.worker.clone() else { return };
-        let (doc, position) = self.doc_and_caret(cx);
-        let answer = ask(cx, |reply| worker.references(doc, position, reply));
+        let Some(answer) = self.uses(cx) else { return };
         self.finding = cx.spawn(async move |this, cx| {
             let answer = answer.await;
             _ = this.update(cx, |this, cx| match answer {
@@ -214,9 +327,10 @@ impl EditorSession {
         });
     }
 
-    fn doc_and_caret(&self, cx: &App) -> (Doc, Position) {
+    /// The file as the server reads it, and the caret in its rows; `None` on a removed row.
+    fn doc_and_caret(&self, cx: &App) -> Option<(Doc, Position)> {
         let state = self.editor.read(cx);
-        (Doc { path: self.path.clone(), text: state.value().to_string() }, state.cursor_position())
+        Some((self.rows.doc(&state.value()), self.rows.to_head(state.cursor_position())?))
     }
 
     /// Asks the server what is wrong with the buffer and underlines it. A set lands only if the
@@ -224,17 +338,20 @@ impl EditorSession {
     /// line; a newer check covers the rest.
     pub fn check(&mut self, cx: &mut Context<Self>) {
         let Some(worker) = self.worker.clone() else { return };
-        let (doc, _) = self.doc_and_caret(cx);
-        let text = doc.text.clone();
+        let shown = self.editor.read(cx).value().to_string();
+        let doc = self.rows.doc(&shown);
         let answer = ask(cx, |reply| worker.diagnostics(doc, reply));
+        let rows = self.rows.clone();
         self.checking = cx.spawn(async move |this, cx| {
             let answer = answer.await;
             _ = this.update(cx, |this, cx| {
-                if this.editor.read(cx).value().as_ref() != text {
+                if this.editor.read(cx).value().as_ref() != shown {
                     return;
                 }
                 match answer {
                     Ok(diagnostics) => {
+                        let diagnostics: Vec<Diagnostic> =
+                            diagnostics.into_iter().map(|d| Diagnostic { range: rows.range_to_view(d.range), ..d }).collect();
                         this.problems = summary(&diagnostics);
                         beui::code_editor::set_diagnostics(&this.editor, diagnostics, cx);
                     }
@@ -298,13 +415,14 @@ fn ask<T: Send + 'static>(cx: &App, send: impl FnOnce(Reply<T>)) -> Task<Result<
 /// The editor's view of the server.
 struct EditorLsp {
     worker: LspWorker,
-    path: PathBuf,
+    rows: Rows,
     last: LastNavigation,
 }
 
 impl EditorLsp {
-    fn doc(&self, text: &Rope) -> Doc {
-        Doc { path: self.path.clone(), text: text.to_string() }
+    /// The file as the server reads it, and the offset's place in its rows; `None` on a removed row.
+    fn ask_at(&self, text: &Rope, offset: usize) -> Option<(Doc, Position)> {
+        Some((self.rows.doc(&text.to_string()), self.rows.to_head(text.offset_to_position(offset))?))
     }
 }
 
@@ -318,11 +436,12 @@ impl DefinitionProvider for EditorLsp {
         _window: &mut Window,
         cx: &mut App,
     ) -> Task<anyhow::Result<Vec<LocationLink>>> {
-        let (doc, position) = (self.doc(text), text.offset_to_position(offset));
+        let Some((doc, position)) = self.ask_at(text, offset) else { return Task::ready(Ok(Vec::new())) };
         let answer = ask(cx, |reply| self.worker.navigate(doc, position, reply));
-        let last = self.last.clone();
+        let (last, rows) = (self.last.clone(), self.rows.clone());
         cx.background_spawn(async move {
-            let navigation = answer.await?;
+            let mut navigation = answer.await?;
+            navigation.targets = navigation.targets.into_iter().map(|t| rows.target(t)).collect();
             let links = navigation.targets.iter().map(link).collect();
             if let Ok(mut last) = last.lock() {
                 *last = Some(navigation);
@@ -334,9 +453,12 @@ impl DefinitionProvider for EditorLsp {
 
 impl HoverProvider for EditorLsp {
     fn hover(&self, text: &Rope, offset: usize, _window: &mut Window, cx: &mut App) -> Task<anyhow::Result<Option<Hover>>> {
-        let (doc, position) = (self.doc(text), text.offset_to_position(offset));
+        let Some((doc, position)) = self.ask_at(text, offset) else { return Task::ready(Ok(None)) };
         let answer = ask(cx, |reply| self.worker.hover(doc, position, reply));
-        cx.background_spawn(async move { Ok(answer.await?) })
+        let rows = self.rows.clone();
+        cx.background_spawn(async move {
+            Ok(answer.await?.map(|hover| Hover { range: hover.range.map(|r| rows.range_to_view(r)), ..hover }))
+        })
     }
 }
 
@@ -351,17 +473,17 @@ fn link(target: &Target) -> LocationLink {
 }
 
 /// What to do when gpui-base is about to jump: `true` means it was handled here.
-type ShowDocument = Rc<dyn Fn(&ShowDocumentParams, &mut App) -> bool>;
+type ShowDocument = Rc<dyn Fn(&ShowDocumentParams, &mut Window, &mut App) -> bool>;
 
 /// Gives `state` the server's definitions and hover cards. `show` decides each jump first: it lists
 /// several uses, names a file the story cannot show, or lets gpui-base move the caret.
-fn attach(state: &Entity<EditorState>, path: &Path, worker: LspWorker, last: LastNavigation, show: ShowDocument, cx: &mut App) {
-    let provider = Rc::new(EditorLsp { worker, path: path.to_path_buf(), last });
+fn attach(state: &Entity<EditorState>, rows: &Rows, worker: LspWorker, last: LastNavigation, show: ShowDocument, cx: &mut App) {
+    let provider = Rc::new(EditorLsp { worker, rows: rows.clone(), last });
     state.update(cx, |state, cx| {
         let lsp = state.lsp_mut();
         lsp.definition_provider = Some(provider.clone());
         lsp.hover_provider = Some(provider);
-        lsp.show_document = Some(Rc::new(move |params: &ShowDocumentParams, _: &mut Window, cx: &mut App| show(params, cx)));
+        lsp.show_document = Some(Rc::new(move |params: &ShowDocumentParams, window: &mut Window, cx: &mut App| show(params, window, cx)));
         state.refresh(cx);
     });
 }
