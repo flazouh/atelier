@@ -11,6 +11,7 @@ use beui::{InlineHunk, RowMap};
 
 /// The files the pull request did not change, at its head. A jump into one opens it Brought In.
 const UNCHANGED: &[(&str, &str)] = &[
+    (".gitignore", "/target\n"),
     ("Cargo.toml", "[package]\nname = \"relay\"\nversion = \"0.1.0\"\nedition = \"2021\"\n"),
     (
         "src/lib.rs",
@@ -190,29 +191,6 @@ impl Fixture {
         Self { root, changed: CHANGES.iter().map(shown).collect() }
     }
 
-    /// Every file in the repository, relative, sorted: what Go to file offers.
-    pub fn files(&self) -> Vec<String> {
-        fn walk(dir: &Path, root: &Path, out: &mut Vec<String>) {
-            let Ok(entries) = fs::read_dir(dir) else { return };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = entry.file_name().to_string_lossy().into_owned();
-                if name.starts_with('.') || name == "target" {
-                    continue;
-                }
-                if path.is_dir() {
-                    walk(&path, root, out);
-                } else if let Ok(relative) = path.strip_prefix(root) {
-                    out.push(relative.to_string_lossy().into_owned());
-                }
-            }
-        }
-        let mut out = Vec::new();
-        walk(&self.root, &self.root, &mut out);
-        out.sort();
-        out
-    }
-
     /// The changed file at `relative`, by its index.
     pub fn changed_at(&self, relative: &str) -> Option<usize> {
         self.changed.iter().position(|f| f.path == relative)
@@ -222,6 +200,20 @@ impl Fixture {
     pub fn relative(&self, path: &Path) -> Option<String> {
         path.strip_prefix(&self.root).ok().map(|p| p.to_string_lossy().into_owned())
     }
+}
+
+/// Every file in the repository at `root`, relative and sorted, as Go to file offers them: what
+/// `.gitignore` leaves, hidden files left out. It reads the disk, so call it off the UI thread.
+pub fn list_files(root: &Path) -> Vec<String> {
+    let mut out: Vec<String> = ignore::WalkBuilder::new(root)
+        .require_git(false)
+        .build()
+        .flatten()
+        .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
+        .filter_map(|entry| entry.path().strip_prefix(root).ok().map(|p| p.to_string_lossy().into_owned()))
+        .collect();
+    out.sort();
+    out
 }
 
 #[cfg(test)]

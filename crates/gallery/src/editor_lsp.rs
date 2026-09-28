@@ -281,11 +281,16 @@ impl EditorSession {
         self.editor.update(cx, |state, cx| state.set_cursor_position(start, window, cx));
     }
 
-    /// The uses of the name at the caret, this file's in shown rows. `None` before the server is
-    /// ready, or on a removed row, which the file does not have.
-    pub fn uses(&self, cx: &App) -> Option<Task<Result<Vec<Target>, LspError>>> {
+    /// The uses of the name at `at`, a shown offset such as the one under the pointer, or at the
+    /// caret without one; this file's in shown rows. `None` before the server is ready, or on a
+    /// removed row, which the file does not have.
+    pub fn uses(&self, at: Option<usize>, cx: &App) -> Option<Task<Result<Vec<Target>, LspError>>> {
         let worker = self.worker.clone()?;
-        let (doc, position) = self.doc_and_caret(cx)?;
+        let (doc, caret) = self.doc_and_caret(cx)?;
+        let position = match at {
+            Some(offset) => self.rows.to_head(self.editor.read(cx).text().offset_to_position(offset))?,
+            None => caret,
+        };
         let answer = ask(cx, |reply| worker.references(doc, position, reply));
         let rows = self.rows.clone();
         Some(cx.background_spawn(async move { Ok(answer.await?.into_iter().map(|t| rows.target(t)).collect()) }))
@@ -311,7 +316,7 @@ impl EditorSession {
 
     /// Lists every use of the symbol at the caret, as ⇧F12 does.
     pub fn find_references(&mut self, cx: &mut Context<Self>) {
-        let Some(answer) = self.uses(cx) else { return };
+        let Some(answer) = self.uses(None, cx) else { return };
         self.finding = cx.spawn(async move |this, cx| {
             let answer = answer.await;
             _ = this.update(cx, |this, cx| match answer {

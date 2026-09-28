@@ -17,3 +17,15 @@ fn a_file_added_whole_is_one_hunk_of_added_rows() {
     assert_eq!((test.added(), test.removed()), (12, 0));
     assert_eq!(test.text, ABORT_TEST.trim_end_matches('\n'));
 }
+
+#[test]
+fn go_to_file_lists_what_gitignore_leaves() {
+    let fixture = Fixture::write();
+    std::fs::create_dir_all(fixture.root.join("target/debug")).unwrap();
+    std::fs::write(fixture.root.join("target/debug/build.log"), "").unwrap();
+    let files = list_files(&fixture.root);
+    assert!(files.contains(&"src/config.rs".to_string()));
+    assert!(files.contains(&"tests/abort.rs".to_string()));
+    assert!(!files.iter().any(|f| f.starts_with("target/")), "the build output is ignored: {files:?}");
+    assert!(!files.iter().any(|f| f.starts_with('.')), "hidden files are left out: {files:?}");
+}

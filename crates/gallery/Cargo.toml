@@ -10,6 +10,7 @@ gpui-kit.workspace = true
 beui.workspace = true
 lathe-agents.workspace = true
 lathe-lsp.workspace = true
+ignore = "0.4.33"
 lsp-types = "0.97"
 anyhow = "1"
 futures-channel = "0.3"

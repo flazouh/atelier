@@ -163,6 +163,9 @@ pub struct PrStory {
     back: Vec<(Place, Position)>,
     session: Option<Entity<EditorSession>>,
     lookup: Option<Lookup>,
+    /// The repository's files, listed once on a background thread; `None` until then.
+    files: Option<Rc<Vec<String>>>,
+    _listing: Task<()>,
     seen: HashSet<SharedString>,
     focus: FocusHandle,
     details: bool,
@@ -200,6 +203,21 @@ impl PrStory {
         let mut seen = HashSet::new();
         seen.insert(SharedString::from("tests/abort.rs"));
         let place = Place { path: first.path.to_string(), brought_in: false };
+        let listing = cx.background_spawn({
+            let root = fixture.root.clone();
+            async move { crate::pr_fixture::list_files(&root) }
+        });
+        let _listing = cx.spawn(async move |story, cx| {
+            let files = listing.await;
+            story
+                .update(cx, |story, cx| {
+                    story.files = Some(Rc::new(files));
+                    if story.lookup.as_ref().is_some_and(|l| l.command == Command::GoToFile) {
+                        story.fill_files(cx);
+                    }
+                })
+                .ok();
+        });
         let mut story = Self {
             fixture,
             editor,
@@ -207,6 +225,8 @@ impl PrStory {
             back: Vec::new(),
             session: None,
             lookup: None,
+            files: None,
+            _listing,
             seen,
             focus: cx.focus_handle(),
             details: true,
@@ -339,10 +359,12 @@ impl PrStory {
         }
     }
 
-    /// Opens the lookup for `command` and asks for its rows.
+    /// Opens the lookup for `command` and asks for its rows. Uses asks about the name under the
+    /// pointer when the pointer is over the text, else the one at the caret.
     fn open_lookup(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+        let pointer = self.editor.read(cx).offset_at_pointer(window);
         self.open_finder(command, window, cx);
-        self.ask(command, cx);
+        self.ask(command, pointer, cx);
         cx.notify();
     }
 
@@ -370,28 +392,31 @@ impl PrStory {
     }
 
     /// Fills the open lookup for `command`: from the server, or from the repository's files.
-    fn ask(&mut self, command: Command, cx: &mut Context<Self>) {
+    fn ask(&mut self, command: Command, pointer: Option<usize>, cx: &mut Context<Self>) {
         let Some(session) = self.session.clone() else { return self.note("The language server is not ready", cx) };
         match command {
-            Command::Uses => match session.read(cx).uses(cx) {
+            Command::Uses => match session.read(cx).uses(pointer, cx) {
                 Some(task) => self.wait(task, "Asking for the uses", |story, uses, cx| story.fill_uses(uses, cx), cx),
-                None => self.note("Put the caret on a name in the new side", cx),
+                None => self.note("Point at a name in the new side, or put the caret on one", cx),
             },
             Command::FileNames => match session.read(cx).names(cx) {
                 Some(task) => self.wait(task, "Asking for the names", |story, names, cx| story.fill_names(names, false, cx), cx),
                 None => self.note("The language server is not ready", cx),
             },
             Command::GoToName => self.note("Type part of a name", cx),
-            _ => {
-                let files = self.fixture.files();
-                let leads = files
-                    .iter()
-                    .map(|f| Lead { path: self.fixture.root.join(f), position: Position::default(), shown_rows: false })
-                    .collect();
-                let items = files.iter().map(|f| FinderItem::new(f.clone(), self.file_note(f)).icon(f.clone())).collect();
-                self.set_rows(items, leads, cx);
-            }
+            _ => self.fill_files(cx),
         }
+    }
+
+    /// Go to file's rows: the repository's files, once the background listing has them.
+    fn fill_files(&mut self, cx: &mut Context<Self>) {
+        let Some(files) = self.files.clone() else { return self.note("Loading files", cx) };
+        let leads = files
+            .iter()
+            .map(|f| Lead { path: self.fixture.root.join(f), position: Position::default(), shown_rows: false })
+            .collect();
+        let items = files.iter().map(|f| FinderItem::new(f.clone(), self.file_note(f)).icon(f.clone())).collect();
+        self.set_rows(items, leads, cx);
     }
 
     /// "changed" for a file the pull request changed, nothing for the rest.
