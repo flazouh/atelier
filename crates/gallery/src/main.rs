@@ -125,13 +125,13 @@ fn preview_actions() -> Vec<PromptAction> {
     vec![
         PromptAction::new("image", "Attach image")
             .description("Add a screenshot or visual reference.")
-            .icon(IconName::ImagePlus),
+            .icon(IconName::AddPhoto),
         PromptAction::new("skill", "Use a skill")
             .description("Give the agent a specialized workflow.")
-            .icon(IconName::Puzzle),
+            .icon(IconName::Extension),
         PromptAction::new("context", "Add context")
             .description("Include a file with supporting details.")
-            .icon(IconName::FileText),
+            .icon(IconName::Description),
     ]
 }
 
@@ -355,7 +355,7 @@ impl Gallery {
             .child(div().flex_1())
             .child(
                 Button::new("appearance")
-                    .icon(if dark { IconName::Sun } else { IconName::Moon })
+                    .icon(if dark { IconName::LightMode } else { IconName::DarkMode })
                     .label(if dark { "Light" } else { "Dark" })
                     .variant(ButtonVariant::Ghost)
                     .size(ButtonSize::Sm)
@@ -563,17 +563,17 @@ fn buttons() -> impl IntoElement {
         .child(section(
             "With a chip: hover to slide the arrow",
             row()
-                .child(Button::new("chip-sm").label("New session").chip(IconName::ArrowRight))
-                .child(Button::new("chip-md").label("Continue").chip(IconName::ArrowRight).size(ButtonSize::Md))
-                .child(Button::new("chip-lg").label("Get started").chip(IconName::ArrowRight).size(ButtonSize::Lg)),
+                .child(Button::new("chip-sm").label("New session").chip(IconName::ArrowForward))
+                .child(Button::new("chip-md").label("Continue").chip(IconName::ArrowForward).size(ButtonSize::Md))
+                .child(Button::new("chip-lg").label("Get started").chip(IconName::ArrowForward).size(ButtonSize::Lg)),
         ))
         .child(section(
             "Icon buttons",
             row()
                 .child(Button::new("i-send").icon(IconName::ArrowUp).size(ButtonSize::Icon))
                 .child(Button::new("i-stop").icon(IconName::Square).size(ButtonSize::Icon).variant(ButtonVariant::Secondary))
-                .child(Button::new("i-attach").icon(IconName::Paperclip).size(ButtonSize::Icon).variant(ButtonVariant::Ghost))
-                .child(Button::new("i-more").icon(IconName::Ellipsis).size(ButtonSize::Icon).variant(ButtonVariant::Ghost)),
+                .child(Button::new("i-attach").icon(IconName::AttachFile).size(ButtonSize::Icon).variant(ButtonVariant::Ghost))
+                .child(Button::new("i-more").icon(IconName::MoreHoriz).size(ButtonSize::Icon).variant(ButtonVariant::Ghost)),
         ))
         .child(section("Disabled", row().child(Button::new("disabled").label("Send").disabled(true))))
 }
