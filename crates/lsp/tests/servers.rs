@@ -169,7 +169,9 @@ fn downloading() -> bool {
 fn workers() -> Workers {
     let store = if downloading() {
         let dir = std::env::temp_dir().join(format!("lathe-lsp-downloads-{}", std::process::id()));
-        let go = find_program("go").and_then(|go| go.parent().map(Path::to_path_buf));
+        // Go's own folder, not the one that links to it: a shared folder such as ~/.local/bin would
+        // also hold installed servers, and the run would prove nothing about downloads.
+        let go = find_program("go").and_then(|go| go.canonicalize().ok()).and_then(|go| go.parent().map(Path::to_path_buf));
         Store::new(dir, go.into_iter().collect(), false)
     } else {
         Store::new(std::env::temp_dir().join("lathe-lsp-no-downloads"), search_dirs(), true)
