@@ -238,6 +238,10 @@ path = "src/lib.rs"
 doctest = false
 
 [[test]]
+name = "injection_edits"
+path = "tests/injection_edits.rs"
+
+[[test]]
 name = "base_compat"
 path = "tests/base_compat.rs"
 
