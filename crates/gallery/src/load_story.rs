@@ -1,14 +1,21 @@
-//! The "Highlight load" story: a 10k-line Rust file in the editor, a 5k-row diff and 20 code blocks,
-//! all highlighted. With `GALLERY_SCROLL=1` it scrolls the editor and the page each frame, logs what
-//! each frame took and what highlighting took inside it, prints the medians after 300 frames, and quits.
+//! The "Highlight load" story: a 10k-line Rust file in the editor and a 5k-row diff on the left, 20
+//! code blocks on the right, all highlighted. With `GALLERY_SCROLL=1` it scrolls the editor, the diff
+//! and the blocks each frame, logs what each frame took, what highlighting took inside it, and the
+//! diff's layout and paint apart, prints the medians after 300 frames, and quits.
 //! `LOAD_DIFF_ROWS` sets the diff's size. It backs the frame numbers in `docs/code-editor.md` ("Performance").
 
-use std::time::{Duration, Instant};
+use std::{
+    cell::RefCell,
+    panic::Location,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 use beui::{CodeBlock, CodeEditor, DiffLine, FileDiff, FileDiffStatus, syntax::SyntaxCache};
 use gpui_kit::{
-    Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle,
-    StatefulInteractiveElement, Styled, Window, component::input::EditorState, div, point, px,
+    AnyElement, App, Bounds, Context, Element, ElementId, Entity, GlobalElementId, InspectorElementId,
+    InteractiveElement, IntoElement, LayoutId, ParentElement, Pixels, Render, ScrollHandle, StatefulInteractiveElement,
+    Styled, UniformListScrollHandle, Window, component::input::EditorState, div, point, px,
 };
 
 /// How many frames the scroll runs for.
@@ -49,6 +56,10 @@ pub struct LoadStory {
     diff: Vec<DiffLine>,
     blocks: Vec<String>,
     page: ScrollHandle,
+    diff_scroll: UniformListScrollHandle,
+    diff_times: Rc<RefCell<Stages>>,
+    diff_layout: Vec<Duration>,
+    diff_paint: Vec<Duration>,
     scroll: bool,
     last: Option<Instant>,
     frames: Vec<Duration>,
@@ -62,6 +73,10 @@ impl LoadStory {
             diff: DiffLine::parse(&diff(std::env::var("LOAD_DIFF_ROWS").ok().and_then(|n| n.parse().ok()).unwrap_or(5_000))),
             blocks: (0..20).map(|i| rust_file(25 + i)).collect(),
             page: ScrollHandle::new(),
+            diff_scroll: UniformListScrollHandle::new(),
+            diff_times: Rc::default(),
+            diff_layout: Vec::new(),
+            diff_paint: Vec::new(),
             scroll: std::env::var("GALLERY_SCROLL").is_ok_and(|v| v == "1"),
             last: None,
             frames: Vec::new(),
@@ -82,16 +97,22 @@ impl LoadStory {
             }
             self.frames.push(now - last);
             self.highlighting.push(spent);
+            let stages = std::mem::take(&mut *self.diff_times.borrow_mut());
+            self.diff_layout.push(stages.layout);
+            self.diff_paint.push(stages.paint);
         }
         if self.frames.len() == FRAMES {
             report("frame", &mut self.frames);
             report("highlight in frame", &mut self.highlighting);
+            report("diff layout", &mut self.diff_layout);
+            report("diff paint", &mut self.diff_paint);
             cx.quit();
             return;
         }
         let n = self.frames.len() as f32;
         self.editor.update(cx, |e, cx| e.set_scroll_offset(point(px(0.), px(-STEP * n)), cx));
         self.page.set_offset(point(px(0.), px(-STEP * n)));
+        self.diff_scroll.0.borrow().base_handle.set_offset(point(px(0.), px(-STEP * n)));
         window.request_animation_frame();
     }
 }
@@ -110,32 +131,99 @@ fn report(name: &str, samples: &mut [Duration]) {
     );
 }
 
+/// Time spent laying out and painting one element in a frame.
+#[derive(Default)]
+struct Stages {
+    layout: Duration,
+    paint: Duration,
+}
+
+/// Wraps an element and adds what its layout (request_layout, which builds a component, and
+/// prepaint) and its paint take to `stages`. Paint here is building the scene on the CPU; the GPU
+/// draws it later.
+struct Timed {
+    child: AnyElement,
+    stages: Rc<RefCell<Stages>>,
+}
+
+impl IntoElement for Timed {
+    type Element = Self;
+
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for Timed {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static Location<'static>> {
+        None
+    }
+
+    fn request_layout(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, ()) {
+        let start = Instant::now();
+        let id = self.child.request_layout(window, cx);
+        self.stages.borrow_mut().layout += start.elapsed();
+        (id, ())
+    }
+
+    fn prepaint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), window: &mut Window, cx: &mut App) {
+        let start = Instant::now();
+        self.child.prepaint(window, cx);
+        self.stages.borrow_mut().layout += start.elapsed();
+    }
+
+    fn paint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), _: &mut (), window: &mut Window, cx: &mut App) {
+        let start = Instant::now();
+        self.child.paint(window, cx);
+        self.stages.borrow_mut().paint += start.elapsed();
+    }
+}
+
 impl Render for LoadStory {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.scroll {
             self.step(window, cx);
         }
+        let diff = FileDiff::new("load-diff", "src/load.rs", self.diff.clone())
+            .status(FileDiffStatus::Complete)
+            .collapse_on_complete(false)
+            .max_height(560.)
+            .scroll_handle(self.diff_scroll.clone());
         div()
-            .id("load-page")
             .size_full()
             .flex()
-            .flex_col()
             .gap(px(12.))
             .p(px(12.))
-            .overflow_y_scroll()
-            .track_scroll(&self.page)
-            .child(div().flex_none().h(px(480.)).child(CodeEditor::new(&self.editor)))
             .child(
-                FileDiff::new("load-diff", "src/load.rs", self.diff.clone())
-                    .status(FileDiffStatus::Complete)
-                    .collapse_on_complete(false)
-                    .max_height(100_000.),
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(12.))
+                    .child(div().flex_none().h(px(480.)).child(CodeEditor::new(&self.editor)))
+                    .child(Timed { child: diff.into_any_element(), stages: self.diff_times.clone() }),
             )
-            .children(
-                self.blocks
-                    .iter()
-                    .enumerate()
-                    .map(|(i, code)| CodeBlock::new(("load-block", i), code.clone()).language("rust").title(format!("block_{i}.rs"))),
+            .child(
+                div()
+                    .id("load-blocks")
+                    .w(px(520.))
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .gap(px(12.))
+                    .overflow_y_scroll()
+                    .track_scroll(&self.page)
+                    .children(self.blocks.iter().enumerate().map(|(i, code)| {
+                        CodeBlock::new(("load-block", i), code.clone()).language("rust").title(format!("block_{i}.rs"))
+                    })),
             )
     }
 }
