@@ -154,3 +154,11 @@ letters through only when nobody is typing (lathe's review keys: `s`, `w`, `u`) 
 read-only editor, such as a pull request's diff, from one being typed in. A read-only input's context
 is now `Input readonly`; bindings on `Input` still match it.
 Test: `test_a_read_only_input_says_so_in_its_key_context`.
+
+## 15. The offset under the pointer
+
+`offset_at_pointer(window)` is the text offset under the pointer when the pointer is over the text,
+and `None` elsewhere, so an owner can act on "the name under the pointer", as lathe's `u` (Uses) does
+in a pull request's diff. It is `index_for_mouse_position` behind the bounds check the Cmd underline
+already makes.
+Test: `test_the_offset_under_the_pointer`.

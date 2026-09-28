@@ -3016,6 +3016,14 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.hovered_row
     }
 
+    /// lathe patch: the text offset under the pointer, when the pointer is over the text, so a
+    /// command such as "the uses of the name under the pointer" can ask for it.
+    pub fn offset_at_pointer(&self, window: &Window) -> Option<usize> {
+        let position = window.mouse_position();
+        let over_text = self.last_bounds.as_ref().is_some_and(|b| b.contains(&position));
+        over_text.then(|| self.index_for_mouse_position(position).0)
+    }
+
     /// lathe patch: the row the pointer is over, redrawing when it changes.
     pub(super) fn set_hovered_row(&mut self, position: Option<Point<Pixels>>, cx: &mut Context<Self>) {
         let row = position.map(|p| self.text.offset_to_point(self.index_for_mouse_position(p).0).row);
@@ -7335,6 +7343,29 @@ mod tests {
         assert_eq!(ranges(&mut cx), vec![0..2, 7..9, 10..12], "and stops once every match is taken");
         cx.simulate_keystrokes("x");
         assert_cursors(&mut cx, &view.input, "x| abc x|\nx|");
+    }
+
+    /// lathe patch: the offset under the pointer is the text's when the pointer is over it, and none
+    /// when it is outside the editor.
+    #[gpui::test]
+    fn test_the_offset_under_the_pointer(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        cx.update(|window, cx| view.input.update(cx, |state, cx| state.set_value("line 0\nline 1\nline 2", window, cx)));
+        cx.run_until_parked();
+        let (on_row_1, outside) = view.input.read_with(&cx, |state, _| {
+            let bounds = state.last_bounds.expect("painted");
+            let layout = state.last_layout.as_ref().expect("laid out");
+            let top = layout.row_rects(None)[1].1;
+            let x = bounds.origin.x + layout.line_number_width + px(2.);
+            (point(x, bounds.origin.y + top + layout.line_height / 2.), point(bounds.right() + px(40.), bounds.origin.y))
+        });
+        cx.simulate_mouse_move(on_row_1, None, gpui::Modifiers::default());
+        let offset = cx.update(|window, cx| view.input.read(cx).offset_at_pointer(window));
+        assert_eq!(offset, Some("line 0\n".len()), "the start of row 1, under the pointer");
+        cx.simulate_mouse_move(outside, None, gpui::Modifiers::default());
+        assert_eq!(cx.update(|window, cx| view.input.read(cx).offset_at_pointer(window)), None, "off the text: none");
     }
 
     /// lathe patch: a read-only editor adds `readonly` to its key context; an editable one does not.
