@@ -58,7 +58,7 @@ pub struct LoadStory {
 impl LoadStory {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
-            editor: CodeEditor::state("load.rs", &rust_file(10_000), window, cx),
+            editor: CodeEditor::state("load.rs", rust_file(10_000), window, cx),
             diff: DiffLine::parse(&diff(std::env::var("LOAD_DIFF_ROWS").ok().and_then(|n| n.parse().ok()).unwrap_or(5_000))),
             blocks: (0..20).map(|i| rust_file(25 + i)).collect(),
             page: ScrollHandle::new(),
