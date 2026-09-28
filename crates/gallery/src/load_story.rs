@@ -1,7 +1,7 @@
 //! The "Highlight load" story: a 10k-line Rust file in the editor, a 5k-row diff and 20 code blocks,
 //! all highlighted. With `GALLERY_SCROLL=1` it scrolls the editor and the page each frame, logs what
 //! each frame took and what highlighting took inside it, prints the medians after 300 frames, and quits.
-//! It backs the frame numbers in `docs/code-editor.md` ("Performance").
+//! `LOAD_DIFF_ROWS` sets the diff's size. It backs the frame numbers in `docs/code-editor.md` ("Performance").
 
 use std::time::{Duration, Instant};
 
@@ -59,7 +59,7 @@ impl LoadStory {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
             editor: CodeEditor::state("load.rs", &rust_file(10_000), window, cx),
-            diff: DiffLine::parse(&diff(5_000)),
+            diff: DiffLine::parse(&diff(std::env::var("LOAD_DIFF_ROWS").ok().and_then(|n| n.parse().ok()).unwrap_or(5_000))),
             blocks: (0..20).map(|i| rust_file(25 + i)).collect(),
             page: ScrollHandle::new(),
             scroll: std::env::var("GALLERY_SCROLL").is_ok_and(|v| v == "1"),
@@ -77,6 +77,9 @@ impl LoadStory {
             cx.global_mut::<SyntaxCache>().spent = Duration::ZERO;
         }
         if let Some(last) = self.last.replace(now) {
+            if spent > Duration::from_millis(2) {
+                println!("slow: frame {} spent {:.3} ms highlighting", self.frames.len(), spent.as_secs_f64() * 1000.);
+            }
             self.frames.push(now - last);
             self.highlighting.push(spent);
         }
