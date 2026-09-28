@@ -76,11 +76,15 @@ pub(crate) struct InjectionLayer {
     pub(crate) tree: Tree,
     /// One layer over all of a language's ranges (`injection.combined`).
     combined: bool,
+    /// The bytes of every node the match captured, the language and predicate nodes too:
+    /// an edit there can change the layer though its ranges stay the same.
+    match_range: Range<usize>,
 }
 
 impl InjectionLayer {
-    /// This layer moved by `edit`, or `None` when the edit touches one of its ranges.
+    /// This layer moved by `edit`, or `None` when the edit touches its match.
     fn edited(&self, edit: &InputEdit) -> Option<InjectionLayer> {
+        let match_range = shift_bytes(&self.match_range, edit)?;
         let ranges = self
             .ranges
             .iter()
@@ -97,6 +101,7 @@ impl InjectionLayer {
             ranges,
             tree,
             combined: self.combined,
+            match_range,
         })
     }
 }
@@ -126,6 +131,8 @@ struct FoundInjection {
     highlight_query: Arc<Query>,
     ranges: Vec<tree_sitter::Range>,
     combined: bool,
+    /// See [`InjectionLayer::match_range`].
+    match_range: Range<usize>,
 }
 
 /// The ranges of one combined injection, up to the count and byte caps.
@@ -197,6 +204,18 @@ fn shift_point(point: Point, edit: &InputEdit) -> Point {
             point.column,
         )
     }
+}
+
+/// `range` moved by `edit`, or `None` when the edit touches it.
+fn shift_bytes(range: &Range<usize>, edit: &InputEdit) -> Option<Range<usize>> {
+    if range.end < edit.start_byte {
+        return Some(range.clone());
+    }
+    if range.start <= edit.old_end_byte {
+        return None;
+    }
+    let delta = |offset: usize| offset - edit.old_end_byte + edit.new_end_byte;
+    Some(delta(range.start)..delta(range.end))
 }
 
 /// `range` moved by `edit`, or `None` when the edit touches it.
@@ -308,11 +327,14 @@ fn find_injections(
             continue;
         }
         sort_ranges(&mut ranges);
+        let start = query_match.captures.iter().map(|c| c.node.start_byte()).min();
+        let end = query_match.captures.iter().map(|c| c.node.end_byte()).max();
         found.push(FoundInjection {
             language_name,
             highlight_query,
             ranges,
             combined,
+            match_range: start.unwrap_or(0)..end.unwrap_or(0),
         });
     }
     found
@@ -969,7 +991,10 @@ impl SyntaxHighlighter {
                 text,
                 false,
             ) {
-                new_layers.push(layer);
+                new_layers.push(InjectionLayer {
+                    match_range: injection.match_range,
+                    ..layer
+                });
             }
         }
 
@@ -1078,7 +1103,10 @@ impl SyntaxHighlighter {
                 let mut tree = layer.tree.clone();
                 tree.edit(edit);
                 old_combined.insert(layer.language_name.clone(), tree);
-            } else if let Some(moved) = layer.edited(edit).filter(|l| !touches(&l.byte_range)) {
+            } else if let Some(moved) = layer
+                .edited(edit)
+                .filter(|l| !touches(&l.byte_range) && !touches(&l.match_range))
+            {
                 kept.push(moved);
             }
         }
@@ -1199,7 +1227,10 @@ impl SyntaxHighlighter {
                 &self.text,
                 false,
             ) {
-                kept.push(layer);
+                kept.push(InjectionLayer {
+                    match_range: injection.match_range,
+                    ..layer
+                });
             }
         }
         kept.extend(combined_layers);
@@ -1256,6 +1287,7 @@ impl SyntaxHighlighter {
             language_name: language_name.clone(),
             highlight_query,
             ranges,
+            match_range: byte_range.clone(),
             byte_range,
             tree: new_tree,
             combined,
