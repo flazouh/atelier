@@ -9,7 +9,7 @@ use gpui::{
     HighlightStyle, Hitbox, HitboxBehavior, Hsla, InteractiveElement, IntoElement, LayoutId,
     LongPressEvent, MouseButton, MouseMoveEvent, MouseUpEvent, ParentElement as _, Path, Pixels,
     Point, Position, ShapedLine, SharedString, Size, Style, Styled as _, TextAlign, TextRun,
-    TextStyle, TouchDragEvent, TouchPhase, UnderlineStyle, Window, fill, point, px, relative, size,
+    TextStyle, TouchDragEvent, TouchPhase, UnderlineStyle, Window, div, fill, point, px, relative, size,
 };
 use ropey::Rope;
 use smallvec::SmallVec;
@@ -21,7 +21,7 @@ use crate::{
 };
 
 use super::{
-    InputBaseState, RowBackground, TextDecoration,
+    InputBaseState, RowBackground, RowBlock, TextDecoration,
     layout::{LastLayout, WhitespaceIndicators},
     mode::LayoutMode,
 };
@@ -717,16 +717,18 @@ impl<M: InputModeKind> TextElement<M> {
         let mut line_corners = vec![];
 
         // Iterate only over visible (non-hidden) buffer lines
-        for (prev_lines_offset, line) in last_layout
+        for ((prev_lines_offset, line), buffer_line) in last_layout
             .visible_line_byte_offsets
             .iter()
             .zip(lines.iter())
+            .zip(last_layout.visible_buffer_lines.iter())
         {
             let prev_lines_offset = *prev_lines_offset;
             let line_size = line.size(line_height);
             let line_wrap_width = line_size.width;
 
-            let line_origin = point(px(0.), offset_y);
+            // lathe patch: a row block or a row gap above the row moves its highlight down with it.
+            let line_origin = point(px(0.), offset_y + last_layout.gap_above(*buffer_line));
 
             let line_cursor_start = line.position_for_index(
                 start_ix.saturating_sub(prev_lines_offset),
@@ -961,6 +963,7 @@ impl<M: InputModeKind> TextElement<M> {
         state: &InputBaseState<M>,
         line_height: Pixels,
         input_height: Pixels,
+        gaps: Pixels,
     ) -> (Range<usize>, Vec<usize>, Pixels) {
         // Add extra rows to avoid showing empty space when scroll to bottom.
         let extra_rows = 1;
@@ -989,8 +992,10 @@ impl<M: InputModeKind> TextElement<M> {
 
         // Display rows are uniformly `line_height` tall, so the visible window maps
         // directly to a display-row range.
-        let viewport_top = (-scroll_top).max(px(0.));
-        let viewport_bottom = viewport_top + input_height;
+        // lathe patch: row blocks and row gaps push rows down, so a row that sits `gaps` above the
+        // top by row count alone may still show. Lay those out too.
+        let viewport_top = (-scroll_top - gaps).max(px(0.));
+        let viewport_bottom = (-scroll_top).max(px(0.)) + input_height;
         let line_height_f = f32::from(line_height);
         let first_display =
             ((f32::from(viewport_top) / line_height_f).floor() as usize).min(display_count - 1);
@@ -1428,6 +1433,52 @@ impl<M: InputModeKind> TextElement<M> {
             .collect()
     }
 
+    /// lathe patch: lays out each row block at the text's width, to learn how tall its gap is. A
+    /// block on a row that is folded away gets no gap. Each one blocks the pointer, so a press in it
+    /// never reaches the text under it.
+    fn measure_row_blocks(&self, width: Pixels, window: &mut Window, cx: &mut App) -> Vec<(usize, AnyElement, Pixels)> {
+        let state = self.state.read(cx);
+        let blocks: Vec<RowBlock> = state
+            .row_blocks()
+            .iter()
+            .filter(|block| state.display_map.visible_wrap_row_count_for_buffer_line(block.row) > 0)
+            .cloned()
+            .collect();
+        blocks
+            .into_iter()
+            .map(|block| {
+                let mut element = div().w(width).occlude().child((block.render)(window, cx)).into_any_element();
+                let space = size(gpui::AvailableSpace::Definite(width), gpui::AvailableSpace::MinContent);
+                let height = element.layout_as_root(space, window, cx).height;
+                (block.row, element, height)
+            })
+            .collect()
+    }
+
+    /// lathe patch: puts each measured row block under its row, left-aligned with the text. A block
+    /// whose row is scrolled out of view is not drawn; its gap still counts.
+    fn place_row_blocks(
+        blocks: Vec<(usize, AnyElement, Pixels)>,
+        bounds: &Bounds<Pixels>,
+        last_layout: &LastLayout,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Vec<AnyElement> {
+        if blocks.is_empty() {
+            return vec![];
+        }
+        let rows = last_layout.row_rects(None);
+        blocks
+            .into_iter()
+            .filter_map(|(row, mut element, _)| {
+                let (_, top, height) = rows.iter().find(|(r, _, _)| *r == row).copied()?;
+                let origin = point(bounds.origin.x + last_layout.line_number_width, bounds.origin.y + top + height);
+                element.prepaint_at(origin, window, cx);
+                Some(element)
+            })
+            .collect()
+    }
+
     /// Paint fold icons using prepaint hitboxes.
     ///
     /// This handles:
@@ -1764,6 +1815,8 @@ pub(super) struct PrepaintState {
     fold_icon_layout: FoldIconLayout,
     /// lathe patch: the owner's row widgets, laid out for this frame.
     row_widgets: Vec<AnyElement>,
+    /// lathe patch: the owner's row blocks, laid out for this frame.
+    row_blocks: Vec<AnyElement>,
     /// lathe patch: the text area, right of the gutter, where the pointer is an I-beam.
     text_hitbox: Hitbox,
     // Inline completion rendering data
@@ -1951,11 +2004,16 @@ impl<M: InputModeKind> Element for TextElement<M> {
             });
         }
 
-        let state = self.state.read(cx);
         let line_height = window.line_height();
+        // lathe patch: each row block, laid out at the text's width to learn its height.
+        let text_width = bounds.size.width - line_number_width - RIGHT_MARGIN;
+        let row_blocks = self.measure_row_blocks(text_width, window, cx);
+        let blocks_height = row_blocks.iter().fold(px(0.), |sum, (_, _, height)| sum + *height);
 
+        let state = self.state.read(cx);
+        let transient_gaps = state.row_gaps().iter().fold(px(0.), |sum, gap| sum + line_height * gap.rows);
         let (visible_range, visible_buffer_lines, visible_top) =
-            self.calculate_visible_range(&state, line_height, bounds.size.height);
+            self.calculate_visible_range(&state, line_height, bounds.size.height, blocks_height + transient_gaps);
         let visible_start_offset = state.text.line_start_offset(visible_range.start);
         let visible_end_offset = state
             .text
@@ -2007,7 +2065,12 @@ impl<M: InputModeKind> Element for TextElement<M> {
             cursor_bounds: None,
             text_align: state.text_align,
             content_width: bounds.size.width,
-            row_gaps: state.row_gaps().iter().map(|gap| (gap.row, line_height * gap.rows)).collect(),
+            row_gaps: state
+                .row_gaps()
+                .iter()
+                .map(|gap| (gap.row, line_height * gap.rows))
+                .chain(row_blocks.iter().map(|(row, _, height)| (row + 1, *height)))
+                .collect(),
         };
 
         let run = TextRun {
@@ -2136,7 +2199,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 longest_line_width
             },
             (total_wrapped_lines as f32 * line_height
-                + empty_bottom_height.max(ghost_lines_height))
+                + empty_bottom_height.max(ghost_lines_height)
+                // lathe patch: the text scrolls past every row block.
+                + blocks_height)
             .max(bounds.size.height),
         );
 
@@ -2272,6 +2337,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
             HitboxBehavior::Normal,
         );
         let hitbox = window.insert_hitbox(input_bounds, HitboxBehavior::Normal);
+        // lathe patch: after the editor's hitboxes, so a block's own hitbox is on top of them.
+        let row_blocks = Self::place_row_blocks(row_blocks, &bounds, &last_layout, window, cx);
 
         PrepaintState {
             hitbox,
@@ -2290,6 +2357,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             indent_guides_path,
             fold_icon_layout,
             row_widgets,
+            row_blocks,
             text_hitbox,
             ghost_first_line,
             ghost_lines,
@@ -2639,6 +2707,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
         window.with_content_mask(Some(gpui::ContentMask { bounds: input_bounds }), |window| {
             for widget in prepaint.row_widgets.iter_mut() {
                 widget.paint(window, cx);
+            }
+            for block in prepaint.row_blocks.iter_mut() {
+                block.paint(window, cx);
             }
         });
 

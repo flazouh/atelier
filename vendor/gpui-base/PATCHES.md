@@ -117,3 +117,18 @@ is fine for a gap that lives 190ms.
 Code: `src/input/base/layout.rs`, `src/input/base/state.rs`, `src/input/base/element.rs`,
 `src/input/editor/indent.rs`.
 Test: `test_a_row_gap_pushes_its_row_and_the_rows_below_down`.
+
+## 12. Row blocks: an element in a gap below a row
+
+A comment thread must sit under its row and push the rows below it down, for as long as it is open.
+A row gap (patch 11) only moves what is painted, and a row widget sits on its row. `set_row_blocks`
+places an owner's element in a gap below its row, as wide as the text and as tall as its content:
+the editor lays each block out at the text's width in the frame it lays the text out, so the gap is
+always exactly its height. The gap counts everywhere, unlike patch 11's: the pointer's hit test, the
+selection highlight, the caret, IME and touch positions, and the scroll height all add it, and the
+visible range reaches up far enough to lay out rows the blocks push into view. Each block blocks the
+pointer and is placed after the editor's own hitboxes, so a press in it never moves the caret. A block
+on a folded row gets no gap.
+Code: `RowBlock` and `set_row_blocks` in `src/input/base/state.rs`, `measure_row_blocks` and
+`place_row_blocks` in `src/input/base/element.rs`.
+Test: `test_a_row_block_opens_a_gap_below_its_row`.

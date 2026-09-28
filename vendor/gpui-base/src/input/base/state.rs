@@ -139,6 +139,16 @@ pub struct RowWidget {
     pub render: Rc<dyn Fn(&mut Window, &mut App) -> gpui::AnyElement>,
 }
 
+/// lathe patch: an element in a gap below one buffer row, as wide as the text and as tall as its
+/// content, which pushes every row below it down. Unlike a [`RowGap`] it lasts: the pointer, the
+/// selection, the caret and the scroll height all count it. A comment thread under a row is one. See
+/// [`InputBaseState::set_row_blocks`].
+#[derive(Clone)]
+pub struct RowBlock {
+    pub row: usize,
+    pub render: Rc<dyn Fn(&mut Window, &mut App) -> gpui::AnyElement>,
+}
+
 /// lathe patch: empty space above one buffer row, `rows` row heights tall, which pushes that row and
 /// every row below it down. An owner that shrinks it frame by frame slides those rows up into the
 /// place of rows it just deleted. See [`InputBaseState::set_row_gaps`].
@@ -451,6 +461,8 @@ pub struct InputBaseState<M: InputModeKind> {
     row_covers: Vec<RowBackground>,
     /// lathe patch: space above rows. See `set_row_gaps`.
     row_gaps: Vec<RowGap>,
+    /// lathe patch: elements in gaps below rows. See `set_row_blocks`.
+    row_blocks: Vec<RowBlock>,
     /// lathe patch: a style the owner pinned. While it is set, `set_editor_style` applies it in place
     /// of whatever it was given, so a wrapper that sets a theme style on every render cannot replace
     /// the owner's.
@@ -778,6 +790,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             row_widgets: Vec::new(),
             row_covers: Vec::new(),
             row_gaps: Vec::new(),
+            row_blocks: Vec::new(),
             diagnostic_popover: None,
             context_menu_handler: None,
             pending_context_menu: None,
@@ -941,7 +954,9 @@ impl<M: InputModeKind> InputBaseState<M> {
             let local_offset = offset.saturating_sub(prev_lines_offset);
             if let Some(pos) = line.position_for_index(local_offset, last_layout, false) {
                 let sub_line_index = (pos.y / line_height) as usize;
-                let adjusted_pos = point(pos.x + last_layout.line_number_width, pos.y + y_offset);
+                // lathe patch: rows under a row block or a row gap sit lower by its height.
+                let gap = last_layout.gap_above(last_layout.visible_buffer_lines[vi]);
+                let adjusted_pos = point(pos.x + last_layout.line_number_width, pos.y + y_offset + gap);
                 return (vi, sub_line_index, Some(adjusted_pos));
             }
 
@@ -2966,6 +2981,17 @@ impl<M: InputModeKind> InputBaseState<M> {
         &self.row_gaps
     }
 
+    /// lathe patch: elements the editor places in a gap below their row, as [`RowBlock`] describes.
+    /// The editor measures each one at the text's width in the frame it lays the text out, so the
+    /// gap is always exactly as tall as the block. The owner sets them on every render.
+    pub fn set_row_blocks(&mut self, blocks: Vec<RowBlock>) {
+        self.row_blocks = blocks;
+    }
+
+    pub(super) fn row_blocks(&self) -> &[RowBlock] {
+        &self.row_blocks
+    }
+
     /// lathe patch: every selection as a byte range, in text order.
     pub fn selected_ranges(&self) -> Vec<Range<usize>> {
         let mut ranges: Vec<_> = self.selections.iter().map(|sel| sel.start..sel.end).collect();
@@ -3065,8 +3091,9 @@ impl<M: InputModeKind> InputBaseState<M> {
         {
             let line_start_offset = last_layout.visible_line_byte_offsets[vi];
 
-            // Calculate line origin for this display row
-            let line_origin = point(px(0.), y_offset);
+            // Calculate line origin for this display row. lathe patch: a row block or a row gap
+            // above it moves it down, for the pointer as for the painter.
+            let line_origin = point(px(0.), y_offset + last_layout.gap_above(*_buffer_line));
             let pos = inner_position - line_origin;
 
             // Return offset by use closest_index_for_x if is single line mode.
@@ -4231,6 +4258,8 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
             }
 
             let index_offset = last_layout.visible_line_byte_offsets[vi];
+            // lathe patch: a row block or a row gap above the row moves it down.
+            let row_top = y_offset + last_layout.gap_above(last_layout.visible_buffer_lines[vi]);
 
             if start_origin.is_none() {
                 if let Some(p) = line.position_for_index(
@@ -4238,7 +4267,7 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
                     last_layout,
                     false,
                 ) {
-                    start_origin = Some(p + point(px(0.), y_offset));
+                    start_origin = Some(p + point(px(0.), row_top));
                 }
             }
 
@@ -4248,7 +4277,7 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
                     last_layout,
                     false,
                 ) {
-                    end_origin = Some(p + point(px(0.), y_offset));
+                    end_origin = Some(p + point(px(0.), row_top));
                 }
             }
 
@@ -7094,6 +7123,59 @@ mod tests {
         let (after, _) = tops(&mut cx);
         let gap = line_height * 1.5;
         assert_eq!(after, vec![before[0], before[1], before[2] + gap, before[3] + gap]);
+    }
+
+    /// lathe patch: a row block sits in a gap below its row, as tall as its content. The rows under it
+    /// move down by that height for the pointer as well as the painter, and the text scrolls past it.
+    #[gpui::test]
+    fn test_a_row_block_opens_a_gap_below_its_row(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        let text = (0..100).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        cx.update(|window, cx| view.input.update(cx, |state, cx| state.set_value(text, window, cx)));
+        cx.run_until_parked();
+        let read = |cx: &mut VisualTestContext| {
+            view.input.read_with(cx, |state, _| {
+                let layout = state.last_layout.as_ref().expect("laid out");
+                let tops = layout.row_rects(None).iter().take(4).map(|(_, top, _)| *top).collect::<Vec<_>>();
+                (tops, layout.line_height, state.scroll_size.height)
+            })
+        };
+        let (before, line_height, height_before) = read(&mut cx);
+        let block = px(30.);
+        cx.update(|_, cx| {
+            view.input.update(cx, |state, cx| {
+                state.set_row_blocks(vec![RowBlock { row: 1, render: Rc::new(move |_, _| div().h(block).into_any_element()) }]);
+                cx.notify();
+            })
+        });
+        cx.run_until_parked();
+        let (after, _, height_after) = read(&mut cx);
+        assert_eq!(after, vec![before[0], before[1], before[2] + block, before[3] + block]);
+        assert_eq!(height_after, height_before + block, "the text scrolls past the block");
+        view.input.read_with(&cx, |state, _| {
+            let bounds = state.last_bounds.expect("painted");
+            let layout = state.last_layout.as_ref().expect("laid out");
+            let at = |top: Pixels| point(bounds.origin.x + layout.line_number_width + px(2.), bounds.origin.y + top + line_height / 2.);
+            assert_eq!(state.index_for_mouse_position(at(after[2])).0, state.text.line_start_offset(2), "the pointer finds row 2 where it is painted");
+            assert_eq!(state.index_for_mouse_position(at(after[1])).0, state.text.line_start_offset(1), "row 1 stays put");
+        });
+        // A press in the block is the block's, not the text's: the caret stays where it was.
+        let (in_block, on_row_2, row_2) = view.input.read_with(&cx, |state, _| {
+            let bounds = state.last_bounds.expect("painted");
+            let x = bounds.origin.x + state.last_layout.as_ref().unwrap().line_number_width + px(2.);
+            let row_bottom = bounds.origin.y + after[1] + line_height;
+            (point(x, row_bottom + block / 2.), point(x, bounds.origin.y + after[2] + line_height / 2.), state.text.line_start_offset(2))
+        });
+        cx.update(|window, cx| view.input.update(cx, |state, cx| {
+            state.focus(window, cx);
+            state.set_selected_range(3..3, cx);
+        }));
+        cx.simulate_click(in_block, gpui::Modifiers::default());
+        view.input.read_with(&cx, |state, _| assert_eq!(state.cursor(), 3, "a press in the block leaves the caret"));
+        cx.simulate_click(on_row_2, gpui::Modifiers::default());
+        view.input.read_with(&cx, |state, _| assert_eq!(state.cursor(), row_2, "a press on row 2 lands on row 2"));
     }
 
     /// lathe patch: every selection can be read and put back as byte ranges.
