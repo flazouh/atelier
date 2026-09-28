@@ -508,6 +508,15 @@ impl SyntaxHighlighter {
         self.text = text.clone();
     }
 
+    /// Each injection layer's language and ranges, in order: for tests that compare two highlighters.
+    #[doc(hidden)]
+    pub fn injection_layer_ranges(&self) -> Vec<(SharedString, Vec<tree_sitter::Range>, Range<usize>)> {
+        self.injection_layers
+            .iter()
+            .map(|l| (l.language_name.clone(), l.ranges.clone(), l.byte_range.clone()))
+            .collect()
+    }
+
     /// Returns the language name for this highlighter.
     pub fn language(&self) -> &SharedString {
         &self.language
@@ -1733,153 +1742,6 @@ $x = 1;
             vec![(2..2, red), (4..6, green)],
             vec![(0..4, clean), (4..6, green), (6..10, clean)],
         );
-    }
-
-    /// The point of byte `offset` in `text`.
-    #[cfg(feature = "tree-sitter-languages")]
-    fn point_of(text: &str, offset: usize) -> Point {
-        let before = &text[..offset];
-        let row = before.matches('\n').count();
-        let column = offset - before.rfind('\n').map_or(0, |n| n + 1);
-        Point::new(row, column)
-    }
-
-    /// What a layer is, apart from its tree.
-    #[cfg(feature = "tree-sitter-languages")]
-    fn layer_shapes(h: &SyntaxHighlighter) -> Vec<(String, Vec<tree_sitter::Range>, Range<usize>)> {
-        h.injection_layers
-            .iter()
-            .map(|l| (l.language_name.to_string(), l.ranges.clone(), l.byte_range.clone()))
-            .collect()
-    }
-
-    /// Applies `edits` seeded random edits to `text`, each one incrementally, and after each checks the
-    /// layers and the styles against a highlighter that parsed the same text from scratch.
-    #[cfg(feature = "tree-sitter-languages")]
-    #[track_caller]
-    fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&str], edits: usize, seed: u64) {
-        let theme = HighlightTheme::default_dark();
-        let mut state = seed;
-        let mut next = move |n: usize| {
-            // xorshift64: deterministic, so a failure replays.
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            (state % n.max(1) as u64) as usize
-        };
-        let mut text = text.to_string();
-        let mut h = SyntaxHighlighter::new(language);
-        assert!(h.update(None, &Rope::from(text.as_str()), None));
-        for step in 0..edits {
-            let mut start = next(text.len() + 1);
-            while !text.is_char_boundary(start) {
-                start -= 1;
-            }
-            let (old_end, insert) = if next(3) == 0 {
-                let mut end = (start + next(24)).min(text.len());
-                while !text.is_char_boundary(end) {
-                    end -= 1;
-                }
-                (end, "")
-            } else {
-                (start, snippets[next(snippets.len())])
-            };
-            let (start_position, old_end_position) = (point_of(&text, start), point_of(&text, old_end));
-            text.replace_range(start..old_end, insert);
-            let new_end = start + insert.len();
-            let edit = InputEdit {
-                start_byte: start,
-                old_end_byte: old_end,
-                new_end_byte: new_end,
-                start_position,
-                old_end_position,
-                new_end_position: point_of(&text, new_end),
-            };
-            let rope = Rope::from(text.as_str());
-            assert!(h.update(Some(edit), &rope, None));
-            let mut fresh = SyntaxHighlighter::new(language);
-            assert!(fresh.update(None, &rope, None));
-            assert_eq!(
-                layer_shapes(&h),
-                layer_shapes(&fresh),
-                "{language}, edit {step} ({start}..{old_end} -> {insert:?}): layers differ"
-            );
-            assert_eq!(
-                h.styles(&(0..rope.len()), theme.as_ref()),
-                fresh.styles(&(0..rope.len()), theme.as_ref()),
-                "{language}, edit {step} ({start}..{old_end} -> {insert:?}): styles differ"
-            );
-        }
-    }
-
-    #[cfg(feature = "tree-sitter-languages")]
-    #[test]
-    fn test_incremental_injections_match_a_rebuild_for_rust_macros() {
-        let text = indoc::indoc! {r#"
-            fn a(v: u64) -> String {
-                let s = format!("{} and {}", v, "x");
-                println!("{s}");
-                vec![1, 2, 3].len();
-                s
-            }
-            macro_rules! twice { ($e:expr) => { $e; $e } }
-            fn b() { twice!(a(1)); assert_eq!(1, 1); }
-        "#};
-        let snippets = ["x", "\n", "m!(a)", "(", ")", "\"", "format!(\"{}\", 1)", "!", "[", "]", "{", "}", " "];
-        assert_incremental_matches_rebuild("rust", text, &snippets, 200, 0x9e37_79b9_7f4a_7c15);
-    }
-
-    #[cfg(feature = "tree-sitter-languages")]
-    #[test]
-    fn test_incremental_injections_match_a_rebuild_for_markdown_fences() {
-        let text = indoc::indoc! {r#"
-            # Title with `code` and *emphasis*
-
-            A paragraph with a [link](https://example.com) and **bold**.
-
-            ```rust
-            fn main() { println!("hi"); }
-            ```
-
-            - one `item`
-            - two _items_
-
-            <div>html block</div>
-
-            ```js
-            const a = `t`;
-            ```
-        "#};
-        let snippets = ["x", "\n", "```", "```rust\n", "`", "*", "_", "[a](b)", "\n\n", "<b>", "# ", "- "];
-        assert_incremental_matches_rebuild("markdown", text, &snippets, 200, 0x2545_f491_4f6c_dd1d);
-    }
-
-    #[cfg(feature = "tree-sitter-languages")]
-    #[test]
-    fn test_incremental_injections_match_a_rebuild_for_html_script_and_style() {
-        let text = indoc::indoc! {r#"
-            <html>
-            <head><style>body { color: red; }</style></head>
-            <body>
-            <script>const a = 1; function f() { return a; }</script>
-            <p>text</p>
-            <script>let b = "</p>";</script>
-            </body>
-            </html>
-        "#};
-        let snippets = ["x", "\n", "<script>", "</script>", "<style>", "</style>", "{", "}", ";", "\"", "<", ">"];
-        assert_incremental_matches_rebuild("html", text, &snippets, 200, 0xda94_2042_e4dd_58b5);
-    }
-
-    /// Past the cap on injected parses, only the first layers exist; an edit must keep that set.
-    #[cfg(feature = "tree-sitter-languages")]
-    #[test]
-    fn test_incremental_injections_match_a_rebuild_past_the_cap() {
-        let text: String = (0..MAX_NON_COMBINED_INJECTION_PARSES + 40)
-            .map(|i| format!("fn f{i}() {{ m!({i}); }}\n"))
-            .collect();
-        let snippets = ["m!(x)", "x", "\n", "(", ")", "fn g() { n!(1); }\n"];
-        assert_incremental_matches_rebuild("rust", &text, &snippets, 40, 0x1234_5678_9abc_def1);
     }
 
 }
