@@ -118,6 +118,8 @@ struct Gallery {
     inline: Entity<gpui_kit::component::input::EditorState>,
     /// The hunks still waiting in that buffer.
     inline_hunks: Vec<InlineHunk>,
+    /// Hunks the user decided, fading before their edit runs.
+    inline_resolving: Vec<beui::Resolve>,
     /// That buffer's text as the hunks last matched it, so an edit can move them with the rows.
     inline_text: String,
     /// The review before and after each decision, so undo and redo bring its hunks back too.
@@ -212,6 +214,7 @@ impl Gallery {
             choice: None,
             inline,
             inline_hunks: inline_fixture(),
+            inline_resolving: Vec::new(),
             inline_text: INLINE_FILE.to_string(),
             inline_history: Default::default(),
             _inline_edits,
@@ -320,7 +323,7 @@ impl Gallery {
             Story::Tools => tools().into_any_element(),
             Story::Diffs => diffs().into_any_element(),
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
-            Story::Inline => inline_story(&self.inline, &self.inline_hunks, cx).into_any_element(),
+            Story::Inline => inline_story(&self.inline, &self.inline_hunks, &self.inline_resolving, cx).into_any_element(),
             Story::Editor => editor_story::editor_story(self, cx).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
             Story::Prompt => prompt_story(&self.prompt, self.notice.clone(), cx).into_any_element(),
@@ -810,11 +813,22 @@ fn inline_fixture() -> Vec<InlineHunk> {
 fn inline_story(
     state: &Entity<gpui_kit::component::input::EditorState>,
     hunks: &[InlineHunk],
+    resolving: &[beui::Resolve],
     cx: &mut Context<Gallery>,
 ) -> impl IntoElement {
     let left = beui::inline_review::pending_count(hunks, &[]);
-    let decide = cx.listener(
+    // A decision starts the hunk's fade; its edit runs once the fade is over.
+    let decide = cx.listener(|this: &mut Gallery, (id, decision): &(SharedString, Decision), _, cx| {
+        if !this.inline_resolving.iter().any(|r| &r.id == id) {
+            this.inline_resolving.push(beui::Resolve::new(id.clone(), *decision));
+            cx.notify();
+        }
+    });
+    let resolved = cx.listener(
         |this: &mut Gallery, (id, decision): &(SharedString, Decision), window: &mut Window, cx| {
+            // A frame can report the same finished fade twice; only the first one edits.
+            let Some(at) = this.inline_resolving.iter().position(|r| &r.id == id) else { return };
+            this.inline_resolving.remove(at);
             let Some(hunk) = this.inline_hunks.iter().find(|h| &h.id == id).cloned() else { return };
             let closed = hunk.closing(*decision);
             let before = (this.inline_text.clone(), this.inline_hunks.clone());
@@ -848,7 +862,9 @@ fn inline_story(
                 // The first hunk left is the current one, so its bar stays up without a pointer. That
                 // is also the only way a headless screenshot can show one.
                 .when_some(hunks.first(), |review, hunk| review.current(hunk.id.clone()))
-                .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx)),
+                .resolving(resolving.to_vec())
+                .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx))
+                .on_resolved(move |id, decision, window, cx| resolved(&(id.clone(), decision), window, cx)),
         )
 }
 
