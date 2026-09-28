@@ -17,7 +17,7 @@ gpui-base and gpui-component ship the hard parts, so lathe reskins them rather t
 | Line numbers, folding, soft wrap | `EditorState::line_number`, fold candidates | Reuse, restyle the gutter. |
 | Diagnostics model and hover | `gpui_base::input::{Diagnostic, DiagnosticSet, DiagnosticSeverity}`, `DiagnosticPopover` | Feed it from LSP, restyle. |
 | LSP client | nothing | Stage C writes one. `lsp-types` 0.97 is already in the lock. |
-| Agent hunks with accept and reject | nothing | Stage A writes it. |
+| Agent hunks with accept and reject | nothing | The inline review writes it (`docs/inline-review.md`). |
 
 ## What the live server taught us
 
@@ -44,29 +44,13 @@ The editor story wires it the way Zed does: Cmd-hover underlines, Cmd-click and 
 rests on a symbol, and problems are pulled on open and 150ms after typing pauses. `LspWorker` owns the
 server on its own thread, so no request blocks the window, and a newer check replaces a queued one.
 
-## Stage A: the hunk review
+## Stage A: the hunk review (removed)
 
-The thing the user sees while the agent edits a file. One `HunkReview` per file.
-
-- **Rows.** Mono at `text-xs`, line height 20px, a 36px gutter of old and new numbers, then a 12px sign
-  column, then the code. Added rows wash with `theme.diff_line(true)`, removed rows with
-  `diff_line(false)`, both 7% as `FileDiff` already does. Context rows have no wash.
-- **Per hunk bar.** It sits at the hunk's top right, on the row band, and holds Accept and Reject as
-  `ButtonSize::Chip`, plus `Kbd` hints `⌘↵` and `⌘⌫`. It fades in on hover over the hunk or when the hunk
-  is the current one, over `duration::MORPH` (180ms).
-- **Header.** The path in mono, `+n −m` in the muted diff colors, the count of hunks left, then Accept all
-  and Reject all.
-- **Resolve animation.** This is the heart of it. Accepting a hunk collapses its removed rows to zero
-  height while their wash fades, and the added rows drop their wash and settle into plain code. Rejecting
-  does the mirror. Both run over `duration::RESOLVE` (260ms) on `ease::MORPH`, and the rows below slide up
-  as the height closes. Under Reduce Motion the rows vanish at once with no slide.
-- **Arrival.** A hunk the agent has just written enters with `Entrance`, staggered 35ms, as the chat items
-  do.
-- **State.** `HunkReview` takes `Vec<Hunk>`; each `Hunk` has an id, its rows, and a `HunkState` of
-  `Pending`, `Accepted` or `Rejected`. The component animates and reports; the caller owns the file.
-
-Pure functions to test first: `hunk_stats` (added and removed per hunk and per file), `resolve_rows` (which
-rows survive an accept or a reject), and `pending_count`.
+Stage A was a separate diff pane, `HunkReview`, with Accept and Reject on each hunk, for while the
+file's editor was locked read-only. The inline review (`docs/inline-review.md`) replaced that lock, so
+the pane had no use left and was deleted on 2026-09-28. Accepting and rejecting now happen in one place,
+the editor, for an open file and for a multi-file review alike. `FileDiff` stays, for a read-only diff
+in a chat message.
 
 ## Stage B: the editor
 
@@ -179,7 +163,6 @@ The gallery's Editor story has a tab per language with a fixture project on disk
   pyright and gopls, clippy, the gallery
   build, and the tests of the patched `vendor/gpui-base`, which the workspace excludes.
 - Gallery stories "Hunks" and "Editor", captured on `hp-agent` in both themes.
-- Stage A resolve: capture at 0, 130 and 260ms and confirm the rows close rather than jump.
 - Stage C: `LATHE_REQUIRE_LSP=1 cargo test -p lathe-lsp --test rust_analyzer` on a box with the server,
   so a missing server fails rather than skipping. Passed on `hp-agent` against rust-analyzer 1.98.1.
 - The Editor story, driven on `hp-agent`: Check reported "2 problems, first: mismatched types, expected

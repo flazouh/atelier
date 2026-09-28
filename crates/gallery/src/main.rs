@@ -4,11 +4,11 @@
 
 use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
-    CodeBlock, CodeBlockStatus, DiffLine, DiffLineKind, EntranceList, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
+    CodeBlock, CodeBlockStatus, DiffLine, EntranceList, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
     PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, SubagentRow, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
-    CodeEditor, Decision, Hunk, HunkReview, HunkState, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
+    CodeEditor, Decision, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
 use std::time::{Duration, Instant};
@@ -38,7 +38,6 @@ enum Story {
     Tools,
     Diffs,
     Plan,
-    Hunks,
     Inline,
     Editor,
     Select,
@@ -46,7 +45,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 16] = [
+    const ALL: [Story; 15] = [
         Story::AgentPanel,
         Story::Colors,
         Story::Typography,
@@ -58,7 +57,6 @@ impl Story {
         Story::Tools,
         Story::Diffs,
         Story::Plan,
-        Story::Hunks,
         Story::Inline,
         Story::Editor,
         Story::Select,
@@ -78,7 +76,6 @@ impl Story {
             Story::Tools => "Tool calls",
             Story::Diffs => "Diffs and code",
             Story::Plan => "Plan",
-            Story::Hunks => "Hunks",
             Story::Inline => "Inline review",
             Story::Editor => "Editor",
             Story::Select => "Select",
@@ -117,8 +114,6 @@ fn preview_actions() -> Vec<PromptAction> {
 struct Gallery {
     story: Story,
     choice: Option<usize>,
-    /// The Hunks story's own file, so Accept and Reject really resolve.
-    hunks: Vec<Hunk>,
     /// The Inline review story's buffer: both sides of every hunk, as real text.
     inline: Entity<gpui_kit::component::input::EditorState>,
     /// The hunks still waiting in that buffer.
@@ -215,7 +210,6 @@ impl Gallery {
             Self {
             story,
             choice: None,
-            hunks: sample_hunks(),
             inline,
             inline_hunks: inline_fixture(),
             inline_text: INLINE_FILE.to_string(),
@@ -326,7 +320,6 @@ impl Gallery {
             Story::Tools => tools().into_any_element(),
             Story::Diffs => diffs().into_any_element(),
             Story::Plan => narrow(TodoList::new("plan", beui_plan()).title("Implementation plan")).into_any_element(),
-            Story::Hunks => hunks_story(&self.hunks, cx).into_any_element(),
             Story::Inline => inline_story(&self.inline, &self.inline_hunks, cx).into_any_element(),
             Story::Editor => editor_story::editor_story(self, cx).into_any_element(),
             Story::Select => select_story(self.choice, cx).into_any_element(),
@@ -856,89 +849,6 @@ fn inline_story(
                 // is also the only way a headless screenshot can show one.
                 .when_some(hunks.first(), |review, hunk| review.current(hunk.id.clone()))
                 .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx)),
-        )
-}
-
-/// The agent's edit to one file, as the review shows it. Accept and Reject resolve for real, so the
-/// rows close and the survivors settle into plain code.
-fn sample_hunks() -> Vec<Hunk> {
-    let row = |kind: DiffLineKind, old: Option<u32>, new: Option<u32>, text: &str| DiffLine {
-        kind,
-        old_line: old,
-        new_line: new,
-        text: text.to_string().into(),
-    };
-    vec![
-        Hunk::new(
-            "h1",
-            vec![
-                row(DiffLineKind::Context, Some(64), Some(64), "/// The line before each side's first line."),
-                row(DiffLineKind::Context, Some(65), Some(65), "fn hunk_starts(header: &str) -> (u32, u32) {"),
-                row(DiffLineKind::Context, Some(66), Some(66), "    let start = |sign: char| {"),
-                row(DiffLineKind::Removed, Some(67), None, "            .map_or(0, |n| n)"),
-                row(DiffLineKind::Added, None, Some(67), "            .map_or(0, |n| n.saturating_sub(1))"),
-                row(DiffLineKind::Context, Some(68), Some(68), "    };"),
-            ],
-        ),
-        Hunk::new(
-            "h2",
-            vec![
-                row(DiffLineKind::Context, Some(96), Some(96), "#[test]"),
-                row(DiffLineKind::Added, None, Some(97), "fn a_hunk_at_line_one_starts_at_one() {"),
-                row(DiffLineKind::Added, None, Some(98), "    let lines = DiffLine::parse(\"@@ -1,1 +1,1 @@\\n a\");"),
-                row(DiffLineKind::Added, None, Some(99), "    assert_eq!(lines[1].new_line, Some(1));"),
-                row(DiffLineKind::Added, None, Some(100), "}"),
-                row(DiffLineKind::Context, Some(97), Some(101), ""),
-            ],
-        ),
-    ]
-}
-
-fn hunks_story(hunks: &[Hunk], cx: &mut Context<Gallery>) -> impl IntoElement {
-    let resolve = |state: HunkState, cx: &mut Context<Gallery>| {
-        let gallery = cx.entity().downgrade();
-        move |id: &SharedString, _: &mut Window, cx: &mut App| {
-            let id = id.clone();
-            gallery
-                .update(cx, |g, cx| {
-                    if let Some(hunk) = g.hunks.iter_mut().find(|h| h.id == id) {
-                        hunk.state = state;
-                    }
-                    cx.notify();
-                })
-                .ok();
-        }
-    };
-    let reset = cx.listener(|this, _, _, cx| {
-        this.hunks = sample_hunks();
-        cx.notify();
-    });
-    div()
-        .flex()
-        .flex_col()
-        .gap(px(12.))
-        .max_w(px(720.))
-        .child(
-            HunkReview::new("review", "crates/beui/src/file_diff.rs", hunks.to_vec())
-                .on_accept(resolve(HunkState::Accepted, cx))
-                .on_reject(resolve(HunkState::Rejected, cx))
-                .on_accept_all(cx.listener(|this, _, _, cx| {
-                    for hunk in &mut this.hunks {
-                        hunk.state = HunkState::Accepted;
-                    }
-                    cx.notify();
-                }))
-                .on_reject_all(cx.listener(|this, _, _, cx| {
-                    for hunk in &mut this.hunks {
-                        hunk.state = HunkState::Rejected;
-                    }
-                    cx.notify();
-                })),
-        )
-        .child(
-            div().child(
-                Button::new("hunks-reset").label("Reset the file").variant(ButtonVariant::Ghost).on_click(reset),
-            ),
         )
 }
 
