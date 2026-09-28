@@ -15,6 +15,25 @@ fn point_of(text: &str, offset: usize) -> Point {
     Point::new(row, column)
 }
 
+/// Each layer as `language start..end [ranges]`, with each range's points.
+fn shapes(h: &SyntaxHighlighter) -> Vec<String> {
+    h.injection_layer_ranges()
+        .iter()
+        .map(|(language, ranges, bytes)| {
+            let ranges: Vec<String> = ranges
+                .iter()
+                .map(|r| {
+                    format!(
+                        "{}..{}@{}:{}-{}:{}",
+                        r.start_byte, r.end_byte, r.start_point.row, r.start_point.column, r.end_point.row, r.end_point.column
+                    )
+                })
+                .collect();
+            format!("{language} {bytes:?} {ranges:?}")
+        })
+        .collect()
+}
+
 #[track_caller]
 fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&str], edits: usize, seed: u64) {
     let theme = HighlightTheme::default_dark();
@@ -60,7 +79,15 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
         let mut fresh = SyntaxHighlighter::new(language);
         assert!(fresh.update(None, &rope, None));
         let what = format!("{language}, edit {step} ({start}..{old_end} -> {insert:?})");
-        assert_eq!(h.injection_layer_ranges(), fresh.injection_layer_ranges(), "{what}: layers differ");
+        let (got, want) = (shapes(&h), shapes(&fresh));
+        if got != want {
+            let only = |a: &[String], b: &[String]| a.iter().filter(|x| !b.contains(x)).cloned().collect::<Vec<_>>();
+            panic!(
+                "{what}: layers differ\n  only incremental: {:?}\n  only rebuild: {:?}\n  text: {text:?}",
+                only(&got, &want),
+                only(&want, &got)
+            );
+        }
         assert_eq!(
             h.styles(&(0..rope.len()), theme.as_ref()),
             fresh.styles(&(0..rope.len()), theme.as_ref()),
