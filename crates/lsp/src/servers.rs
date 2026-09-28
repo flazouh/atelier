@@ -4,9 +4,9 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_json::{Value, json};
+use serde_json::Value;
 
-use crate::install::{Download, Kind, Package, PlatformFile, Unpack};
+use crate::install::{Download, Kind, PlatformFile, Unpack};
 
 /// How to run one language server, and for which files.
 #[derive(Debug)]
@@ -45,50 +45,26 @@ pub const SERVERS: &[ServerSpec] = &[
         initialization_options: no_options,
     },
     ServerSpec {
-        name: "typescript-language-server",
-        program: "typescript-language-server",
-        args: &["--stdio"],
+        name: "tsgo",
+        // TypeScript 7's compiler is native Go and serves LSP itself, so there is no Node.js and no
+        // tsserver. The binary is `tsc`, but a `tsc` on the PATH is most often TypeScript 5, which has
+        // no `--lsp`; `tsgo` is the name the native preview installed it under.
+        program: "tsgo",
+        args: &["--lsp", "--stdio"],
         language_ids: &["typescript", "typescriptreact", "javascript", "javascriptreact"],
         root_markers: &["tsconfig.json", "jsconfig.json", "package.json"],
-        install: "npm install -g typescript@5 typescript-language-server",
-        download: Some(Download {
-            version: "6.0.1",
-            kind: Kind::Node {
-                packages: &[
-                    Package {
-                        name: "typescript-language-server",
-                        url: "https://registry.npmjs.org/typescript-language-server/-/typescript-language-server-6.0.1.tgz",
-                        sha256: "85eabb9251d85d3798b247b2bc0895ca111d866bfbf59533f64b2461b0d8649f",
-                    },
-                    Package {
-                        name: "typescript",
-                        url: "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz",
-                        sha256: "10e108c9cf7d5f2879053dff18515fb405abf2ccef63eaaf017d9c571687a1d3",
-                    },
-                ],
-                script: "node_modules/typescript-language-server/lib/cli.mjs",
-            },
-        }),
-        initialization_options: typescript_options,
+        install: "npm install -g @typescript/native-preview",
+        download: Some(TSGO),
+        initialization_options: no_options,
     },
     ServerSpec {
-        name: "pyright",
-        program: "pyright-langserver",
-        args: &["--stdio"],
+        name: "ty",
+        program: "ty",
+        args: &["server"],
         language_ids: &["python"],
-        root_markers: &["pyproject.toml", "setup.py", "requirements.txt", "pyrightconfig.json"],
-        install: "npm install -g pyright",
-        download: Some(Download {
-            version: "1.1.414",
-            kind: Kind::Node {
-                packages: &[Package {
-                    name: "pyright",
-                    url: "https://registry.npmjs.org/pyright/-/pyright-1.1.414.tgz",
-                    sha256: "bf5f473f6167c0d14175492c3263d783b4489a6956e1c06c18e15228e3a3fa42",
-                }],
-                script: "node_modules/pyright/langserver.index.js",
-            },
-        }),
+        root_markers: &["pyproject.toml", "ty.toml", "setup.py", "requirements.txt"],
+        install: "uv tool install ty",
+        download: Some(TY),
         initialization_options: no_options,
     },
     ServerSpec {
@@ -148,6 +124,69 @@ const RUST_ANALYZER: Download = Download {
     },
 };
 
+/// TypeScript 7's native compiler, from its per-platform npm packages. The tarball's top folder is
+/// `package`, which unpacking drops, so the binary lands at `lib/tsc` beside the `lib.*.d.ts` it reads.
+const TSGO: Download = Download {
+    version: "7.0.2",
+    kind: Kind::Platform {
+        files: &[
+            PlatformFile {
+                platform: "aarch64-apple-darwin",
+                url: "https://registry.npmjs.org/@typescript/typescript-darwin-arm64/-/typescript-darwin-arm64-7.0.2.tgz",
+                sha256: "902e2fe1cf0799198ef902c6b8c310a450fef629a6baba41d45641ef75c04ebd",
+            },
+            PlatformFile {
+                platform: "x86_64-apple-darwin",
+                url: "https://registry.npmjs.org/@typescript/typescript-darwin-x64/-/typescript-darwin-x64-7.0.2.tgz",
+                sha256: "eba158cb54050f723d5ff781438f33de5640054440bb4f2bd170cfe9bc2eb551",
+            },
+            PlatformFile {
+                platform: "aarch64-unknown-linux-gnu",
+                url: "https://registry.npmjs.org/@typescript/typescript-linux-arm64/-/typescript-linux-arm64-7.0.2.tgz",
+                sha256: "c83d931ac9dd7549cde6e71246aa9d6a9812843023df3e277fe3b5dcf41dd0ea",
+            },
+            PlatformFile {
+                platform: "x86_64-unknown-linux-gnu",
+                url: "https://registry.npmjs.org/@typescript/typescript-linux-x64/-/typescript-linux-x64-7.0.2.tgz",
+                sha256: "7ecad6f67377e831856367ab062ef394f21506a611405bf8ac0ff039348637d3",
+            },
+        ],
+        unpack: Unpack::TarGz,
+        program: "lib/tsc",
+    },
+};
+
+/// Astral's ty, a Python type checker in Rust. The checksums match the release's own `sha256.sum`.
+const TY: Download = Download {
+    version: "0.0.84",
+    kind: Kind::Platform {
+        files: &[
+            PlatformFile {
+                platform: "aarch64-apple-darwin",
+                url: "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-aarch64-apple-darwin.tar.gz",
+                sha256: "c65c09f27bcef726c0b043dcee8d0f1e578bd1936799e5bc447235cbc3e19d91",
+            },
+            PlatformFile {
+                platform: "x86_64-apple-darwin",
+                url: "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-x86_64-apple-darwin.tar.gz",
+                sha256: "3891e5509d306721cee4dd4e69b94535dbd96371af7ec3b734ee65f25b167ae4",
+            },
+            PlatformFile {
+                platform: "aarch64-unknown-linux-gnu",
+                url: "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-aarch64-unknown-linux-gnu.tar.gz",
+                sha256: "d575243e0586742ae0e9186441358bd7e57e8160e319b3afb781430126762a39",
+            },
+            PlatformFile {
+                platform: "x86_64-unknown-linux-gnu",
+                url: "https://github.com/astral-sh/ty/releases/download/0.0.84/ty-x86_64-unknown-linux-gnu.tar.gz",
+                sha256: "336bb36b7e917d844b8b16925d373b4614b326e452c881ff4ed6bc5904b65185",
+            },
+        ],
+        unpack: Unpack::TarGz,
+        program: "ty",
+    },
+};
+
 /// The Node.js that runs every npm server, so the user needs none. The checksums are the ones in
 /// Node's own `SHASUMS256.txt`.
 pub const NODE: Download = Download {
@@ -179,19 +218,6 @@ pub const NODE: Download = Download {
         program: "bin/node",
     },
 };
-
-/// typescript-language-server runs the project's own TypeScript, from `node_modules`. A project
-/// without one, such as a single file, would make it refuse to start, so it is pointed at the
-/// TypeScript installed beside the server itself, as editors do.
-fn typescript_options(program: &Path, root: &Path) -> Option<Value> {
-    if root.join("node_modules/typescript/lib/tsserver.js").exists() {
-        return None;
-    }
-    let installed = std::fs::canonicalize(program).ok()?;
-    let modules = installed.ancestors().find(|dir| dir.file_name().is_some_and(|n| n == "node_modules"))?;
-    let lib = modules.join("typescript/lib");
-    lib.join("tsserver.js").exists().then(|| json!({ "tsserver": { "path": lib } }))
-}
 
 /// The standard LSP language id of each language lathe knows, and the file extensions that are in it.
 pub const LANGUAGES: &[(&str, &[&str])] = &[

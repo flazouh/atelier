@@ -65,31 +65,19 @@ fn the_root_is_the_nearest_directory_with_a_marker() {
     std::fs::remove_dir_all(&base).ok();
 }
 
-#[cfg(unix)]
+/// A pin that misses a platform leaves that platform's users with no server and no way to get one.
 #[test]
-fn typescript_falls_back_to_the_typescript_beside_the_server() {
-    let base = std::env::temp_dir().join(format!("lathe-ts-{}", std::process::id()));
-    let modules = base.join("prefix/lib/node_modules");
-    let cli = modules.join("typescript-language-server/lib/cli.mjs");
-    std::fs::create_dir_all(cli.parent().unwrap()).unwrap();
-    std::fs::write(&cli, "").unwrap();
-    std::fs::create_dir_all(modules.join("typescript/lib")).unwrap();
-    std::fs::write(modules.join("typescript/lib/tsserver.js"), "").unwrap();
-    let program = base.join("prefix/bin/typescript-language-server");
-    std::fs::create_dir_all(program.parent().unwrap()).unwrap();
-    std::os::unix::fs::symlink(&cli, &program).unwrap();
-    let options = server_for("typescript").unwrap().initialization_options;
-
-    let bare = base.join("bare");
-    std::fs::create_dir_all(&bare).unwrap();
-    let lib = std::fs::canonicalize(modules.join("typescript/lib")).unwrap();
-    assert_eq!(options(&program, &bare), Some(json!({ "tsserver": { "path": lib } })), "no TypeScript of its own");
-
-    let project = base.join("project");
-    std::fs::create_dir_all(project.join("node_modules/typescript/lib")).unwrap();
-    std::fs::write(project.join("node_modules/typescript/lib/tsserver.js"), "").unwrap();
-    assert_eq!(options(&program, &project), None, "a project's own TypeScript wins");
-    std::fs::remove_dir_all(&base).ok();
+fn every_platform_pin_covers_every_platform_lathe_downloads_for() {
+    let platforms = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"];
+    let pins = SERVERS.iter().filter_map(|spec| spec.download.as_ref().map(|d| (spec.name, d))).chain([("node", &NODE)]);
+    for (name, download) in pins {
+        let Kind::Platform { files, .. } = &download.kind else { continue };
+        let mut covered: Vec<&str> = files.iter().map(|file| file.platform).collect();
+        covered.sort();
+        let mut expected = platforms.to_vec();
+        expected.sort();
+        assert_eq!(covered, expected, "{name}");
+    }
 }
 
 #[test]

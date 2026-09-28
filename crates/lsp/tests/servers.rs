@@ -71,7 +71,7 @@ const TYPESCRIPT: Fixture = Fixture {
 
 const PYTHON: Fixture = Fixture {
     language: "python",
-    project: &[("pyrightconfig.json", "{}\n")],
+    project: &[("pyproject.toml", "[project]\nname = \"fixture\"\nversion = \"0.1.0\"\n")],
     source: (
         "fixture.py",
         "def width() -> int:\n    return 7\n\n\ndef broken() -> int:\n    text: int = \"not a number\"\n    return text + len(\"😀\") * 0 + width()\n",

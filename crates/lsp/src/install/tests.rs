@@ -56,8 +56,11 @@ fn binary(url: &'static str, sha256: &'static str) -> Option<Download> {
     })
 }
 
+/// A log of what `report` heard.
+type Log = RefCell<Vec<String>>;
+
 /// Everything `report` heard.
-fn heard() -> (RefCell<Vec<String>>, impl Fn(&RefCell<Vec<String>>, String)) {
+fn heard() -> (Log, impl Fn(&Log, String)) {
     (RefCell::default(), |log: &RefCell<Vec<String>>, line| log.borrow_mut().push(line))
 }
 

@@ -37,7 +37,7 @@ const FIXTURES: &[Fixture] = &[
     },
     Fixture {
         label: "Python",
-        project: &[("pyrightconfig.json", "{}\n")],
+        project: &[("pyproject.toml", "[project]\nname = \"fixture\"\nversion = \"0.1.0\"\n")],
         file: "shapes.py",
         text: "# `width` is used twice below: Cmd-click its declaration to list both.\n\n\ndef width() -> int:\n    return 7\n\n\ndef area() -> int:\n    return width() * width()\n\n\ndef broken() -> int:\n    text: int = \"not a number\"\n    return text + width()\n",
     },
