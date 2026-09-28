@@ -19,6 +19,7 @@ mod agent_parts;
 mod editor_lsp;
 mod editor_story;
 mod load_story;
+mod pr_fixture;
 mod pr_story;
 mod review_story;
 

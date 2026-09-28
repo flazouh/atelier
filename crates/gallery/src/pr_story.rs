@@ -1,6 +1,5 @@
 //! The "Pull request" and "Pull requests" stories, laid out like GitQuiet's pull request and working set
-//! screens (`site/public/store/pull-request.png` and `working-set.png`), in beui's look. Plain fixture
-//! data: nothing here asks GitHub anything.
+//! screens (`site/public/store/pull-request.png` and `working-set.png`), in beui's look.
 //!
 //! The pull request: a left rail (unsent comments, checks, the conversation, the box for the whole pull
 //! request, the verdict, the commits) and a right pane (the seen bar, the changed file tree, and the
@@ -10,79 +9,53 @@
 //! It fits any pane from an 1100px window up ([`fit`]): the rail and the right pane share the width,
 //! the tree folds away first when the diff would get too narrow, then the rail narrows. ⌘⇧B brings the
 //! tree back, and the choice holds until the next ⌘⇧B.
+//!
+//! The diff is read, not typed in, and its new side is the file at the pull request's head, so the
+//! language server answers on it as in the Editor story (`editor_lsp`), with rust-analyzer on a small
+//! crate written to disk (`pr_fixture`). The removed rows get nothing.
+//!
+//! - Hover a name for its card; ⌘-click it or press F12 to go to its definition. In this file the caret
+//!   moves; in another changed file, that file opens and the tree selects it; in a file the pull request
+//!   did not change, the file opens Brought In, out of the seen count. Escape or Previous goes back to
+//!   the file before, along a stack.
+//! - On a declaration, ⌘-click lists its uses.
+//! - `u` Uses, `o` Names in this file, `T` Go to name, `t` Go to file each open a finder over the diff;
+//!   their caps are on the file's header.
+//! - The server's problems underline the new side, and its state is the line under the diff.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf, rc::Rc};
 
 use beui::{
     ActiveTheme, ChangedFile, ChangedFileTree, CheckRun, CheckState, ChecksPanel, CommentComposer, CommentComposerEvent,
-    CommitData, CommitsSummary, Comment, ConversationList, Court, CourtItem, CourtList, InlineHunk, InlineReview,
-    JobStep, LineComment, PrChipData, PrState, RemarkSummary, ReviewBar, ReviewFileHeader, ReviewHandlers, ReviewProgress,
-    ThreadSummary, UnsentComments, VerdictBox, VerdictEvent,
+    CommitData, CommitsSummary, Comment, ConversationList, Court, CourtItem, CourtList, Filter, Finder, FinderEvent, FinderItem,
+    InlineReview, JobStep, LineComment, PrChipData, PrState, RemarkSummary, ReviewBar, ReviewFileHeader, ReviewHandlers,
+    ReviewProgress, RowMap, ThreadSummary, UnsentComments, VerdictBox, VerdictEvent,
     file_tree::FileTree,
+    keys::Command,
     pr::{Checks, ReviewState},
     review::step,
     theme::radius,
+    typography::TextSize,
 };
 use gpui_kit::{
-    AnyElement, AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled,
-    Subscription, Window,
+    AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render,
+    SharedString, StatefulInteractiveElement, Styled, Subscription, Task, Window,
     base::input::RowBlock,
     component::input::EditorState,
-    div, prelude::FluentBuilder, px,
+    deferred, div, prelude::FluentBuilder, px,
+};
+use lathe_lsp::{LspError, canonical, client::uri_to_path};
+use lsp_types::Position;
+
+use crate::{
+    editor_lsp::{EditorSession, Elsewhere, Jump},
+    pr_fixture::Fixture,
 };
 
-struct PrFile {
-    path: &'static str,
-    text: &'static str,
-    hunks: fn() -> Vec<InlineHunk>,
-}
-
-const SERVER: &str = "fn onAborted(this: *RequestContext) void {
-    if (this.flags.aborted) {
-        this.finalizeForAbort();
-        return;
-    }
-    if (this.response_ptr) |response| {
-        this.renderResponse(response);
-    }
-    // A stream aborted between chunks still owns the sink, and the top of it
-    // wrote a second set of headers onto a socket uWS had already taken back.
-    if (this.response_ptr) |response| {
-        if (this.flags.has_written_status and this.byte_stream != null) {
-            this.detachByteStream();
-        }
-        this.renderResponse(response);
-    }
-    if (this.flags.aborted_mid_chunk) {
-        this.flushPending();
-    }
-}
-";
-
-const RESPONSE: &str = "pub fn writeStatus(this: *Response, status: u16) void {
-    this.status = status;
-    this.flags.has_written_status = true;
-}
-";
-
-const STREAMS: &str = "pub fn detach(this: *ByteStream) void {
-    this.sink = null;
-    this.pending.deinit();
-    this.pending = .{};
-}
-";
-
-const HTTP: &str = "pub const PATIENCE_MS = 20;
-pub const PATIENCE_MS = 50;
-";
-
-const PR_FILES: [PrFile; 4] = [
-    PrFile { path: "src/bun.js/api/server.zig", text: SERVER, hunks: || vec![InlineHunk::new("s-1", 5..8, 8..16)] },
-    PrFile { path: "src/bun.js/webcore/response.zig", text: RESPONSE, hunks: || vec![InlineHunk::new("r-1", 2..2, 2..3)] },
-    PrFile { path: "src/bun.js/webcore/streams.zig", text: STREAMS, hunks: || vec![InlineHunk::new("t-1", 2..2, 2..4)] },
-    PrFile { path: "src/http.zig", text: HTTP, hunks: || vec![InlineHunk::new("h-1", 0..1, 1..2)] },
-];
+/// The head row of `src/request.rs` a bot's thread hangs under.
+const THREAD_ROW: usize = 16;
+/// The line under the diff that says what the server is doing.
+const STATUS_HEIGHT: f32 = 22.;
 
 fn checks() -> Vec<CheckRun> {
     let step = |name: &str, state, log: &[&str]| JobStep {
@@ -93,25 +66,24 @@ fn checks() -> Vec<CheckRun> {
     };
     vec![
         CheckRun {
-            name: "bun-linux-x64".into(),
-            summary: "zig build test".into(),
+            name: "linux-x64".into(),
+            summary: "cargo test".into(),
             state: CheckState::Failed,
             steps: vec![
                 step("Set up job", CheckState::Passed, &[]),
-                step("Run zig build test", CheckState::Failed, &[
-                    "Build Summary: 412/414 steps succeeded; 1 failed",
-                    "test/js/bun/http/serve-abort.test.ts:",
-                    "error: expected 1 set of headers, received 2",
-                    "##[error]Process completed with exit code 1.",
+                step("Run cargo test", CheckState::Failed, &[
+                    "error[E0308]: mismatched types",
+                    "  --> src/request.rs:22:37: expected `bool`, found integer",
+                    "##[error]Process completed with exit code 101.",
                 ]),
             ],
         },
         CheckRun { name: "windows-x64".into(), summary: "flaky timing on the runner".into(), state: CheckState::Tolerated, steps: vec![
-            step("Run tests", CheckState::Tolerated, &["Timed out after 20ms waiting for the socket", "##[error]Process completed with exit code 1."]),
+            step("Run tests", CheckState::Tolerated, &["Timed out after 50ms waiting for the socket", "##[error]Process completed with exit code 1."]),
         ] },
-        CheckRun { name: "lint".into(), summary: "zig fmt --check".into(), state: CheckState::Passed, steps: vec![] },
-        CheckRun { name: "typecheck".into(), summary: "tsc --noEmit".into(), state: CheckState::Passed, steps: vec![] },
-        CheckRun { name: "bun-darwin-aarch64".into(), summary: "zig build test".into(), state: CheckState::Running, steps: vec![] },
+        CheckRun { name: "lint".into(), summary: "cargo fmt --check".into(), state: CheckState::Passed, steps: vec![] },
+        CheckRun { name: "clippy".into(), summary: "cargo clippy".into(), state: CheckState::Passed, steps: vec![] },
+        CheckRun { name: "darwin-aarch64".into(), summary: "cargo test".into(), state: CheckState::Running, steps: vec![] },
     ]
 }
 
@@ -129,14 +101,14 @@ fn conversation() -> (Vec<ThreadSummary>, Vec<RemarkSummary>) {
     };
     (
         vec![
-            thread(&["bot"], "has_written_status is read before detachByteStream clears it", 1, false),
-            thread(&["Ada", "Rui"], "The early return leaves pending.state at .pending while the sink is gone", 2, false),
-            thread(&["Dario"], "Does this need to run before renderResponse? On a HEAD request it would not", 1, false),
-            thread(&["Mia", "Rui"], "Twenty milliseconds is going to be flaky on the Windows runners", 2, false),
-            thread(&["Kai", "Rui"], "receivedlastchunk is the field on the state rather than on the response", 2, true),
+            thread(&["bot"], "has_written_status is read before detach clears the sink", 1, false),
+            thread(&["Ada", "Rui"], "The early return leaves pending full while the sink is gone", 2, false),
+            thread(&["Dario"], "Does this need to run before write_status? On a HEAD request it would not", 1, false),
+            thread(&["Mia", "Rui"], "Fifty milliseconds is going to be flaky on the Windows runners", 2, false),
+            thread(&["Kai", "Rui"], "aborted_mid_chunk is the field on the flags rather than on the response", 2, true),
         ],
         vec![
-            remark("canary", "bun-linux-x64 built at 5b2c1a9. Download the canary build to try it."),
+            remark("canary", "linux-x64 built at 5b2c1a9. Download the canary build to try it."),
             remark("Jarred", "Pushed the decoder fix. The abort path is the interesting one."),
             remark("bench", "http server throughput: 118,402 req/s on main, 119,180 req/s here."),
         ],
@@ -157,9 +129,40 @@ fn commits() -> Vec<CommitData> {
         .collect()
 }
 
+/// What the file card shows: a changed file, or one brought in to read beside them.
+#[derive(Clone, Debug, PartialEq)]
+struct Place {
+    /// Relative to the repository.
+    path: String,
+    brought_in: bool,
+}
+
+/// Where a row of a lookup leads: a file and a place in it, in that file's own rows, or in the shown
+/// rows when it is the file on screen.
+#[derive(Clone, Debug)]
+struct Lead {
+    path: PathBuf,
+    position: Position,
+    shown_rows: bool,
+}
+
+/// A lookup open over the diff, and where each of its rows leads.
+struct Lookup {
+    command: Command,
+    finder: Entity<Finder>,
+    leads: Vec<Lead>,
+    asking: Task<()>,
+    _events: Subscription,
+}
+
 pub struct PrStory {
+    fixture: Fixture,
     editor: Entity<EditorState>,
-    current: usize,
+    place: Place,
+    /// Where Escape and Previous go back to, newest last, with the caret there.
+    back: Vec<(Place, Position)>,
+    session: Option<Entity<EditorSession>>,
+    lookup: Option<Lookup>,
     seen: HashSet<SharedString>,
     focus: FocusHandle,
     details: bool,
@@ -172,11 +175,14 @@ pub struct PrStory {
     composer: Entity<CommentComposer>,
     verdict: Entity<VerdictBox>,
     _subscriptions: Vec<Subscription>,
+    _session: Option<Subscription>,
 }
 
 impl PrStory {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let editor = beui::CodeEditor::state(PR_FILES[0].path, PR_FILES[0].text, window, cx);
+        let fixture = Fixture::write();
+        let first = &fixture.changed[0];
+        let editor = beui::CodeEditor::state(first.path, first.text.as_str(), window, cx);
         let composer = cx.new(|cx| {
             let mut c = CommentComposer::new("On this pull request", "You", window, cx);
             c.set_text("The abort path reads right to me. Before I approve: is the HEAD case dperrault asked about covered anywhere, or does that want its own test?", window, cx);
@@ -192,10 +198,15 @@ impl PrStory {
             }),
         ];
         let mut seen = HashSet::new();
-        seen.insert(SharedString::from(PR_FILES[3].path));
-        Self {
+        seen.insert(SharedString::from("tests/abort.rs"));
+        let place = Place { path: first.path.to_string(), brought_in: false };
+        let mut story = Self {
+            fixture,
             editor,
-            current: 0,
+            place: place.clone(),
+            back: Vec::new(),
+            session: None,
+            lookup: None,
             seen,
             focus: cx.focus_handle(),
             details: true,
@@ -206,33 +217,282 @@ impl PrStory {
             composer,
             verdict,
             _subscriptions: subs,
-        }
+            _session: None,
+        };
+        story.show(place, None, window, cx);
+        story
     }
 
     fn changed(&self) -> Vec<ChangedFile> {
-        PR_FILES
-            .iter()
-            .map(|f| {
-                let hunks = (f.hunks)();
-                ChangedFile::new(f.path, hunks.iter().map(|h| h.added.len()).sum(), hunks.iter().map(|h| h.removed.len()).sum())
-            })
-            .collect()
+        self.fixture.changed.iter().map(|f| ChangedFile::new(f.path, f.added(), f.removed())).collect()
     }
 
-    fn open(&mut self, path: &SharedString, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(at) = PR_FILES.iter().position(|f| f.path == path.as_ref()) else { return };
-        if at != self.current {
-            self.current = at;
-            self.editor.update(cx, |s, cx| s.set_value(PR_FILES[at].text, window, cx));
+    /// The rows the card shows over the file on screen.
+    fn rows(&self) -> RowMap {
+        match self.fixture.changed_at(&self.place.path) {
+            Some(i) if !self.place.brought_in => self.fixture.changed[i].rows.clone(),
+            _ => RowMap::default(),
+        }
+    }
+
+    fn path_on_disk(&self) -> PathBuf {
+        self.fixture.root.join(&self.place.path)
+    }
+
+    /// Puts `place` in the card, the caret at `position` in shown rows, and a language server on it.
+    fn show(&mut self, place: Place, position: Option<Position>, window: &mut Window, cx: &mut Context<Self>) {
+        let changed = self.fixture.changed_at(&place.path).filter(|_| !place.brought_in);
+        let (text, rows) = match changed {
+            Some(i) => (self.fixture.changed[i].text.clone(), self.fixture.changed[i].rows.clone()),
+            None => {
+                let text = std::fs::read_to_string(self.fixture.root.join(&place.path)).unwrap_or_default();
+                (text.trim_end_matches('\n').to_string(), RowMap::default())
+            }
+        };
+        self.editor.update(cx, |state, cx| {
+            // The last file's server must not answer for this one while the next one starts.
+            let lsp = state.lsp_mut();
+            lsp.definition_provider = None;
+            lsp.hover_provider = None;
+            lsp.show_document = None;
+            state.set_value(text, window, cx);
+            if let Some(position) = position {
+                state.set_cursor_position(position, window, cx);
+            }
+        });
+        beui::code_editor::set_diagnostics(&self.editor, Vec::new(), cx);
+        self.place = place;
+        let this = cx.entity().downgrade();
+        let elsewhere: Elsewhere = Rc::new(move |jump: Jump, window: &mut Window, cx: &mut gpui_kit::App| {
+            this.update(cx, |story, cx| story.jump(jump, window, cx)).ok();
+        });
+        let (editor, path) = (self.editor.clone(), self.path_on_disk());
+        let session = cx.new(|cx| EditorSession::for_review(editor, path, rows, Some(elsewhere), cx));
+        self._session = Some(cx.observe_in(&session, window, |story, session, window, cx| {
+            // A ⌘-click on a declaration lists its uses: in this view, as the Uses lookup.
+            let uses = session.read(cx).references().to_vec();
+            if !uses.is_empty() {
+                session.update(cx, |s, cx| s.close_references(cx));
+                story.open_lookup(Command::Uses, window, cx);
+                story.fill_uses(uses, cx);
+            }
             cx.notify();
+        }));
+        self.session = Some(session);
+        cx.notify();
+    }
+
+    /// Opens a changed file from the tree or the keys: a fresh start, so the way back is cleared.
+    fn open(&mut self, path: &SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        if self.place.path == path.as_ref() && !self.place.brought_in {
+            return;
+        }
+        self.back.clear();
+        self.show(Place { path: path.to_string(), brought_in: false }, None, window, cx);
+    }
+
+    /// Follows a jump out of the file on screen: to another changed file, or Brought In.
+    fn jump(&mut self, jump: Jump, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(relative) = self.fixture.relative(&canonical(&jump.path)) else { return };
+        let caret = self.editor.read(cx).cursor_position();
+        self.back.push((self.place.clone(), caret));
+        let (place, position) = match self.fixture.changed_at(&relative) {
+            Some(i) => {
+                let line = self.fixture.changed[i].rows.to_view(jump.position.line as usize) as u32;
+                (Place { path: relative, brought_in: false }, Position { line, ..jump.position })
+            }
+            None => (Place { path: relative, brought_in: true }, jump.position),
+        };
+        self.show(place, Some(position), window, cx);
+    }
+
+    fn go_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((place, caret)) = self.back.pop() {
+            self.show(place, Some(caret), window, cx);
         }
     }
 
     fn step(&mut self, by: isize, window: &mut Window, cx: &mut Context<Self>) {
         let order = FileTree::new(&self.changed()).file_order();
-        if let Some(path) = step(&order, Some(&SharedString::from(PR_FILES[self.current].path)), by) {
+        // From a file brought in, the walk goes on from the changed file it was reached from.
+        let from = std::iter::once(&self.place)
+            .chain(self.back.iter().rev().map(|(p, _)| p))
+            .find(|p| !p.brought_in)
+            .map(|p| SharedString::from(p.path.clone()));
+        if let Some(path) = step(&order, from.as_ref(), by) {
             self.open(&path, window, cx);
         }
+    }
+
+    fn open_lookup(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+        let (title, placeholder, filter) = match command {
+            Command::Uses => ("Uses", "Filter the uses", Filter::Here),
+            Command::FileNames => ("Names in this file", "Filter the names", Filter::Here),
+            Command::GoToName => ("Go to name", "Part of a name", Filter::Owner),
+            _ => ("Go to file", "Part of a path", Filter::Here),
+        };
+        let finder = cx.new(|cx| Finder::new(title, placeholder, filter, window, cx).command(command));
+        let events = cx.subscribe_in(&finder, window, |story, _, event: &FinderEvent, window, cx| match event {
+            FinderEvent::Query(query) => {
+                if story.lookup.as_ref().is_some_and(|l| l.command == Command::GoToName) {
+                    story.ask_names(query.clone(), cx);
+                }
+            }
+            FinderEvent::Pick(at) => story.pick(*at, window, cx),
+            FinderEvent::Dismiss => story.close_lookup(window, cx),
+        });
+        finder.read(cx).focus_handle(cx).focus(window, cx);
+        self.lookup = Some(Lookup { command, finder, leads: Vec::new(), asking: Task::ready(()), _events: events });
+        let Some(session) = self.session.clone() else { return self.note("The language server is not ready", cx) };
+        match command {
+            Command::Uses => match session.read(cx).uses(cx) {
+                Some(task) => self.wait(task, "Asking for the uses", |story, uses, cx| story.fill_uses(uses, cx), cx),
+                None => self.note("Put the caret on a name in the new side", cx),
+            },
+            Command::FileNames => match session.read(cx).names(cx) {
+                Some(task) => self.wait(task, "Asking for the names", |story, names, cx| story.fill_names(names, false, cx), cx),
+                None => self.note("The language server is not ready", cx),
+            },
+            Command::GoToName => self.note("Type part of a name", cx),
+            _ => {
+                let files = self.fixture.files();
+                let leads = files
+                    .iter()
+                    .map(|f| Lead { path: self.fixture.root.join(f), position: Position::default(), shown_rows: false })
+                    .collect();
+                let items = files.iter().map(|f| FinderItem::new(f.clone(), self.file_note(f)).icon(f.clone())).collect();
+                self.set_rows(items, leads, cx);
+            }
+        }
+        cx.notify();
+    }
+
+    /// "changed" for a file the pull request changed, nothing for the rest.
+    fn file_note(&self, relative: &str) -> &'static str {
+        if self.fixture.changed_at(relative).is_some() { "changed" } else { "" }
+    }
+
+    fn note(&mut self, note: &'static str, cx: &mut Context<Self>) {
+        if let Some(lookup) = &self.lookup {
+            lookup.finder.update(cx, |f, cx| f.set_note(note, cx));
+        }
+    }
+
+    fn set_rows(&mut self, items: Vec<FinderItem>, leads: Vec<Lead>, cx: &mut Context<Self>) {
+        if let Some(lookup) = &mut self.lookup {
+            lookup.leads = leads;
+            lookup.finder.update(cx, |f, cx| f.set_items(items, cx));
+        }
+    }
+
+    /// Waits for a server's answer off the UI thread; the lookup says `asking` meanwhile.
+    fn wait<T: 'static>(
+        &mut self,
+        task: Task<Result<T, LspError>>,
+        asking: &'static str,
+        then: impl FnOnce(&mut Self, T, &mut Context<Self>) + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        self.note(asking, cx);
+        let waiting = cx.spawn(async move |story, cx| {
+            let answer = task.await;
+            story
+                .update(cx, |story, cx| match answer {
+                    Ok(found) => then(story, found, cx),
+                    Err(LspError::Superseded) => {}
+                    Err(error) => {
+                        let text = format!("{error}");
+                        if let Some(lookup) = &story.lookup {
+                            lookup.finder.update(cx, |f, cx| f.set_note(text, cx));
+                        }
+                    }
+                })
+                .ok();
+        });
+        if let Some(lookup) = &mut self.lookup {
+            lookup.asking = waiting;
+        }
+    }
+
+    /// A place's line for a row: the file's own line, counted from 1.
+    fn line_of(&self, lead: &Lead) -> usize {
+        let line = lead.position.line as usize;
+        let line = if lead.shown_rows { self.rows().to_head(line).unwrap_or(line) } else { line };
+        line + 1
+    }
+
+    fn lead(&self, path: Option<PathBuf>, position: Position) -> Option<Lead> {
+        let path = path?;
+        let shown_rows = path == self.path_on_disk();
+        Some(Lead { path, position, shown_rows })
+    }
+
+    fn fill_uses(&mut self, uses: Vec<lathe_lsp::Target>, cx: &mut Context<Self>) {
+        let mut items = Vec::new();
+        let mut leads = Vec::new();
+        for target in uses {
+            let Some(lead) = self.lead(target.path.clone(), target.range.start) else { continue };
+            let relative = self.fixture.relative(&lead.path).unwrap_or_default();
+            items.push(FinderItem::new(target.line_text.clone(), format!("{relative}:{}", self.line_of(&lead))).icon(relative));
+            leads.push(lead);
+        }
+        if items.is_empty() {
+            self.note("No uses", cx);
+        }
+        self.set_rows(items, leads, cx);
+    }
+
+    fn fill_names(&mut self, names: Vec<lathe_lsp::Symbol>, with_file: bool, cx: &mut Context<Self>) {
+        let mut items = Vec::new();
+        let mut leads = Vec::new();
+        for symbol in names {
+            let path = uri_to_path(&symbol.uri).map(|p| canonical(&p));
+            let Some(lead) = self.lead(path, symbol.range.start) else { continue };
+            let relative = self.fixture.relative(&lead.path).unwrap_or_default();
+            let line = self.line_of(&lead);
+            let detail = match (with_file, symbol.container.is_empty()) {
+                (true, _) => format!("{relative}:{line}"),
+                (false, true) => format!("line {line}"),
+                (false, false) => format!("{}, line {line}", symbol.container),
+            };
+            let item = FinderItem::new(symbol.name.clone(), detail);
+            items.push(if with_file { item.icon(relative) } else { item });
+            leads.push(lead);
+        }
+        if items.is_empty() {
+            self.note("No names", cx);
+        }
+        self.set_rows(items, leads, cx);
+    }
+
+    fn ask_names(&mut self, query: SharedString, cx: &mut Context<Self>) {
+        if query.trim().is_empty() {
+            self.set_rows(Vec::new(), Vec::new(), cx);
+            return self.note("Type part of a name", cx);
+        }
+        let Some(task) = self.session.as_ref().and_then(|s| s.read(cx).project_names(&query, cx)) else { return };
+        self.wait(task, "Asking for the names", |story, names, cx| story.fill_names(names, true, cx), cx);
+    }
+
+    fn pick(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(lead) = self.lookup.as_ref().and_then(|l| l.leads.get(at).cloned()) else { return };
+        self.close_lookup(window, cx);
+        if lead.path == self.path_on_disk() {
+            let position = if lead.shown_rows {
+                lead.position
+            } else {
+                Position { line: self.rows().to_view(lead.position.line as usize) as u32, ..lead.position }
+            };
+            self.editor.update(cx, |state, cx| state.set_cursor_position(position, window, cx));
+        } else {
+            self.jump(Jump { path: lead.path, position: lead.position }, window, cx);
+        }
+    }
+
+    fn close_lookup(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.lookup = None;
+        self.focus.focus(window, cx);
+        cx.notify();
     }
 
     fn handlers(&self, cx: &mut Context<Self>) -> ReviewHandlers {
@@ -245,9 +505,18 @@ impl PrStory {
         };
         ReviewHandlers::default()
             .on_next(with(|s, w, cx| s.step(1, w, cx)))
-            .on_previous(with(|s, w, cx| s.step(-1, w, cx)))
+            .on_previous(with(|s, w, cx| {
+                if s.back.is_empty() {
+                    s.step(-1, w, cx)
+                } else {
+                    s.go_back(w, cx)
+                }
+            }))
             .on_mark(with(|s, _, cx| {
-                let path = SharedString::from(PR_FILES[s.current].path);
+                if s.place.brought_in {
+                    return;
+                }
+                let path = SharedString::from(s.place.path.clone());
                 if !s.seen.remove(&path) {
                     s.seen.insert(path);
                 }
@@ -257,9 +526,15 @@ impl PrStory {
                 s.review_mode = !s.review_mode;
                 cx.notify();
             }))
-            .on_dismiss(with(|s, _, cx| {
-                s.review_mode = false;
-                cx.notify();
+            .on_dismiss(with(|s, w, cx| {
+                if s.lookup.is_some() {
+                    s.close_lookup(w, cx);
+                } else if !s.back.is_empty() {
+                    s.go_back(w, cx);
+                } else {
+                    s.review_mode = false;
+                    cx.notify();
+                }
             }))
             .on_toggle_details(with(|s, _, cx| {
                 s.details = !s.details;
@@ -274,6 +549,10 @@ impl PrStory {
                 s.seen.clear();
                 cx.notify();
             }))
+            .on_uses(with(|s, w, cx| s.open_lookup(Command::Uses, w, cx)))
+            .on_file_names(with(|s, w, cx| s.open_lookup(Command::FileNames, w, cx)))
+            .on_go_to_name(with(|s, w, cx| s.open_lookup(Command::GoToName, w, cx)))
+            .on_go_to_file(with(|s, w, cx| s.open_lookup(Command::GoToFile, w, cx)))
     }
 }
 
@@ -317,7 +596,7 @@ impl Render for PrStory {
         let theme = cx.theme().clone();
         let handlers = self.handlers(cx);
         let changed = self.changed();
-        let file = &changed[self.current];
+        let shown = self.fixture.changed_at(&self.place.path).filter(|_| !self.place.brought_in);
         let progress = ReviewProgress {
             files: changed.len(),
             reviewed: self.seen.len(),
@@ -328,8 +607,8 @@ impl Render for PrStory {
         let body = height - 16. - 52.;
         let (threads, remarks) = conversation();
         let unsent = self.unsent;
-
         let layout = self.fit();
+
         let rail = div()
             .id("pr-rail")
             .flex()
@@ -355,23 +634,32 @@ impl Render for PrStory {
             .child(CommitsSummary::new("pr-commits", commits()));
 
         let open = cx.listener(|this, path: &SharedString, window, cx| this.open(path, window, cx));
-        let blocks = if self.current == 0 {
-            vec![RowBlock {
-                row: 12,
-                render: std::rc::Rc::new(move |_, _| {
-                    LineComment::new("pr-thread", vec![Comment::new(
-                        "bot",
-                        "1h ago",
-                        "`has_written_status` is read before `detachByteStream` clears it, so a response that was already partly written takes this branch twice. Consider capturing it above the `if`.",
-                    )])
-                    .on_reply(|_, _, _| {})
-                    .on_resolve(|_, _, _| {})
-                    .into_any_element()
-                }),
-            }]
-        } else {
-            Vec::new()
+        let (hunks, added, removed, blocks) = match shown {
+            Some(i) => {
+                let file = &self.fixture.changed[i];
+                let blocks = if file.path == "src/request.rs" {
+                    vec![RowBlock {
+                        row: file.rows.to_view(THREAD_ROW),
+                        render: std::rc::Rc::new(move |_, _| {
+                            LineComment::new("pr-thread", vec![Comment::new(
+                                "bot",
+                                "1h ago",
+                                "`has_written_status` is read before `detach` clears the sink, so a response that was already partly written takes this branch twice. Consider capturing it above the `if`.",
+                            )])
+                            .on_reply(|_, _, _| {})
+                            .on_resolve(|_, _, _| {})
+                            .into_any_element()
+                        }),
+                    }]
+                } else {
+                    Vec::new()
+                };
+                (file.hunks.clone(), file.added(), file.removed(), blocks)
+            }
+            None => (Vec::new(), 0, 0, Vec::new()),
         };
+        let status = self.session.as_ref().map(|s| s.read(cx).status().join("   ")).unwrap_or_default();
+        let current = shown.map(|i| SharedString::from(self.fixture.changed[i].path)).unwrap_or_default();
         let card = || div().h(px(body)).bg(theme.card).rounded(radius::LG).p(px(6.));
         let files = div()
             .flex()
@@ -383,21 +671,47 @@ impl Render for PrStory {
                     card().flex_none().w(px(TREE)).child(
                         ChangedFileTree::new("pr-tree", changed.clone())
                             .reviewed(self.seen.clone())
-                            .current(file.path.clone())
+                            .current(current)
                             .on_open(move |path, window, cx| open(path, window, cx)),
                     ),
                 )
             })
             .child(
-                card().flex_1().min_w_0().flex().flex_col().child(ReviewFileHeader::new("pr-file", file.path.clone(), file.added, file.removed, ReviewHandlers::default())).child(
-                    InlineReview::new("pr-diff", &self.editor, (PR_FILES[self.current].hunks)())
-                        .decisions(false)
-                        .on_card(true)
-                        .row_blocks(blocks)
-                        .height(px(body - 12. - 40.)),
-                ),
+                card()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .child(
+                        ReviewFileHeader::new("pr-file", self.place.path.clone(), added, removed, handlers.clone())
+                            .brought_in(self.place.brought_in),
+                    )
+                    .child(
+                        InlineReview::new("pr-diff", &self.editor, hunks)
+                            .decisions(false)
+                            .read_only(true)
+                            .on_card(true)
+                            .row_blocks(blocks)
+                            .height(px(body - 12. - 40. - STATUS_HEIGHT)),
+                    )
+                    .child(
+                        div()
+                            .flex_none()
+                            .h(px(STATUS_HEIGHT))
+                            .px(px(10.))
+                            .flex()
+                            .items_center()
+                            .truncate()
+                            .text_size(TextSize::Xs.font_size())
+                            .text_color(theme.muted_foreground)
+                            .child(status),
+                    ),
             );
+        let lookup = self.lookup.as_ref().map(|l| {
+            deferred(div().absolute().top(px(52.)).left_0().right_0().flex().justify_center().child(l.finder.clone())).with_priority(1)
+        });
         let right = div()
+            .relative()
             .flex()
             .flex_col()
             .flex_1()
@@ -410,7 +724,8 @@ impl Render for PrStory {
                     .next_primary(true)
                     .review_mode(self.review_mode),
             )
-            .child(files);
+            .child(files)
+            .children(lookup);
 
         // The pane's width after layout; a change that moves the split draws again.
         let this = cx.entity().downgrade();
