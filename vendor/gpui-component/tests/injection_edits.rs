@@ -1,6 +1,7 @@
 //! Incremental injection layers (PATCHES.md, patch 1) against the ground truth: after each of a series
 //! of seeded random edits, a highlighter updated with the edit has the same injection layers and the
-//! same styles as one that parsed the same text from scratch.
+//! same styles as one that parsed the same text from scratch. Both parse with no time budget, so the
+//! result never depends on the machine's speed; one test sets the budget to zero on purpose.
 #![cfg(feature = "tree-sitter-languages")]
 
 use gpui_component::highlighter::{HighlightTheme, SyntaxHighlighter};
@@ -34,6 +35,28 @@ fn shapes(h: &SyntaxHighlighter) -> Vec<String> {
         .collect()
 }
 
+/// A highlighter that parsed `text` from scratch, with no time budget.
+fn fresh(language: &str, text: &Rope) -> SyntaxHighlighter {
+    let mut h = SyntaxHighlighter::new(language);
+    h.set_injection_budget(None);
+    assert!(h.update(None, text, None));
+    h
+}
+
+/// An edit that inserts `insert` at byte `at` of `text`, which it changes.
+fn insert(text: &mut String, at: usize, insert: &str) -> InputEdit {
+    let start = point_of(text, at);
+    text.insert_str(at, insert);
+    InputEdit {
+        start_byte: at,
+        old_end_byte: at,
+        new_end_byte: at + insert.len(),
+        start_position: start,
+        old_end_position: start,
+        new_end_position: point_of(text, at + insert.len()),
+    }
+}
+
 #[track_caller]
 fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&str], edits: usize, seed: u64) {
     let theme = HighlightTheme::default_dark();
@@ -47,9 +70,9 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
     };
     let mut text = text.to_string();
     let mut h = SyntaxHighlighter::new(language);
+    h.set_injection_budget(None);
     assert!(h.update(None, &Rope::from(text.as_str()), None));
     let mut in_place = 0;
-    let mut skipped = 0;
     assert!(!h.injection_layer_ranges().is_empty(), "{language}: the fixture has injections");
     for step in 0..edits {
         let mut start = next(text.len() + 1);
@@ -79,15 +102,8 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
         let rope = Rope::from(text.as_str());
         assert!(h.update(Some(edit), &rope, None));
         in_place += usize::from(h.injections_edited());
-        let mut fresh = SyntaxHighlighter::new(language);
-        assert!(fresh.update(None, &rope, None));
+        let fresh = fresh(language, &rope);
         let what = format!("{language}, edit {step} ({start}..{old_end} -> {insert:?})");
-        // A layer whose parse ran out of time (20ms, which a debug build on a busy machine can reach)
-        // is missing from one side for this step only: the next edit rebuilds.
-        if !h.injections_complete() || !fresh.injections_complete() {
-            skipped += 1;
-            continue;
-        }
         let (got, want) = (shapes(&h), shapes(&fresh));
         if got != want {
             let only = |a: &[String], b: &[String]| a.iter().filter(|x| !b.contains(x)).cloned().collect::<Vec<_>>();
@@ -103,8 +119,7 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
             "{what}: styles differ"
         );
     }
-    // Most edits must take the in-place path and be compared, or this test proves nothing about it.
-    assert!(skipped * 10 <= edits, "{language}: {skipped} of {edits} edits ran out of time");
+    // Most edits must take the in-place path, or this test proves nothing about it.
     assert!(in_place * 4 >= edits * 3, "{language}: only {in_place} of {edits} edits were in place");
 }
 
@@ -184,4 +199,29 @@ fn many_seeds() {
         assert_incremental_matches_rebuild("markdown", "# `a` *b*\n\ntext [l](u)\n\n```rust\nfn a() {}\n```\n\n- `c`\n", &["```", "```rust\n", "`", "*", "\n", "\n\n", "x", "# ", "rust"], 400, seed);
         assert_incremental_matches_rebuild("html", "<p><script>let a = 1;</script><style>p { color: red }</style></p>\n", &["<script>", "</script>", "<style>", "</style>", "x", "\"", ">", "<", "\n"], 400, seed);
     }
+}
+
+/// A layer whose parse runs out of its budget is missing, so the set says it is incomplete, and the
+/// next edit builds every layer again and ends equal to a fresh highlighter.
+#[test]
+fn a_layer_out_of_time_makes_the_next_edit_rebuild() {
+    let theme = HighlightTheme::default_dark();
+    // A macro body large enough that its parse reaches tree-sitter's progress check.
+    let body: String = (0..400).map(|i| format!("a{i} + ")).collect();
+    let mut text = format!("fn f() {{ m!({body}1); }}\nfn g() {{ n!(2); }}\n");
+    let mut h = SyntaxHighlighter::new("rust");
+    h.set_injection_budget(Some(std::time::Duration::ZERO));
+    assert!(h.update(None, &Rope::from(text.as_str()), None));
+    assert!(!h.injections_complete(), "with no time at all, the big layer is missing");
+
+    h.set_injection_budget(None);
+    let at = text.find("n!(2)").unwrap() + 3;
+    let edit = insert(&mut text, at, "3 + ");
+    let rope = Rope::from(text.as_str());
+    assert!(h.update(Some(edit), &rope, None));
+    assert!(!h.injections_edited(), "the edit after a missing layer rebuilds rather than edits");
+    assert!(h.injections_complete());
+    let fresh = fresh("rust", &rope);
+    assert_eq!(shapes(&h), shapes(&fresh));
+    assert_eq!(h.styles(&(0..rope.len()), theme.as_ref()), fresh.styles(&(0..rope.len()), theme.as_ref()));
 }
