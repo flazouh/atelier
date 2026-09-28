@@ -36,7 +36,7 @@ pub const SESSION_LEN: usize = 12;
 /// own list, so each still enters on its own.
 fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> EntranceList {
     let tools = [
-        ("s-read", ToolCall::new("s-read", "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
+        ("s-read", ToolCall::new("s-read", "Read file").file("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
         ("s-grep", ToolCall::new("s-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
     ];
     let tools = tools.into_iter().take(shown.saturating_sub(1)).fold(

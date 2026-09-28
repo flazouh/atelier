@@ -110,9 +110,9 @@ pub fn running_card(id: &'static str, tick: usize) -> SubagentCard {
 
 fn sample_calls() -> Vec<ToolCall> {
     vec![
-        ToolCall::new("sc-read", "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done),
+        ToolCall::new("sc-read", "Read file").file("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done),
         ToolCall::new("sc-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done),
-        ToolCall::new("sc-read2", "Read file").tool("crates/beui/src/theme.rs").status(ToolStatus::Running),
+        ToolCall::new("sc-read2", "Read file").file("crates/beui/src/theme.rs").status(ToolStatus::Running),
     ]
 }
 

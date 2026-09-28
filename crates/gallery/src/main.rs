@@ -723,7 +723,7 @@ fn tools() -> impl IntoElement {
                 div()
                     .flex()
                     .flex_col()
-                    .child(ToolCall::new("t-read", "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
+                    .child(ToolCall::new("t-read", "Read file").file("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
                     .child(ToolCall::new("t-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done).output("crates/beui/src/file_diff.rs:69: fn hunk_starts(header: &str) -> (u32, u32) {"))
                     .child(ToolCall::new("t-test", "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
                     .child(ToolCall::new("t-run", "Running clippy").tool("cargo clippy --workspace").status(ToolStatus::Running).output("Checking beui v0.1.0\n    Checking beui-gallery v0.1.0"))
