@@ -203,6 +203,63 @@ before the network, and a server on the search path wins. A live test, run when
 and runs every live check on each. It searches only Go's own folder for `go`, never a shared one such
 as `~/.local/bin`, which would hold installed servers.
 
+## Performance
+
+Syntax colours come from gpui-component's tree-sitter `SyntaxHighlighter` in two places:
+
+- The editor drives its own highlighter (gpui-component's `input_adapter.rs`). It parses on the UI
+  thread with a 2 ms budget, and in the background for a text over 256 KB.
+- Diffs, code blocks and the pull request view go through `crates/beui/src/syntax.rs`. Every text parses
+  on a background thread, never on the UI thread. Each background thread keeps one highlighter per
+  language, because building one compiles its queries: 46 ms for Rust on the HP, against 0.13 ms to
+  parse a 25-line block with a warm one. While a text parses, its slot keeps the colours of its last
+  text on each unchanged row, so a streamed block does not flash plain.
+
+Machine: `hp-agent`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release build. Each number is
+the median and p95 of 20 runs. Measured at commit `adaa11b`.
+
+    cargo test --release -p beui --test highlight_bench -- --ignored --nocapture --test-threads=1
+
+| Case | Target | Median | p95 | Result |
+| --- | --- | --- | --- | --- |
+| Editor: 10k-line Rust, first parse and visible styles | < 50 ms, off the UI thread | 135.5 ms | 141.1 ms | Fails. Off the UI thread (302 KB > 256 KB) |
+| Editor: 10k-line Rust, a keystroke and visible styles | < 1 ms | 49.4 ms | 51.8 ms | Fails, on the UI thread |
+| Editor: the same file with no macros | (cause) | 21.0 ms | 39.4 ms | |
+| Editor: 10k-line Go, which has no injections | (cause) | 1.06 ms | 1.14 ms | |
+| Editor: visible styles for a scroll step | < 0.5 ms | 0.39 ms | 0.40 ms | Passes |
+| Diff: 5k rows, both sides parsed and styled | < 50 ms, off the UI thread | 18.8 ms | 22.3 ms | Passes |
+| Diff: 5k rows, a frame on the UI thread | < 0.5 ms | 0.15 ms | 0.19 ms | Passes |
+| 20 code blocks of 25 lines, all parsed | off the UI thread | 2.69 ms | 2.78 ms | Passes |
+| One 25-line block, warm highlighter | | 0.13 ms | 0.15 ms | |
+| One 25-line block, new highlighter | | 45.8 ms | 46.4 ms | |
+| 3k-line TypeScript, parsed and styled | | 13.7 ms | 14.1 ms | |
+| 2k-line Zig, parsed and styled | | 8.4 ms | 9.0 ms | |
+
+Why the editor fails: after each parse, `SyntaxHighlighter::update` rebuilds the injection layers
+(Rust's macro bodies) over the whole tree. The 2 ms budget covers only the main parse, so this work runs
+on the UI thread at every keystroke. It walks the whole tree with the injection query even when the file
+has no macro (21 ms), and it parses again each macro layer below the edit, whose byte range moved
+(49 ms). Go, with no injections, takes 1.06 ms. The code is in gpui-component 0.6.6, which is not
+vendored here. The fix is to rebuild the layers only near the edit, or in the background with the tree.
+
+Frames, from the gallery's "Highlight load" story: a 10k-line Rust file in the editor, a 5k-row diff and
+20 code blocks, scrolled 48 px a frame for 300 frames under Xvfb.
+
+    DISPLAY=:97 GALLERY_STORY="Highlight load" GALLERY_SCROLL=1 target/release/beui-gallery
+
+| Measure | Median | p95 | Max | Frames over 8 ms |
+| --- | --- | --- | --- | --- |
+| Time in `syntax::highlight` per frame, 5k-row diff | 0.100 ms | 0.166 ms | 4.197 ms | 0 of 300 |
+| Time in `syntax::highlight` per frame, 500-row diff | 0.056 ms | 0.073 ms | 5.673 ms | 0 of 300 |
+| Whole frame, 5k-row diff | 592 ms | 880 ms | 1104 ms | 300 of 300 |
+
+- The HP renders in software (Mesa's Vulkan under Xvfb), so a whole frame here says little about a Mac.
+  A 500-row diff still takes 192 ms a frame. FileDiff lays out every row on each frame, because it has no
+  virtual list; that is the next thing to fix for large diffs, not the colours.
+- The few slow frames for `highlight` came on cache hits in mid-scroll, and they moved between runs. One
+  earlier run, with the 500-row diff, had 2 frames over 8 ms, at 13.8 ms the most. The UI thread is likely preempted while the software renderer uses all
+  cores. This is not proven.
+
 ## Checks
 
 - `tools/check.sh` on `hp-agent`: the workspace tests with live rust-analyzer, tsgo, ty and gopls,
