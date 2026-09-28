@@ -589,6 +589,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "gpui-kit",
+ "lathe-agents",
  "lathe-lsp",
  "lsp-types",
 ]
@@ -3639,6 +3640,14 @@ dependencies = [
  "euclid",
  "polycool",
  "smallvec",
+]
+
+[[package]]
+name = "lathe-agents"
+version = "0.1.0"
+dependencies = [
+ "beui",
+ "gpui-kit",
 ]
 
 [[package]]

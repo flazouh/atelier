@@ -1,0 +1,10 @@
+[package]
+name = "lathe-agents"
+description = "Each agent's look for beui: Claude's spark, colours, and wording."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui-kit.workspace = true
+beui.workspace = true

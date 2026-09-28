@@ -1,0 +1,31 @@
+//! Serves every agent's strips to GPUI, then everything beui serves.
+
+use std::borrow::Cow;
+
+use gpui_kit::{AssetSource, Result, SharedString};
+
+use crate::claude;
+
+/// Hand this to the application in place of [`beui::Assets`], so agents' marks load.
+pub struct Assets;
+
+impl AssetSource for Assets {
+    fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        if let Some(bytes) = strip_bytes(path) {
+            return Ok(Some(Cow::Borrowed(bytes)));
+        }
+        beui::Assets.load(path)
+    }
+
+    fn list(&self, path: &str) -> Result<Vec<SharedString>> {
+        beui::Assets.list(path)
+    }
+}
+
+/// The embedded strip served at `path`, if an agent ships one there.
+pub(crate) fn strip_bytes(path: &str) -> Option<&'static [u8]> {
+    claude::SparkState::ALL.iter().map(|state| state.strip()).find(|strip| strip.path == path).map(|strip| strip.bytes)
+}
+
+#[cfg(test)]
+mod tests;

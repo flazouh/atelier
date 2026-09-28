@@ -6,11 +6,12 @@ use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
     CodeBlock, CodeBlockStatus, DiffLine, EntranceList, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
-    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spark, SparkState, Spinner, SubagentRow, TextSize, Thinking,
+    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spinner, SubagentRow, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
     CodeEditor, Decision, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
     pane_header,
 };
+use lathe_agents::claude::{self, SparkState};
 use std::time::{Duration, Instant};
 
 
@@ -472,7 +473,7 @@ fn spark_story(cx: &App) -> impl IntoElement {
             .items_center()
             .gap(px(8.))
             .w(px(80.))
-            .child(Spark::new(SharedString::from(format!("spark-{}", state.name())), state).size(px(20.)))
+            .child(claude::spark(SharedString::from(format!("spark-{}", state.name())), state).size(px(20.)))
             .child(div().text_size(px(11.)).text_color(muted).child(state.name()))
     }))
 }
@@ -548,17 +549,17 @@ fn working(started: Instant) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
-        .child(Thinking::new("think", ThinkingPhase::Thinking { since: started }).elapsed("4s").tokens(1_234))
+        .child(Thinking::new("think", claude::look(), ThinkingPhase::Thinking { since: started }).elapsed("4s").tokens(1_234))
         .child(
-            Thinking::new("think-stepped", ThinkingPhase::Thinking { since: started })
+            Thinking::new("think-stepped", claude::look(), ThinkingPhase::Thinking { since: started })
                 .style(ThinkingStyle::Shimmer(Shimmer::Stepped))
                 .elapsed("4s"),
         )
-        .child(Thinking::new("think-breath", thinking_for(started, 16)).style(ThinkingStyle::Breath).elapsed("16s"))
-        .child(Thinking::new("sending", ThinkingPhase::Sending))
-        .child(Thinking::new("tools", ThinkingPhase::RunningTools).elapsed("31s").tasks(3))
-        .child(Thinking::new("orbit", ThinkingPhase::Thinking { since: started }).elapsed("9s").subagents(2))
-        .child(Thinking::new("thought", ThinkingPhase::Thought { seconds: 4 }))
+        .child(Thinking::new("think-breath", claude::look(), thinking_for(started, 16)).style(ThinkingStyle::Breath).elapsed("16s"))
+        .child(Thinking::new("sending", claude::look(), ThinkingPhase::Sending))
+        .child(Thinking::new("tools", claude::look(), ThinkingPhase::RunningTools).elapsed("31s").tasks(3))
+        .child(Thinking::new("orbit", claude::look(), ThinkingPhase::Thinking { since: started }).elapsed("9s").subagents(2))
+        .child(Thinking::new("thought", claude::look(), ThinkingPhase::Thought { seconds: 4 }))
 }
 
 fn messages(started: Instant) -> impl IntoElement {
@@ -931,7 +932,7 @@ fn session_list(started: Instant, replay: usize, shown: usize) -> EntranceList {
                 .on_deny(|_, _, _| {})
                 .into_any_element(),
         ),
-        ("s-think", Thinking::new("s-think", thinking_for(started, 18)).elapsed("18s").tokens(3_400).subagents(2).into_any_element()),
+        ("s-think", Thinking::new("s-think", claude::look(), thinking_for(started, 18)).elapsed("18s").tokens(3_400).subagents(2).into_any_element()),
     ];
     // The two reads share one row of this list, so once both show it holds one item fewer.
     let rows = if shown >= 3 { shown - 1 } else { shown };
@@ -963,9 +964,9 @@ fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, sh
 
     // One row per subagent, above the composer. They arrive with the rest of the replay.
     let subagents = [
-        SubagentRow::new("sa-explore", "Explore", "Find every caller of hunk_starts").elapsed("12s"),
-        SubagentRow::new("sa-test", "Test runner", "Run the diff parser tests").elapsed("5s"),
-        SubagentRow::new("sa-review", "Review", "Check the off-by-one fix").finished(Some(38)),
+        SubagentRow::new("sa-explore", claude::look(), "Explore", "Find every caller of hunk_starts").elapsed("12s"),
+        SubagentRow::new("sa-test", claude::look(), "Test runner", "Run the diff parser tests").elapsed("5s"),
+        SubagentRow::new("sa-review", claude::look(), "Review", "Check the off-by-one fix").finished(Some(38)),
     ];
     let agents = subagents.into_iter().enumerate().filter(|(i, _)| shown >= SESSION_LEN.saturating_sub(3) + i).fold(
         EntranceList::new(ElementId::NamedInteger("subagents".into(), replay as u64), div().flex().flex_col().gap(px(4.))),
@@ -991,7 +992,7 @@ fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, sh
 }
 
 fn main() {
-    gpui_kit::application().with_assets(beui::Assets).run(|cx| {
+    gpui_kit::application().with_assets(lathe_agents::Assets).run(|cx| {
         beui::init(cx);
         match std::env::var("GALLERY_THEME").as_deref() {
             Ok("dark") => beui::theme::set_appearance(Appearance::Dark, cx),
