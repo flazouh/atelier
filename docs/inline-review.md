@@ -53,8 +53,9 @@ on `ease::MORPH`, in 290ms in all:
 3. The collapse, `duration::RESOLVE` (190ms). A gap as tall as the deleted rows holds their place and
    shrinks to nothing, so the rows below slide up, as they did in the Stage A pane.
 
-The gap moves the painted rows only. Selections, the pointer's hit test and the scroll height ignore it
-for those 190ms. Under Reduce Motion there is no fade and no gap: the edit lands at once.
+The gap moves the painted rows, and since patch 12 the pointer's hit test and the selection highlight
+too, since they read the same `gap_above`. Only the scroll height leaves it out, which is fine for those
+190ms. Under Reduce Motion there is no fade and no gap: the edit lands at once.
 
 ## What to test first, with no window
 

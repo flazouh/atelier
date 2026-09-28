@@ -2975,10 +2975,10 @@ impl<M: InputModeKind> InputBaseState<M> {
         &self.row_covers
     }
 
-    /// lathe patch: empty space above rows, as [`RowGap`] describes. It moves only what is painted:
-    /// the text, washes, covers, widgets, line numbers, indent guides and carets. Selections, the
-    /// pointer's hit test and the scroll height ignore it, which is right for a gap that lives a few
-    /// hundred milliseconds and wrong for anything longer.
+    /// lathe patch: empty space above rows, as [`RowGap`] describes. It moves the text, washes,
+    /// covers, widgets, line numbers, indent guides, carets, selections and the pointer's hit test.
+    /// The scroll height leaves it out, which is right for a gap that lives a few hundred milliseconds
+    /// and wrong for anything longer: use a [`RowBlock`] for that.
     pub fn set_row_gaps(&mut self, gaps: Vec<RowGap>, cx: &mut Context<Self>) {
         if self.row_gaps != gaps {
             self.row_gaps = gaps;
