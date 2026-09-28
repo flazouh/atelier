@@ -1106,14 +1106,11 @@ impl SyntaxHighlighter {
             ));
         }
 
-        // Single layers the edit did not touch, moved; combined ones, their trees edited.
+        // Single layers the edit did not touch, moved. Combined ones are parsed again below.
         let mut kept = Vec::new();
-        let mut old_combined: HashMap<SharedString, Tree> = HashMap::new();
         for layer in &self.injection_layers {
             if layer.combined {
-                let mut tree = layer.tree.clone();
-                tree.edit(edit);
-                old_combined.insert(layer.language_name.clone(), tree);
+                continue;
             } else if let Some(moved) = layer
                 .edited(edit)
                 .filter(|l| !touches(&l.byte_range) && !touches(&l.match_range))
@@ -1177,7 +1174,8 @@ impl SyntaxHighlighter {
         kept.truncate(k);
         singles.truncate(n);
 
-        // Combined layers: their ranges, moved and updated, then one parse on the edited tree.
+        // Combined layers: their ranges, moved and updated, then parsed afresh. Parsing on the
+        // old tree edited does not match a fresh parse once the included ranges change.
         let mut languages: Vec<SharedString> = self
             .combined_ranges
             .iter()
@@ -1221,7 +1219,7 @@ impl SyntaxHighlighter {
                 &language_name,
                 highlight_query,
                 normalized,
-                old_combined.get(&language_name),
+                None,
                 &self.text,
                 true,
             ) {
