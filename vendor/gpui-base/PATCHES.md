@@ -126,7 +126,8 @@ A row gap (patch 11) only moves what is painted, and a row widget sits on its ro
 places an owner's element in a gap below its row, as wide as the text and as tall as its content:
 the editor lays each block out at the text's width in the frame it lays the text out, so the gap is
 always exactly its height. The pointer's hit test, the selection highlight, the caret, IME and touch
-positions, and the scroll height all add it (the first four now add patch 11's gaps too), and the
+positions, the fold chevrons and the fold chip, and the scroll height all add it (all but the last
+now add patch 11's gaps too), and the
 visible range reaches up far enough to lay out rows the blocks push into view. Each block blocks the
 pointer and is placed after the editor's own hitboxes, so a press in it never moves the caret. A block
 on a folded row gets no gap. Blocks on the same row stack in the order the owner gives them.

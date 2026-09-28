@@ -1267,7 +1267,8 @@ impl<M: InputModeKind> TextElement<M> {
                         buffer_line,
                         is_folded,
                         display_row: buffer_line,
-                        offset_y,
+                        // lathe patch: a row block or a row gap above the row moves its chevron too.
+                        offset_y: offset_y + last_layout.gap_above(buffer_line),
                         line_end: is_folded
                             .then(|| line.position_for_index(line.len(), last_layout, false))
                             .flatten(),
