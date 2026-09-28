@@ -303,11 +303,6 @@ impl EditorSession {
         Some(cx.background_spawn(async move { Ok(answer.await?.into_iter().map(|s| rows.symbol(s)).collect()) }))
     }
 
-    /// The file this session serves, canonical.
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
-
     /// Lists every use of the symbol at the caret, as ⇧F12 does.
     pub fn find_references(&mut self, cx: &mut Context<Self>) {
         let Some(answer) = self.uses(cx) else { return };
