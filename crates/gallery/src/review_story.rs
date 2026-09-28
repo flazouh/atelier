@@ -16,8 +16,8 @@ use beui::{
     theme::radius,
 };
 use gpui_kit::{
-    AnyElement, AppContext, Context, Entity, Focusable, InteractiveElement, IntoElement, ParentElement, Render,
-    SharedString, Styled, Subscription, Window,
+    AnyElement, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render,
+    SharedString, Styled, Subscription, Window, anchored, deferred, point,
     base::input::{InputEvent, RowBlock},
     component::input::EditorState,
     div, prelude::FluentBuilder, px,
@@ -114,6 +114,12 @@ struct Thread {
 
 pub struct ReviewStory {
     editor: Entity<EditorState>,
+    /// The pane's own focus: Escape in the editor moves here, so the letters work.
+    focus: FocusHandle,
+    /// Files the reader marked seen with `x`, whatever their hunks.
+    marked: HashSet<SharedString>,
+    /// `r`: the review on the whole window.
+    review_mode: bool,
     files: Vec<FileState>,
     current: usize,
     resolving: Vec<beui::Resolve>,
@@ -145,6 +151,9 @@ impl ReviewStory {
         });
         let mut story = Self {
             editor,
+            focus: cx.focus_handle(),
+            marked: HashSet::new(),
+            review_mode: false,
             files,
             current: 0,
             resolving: Vec::new(),
@@ -182,8 +191,17 @@ impl ReviewStory {
         self.files.iter().map(|f| ChangedFile::new(f.path.clone(), f.added, f.removed)).collect()
     }
 
+    /// A file is reviewed when no hunk is left in it, or when the reader marked it.
     fn reviewed(&self) -> HashSet<SharedString> {
-        self.files.iter().filter(|f| f.hunks.is_empty()).map(|f| f.path.clone()).collect()
+        self.files.iter().filter(|f| f.hunks.is_empty() || self.marked.contains(&f.path)).map(|f| f.path.clone()).collect()
+    }
+
+    fn toggle_mark(&mut self, cx: &mut Context<Self>) {
+        let path = self.files[self.current].path.clone();
+        if !self.marked.remove(&path) {
+            self.marked.insert(path);
+        }
+        cx.notify();
     }
 
     fn progress(&self) -> ReviewProgress {
@@ -232,6 +250,7 @@ impl ReviewStory {
 
     fn put_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.files = FIXTURES.iter().map(FileState::open).collect();
+        self.marked.clear();
         self.resolving.clear();
         let text = self.files[self.current].text.clone();
         self.editor.update(cx, |state, cx| state.set_value(text, window, cx));
@@ -252,6 +271,15 @@ impl ReviewStory {
             .on_accept_file(with(|s, w, cx| s.decide_file(Decision::Accept, w, cx)))
             .on_reject_file(with(|s, w, cx| s.decide_file(Decision::Reject, w, cx)))
             .on_put_back(with(|s, w, cx| s.put_back(w, cx)))
+            .on_mark(with(|s, _, cx| s.toggle_mark(cx)))
+            .on_review_mode(with(|s, _, cx| {
+                s.review_mode = !s.review_mode;
+                cx.notify();
+            }))
+            .on_dismiss(with(|s, _, cx| {
+                s.review_mode = false;
+                cx.notify();
+            }))
     }
 
     /// The threads and the composer on the open file, as blocks under their rows.
@@ -292,7 +320,7 @@ impl ReviewStory {
 }
 
 impl Render for ReviewStory {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let handlers = self.handlers(cx);
         let file = &self.files[self.current];
@@ -324,7 +352,11 @@ impl Render for ReviewStory {
             this.history.record(before, (file.text.clone(), file.hunks.clone()));
             cx.notify();
         });
-        let open = cx.listener(|this, path: &SharedString, window, cx| this.open(path, window, cx));
+        // Pressing a file opens it and hands focus back to the editor.
+        let open = cx.listener(|this, path: &SharedString, window, cx| {
+            this.open(path, window, cx);
+            this.editor.update(cx, |state, cx| state.focus(window, cx));
+        });
         let add = cx.listener(|this, row: &usize, window, cx| this.open_composer(*row, window, cx));
         let blocks = self.blocks(cx);
 
@@ -332,8 +364,10 @@ impl Render for ReviewStory {
             .reviewed(self.reviewed())
             .current(path)
             .on_open(move |path, window, cx| open(path, window, cx));
+        let body = if self.review_mode { f32::from(window.viewport_size().height) - 32. - 52. } else { 560. };
         let review = InlineReview::new("review-editor", &self.editor, hunks.clone())
-            .height(px(560.))
+            .on_card(true)
+            .height(px(body - 12.))
             .when_some(hunks.first(), |r, h| r.current(h.id.clone()))
             .resolving(self.resolving.clone())
             .row_blocks(blocks)
@@ -341,23 +375,37 @@ impl Render for ReviewStory {
             .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx))
             .on_resolved(move |id, decision, window, cx| resolved(&(id.clone(), decision), window, cx));
 
+        // The tree and the diff each sit in the same card, under the bar.
+        let card = || div().h(px(body)).bg(theme.card).rounded(radius::LG).p(px(6.));
         let pane = div()
             .id("review-pane")
             .flex()
             .flex_col()
+            .gap(px(8.))
             .w_full()
             .min_w_0()
             .overflow_hidden()
-            .rounded(radius::XL)
-            .bg(theme.background)
             .child(ReviewBar::new("review-bar", self.progress(), handlers.clone()))
             .child(
                 div()
                     .flex()
-                    .child(div().flex_none().w(px(220.)).h(px(560.)).bg(theme.card).rounded(radius::LG).child(tree))
-                    .child(div().flex_1().min_w_0().child(review)),
+                    .gap(px(8.))
+                    .child(card().flex_none().w(px(220.)).child(tree))
+                    .child(card().flex_1().min_w_0().child(review)),
             );
-        handlers.keys(pane)
+        let pane = handlers.keys(pane, &self.focus);
+        if !self.review_mode {
+            return pane.into_any_element();
+        }
+        // Review mode: the files on the whole window, over everything else, until `r` or Escape.
+        let size = window.viewport_size();
+        deferred(
+            anchored().position(point(px(0.), px(0.))).child(
+                div().w(size.width).h(size.height).p(px(16.)).bg(theme.background).child(pane),
+            ),
+        )
+        .with_priority(1)
+        .into_any_element()
     }
 }
 
