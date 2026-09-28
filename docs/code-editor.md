@@ -211,54 +211,76 @@ Syntax colours come from gpui-component's tree-sitter `SyntaxHighlighter` in two
   thread with a 2 ms budget, and in the background for a text over 256 KB.
 - Diffs, code blocks and the pull request view go through `crates/beui/src/syntax.rs`. Every text parses
   on a background thread, never on the UI thread. Each background thread keeps one highlighter per
-  language, because building one compiles its queries: 46 ms for Rust on the HP, against 0.13 ms to
+  language, because building one compiles its queries: 58 ms for Rust on the HP, against 0.14 ms to
   parse a 25-line block with a warm one. While a text parses, its slot keeps the colours of its last
-  text on each unchanged row, so a streamed block does not flash plain.
+  text on each unchanged row, so a streamed block does not flash plain. A slot's new text drops the
+  parse of its old one.
 
-Machine: `hp-agent`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release build. Each number is
-the median and p95 of 20 runs. Measured at commit `adaa11b`.
+gpui-component is vendored with one patch (`vendor/gpui-component/PATCHES.md`, patch 1): after an
+edit, the injection layers (Rust's macro bodies, Markdown's fences) are moved and re-queried only
+where the tree changed, instead of being rebuilt over the whole file on the UI thread.
+
+Machine: `hp-agent`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release build, at commit
+`6677225`. The HP is shared with CI runners; this run started at a load average of 6.4. Each number is
+the median and p95 of 20 runs.
 
     cargo test --release -p beui --test highlight_bench -- --ignored --nocapture --test-threads=1
 
-| Case | Target | Median | p95 | Result |
-| --- | --- | --- | --- | --- |
-| Editor: 10k-line Rust, first parse and visible styles | < 50 ms, off the UI thread | 135.5 ms | 141.1 ms | Fails. Off the UI thread (302 KB > 256 KB) |
-| Editor: 10k-line Rust, a keystroke and visible styles | < 1 ms | 49.4 ms | 51.8 ms | Fails, on the UI thread |
-| Editor: the same file with no macros | (cause) | 21.0 ms | 39.4 ms | |
-| Editor: 10k-line Go, which has no injections | (cause) | 1.06 ms | 1.14 ms | |
-| Editor: visible styles for a scroll step | < 0.5 ms | 0.39 ms | 0.40 ms | Passes |
-| Diff: 5k rows, both sides parsed and styled | < 50 ms, off the UI thread | 18.8 ms | 22.3 ms | Passes |
-| Diff: 5k rows, a frame on the UI thread | < 0.5 ms | 0.15 ms | 0.19 ms | Passes |
-| 20 code blocks of 25 lines, all parsed | off the UI thread | 2.69 ms | 2.78 ms | Passes |
-| One 25-line block, warm highlighter | | 0.13 ms | 0.15 ms | |
-| One 25-line block, new highlighter | | 45.8 ms | 46.4 ms | |
-| 3k-line TypeScript, parsed and styled | | 13.7 ms | 14.1 ms | |
-| 2k-line Zig, parsed and styled | | 8.4 ms | 9.0 ms | |
+| Case | Target | Before the patch (median) | Median | p95 | Result |
+| --- | --- | --- | --- | --- | --- |
+| Editor: 10k-line Rust, first parse and visible styles | < 50 ms, off the UI thread | 135.5 ms | 161.1 ms | 219.6 ms | Fails on time; it is off the UI thread (302 KB > 256 KB) |
+| Editor: 10k-line Rust, a keystroke and visible styles | < 1 ms | 49.4 ms | 5.75 ms | 11.6 ms | Fails, see below |
+| Editor: the same, typed inside a macro that has a layer | < 1 ms | | 5.61 ms | 7.03 ms | Fails, see below |
+| Editor: the same file with no macros | | 21.0 ms | 6.91 ms | 10.7 ms | |
+| Editor: the same functions in modules of 50 | < 1 ms | | 0.73 ms | 0.85 ms | Passes |
+| Editor: 10k-line Go, which has no injections | | 1.06 ms | 1.10 ms | 1.19 ms | |
+| Editor: visible styles for a scroll step | < 0.5 ms | 0.39 ms | 0.41 ms | 0.45 ms | Passes |
+| Diff: 5k rows, both sides parsed and styled | < 50 ms, off the UI thread | 18.8 ms | 30.7 ms | 33.7 ms | Passes |
+| Diff: 5k rows, a frame on the UI thread | < 0.5 ms | 0.15 ms | 0.16 ms | 0.20 ms | Passes |
+| 20 code blocks of 25 lines, all parsed | off the UI thread | 2.69 ms | 2.81 ms | 3.09 ms | Passes |
+| One 25-line block, warm highlighter | | 0.13 ms | 0.14 ms | 0.15 ms | |
+| One 25-line block, new highlighter | | 45.8 ms | 58.3 ms | 82.9 ms | |
+| 3k-line TypeScript, parsed and styled | | 13.7 ms | 15.5 ms | 22.3 ms | |
+| 2k-line Zig, parsed and styled | | 8.4 ms | 9.4 ms | 15.1 ms | |
 
-Why the editor fails: after each parse, `SyntaxHighlighter::update` rebuilds the injection layers
-(Rust's macro bodies) over the whole tree. The 2 ms budget covers only the main parse, so this work runs
-on the UI thread at every keystroke. It walks the whole tree with the injection query even when the file
-has no macro (21 ms), and it parses again each macro layer below the edit, whose byte range moved
-(49 ms). Go, with no injections, takes 1.06 ms. The code is in gpui-component 0.6.6, which is not
-vendored here. The fix is to rebuild the layers only near the edit, or in the background with the tree.
+At a load average near 4, an earlier run gave 4.4 ms (p95 6.1 ms) for the keystroke; the rest of the
+rows agreed with these to within the load.
 
-Frames, from the gallery's "Highlight load" story: a 10k-line Rust file in the editor, a 5k-row diff and
-20 code blocks, scrolled 48 px a frame for 300 frames under Xvfb.
+Why the keystroke still misses 1 ms: the injection pass, which was the 49 ms, is now about 0.3 ms. What
+is left is tree-sitter's own work, timed by stage at a load near 4:
 
-    DISPLAY=:97 GALLERY_STORY="Highlight load" GALLERY_SCROLL=1 target/release/beui-gallery
+- the incremental parse of the main tree: 1.8 to 3.2 ms (Go: 0.93 ms);
+- `old_tree.changed_ranges(&new_tree)`, which the patch needs to find what changed: 1.1 to 1.6 ms
+  (Go: 0.78 ms);
+- the visible styles: 0.4 ms.
 
-| Measure | Median | p95 | Max | Frames over 8 ms |
-| --- | --- | --- | --- | --- |
-| Time in `syntax::highlight` per frame, 5k-row diff | 0.100 ms | 0.166 ms | 4.197 ms | 0 of 300 |
-| Time in `syntax::highlight` per frame, 500-row diff | 0.056 ms | 0.073 ms | 5.673 ms | 0 of 300 |
-| Whole frame, 5k-row diff | 592 ms | 880 ms | 1104 ms | 300 of 300 |
+Both tree-sitter steps walk the root's children, and the fixture puts about 900 functions at the top
+level. The same text with its functions in modules of 50, about 19 items at the top, takes 0.73 ms.
+So a real file with fewer top-level items meets the target, and a flat one of this size does not.
+Meeting it there needs the editor's sync parse moved off the UI thread (the adapter's background path,
+with the old colours shifted meanwhile), which is a product decision about how late colours may land.
 
-- The HP renders in software (Mesa's Vulkan under Xvfb), so a whole frame here says little about a Mac.
-  A 500-row diff still takes 192 ms a frame. FileDiff lays out every row on each frame, because it has no
-  virtual list; that is the next thing to fix for large diffs, not the colours.
-- The few slow frames for `highlight` came on cache hits in mid-scroll, and they moved between runs. One
-  earlier run, with the 500-row diff, had 2 frames over 8 ms, at 13.8 ms the most. The UI thread is likely preempted while the software renderer uses all
-  cores. This is not proven.
+The first parse is a full pass, so the patch does not change it: about 58 ms goes to compiling the
+highlight and injection queries, the rest to parsing the file and its first 512 macro layers. It
+runs off the UI thread.
+
+Frames, from the gallery's "Highlight load" story: a 10k-line Rust file in the editor and a diff of
+500 or 5000 rows in a 560 px view on the left, 20 code blocks on the right, all scrolled 48 px a frame
+for 300 frames under Xvfb. "Diff layout" is FileDiff's request_layout and prepaint; "diff paint" is
+building its scene on the CPU.
+
+    DISPLAY=:97 GALLERY_STORY="Highlight load" GALLERY_SCROLL=1 LOAD_DIFF_ROWS=5000 target/release/beui-gallery
+
+| Measure | 500 rows, median | 5000 rows, median | 5000 rows, p95 | 5000 rows, max | Over 8 ms, 5000 rows |
+| --- | --- | --- | --- | --- | --- |
+| Diff layout | 1.04 ms | 1.40 ms | 2.16 ms | 3.26 ms | 0 of 300 |
+| Diff paint | 0.20 ms | 0.24 ms | 0.41 ms | 5.61 ms | 0 of 300 |
+| Time in `syntax::highlight` per frame | 0.031 ms | 0.118 ms | 0.185 ms | 0.305 ms | 0 of 300 |
+| Whole frame | 63.9 ms | 64.0 ms | 96.0 ms | 205 ms | 300 of 300 |
+
+- FileDiff's rows are a virtual list now, so its layout no longer grows with the row count. Before, a
+  whole frame took 192 ms with 500 rows and 592 ms with 5000.
+- The HP renders in software (Mesa's Vulkan under Xvfb), so the whole frame says little about a Mac.
 
 ## Checks
 
