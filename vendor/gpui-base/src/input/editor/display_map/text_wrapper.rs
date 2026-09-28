@@ -1229,6 +1229,7 @@ mod tests {
             cursor_bounds: None,
             text_align: TextAlign::Left,
             content_width: px(0.),
+            row_gaps: vec![],
         }
     }
 
@@ -1530,6 +1531,7 @@ mod tests {
             cursor_bounds: None,
             text_align: TextAlign::Left,
             content_width: px(0.),
+            row_gaps: vec![],
         };
 
         assert_eq!(

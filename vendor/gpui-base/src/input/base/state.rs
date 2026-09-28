@@ -139,6 +139,15 @@ pub struct RowWidget {
     pub render: Rc<dyn Fn(&mut Window, &mut App) -> gpui::AnyElement>,
 }
 
+/// lathe patch: empty space above one buffer row, `rows` row heights tall, which pushes that row and
+/// every row below it down. An owner that shrinks it frame by frame slides those rows up into the
+/// place of rows it just deleted. See [`InputBaseState::set_row_gaps`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RowGap {
+    pub row: usize,
+    pub rows: f32,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct RowBackground {
     pub rows: Range<usize>,
@@ -438,6 +447,10 @@ pub struct InputBaseState<M: InputModeKind> {
     row_backgrounds: Vec<RowBackground>,
     /// lathe patch: elements placed at the end of a row. See `set_row_widgets`.
     row_widgets: Vec<RowWidget>,
+    /// lathe patch: fills painted over the text. See `set_row_covers`.
+    row_covers: Vec<RowBackground>,
+    /// lathe patch: space above rows. See `set_row_gaps`.
+    row_gaps: Vec<RowGap>,
     /// lathe patch: a style the owner pinned. While it is set, `set_editor_style` applies it in place
     /// of whatever it was given, so a wrapper that sets a theme style on every render cannot replace
     /// the owner's.
@@ -763,6 +776,8 @@ impl<M: InputModeKind> InputBaseState<M> {
             pinned_editor_style: None,
             row_backgrounds: Vec::new(),
             row_widgets: Vec::new(),
+            row_covers: Vec::new(),
+            row_gaps: Vec::new(),
             diagnostic_popover: None,
             context_menu_handler: None,
             pending_context_menu: None,
@@ -2920,6 +2935,35 @@ impl<M: InputModeKind> InputBaseState<M> {
 
     pub(super) fn row_widgets(&self) -> &[RowWidget] {
         &self.row_widgets
+    }
+
+    /// lathe patch: fills over whole rows, painted over the text and the line numbers. A cover in
+    /// the editor's background colour fades those rows out as its alpha rises, text and all, which
+    /// a wash under the text cannot do. `marker` is ignored.
+    pub fn set_row_covers(&mut self, covers: Vec<RowBackground>, cx: &mut Context<Self>) {
+        if self.row_covers != covers {
+            self.row_covers = covers;
+            cx.notify();
+        }
+    }
+
+    pub(super) fn row_covers(&self) -> &[RowBackground] {
+        &self.row_covers
+    }
+
+    /// lathe patch: empty space above rows, as [`RowGap`] describes. It moves only what is painted:
+    /// the text, washes, covers, widgets, line numbers, indent guides and carets. Selections, the
+    /// pointer's hit test and the scroll height ignore it, which is right for a gap that lives a few
+    /// hundred milliseconds and wrong for anything longer.
+    pub fn set_row_gaps(&mut self, gaps: Vec<RowGap>, cx: &mut Context<Self>) {
+        if self.row_gaps != gaps {
+            self.row_gaps = gaps;
+            cx.notify();
+        }
+    }
+
+    pub(super) fn row_gaps(&self) -> &[RowGap] {
+        &self.row_gaps
     }
 
     /// lathe patch: every selection as a byte range, in text order.
@@ -7025,6 +7069,31 @@ mod tests {
                 assert_eq!(height, layout.line_height);
             }
         });
+    }
+
+    /// lathe patch: a row gap pushes its row and every row below it down by its height, and leaves
+    /// the rows above it where they were.
+    #[gpui::test]
+    fn test_a_row_gap_pushes_its_row_and_the_rows_below_down(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| state.set_value("one\ntwo\nthree\nfour", window, cx));
+        });
+        cx.run_until_parked();
+        let tops = |cx: &mut VisualTestContext| {
+            view.input.read_with(cx, |state, _| {
+                let layout = state.last_layout.as_ref().expect("laid out");
+                (layout.row_rects(None).iter().map(|(_, top, _)| *top).collect::<Vec<_>>(), layout.line_height)
+            })
+        };
+        let (before, line_height) = tops(&mut cx);
+        cx.update(|_, cx| view.input.update(cx, |state, cx| state.set_row_gaps(vec![RowGap { row: 2, rows: 1.5 }], cx)));
+        cx.run_until_parked();
+        let (after, _) = tops(&mut cx);
+        let gap = line_height * 1.5;
+        assert_eq!(after, vec![before[0], before[1], before[2] + gap, before[3] + gap]);
     }
 
     /// lathe patch: every selection can be read and put back as byte ranges.

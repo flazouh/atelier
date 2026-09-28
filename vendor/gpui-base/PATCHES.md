@@ -103,3 +103,17 @@ The definition underline was looked up only on a mouse move with Cmd held, so pr
 pointer already on a symbol showed nothing until the pointer moved. The `on_modifiers_changed`
 listener in `src/input/base/state.rs` now runs the same lookup when Cmd goes down over the text.
 Checked by hand under Xvfb.
+
+## 11. Row covers and row gaps, for a hunk that closes
+
+A buffer row cannot shrink, so a hunk that left the buffer made the rows below it jump up. Two owner
+APIs let a review animate it. `set_row_covers` paints fills over whole rows after the text and again
+after the line numbers, so a cover in the editor's background colour fades rows out, text and all.
+`set_row_gaps` paints empty space above a row, which pushes that row and every row below it down;
+shrinking it frame by frame slides those rows up. `LastLayout::gap_above` is the one place the gap is
+read from: the text, glyph backgrounds, current line, line numbers, washes, covers, row widgets, indent
+guides and carets all add it. Selections, the pointer's hit test and the scroll height ignore it, which
+is fine for a gap that lives 190ms.
+Code: `src/input/base/layout.rs`, `src/input/base/state.rs`, `src/input/base/element.rs`,
+`src/input/editor/indent.rs`.
+Test: `test_a_row_gap_pushes_its_row_and_the_rows_below_down`.

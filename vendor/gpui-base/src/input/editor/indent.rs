@@ -119,7 +119,7 @@ impl<M: InputModeKind> TextElement<M> {
         let tab_size = state.mode.tab_size();
         let line_height = last_layout.line_height;
         let mut builder = PathBuilder::stroke(px(1.));
-        let mut offset_y = last_layout.visible_top;
+        let mut row_top = last_layout.visible_top;
         let mut last_indents = vec![];
 
         for (&buffer_line, line_layout) in last_layout
@@ -128,6 +128,8 @@ impl<M: InputModeKind> TextElement<M> {
             .zip(last_layout.lines.iter())
         {
             let line = state.text.slice_line(buffer_line);
+            // lathe patch: a row gap moves the guides with their row.
+            let offset_y = row_top + last_layout.gap_above(buffer_line);
             let mut current_indents = vec![];
             if line.len() > 0 {
                 let indent_count = tab_size.indent_count(&line);
@@ -153,8 +155,8 @@ impl<M: InputModeKind> TextElement<M> {
                 current_indents = last_indents.clone();
             }
 
-            offset_y += line_layout.wrapped_lines.len() * line_height;
             last_indents = current_indents;
+            row_top += line_layout.wrapped_lines.len() * line_height;
         }
 
         builder.translate(bounds.origin);

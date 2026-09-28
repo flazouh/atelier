@@ -30,6 +30,8 @@ pub(super) struct LastLayout {
     pub(super) cursor_bounds: Option<Bounds<Pixels>>,
     pub(super) text_align: TextAlign,
     pub(super) content_width: Pixels,
+    /// lathe patch: the owner's row gaps as `(row, height)`. See `InputBaseState::set_row_gaps`.
+    pub(super) row_gaps: Vec<(usize, Pixels)>,
 }
 
 impl LastLayout {
@@ -41,7 +43,7 @@ impl LastLayout {
         let mut rects = Vec::with_capacity(self.lines.len());
         for (line, &row) in self.lines.iter().zip(self.visible_buffer_lines.iter()) {
             let height = self.line_height * line.wrapped_lines.len() as f32;
-            rects.push((row, top, height));
+            rects.push((row, top + self.gap_above(row), height));
             top += height;
             if let Some((after, more)) = extra
                 && after == row
@@ -50,6 +52,11 @@ impl LastLayout {
             }
         }
         rects
+    }
+
+    /// lathe patch: how far the row gaps push buffer row `row` down: every gap at or above it.
+    pub(super) fn gap_above(&self, row: usize) -> Pixels {
+        self.row_gaps.iter().filter(|(at, _)| *at <= row).fold(px(0.), |sum, (_, gap)| sum + *gap)
     }
 
     pub(crate) fn line(&self, row: usize) -> Option<&LineLayout> {

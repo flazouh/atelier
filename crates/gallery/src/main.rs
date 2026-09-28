@@ -819,6 +819,8 @@ fn inline_story(
     let left = beui::inline_review::pending_count(hunks, &[]);
     // A decision starts the hunk's fade; its edit runs once the fade is over.
     let decide = cx.listener(|this: &mut Gallery, (id, decision): &(SharedString, Decision), _, cx| {
+        let (now, reduce_motion) = (std::time::Instant::now(), cx.reduce_motion());
+        this.inline_resolving.retain(|r| !r.is_over(now, reduce_motion));
         if !this.inline_resolving.iter().any(|r| &r.id == id) {
             this.inline_resolving.push(beui::Resolve::new(id.clone(), *decision));
             cx.notify();
@@ -827,10 +829,14 @@ fn inline_story(
     let resolved = cx.listener(
         |this: &mut Gallery, (id, decision): &(SharedString, Decision), window: &mut Window, cx| {
             // A frame can report the same finished fade twice; only the first one edits.
-            let Some(at) = this.inline_resolving.iter().position(|r| &r.id == id) else { return };
-            this.inline_resolving.remove(at);
-            let Some(hunk) = this.inline_hunks.iter().find(|h| &h.id == id).cloned() else { return };
+            let Some(at) = this.inline_resolving.iter().position(|r| &r.id == id && !r.is_edited()) else { return };
+            let Some(hunk) = this.inline_hunks.iter().find(|h| &h.id == id).cloned() else {
+                this.inline_resolving.remove(at);
+                return;
+            };
             let closed = hunk.closing(*decision);
+            // The resolve stays until its gap has closed; the next decision drops it.
+            this.inline_resolving[at].edited(closed.clone());
             let before = (this.inline_text.clone(), this.inline_hunks.clone());
             beui::inline_review::apply(&this.inline, &[(hunk, *decision)], window, cx);
             this.inline_hunks = beui::inline_review::shift_after(&this.inline_hunks, id, &closed);

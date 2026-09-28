@@ -41,16 +41,20 @@ does. Nothing is hidden and nothing is virtual.
 - Either way the user can undo, because `replace` records the edit.
 - The user can type anywhere at any time. There is no lock, and no product has one.
 
-## The resolve, honestly
+## The resolve
 
-A row cannot shrink, so the resolve is a fade and then a cut, not a collapse:
+A buffer row cannot shrink, but a gap above one can. The vendored editor's `set_row_gaps` paints empty
+space above a row, and `set_row_covers` paints a fill over rows, text included. The resolve uses both,
+on `ease::MORPH`, in 290ms, inside the 300ms limit:
 
-1. The hunk's wash fades to nothing over `duration::RESOLVE` (260ms) on `ease::MORPH`.
-2. The surviving side's wash fades out with it, so the code settles into plain text.
-3. At the end, the buffer edit runs, and the resolved rows go at once.
+1. The fade, `duration::RESOLVE_FADE` (100ms). A cover in the editor's background colour thickens over
+   the closing rows, so their text and wash fade together. The surviving rows lose their wash.
+2. The edit. The closing rows leave the buffer.
+3. The collapse, `duration::RESOLVE` (190ms). A gap as tall as the deleted rows holds their place and
+   shrinks to nothing, so the rows below slide up, as they did in the Stage A pane.
 
-The fade leads the cut, so the eye has already left the rows before they vanish. Under Reduce Motion the
-edit runs at once with no fade. Write this down rather than claim a collapse we cannot draw.
+The gap moves the painted rows only. Selections, the pointer's hit test and the scroll height ignore it
+for those 190ms. Under Reduce Motion there is no fade and no gap: the edit lands at once.
 
 ## What to test first, with no window
 

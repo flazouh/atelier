@@ -21,7 +21,7 @@ use crate::{
 };
 
 use super::{
-    InputBaseState, TextDecoration,
+    InputBaseState, RowBackground, TextDecoration,
     layout::{LastLayout, WhitespaceIndicators},
     mode::LayoutMode,
 };
@@ -662,7 +662,10 @@ impl<M: InputModeKind> TextElement<M> {
                 bounds: Bounds::new(
                     point(
                         cursor_x,
-                        bounds.top() + cursor_pos.y + ((line_height - cursor_height) / 2.),
+                        bounds.top()
+                            + cursor_pos.y
+                            + last_layout.gap_above(cursor_row)
+                            + ((line_height - cursor_height) / 2.),
                     ),
                     size(CURSOR_WIDTH, cursor_height),
                 ),
@@ -2004,6 +2007,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             cursor_bounds: None,
             text_align: state.text_align,
             content_width: bounds.size.width,
+            row_gaps: state.row_gaps().iter().map(|gap| (gap.row, line_height * gap.rows)).collect(),
         };
 
         let run = TextRun {
@@ -2361,7 +2365,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 .zip(prepaint.last_layout.visible_buffer_lines.iter())
             {
                 let is_active = prepaint.current_row == Some(buffer_line);
-                let p = point(input_bounds.origin.x, origin.y + offset_y);
+                let gap = prepaint.last_layout.gap_above(buffer_line);
+                let p = point(input_bounds.origin.x, origin.y + offset_y + gap);
                 let height = line_height * lines.len() as f32;
                 // Paint the current line background
                 if is_active {
@@ -2392,8 +2397,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
         let ghost = prepaint.current_row.map(|row| (row, prepaint.ghost_lines_height));
         let row_rects = prepaint.last_layout.row_rects(ghost);
         let row_backgrounds = self.state.read(cx).row_backgrounds().to_vec();
-        let wash_rows = |x: Pixels, width: Pixels, markers: bool, window: &mut Window| {
-            for background in &row_backgrounds {
+        let row_covers = self.state.read(cx).row_covers().to_vec();
+        let fill_rows = |fills: &[RowBackground], x: Pixels, width: Pixels, markers: bool, window: &mut Window| {
+            for background in fills {
                 for (_, top, height) in row_rects.iter().filter(|(row, _, _)| background.rows.contains(row)) {
                     let at = point(x, origin.y + *top);
                     window.paint_quad(fill(Bounds::new(at, size(width, *height)), background.color));
@@ -2402,6 +2408,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
                     }
                 }
             }
+        };
+        let wash_rows = |x: Pixels, width: Pixels, markers: bool, window: &mut Window| {
+            fill_rows(&row_backgrounds, x, width, markers, window)
         };
         wash_rows(input_bounds.origin.x, bounds.size.width, false, window);
 
@@ -2419,7 +2428,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
         {
             let p = point(
                 origin.x + prepaint.last_layout.line_number_width + scroll_offset,
-                origin.y + offset_y,
+                origin.y + offset_y + prepaint.last_layout.gap_above(buffer_line),
             );
 
             line.paint_background(
@@ -2489,7 +2498,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
             .zip(prepaint.last_layout.visible_buffer_lines.iter())
         {
             let row = buffer_line;
-            let line_y = origin.y + offset_y;
+            let gap = prepaint.last_layout.gap_above(row);
+            let line_y = origin.y + offset_y + gap;
             let p = point(
                 origin.x + prepaint.last_layout.line_number_width + (scroll_offset),
                 line_y,
@@ -2515,7 +2525,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 let ghost_x = origin.x + prepaint.last_layout.line_number_width;
 
                 for ghost_line in ghost_lines {
-                    let ghost_p = point(ghost_x, origin.y + offset_y);
+                    let ghost_p = point(ghost_x, origin.y + offset_y + gap);
 
                     // Paint semi-transparent background for ghost line
                     let ghost_bounds = Bounds::new(
@@ -2540,6 +2550,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 }
             }
         }
+
+        // lathe patch: the owner's covers, over the text. The gutter gets its own pass below.
+        fill_rows(&row_covers, input_bounds.origin.x, bounds.size.width, false, window);
 
         // Paint blinking cursors (shared blink state for all carets)
         if focused && show_cursor {
@@ -2574,7 +2587,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 .iter()
                 .zip(prepaint.last_layout.visible_buffer_lines.iter())
             {
-                let p = point(input_bounds.origin.x, origin.y + offset_y);
+                let gap = prepaint.last_layout.gap_above(buffer_line);
+                let p = point(input_bounds.origin.x, origin.y + offset_y + gap);
                 let is_active = prepaint.current_row == Some(buffer_line);
 
                 let height = line_height * lines.len() as f32;
@@ -2601,6 +2615,17 @@ impl<M: InputModeKind> Element for TextElement<M> {
                     offset_y += prepaint.ghost_lines_height;
                 }
             }
+        }
+
+        // lathe patch: the covers again, over the line numbers.
+        if prepaint.line_numbers.is_some() {
+            let gutter_bounds = editor_gutter_bounds(
+                input_bounds,
+                prepaint.last_layout.line_number_width,
+                prepaint.ghost_lines_height,
+                editor_paddings,
+            );
+            fill_rows(&row_covers, gutter_bounds.origin.x, gutter_bounds.size.width, false, window);
         }
 
         // Paint fold icons (only visible on hover or for current line)
