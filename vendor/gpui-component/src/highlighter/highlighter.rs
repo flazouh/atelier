@@ -85,6 +85,9 @@ pub(crate) struct InjectionLayer {
     /// The bytes of every node the match captured, the language and predicate nodes too:
     /// an edit there can change the layer though its ranges stay the same.
     match_range: Range<usize>,
+    /// Moved by an edit since it was parsed: its tree shows where the old colours went, but a
+    /// combined layer's tree parsed again on it would not match a fresh parse, so it is not reused.
+    followed: bool,
 }
 
 /// One parse at a time for an editor. A request while one runs waits as a single queued parse,
@@ -165,11 +168,12 @@ impl BackgroundParse {
     }
 }
 
-/// Where an offset lands after `edit`: before it, it stays; after it, it moves by the edit's
-/// length change; inside the replaced text, a range's start goes to the end of the new text and its
-/// end to the start of the edit, so the range keeps only what the edit left of it.
+/// Where a range's end lands after `edit`: before it, it stays; after it, it moves by the edit's
+/// length change; inside the replaced text, a start goes to the end of the new text and an end to
+/// the start of the edit, so the range keeps only what the edit left of it. Text typed exactly at a
+/// range's start or end joins neither side: the start moves past it, the end stays before it.
 fn follow_offset(offset: usize, edit: &InputEdit, start: bool) -> usize {
-    if offset <= edit.start_byte {
+    if offset < edit.start_byte || (!start && offset == edit.start_byte) {
         offset
     } else if offset >= edit.old_end_byte {
         offset - edit.old_end_byte + edit.new_end_byte
@@ -181,7 +185,7 @@ fn follow_offset(offset: usize, edit: &InputEdit, start: bool) -> usize {
 }
 
 fn follow_point(point: Point, offset: usize, edit: &InputEdit, start: bool) -> Point {
-    if offset <= edit.start_byte {
+    if offset < edit.start_byte || (!start && offset == edit.start_byte) {
         point
     } else if offset >= edit.old_end_byte {
         shift_point(point, edit)
@@ -219,6 +223,7 @@ impl InjectionLayer {
             self.byte_range = bytes;
         }
         self.match_range = follow_range(&self.match_range, edit);
+        self.followed = true;
     }
 
     /// This layer moved by `edit`, or `None` when the edit touches its match.
@@ -241,6 +246,7 @@ impl InjectionLayer {
             tree,
             combined: self.combined,
             match_range,
+            followed: self.followed,
         })
     }
 }
@@ -1113,6 +1119,7 @@ impl SyntaxHighlighter {
             old_layers: self
                 .injection_layers
                 .iter()
+                .filter(|layer| !(layer.combined && layer.followed))
                 .map(|layer| ReusableInjectionLayer {
                     language_name: layer.language_name.clone(),
                     highlight_query: layer.highlight_query.clone(),
@@ -1513,6 +1520,7 @@ impl SyntaxHighlighter {
             byte_range,
             tree: new_tree,
             combined,
+            followed: false,
         })
     }
 
