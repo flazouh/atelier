@@ -255,6 +255,8 @@ impl PrStory {
             lsp.definition_provider = None;
             lsp.hover_provider = None;
             lsp.show_document = None;
+            // A hover card belongs to the text it was asked about.
+            state.clear_hover_state(cx);
             state.set_value(text, window, cx);
             if let Some(position) = position {
                 state.set_cursor_position(position, window, cx);
