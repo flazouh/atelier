@@ -84,7 +84,12 @@ fn only_the_newest_question_of_each_kind_per_document_runs() {
         let tell = told(name);
         Job::References { doc: doc(path, name), position: Position::default(), reply: Box::new(move |a| tell(a.is_err())) }
     };
+    let names = |path: &str, name: &'static str| {
+        let tell = told(name);
+        Job::ProjectSymbols { doc: doc(path, name), query: name.into(), reply: Box::new(move |a| tell(a.is_err())) }
+    };
     let batch = vec![
+        names("a.rs", "old query"),
         check("a.rs", "old check"),
         hover("a.rs", "old hover"),
         find("a.rs", "first find"),
@@ -92,21 +97,30 @@ fn only_the_newest_question_of_each_kind_per_document_runs() {
         hover("a.rs", "new hover"),
         find("a.rs", "second find"),
         check("a.rs", "new check"),
+        names("b.rs", "new query"),
     ];
     let jobs = triage(batch);
     let kept: Vec<_> = jobs
         .iter()
         .map(|job| match job {
-            Job::Diagnostics { doc, .. } | Job::Hover { doc, .. } | Job::References { doc, .. } => doc.text.clone(),
+            Job::Diagnostics { doc, .. }
+            | Job::Hover { doc, .. }
+            | Job::References { doc, .. }
+            | Job::Symbols { doc, .. }
+            | Job::ProjectSymbols { doc, .. } => doc.text.clone(),
             Job::Navigate { .. } => "navigate".into(),
         })
         .collect();
-    assert_eq!(kept, ["first find", "other file", "new hover", "second find", "new check"], "order is kept");
+    assert_eq!(kept, ["first find", "other file", "new hover", "second find", "new check", "new query"], "order is kept");
     // The kept jobs hold senders too, so they go before the answers are read.
     drop((jobs, tx));
     let mut told: Vec<_> = rx.iter().collect();
     told.sort();
-    assert_eq!(told, [("old check", true), ("old hover", true)], "each dropped question hears it was superseded");
+    assert_eq!(
+        told,
+        [("old check", true), ("old hover", true), ("old query", true)],
+        "each dropped question hears it was superseded, a project query whatever file it came from"
+    );
 }
 
 #[test]
