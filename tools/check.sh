@@ -15,5 +15,5 @@ CARGO_TARGET_DIR="$PWD/target/vendor" cargo test -q --manifest-path vendor/gpui-
 # gpui-component's own unit tests read files from its repository that the crate does not ship, so
 # only its patch test runs here.
 CARGO_TARGET_DIR="$PWD/target/vendor-component" cargo test -q --manifest-path vendor/gpui-component/Cargo.toml \
-  --features tree-sitter-languages --test injection_edits
+  --features tree-sitter-languages --test injection_edits --test background_parse
 echo "all checks passed"

@@ -590,6 +590,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "gpui-kit",
+ "ignore",
  "lathe-agents",
  "lathe-lsp",
  "lsp-types",
