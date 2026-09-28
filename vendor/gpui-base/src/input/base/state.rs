@@ -7211,6 +7211,27 @@ mod tests {
         view.input.read_with(&cx, |state, _| assert_eq!(state.cursor(), row_2, "a press on row 2 lands on row 2"));
     }
 
+    /// lathe patch: two blocks on one row stack, and the rows below move down by both.
+    #[gpui::test]
+    fn test_blocks_on_one_row_stack(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        cx.update(|window, cx| view.input.update(cx, |state, cx| state.set_value("one\ntwo\nthree", window, cx)));
+        cx.run_until_parked();
+        let tops = |cx: &mut VisualTestContext| {
+            view.input.read_with(cx, |state, _| state.last_layout.as_ref().unwrap().row_rects(None).iter().map(|(_, t, _)| *t).collect::<Vec<_>>())
+        };
+        let before = tops(&mut cx);
+        let block = |h: f32| RowBlock { row: 0, render: Rc::new(move |_, _| div().h(px(h)).into_any_element()) };
+        cx.update(|_, cx| view.input.update(cx, |state, cx| {
+            state.set_row_blocks(vec![block(30.), block(20.)]);
+            cx.notify();
+        }));
+        cx.run_until_parked();
+        assert_eq!(tops(&mut cx), vec![before[0], before[1] + px(50.), before[2] + px(50.)]);
+    }
+
     /// lathe patch: the gutter widget shows on the row under the pointer, follows it, and leaves with it.
     #[gpui::test]
     fn test_the_gutter_widget_follows_the_row_under_the_pointer(cx: &mut TestAppContext) {

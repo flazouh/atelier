@@ -129,7 +129,7 @@ always exactly its height. The pointer's hit test, the selection highlight, the 
 positions, and the scroll height all add it (the first four now add patch 11's gaps too), and the
 visible range reaches up far enough to lay out rows the blocks push into view. Each block blocks the
 pointer and is placed after the editor's own hitboxes, so a press in it never moves the caret. A block
-on a folded row gets no gap.
+on a folded row gets no gap. Blocks on the same row stack in the order the owner gives them.
 Code: `RowBlock` and `set_row_blocks` in `src/input/base/state.rs`, `measure_row_blocks` and
 `place_row_blocks` in `src/input/base/element.rs`.
 Test: `test_a_row_block_opens_a_gap_below_its_row`.

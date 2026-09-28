@@ -1468,11 +1468,16 @@ impl<M: InputModeKind> TextElement<M> {
             return vec![];
         }
         let rows = last_layout.row_rects(None);
+        // Blocks on the same row stack in the order the owner gave them.
+        let mut below: Vec<(usize, Pixels)> = Vec::new();
         blocks
             .into_iter()
-            .filter_map(|(row, mut element, _)| {
+            .filter_map(|(row, mut element, block_height)| {
                 let (_, top, height) = rows.iter().find(|(r, _, _)| *r == row).copied()?;
-                let origin = point(bounds.origin.x + last_layout.line_number_width, bounds.origin.y + top + height);
+                let stacked = below.iter().filter(|(r, _)| *r == row).fold(px(0.), |sum, (_, h)| sum + *h);
+                below.push((row, block_height));
+                let origin =
+                    point(bounds.origin.x + last_layout.line_number_width, bounds.origin.y + top + height + stacked);
                 element.prepaint_at(origin, window, cx);
                 Some(element)
             })
