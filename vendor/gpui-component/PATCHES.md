@@ -40,3 +40,34 @@ cap, the layers and styles equal a highlighter that parsed the same text from sc
 three edits in four took the in-place path. Both sides parse with no budget, so no step depends on
 the machine's speed. `a_layer_out_of_time_makes_the_next_edit_rebuild` sets the budget to zero, sees
 the set marked incomplete, and sees the next edit rebuild and equal a fresh highlighter. `many_seeds` (ignored) runs 12 more seeds of 400 edits.
+
+## 2. The editor parses in the background, always
+
+The editor's adapter (`input_adapter.rs`) parsed on the UI thread with a 2 ms budget, and waited
+150 ms before a background parse only when that failed or the text passed 256 KB, cancelling the
+running parse at every keystroke. A keystroke on a 10k-line Rust file cost 4 to 7 ms on the UI
+thread even after patch 1: tree-sitter's own incremental parse and `changed_ranges`.
+
+Now, for every text size:
+
+- The UI thread only applies the edit. `edit_tree` edits the tree and moves each injection layer
+  (`InjectionLayer::follow`), so the old colours stand where their text went: a range after the edit
+  moves by its length change, one the edit falls inside grows or shrinks, and text typed exactly at a
+  range's start or end joins neither side (`follow_range`). A whole-text replace (`reset_tree`)
+  drops the tree, and its rows draw plain until the parse lands.
+- The parse runs on a background thread through `background_parse` (a snapshot of the edited tree,
+  the text and the injection data) and `BackgroundParse::run`, with no time budget.
+  `apply_parsed` takes the result only if it was for the text held now; one for an older text is
+  dropped.
+- `ParseQueue` keeps one parse running per editor: the keystrokes during it wait as one queued parse,
+  which starts on the newest text when the running one ends. There is no debounce.
+- A combined layer (Markdown's inline text) that an edit moved is not offered for reuse to the next
+  full pass: parsing again on its edited tree does not match a fresh parse.
+
+The inline review's accept and reject, paste, undo and redo all reach the adapter as edits, so they
+take the same path. `apply_background_tree` and the sync-parse constants are gone.
+
+Test: `tests/background_parse.rs`. A table of range moves; the old colours moved by an edit before
+any parse; for Rust, Markdown and HTML, after each of 60 seeded edits, a landed background parse
+equals a synchronous one; and 50 keystrokes during a parse make two parses, of which only the last is
+taken.
