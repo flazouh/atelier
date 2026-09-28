@@ -73,9 +73,9 @@ pub const PR_TEXT: &str = "This fixes the bug from #3344: the header line no lon
 #9999 is unrelated, and `git show #3344` in code stays plain.";
 
 /// The subagents at `tick`: Explore runs the whole time, Test runner joins at 2 and finishes at 8, and
-/// Review joins at 4.
+/// Review joins at 4. The script starts at 5, so the still frame shows all three running.
 pub fn strip_rows(tick: usize) -> Vec<SubagentRow> {
-    let t = tick % LOOP;
+    let t = (tick + 5) % LOOP;
     let look = claude::look();
     let mut rows = vec![
         SubagentRow::new("sa-explore", look.clone(), "Explore", "Find every caller of hunk_starts")
