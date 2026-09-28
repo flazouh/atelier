@@ -133,6 +133,10 @@ pub fn changed_files_story(tick: usize, playing: bool, cx: &mut Context<Gallery>
     div()
         .child(section("Live", row().child(live_button(playing, cx))))
         .child(section(
+            "Running turn, open: files past the fold enter too",
+            narrow(ChangedFiles::new("cf-running-open", files.iter().take(arrived).cloned().collect()).running(running).default_open(true)),
+        ))
+        .child(section(
             "Finished turn, folded",
             narrow(ChangedFiles::new("cf-done", files.clone()).on_open_file(|path, _, _| println!("open {path}")).on_review(|path, _, _| println!("review from {path}"))),
         ))
