@@ -60,6 +60,8 @@ pub struct SyntaxHighlighter {
     combined_ranges: Vec<(SharedString, Vec<tree_sitter::Range>)>,
     /// Whether the last injection pass stopped at `MAX_NON_COMBINED_INJECTION_PARSES`.
     injections_capped: bool,
+    /// Whether the last update changed the injection layers in place, for tests.
+    injections_edited: bool,
     /// Whether `injection_layers` match `text`, so the next edit can update them in place.
     /// False after a parse that skipped them (a timeout, `edit_tree`) or a pass that dropped
     /// combined ranges at a cap.
@@ -639,6 +641,7 @@ impl SyntaxHighlighter {
             injection_layers: Vec::new(),
             combined_ranges: Vec::new(),
             injections_capped: false,
+            injections_edited: false,
             injections_current: false,
         }
     }
@@ -765,6 +768,7 @@ impl SyntaxHighlighter {
             injection_layers: Vec::new(),
             combined_ranges: Vec::new(),
             injections_capped: false,
+            injections_edited: false,
             injections_current: false,
         })
     }
@@ -786,6 +790,12 @@ impl SyntaxHighlighter {
         }
         self.text = text.clone();
         self.injections_current = false;
+    }
+
+    /// Whether the last update changed the injection layers in place rather than rebuilding them.
+    #[doc(hidden)]
+    pub fn injections_edited(&self) -> bool {
+        self.injections_edited
     }
 
     /// Each injection layer's language and ranges, in order: for tests that compare two highlighters.
@@ -890,6 +900,7 @@ impl SyntaxHighlighter {
         let edited = incremental
             && self.injections_current
             && self.edit_injection_layers(&edit, &old_tree, &new_tree);
+        self.injections_edited = edited;
         if !edited {
             self.parse_injection_layers(&new_tree);
         }

@@ -48,6 +48,7 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
     let mut text = text.to_string();
     let mut h = SyntaxHighlighter::new(language);
     assert!(h.update(None, &Rope::from(text.as_str()), None));
+    let mut in_place = 0;
     assert!(!h.injection_layer_ranges().is_empty(), "{language}: the fixture has injections");
     for step in 0..edits {
         let mut start = next(text.len() + 1);
@@ -76,6 +77,7 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
         };
         let rope = Rope::from(text.as_str());
         assert!(h.update(Some(edit), &rope, None));
+        in_place += usize::from(h.injections_edited());
         let mut fresh = SyntaxHighlighter::new(language);
         assert!(fresh.update(None, &rope, None));
         let what = format!("{language}, edit {step} ({start}..{old_end} -> {insert:?})");
@@ -94,6 +96,8 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
             "{what}: styles differ"
         );
     }
+    // Most edits must take the in-place path, or this test proves nothing about it.
+    assert!(in_place * 4 >= edits * 3, "{language}: only {in_place} of {edits} edits were in place");
 }
 
 #[test]
@@ -158,4 +162,18 @@ fn rust_past_the_layer_cap() {
     let text: String = (0..560).map(|i| format!("fn f{i}() {{ m!({i}); }}\n")).collect();
     let snippets = ["m!(x)", "x", "\n", "(", ")", "fn g() { n!(1); }\n"];
     assert_incremental_matches_rebuild("rust", &text, &snippets, 40, 0x1234_5678_9abc_def1);
+}
+
+/// More seeds and edits than the suite runs each time:
+///     cargo test --manifest-path vendor/gpui-component/Cargo.toml --features tree-sitter-languages \
+///         --test injection_edits --release -- --ignored
+#[test]
+#[ignore]
+fn many_seeds() {
+    for seed in 1..=12u64 {
+        let seed = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15);
+        assert_incremental_matches_rebuild("rust", "fn a() { m!(1); println!(\"{}\", 2); vec![3]; }\nfn b() { n!(x); }\n", &["m!(a)", "!", "(", ")", "\"", "x", "\n", "{", "}"], 400, seed);
+        assert_incremental_matches_rebuild("markdown", "# `a` *b*\n\ntext [l](u)\n\n```rust\nfn a() {}\n```\n\n- `c`\n", &["```", "```rust\n", "`", "*", "\n", "\n\n", "x", "# ", "rust"], 400, seed);
+        assert_incremental_matches_rebuild("html", "<p><script>let a = 1;</script><style>p { color: red }</style></p>\n", &["<script>", "</script>", "<style>", "</style>", "x", "\"", ">", "<", "\n"], 400, seed);
+    }
 }
