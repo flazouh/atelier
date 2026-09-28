@@ -14,7 +14,7 @@ fn main() {
     let seconds: u64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(30);
     let text = std::fs::read_to_string(&file).expect("the file reads");
 
-    let (mut client, init) = LspClient::spawn("rust-analyzer", &[], &root, None, Duration::from_secs(60))
+    let (mut client, init) = LspClient::spawn(std::path::Path::new("rust-analyzer"), &[], &root, None, Duration::from_secs(60))
         .expect("rust-analyzer starts");
     println!("server: {:?}", init.server_info.map(|i| i.name));
     client.did_open(&file, "rust", 1, &text).expect("the file opens");

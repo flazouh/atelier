@@ -587,6 +587,7 @@ dependencies = [
  "anyhow",
  "beui",
  "futures-channel",
+ "futures-util",
  "gpui-kit",
  "lathe-lsp",
  "lsp-types",
@@ -3647,6 +3648,7 @@ dependencies = [
  "lsp-types",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]

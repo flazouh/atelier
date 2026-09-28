@@ -1,12 +1,13 @@
 use super::*;
 
 fn workers() -> Workers {
-    Workers::new(Duration::from_secs(1), Duration::from_secs(1))
+    let store = Store::new(std::env::temp_dir().join("lathe-pool-tests"), vec![], true);
+    Workers::new(store, Duration::from_secs(1), Duration::from_secs(1))
 }
 
 #[test]
 fn a_file_with_no_known_language_says_so() {
-    let error = workers().for_file(Path::new("/tmp/notes.xyz")).err().expect("no server");
+    let error = workers().for_file(Path::new("/tmp/notes.xyz"), &|_| {}).err().expect("no server");
     assert_eq!(error.to_string(), "no language server for .xyz files");
 }
 
@@ -20,6 +21,7 @@ fn a_known_server_that_is_missing_names_its_install_command() {
         language_ids: &[],
         root_markers: &[],
         install: "install it",
+        download: None,
         initialization_options: |_, _| None,
     };
     assert!(crate::find_program(spec.program).is_none());

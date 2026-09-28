@@ -13,13 +13,14 @@ use std::{
     time::Duration,
 };
 
-use futures_channel::oneshot;
+use futures_channel::{mpsc, oneshot};
+use futures_util::StreamExt;
 use gpui_kit::{
     App, AppContext, Context, Entity, SharedString, Subscription, Task, Window,
     base::input::{self, DefinitionProvider, HoverProvider, InputEvent, Rope, RopeExt},
     component::input::EditorState,
 };
-use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Target, Workers, canonical, client::uri_to_path};
+use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Store, Target, Workers, canonical, client::uri_to_path};
 use lsp_types::{Diagnostic, Hover, LocationLink, Position, ShowDocumentParams, Uri};
 
 /// How long one question may take. Servers answer in milliseconds once they have indexed.
@@ -35,10 +36,17 @@ const SECONDARY: &str = if cfg!(target_os = "macos") { "⌘" } else { "ctrl" };
 /// from several to list. The provider writes it off the main thread.
 type LastNavigation = Arc<Mutex<Option<Navigation>>>;
 
-/// Every server the gallery runs: one per (server, project), shared by all its tabs.
+/// Every server the gallery runs: one per (server, project), shared by all its tabs. A server the
+/// user has not installed is downloaded into lathe's folder, unless `LATHE_OFFLINE` is set.
 fn workers() -> &'static Workers {
     static WORKERS: OnceLock<Workers> = OnceLock::new();
-    WORKERS.get_or_init(|| Workers::new(READY, ASK))
+    WORKERS.get_or_init(|| Workers::new(Store::from_env(), READY, ASK))
+}
+
+/// What the thread that starts a server says, in order: any downloads, then the result.
+enum Starting {
+    Downloading(String),
+    Done(Result<LspWorker, String>),
 }
 
 /// One file's language server: it starts the server, hands the editor its definitions and hover
@@ -65,10 +73,23 @@ impl EditorSession {
     /// Starts the server for `path`, whose text `editor` holds, and attaches it once it is ready.
     pub fn new(editor: Entity<EditorState>, path: PathBuf, cx: &mut Context<Self>) -> Self {
         let path = canonical(&path);
-        let started = start(path.clone());
+        let mut starting = start(path.clone());
         let _start = cx.spawn(async move |this, cx| {
-            let started = started.await.unwrap_or_else(|_| Err("the server thread stopped".into()));
-            _ = this.update(cx, |this, cx| this.started(started, cx));
+            loop {
+                let started = match starting.next().await {
+                    Some(Starting::Downloading(line)) => {
+                        _ = this.update(cx, |this, cx| {
+                            this.server = format!("{line}, once; later starts use this copy").into();
+                            cx.notify();
+                        });
+                        continue;
+                    }
+                    Some(Starting::Done(started)) => started,
+                    None => Err("the server thread stopped".into()),
+                };
+                _ = this.update(cx, |this, cx| this.started(started, cx));
+                return;
+            }
         });
         let _edits = cx.subscribe(&editor, |this, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
@@ -256,9 +277,13 @@ pub fn go_to_definition(editor: &Entity<EditorState>, window: &mut Window, cx: &
 /// Finds or starts the server for `path` on a thread, so the window opens at once. Anything that
 /// stops it, such as a language lathe has no server for or one that is not installed, comes back as
 /// the sentence the status line shows.
-fn start(path: PathBuf) -> oneshot::Receiver<Result<LspWorker, String>> {
-    let (tx, rx) = oneshot::channel();
-    std::thread::spawn(move || drop(tx.send(workers().for_file(&path).map_err(|e| e.to_string()))));
+fn start(path: PathBuf) -> mpsc::UnboundedReceiver<Starting> {
+    let (tx, rx) = mpsc::unbounded();
+    std::thread::spawn(move || {
+        let report = |line| drop(tx.unbounded_send(Starting::Downloading(line)));
+        let started = workers().for_file(&path, &report).map_err(|e| e.to_string());
+        drop(tx.unbounded_send(Starting::Done(started)));
+    });
     rx
 }
 

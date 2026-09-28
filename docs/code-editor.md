@@ -157,6 +157,48 @@ it (`LATHE_REQUIRE_LSP=rust,typescript,python,go`): from a call, definition land
 on the declaration, the fallback lands on the call; a type error is reported; hover names the symbol.
 The gallery's Editor story has a tab per language with a fixture project on disk.
 
+## Stage E: servers come with the app
+
+A user installs lathe and nothing else. When a file's server is missing, lathe downloads it once,
+as Zed does, and every later start uses that copy.
+
+**Order.** A server the user installed wins, so their version and their settings apply. Then the
+copy lathe already downloaded. Then a download. `LATHE_OFFLINE=1` stops at the second step, and the
+status line shows the install hint as before.
+
+**Where.** `~/Library/Application Support/lathe/servers` on macOS, `$XDG_DATA_HOME/lathe/servers`
+(else `~/.local/share/lathe/servers`) on Linux, or `LATHE_SERVERS_DIR`. Each download lives in
+`<name>/<version>/`. It is unpacked in a staging folder beside it and renamed into place only after
+its checksum matched, so a folder that exists is complete, and two lathes racing both end up using it.
+
+**What, pinned in the registry.** Every file has a fixed version and a SHA-256 taken when it was
+pinned; a file that does not match is deleted and the server reports it as a failed download.
+
+| Server | Download | Runs as |
+|---|---|---|
+| `rust-analyzer` | the `.gz` binary for the platform from its GitHub release | the binary |
+| `typescript-language-server` | its npm tarball, and TypeScript 5's | lathe's Node.js with `lib/cli.mjs` |
+| `pyright` | its npm tarball | lathe's Node.js with `langserver.index.js` |
+| `gopls` | `go install` with `GOBIN` in lathe's folder | the binary; needs Go, which a Go project has |
+| `jdtls` | not downloaded yet: it needs a Java runtime too | the install hint |
+
+- lathe's own Node.js (v24, the current LTS) is one more pinned download, shared by every npm server.
+  The npm servers have no required dependencies, so lathe unpacks their tarballs and needs no npm.
+- TypeScript sits beside the server in the same `node_modules`, so the rule that points
+  `tsserver.path` at the TypeScript installed beside the server needs no change.
+- Downloads use the system's `curl`, `tar` and `gzip`, which macOS and Linux both ship. The checksum is
+  computed in Rust.
+- Platforms: `aarch64` and `x86_64` on macOS and Linux. Anywhere else the install hint shows.
+- While it downloads, the status line says so, with the server and its version.
+- One download runs at a time, and never while holding the lock that starts servers, so a download
+  never stops a server that is already installed from starting.
+
+**Proof.** Unit tests serve fixtures from `file://` URLs: a binary and a Node server install and run,
+a wrong checksum leaves nothing behind, a finished copy is used without any download, offline stops
+before the network, and a server on the search path wins. A live test, run when
+`LATHE_TEST_DOWNLOADS=1`, downloads the real rust-analyzer, Node.js, typescript-language-server and
+pyright into an empty folder and asks each one for a definition.
+
 ## Checks
 
 - `tools/check.sh` on `hp-agent`: the workspace tests with live rust-analyzer, typescript-language-server,

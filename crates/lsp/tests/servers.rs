@@ -13,6 +13,9 @@
 //! A test skips itself when its server is not installed, and says so. `LATHE_REQUIRE_LSP` lists the
 //! languages that must run (`LATHE_REQUIRE_LSP=rust,typescript,python,go`, or `1` for rust), and a
 //! missing server for one of them fails the run rather than passing quietly.
+//!
+//! With `LATHE_TEST_DOWNLOADS=1` the tests ignore the servers installed here and use only the ones
+//! lathe downloads into an empty folder, so the run proves what a user with nothing installed gets.
 
 use std::{
     fs,
@@ -21,7 +24,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_lsp::{Doc, Found, LspError, Navigation, Workers, find_program, find_root, language_id, server_for};
+use lathe_lsp::{
+    Doc, Found, LspError, Navigation, ServerSpec, Store, Workers, find_program, find_root, language_id, search_dirs,
+    server_for,
+};
 use lsp_types::{DiagnosticSeverity, Position};
 
 /// Servers index a project before they answer, so the waits are generous.
@@ -131,9 +137,7 @@ fn java() {
 #[test]
 fn one_server_per_project() {
     let spec = server_for("rust").expect("rust has a server");
-    if find_program(spec.program).is_none() {
-        assert!(!required("rust"), "rust is required but {} is not installed", spec.program);
-        eprintln!("skipped: {} is not installed", spec.program);
+    if !runs("rust", spec) {
         return;
     }
     let base = std::env::temp_dir().join(format!("lathe-lsp-pool-{}", std::process::id()));
@@ -143,15 +147,52 @@ fn one_server_per_project() {
         write(&base.join(project).join("src/lib.rs"), "mod other;\n");
         write(&base.join(project).join("src/other.rs"), "");
     }
-    let workers = Workers::new(READY, ASK);
-    let lib = workers.for_file(&base.join("one/src/lib.rs")).expect("a server for the first file");
-    let other = workers.for_file(&base.join("one/src/other.rs")).expect("the same server for its neighbour");
-    let elsewhere = workers.for_file(&base.join("two/src/lib.rs")).expect("a server for the other project");
+    let workers = workers();
+    let lib = workers.for_file(&base.join("one/src/lib.rs"), &say).expect("a server for the first file");
+    let other = workers.for_file(&base.join("one/src/other.rs"), &say).expect("the same server for its neighbour");
+    let elsewhere = workers.for_file(&base.join("two/src/lib.rs"), &say).expect("a server for the other project");
     assert!(lib.same_server(&other), "one project, one server");
     assert!(!lib.same_server(&elsewhere), "another project, another server");
     assert_eq!(lib.root(), base.join("one").canonicalize().unwrap().as_path());
     drop((lib, other, elsewhere, workers));
     fs::remove_dir_all(&base).ok();
+}
+
+/// Whether the tests use only the servers lathe downloads.
+fn downloading() -> bool {
+    std::env::var("LATHE_TEST_DOWNLOADS").is_ok_and(|v| v == "1")
+}
+
+/// The servers to test: the ones installed here, or with `LATHE_TEST_DOWNLOADS=1` the ones lathe
+/// downloads into a folder that starts empty. Go is still the one installed here, since gopls is
+/// built with it.
+fn workers() -> Workers {
+    let store = if downloading() {
+        let dir = std::env::temp_dir().join(format!("lathe-lsp-downloads-{}", std::process::id()));
+        let go = find_program("go").and_then(|go| go.parent().map(Path::to_path_buf));
+        Store::new(dir, go.into_iter().collect(), false)
+    } else {
+        Store::new(std::env::temp_dir().join("lathe-lsp-no-downloads"), search_dirs(), true)
+    };
+    Workers::new(store, READY, ASK)
+}
+
+/// Prints each download, so a slow first run says why.
+fn say(line: String) {
+    eprintln!("{line}");
+}
+
+/// Whether this language's test can run here; if not, it says why and must not be required.
+fn runs(language: &str, spec: &ServerSpec) -> bool {
+    let why = match downloading() {
+        true => spec.download.is_none().then_some("lathe does not download it"),
+        false => find_program(spec.program).is_none().then_some("it is not installed"),
+    };
+    if let Some(why) = why {
+        assert!(!required(language), "{language} is required but {} cannot run: {why}", spec.program);
+        eprintln!("skipped: {} cannot run, since {why}, so {language} is unproven here", spec.program);
+    }
+    why.is_none()
 }
 
 /// Whether `LATHE_REQUIRE_LSP` says this language must run.
@@ -190,9 +231,7 @@ fn once_ready<T: std::fmt::Debug>(what: &str, mut question: impl FnMut() -> Resu
 
 fn check(fixture: &Fixture) {
     let spec = server_for(fixture.language).expect("lathe knows a server for the language");
-    if find_program(spec.program).is_none() {
-        assert!(!required(fixture.language), "{} is required but {} is not installed", fixture.language, spec.program);
-        eprintln!("skipped: {} is not installed, so {} is unproven here", spec.program, fixture.language);
+    if !runs(fixture.language, spec) {
         return;
     }
 
@@ -207,8 +246,8 @@ fn check(fixture: &Fixture) {
     let root = find_root(&path, spec.root_markers);
     assert_eq!(root, dir, "the root is the directory with the project file");
 
-    let workers = Workers::new(READY, ASK);
-    let worker = workers.for_file(&path).expect("the server starts and shakes hands");
+    let workers = workers();
+    let worker = workers.for_file(&path, &say).expect("the server starts and shakes hands");
     eprintln!("{}: {}", fixture.language, worker.name());
     let doc = |text: &str| Doc { path: path.clone(), text: text.to_string() };
     let line = |text: &str, n: u32| text.split('\n').nth(n as usize).unwrap_or("").to_string();

@@ -102,8 +102,8 @@ impl LspClient {
     /// Starts `program` with `args` and shakes hands for `root`. On success the server is ready for
     /// documents.
     pub fn spawn(
-        program: &str,
-        args: &[&str],
+        program: &Path,
+        args: &[String],
         root: &Path,
         options: Option<Value>,
         timeout: Duration,

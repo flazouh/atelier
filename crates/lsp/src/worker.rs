@@ -29,7 +29,7 @@ use std::{
 use lsp_types::{Diagnostic, Hover, Position, Range, Uri};
 
 use crate::{
-    DEFAULT_SETTLE, LspClient, LspError, ServerMessage,
+    DEFAULT_SETTLE, Launch, LspClient, LspError, ServerMessage,
     client::{answer_for, uri_to_path},
     encoding::{Encoding, range_from_server, to_server},
     navigation::{Found, Navigation, Target, definition_links, lands_on_itself, sort_targets},
@@ -129,9 +129,9 @@ impl LspWorker {
     /// Starts `program` as the server `spec` describes, for the project at `root`, and moves it onto
     /// its own thread once it has shaken hands. It blocks for the handshake, so call it off the UI
     /// thread. `ready` bounds the handshake, `ask` each request.
-    pub fn start(spec: &ServerSpec, program: &Path, root: PathBuf, ready: Duration, ask: Duration) -> Result<Self, LspError> {
-        let options = (spec.initialization_options)(program, &root);
-        let (client, init) = LspClient::spawn(&program.to_string_lossy(), spec.args, &root, options, ready)?;
+    pub fn start(spec: &ServerSpec, launch: &Launch, root: PathBuf, ready: Duration, ask: Duration) -> Result<Self, LspError> {
+        let options = (spec.initialization_options)(launch.server_file(), &root);
+        let (client, init) = LspClient::spawn(&launch.program, &launch.args(spec), &root, options, ready)?;
         let name = init.server_info.map(|i| i.name).unwrap_or_else(|| spec.name.to_string());
         let capabilities = init.capabilities;
         let alive = Arc::new(AtomicBool::new(true));
