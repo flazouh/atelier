@@ -208,7 +208,7 @@ impl Render for LoadStory {
                     .flex()
                     .flex_col()
                     .gap(px(12.))
-                    .child(div().flex_none().h(px(480.)).child(CodeEditor::new(&self.editor)))
+                    .child(div().flex_none().h(px(480.)).child(CodeEditor::new(&self.editor).height(px(480.))))
                     .child(Timed { child: diff.into_any_element(), stages: self.diff_times.clone() }),
             )
             .child(
@@ -222,7 +222,10 @@ impl Render for LoadStory {
                     .overflow_y_scroll()
                     .track_scroll(&self.page)
                     .children(self.blocks.iter().enumerate().map(|(i, code)| {
-                        CodeBlock::new(("load-block", i), code.clone()).language("rust").title(format!("block_{i}.rs"))
+                        // Each at its own height: the column scrolls rather than squeezing them.
+                        div().flex_none().child(
+                            CodeBlock::new(("load-block", i), code.clone()).language("rust").title(format!("block_{i}.rs")),
+                        )
                     })),
             )
     }
