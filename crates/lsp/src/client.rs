@@ -20,7 +20,7 @@ use std::{
 
 use lsp_types::{
     ClientCapabilities, Diagnostic, GeneralClientCapabilities, PositionEncodingKind, DiagnosticClientCapabilities, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, InitializeParams, InitializeResult,
+    DocumentDiagnosticReport, DocumentDiagnosticReportResult, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverParams, InitializeParams, InitializeResult,
     PartialResultParams, Position, PublishDiagnosticsParams, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
     TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri, VersionedTextDocumentIdentifier,
     WorkDoneProgressParams, request::Request,
@@ -261,14 +261,8 @@ impl LspClient {
     /// there is nothing to wait out. rust-analyzer answers with its own checks; `cargo check` results
     /// still arrive only as published sets.
     pub fn pull_diagnostics(&mut self, path: &Path, timeout: Duration) -> Result<Vec<Diagnostic>, LspError> {
-        let params = DocumentDiagnosticParams {
-            text_document: TextDocumentIdentifier { uri: path_to_uri(path)? },
-            identifier: None,
-            previous_result_id: None,
-            work_done_progress_params: WorkDoneProgressParams::default(),
-            partial_result_params: PartialResultParams::default(),
-        };
-        match self.request::<lsp_types::request::DocumentDiagnosticRequest>(params, timeout)? {
+        let params = PullDiagnosticsParams { text_document: TextDocumentIdentifier { uri: path_to_uri(path)? } };
+        match self.request::<PullDiagnostics>(params, timeout)? {
             DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(report)) => {
                 Ok(report.full_document_diagnostic_report.items)
             }
@@ -378,6 +372,22 @@ enum Routed {
     Server(ServerMessage),
     /// A request from the server we do not answer.
     Ignore,
+}
+
+/// `textDocument/diagnostic` with only the document. `lsp-types`' own `DocumentDiagnosticParams` writes
+/// an unset `identifier` as `null`, which the spec does not allow and tsgo refuses.
+enum PullDiagnostics {}
+
+impl Request for PullDiagnostics {
+    type Params = PullDiagnosticsParams;
+    type Result = DocumentDiagnosticReportResult;
+    const METHOD: &'static str = "textDocument/diagnostic";
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PullDiagnosticsParams {
+    text_document: TextDocumentIdentifier,
 }
 
 /// Sorts one message. Pulled out of the read loop so it can be tested without a server.

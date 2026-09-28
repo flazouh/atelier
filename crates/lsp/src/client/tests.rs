@@ -184,3 +184,11 @@ fn a_server_status_says_whether_it_is_quiet() {
     let without = classify(&json!({ "jsonrpc": "2.0", "method": "experimental/serverStatus", "params": {} }));
     assert_eq!(name(&without), "an ignored message", "a status with no quiescent field tells us nothing");
 }
+
+#[test]
+fn a_diagnostic_pull_leaves_out_the_fields_it_does_not_set() {
+    // tsgo refuses `"identifier": null`: the field is optional, so an unset one must be absent.
+    let uri: lsp_types::Uri = "file:///tmp/a.ts".parse().unwrap();
+    let params = serde_json::to_value(PullDiagnosticsParams { text_document: TextDocumentIdentifier { uri } }).unwrap();
+    assert_eq!(params, json!({ "textDocument": { "uri": "file:///tmp/a.ts" } }));
+}
