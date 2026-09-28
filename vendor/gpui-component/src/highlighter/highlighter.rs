@@ -24,6 +24,8 @@ const MAX_INJECTION_LANGUAGE_BYTES: usize = 64;
 /// Parse attempts, not resulting layers: a failed parse still spends budget.
 /// Matches past it keep host highlighting but get no injected tokens.
 const MAX_NON_COMBINED_INJECTION_PARSES: usize = 512;
+/// How long one injection layer's parse may take, unless [`SyntaxHighlighter::set_injection_budget`]
+/// says otherwise.
 const INJECTION_PARSE_TIMEOUT: Duration = Duration::from_millis(20);
 
 /// A syntax highlighter that supports incremental parsing, multiline text,
@@ -62,6 +64,8 @@ pub struct SyntaxHighlighter {
     injections_capped: bool,
     /// Whether the last update changed the injection layers in place, for tests.
     injections_edited: bool,
+    /// How long one injection layer's parse may take; `None` for as long as it needs.
+    injection_budget: Option<Duration>,
     /// Whether `injection_layers` match `text`, so the next edit can update them in place.
     /// False after a parse that skipped them (a timeout, `edit_tree`) or a pass that dropped
     /// combined ranges at a cap.
@@ -344,6 +348,8 @@ fn find_injections(
 
 /// Data needed to compute injection layers on a background thread.
 pub(crate) struct InjectionParseData {
+    /// How long one layer's parse may take; `None` for as long as it needs.
+    pub(crate) budget: Option<Duration>,
     pub(crate) query: Arc<Query>,
     pub(crate) content_capture_index: Option<u32>,
     pub(crate) language_capture_index: Option<u32>,
@@ -642,6 +648,7 @@ impl SyntaxHighlighter {
             combined_ranges: Vec::new(),
             injections_capped: false,
             injections_edited: false,
+            injection_budget: Some(INJECTION_PARSE_TIMEOUT),
             injections_current: false,
         }
     }
@@ -769,6 +776,7 @@ impl SyntaxHighlighter {
             combined_ranges: Vec::new(),
             injections_capped: false,
             injections_edited: false,
+            injection_budget: Some(INJECTION_PARSE_TIMEOUT),
             injections_current: false,
         })
     }
@@ -790,6 +798,13 @@ impl SyntaxHighlighter {
         }
         self.text = text.clone();
         self.injections_current = false;
+    }
+
+    /// How long one injection layer's parse may take: 20ms by default, `None` for as long as it
+    /// needs. For tests, which must not depend on the machine's speed.
+    #[doc(hidden)]
+    pub fn set_injection_budget(&mut self, budget: Option<Duration>) {
+        self.injection_budget = budget;
     }
 
     /// Whether the injection layers are whole for the text: false when a layer's parse ran out of
@@ -920,6 +935,7 @@ impl SyntaxHighlighter {
     pub(crate) fn injection_parse_data(&self) -> Option<InjectionParseData> {
         let query = self.injections_query.clone()?;
         Some(InjectionParseData {
+            budget: self.injection_budget,
             query,
             content_capture_index: self.injection_content_capture_index,
             language_capture_index: self.injection_language_capture_index,
@@ -1010,6 +1026,7 @@ impl SyntaxHighlighter {
                 old_tree,
                 text,
                 false,
+                data.budget,
                 &mut timed_out,
             ) {
                 new_layers.push(InjectionLayer {
@@ -1047,6 +1064,7 @@ impl SyntaxHighlighter {
                 old_tree,
                 text,
                 true,
+                data.budget,
                 &mut timed_out,
             ) {
                 new_layers.push(layer);
@@ -1092,6 +1110,7 @@ impl SyntaxHighlighter {
         let touches = |r: &Range<usize>| region.iter().any(|g| r.start <= g.end && g.start <= r.end);
 
         let data = InjectionParseData {
+            budget: self.injection_budget,
             query,
             content_capture_index: self.injection_content_capture_index,
             language_capture_index: self.injection_language_capture_index,
@@ -1234,6 +1253,7 @@ impl SyntaxHighlighter {
                 None,
                 &self.text,
                 true,
+                data.budget,
                 &mut timed_out,
             ) {
                 combined_layers.push(layer);
@@ -1248,6 +1268,7 @@ impl SyntaxHighlighter {
                 None,
                 &self.text,
                 false,
+                data.budget,
                 &mut timed_out,
             ) {
                 kept.push(InjectionLayer {
@@ -1275,6 +1296,7 @@ impl SyntaxHighlighter {
         old_tree: Option<&Tree>,
         text: &Rope,
         combined: bool,
+        budget: Option<Duration>,
         timed_out_any: &mut bool,
     ) -> Option<InjectionLayer> {
         let (mut parser, grammar) = LanguageRegistry::singleton().parser(language_name).ok()?;
@@ -1283,7 +1305,7 @@ impl SyntaxHighlighter {
         let parse_start = Instant::now();
         let mut timed_out = false;
         let mut progress = |_: &tree_sitter::ParseState| -> ControlFlow<()> {
-            if parse_start.elapsed() > INJECTION_PARSE_TIMEOUT {
+            if budget.is_some_and(|budget| parse_start.elapsed() >= budget) {
                 timed_out = true;
                 ControlFlow::Break(())
             } else {
