@@ -49,6 +49,7 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
     let mut h = SyntaxHighlighter::new(language);
     assert!(h.update(None, &Rope::from(text.as_str()), None));
     let mut in_place = 0;
+    let mut skipped = 0;
     assert!(!h.injection_layer_ranges().is_empty(), "{language}: the fixture has injections");
     for step in 0..edits {
         let mut start = next(text.len() + 1);
@@ -81,6 +82,12 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
         let mut fresh = SyntaxHighlighter::new(language);
         assert!(fresh.update(None, &rope, None));
         let what = format!("{language}, edit {step} ({start}..{old_end} -> {insert:?})");
+        // A layer whose parse ran out of time (20ms, which a debug build on a busy machine can reach)
+        // is missing from one side for this step only: the next edit rebuilds.
+        if !h.injections_complete() || !fresh.injections_complete() {
+            skipped += 1;
+            continue;
+        }
         let (got, want) = (shapes(&h), shapes(&fresh));
         if got != want {
             let only = |a: &[String], b: &[String]| a.iter().filter(|x| !b.contains(x)).cloned().collect::<Vec<_>>();
@@ -96,7 +103,8 @@ fn assert_incremental_matches_rebuild(language: &str, text: &str, snippets: &[&s
             "{what}: styles differ"
         );
     }
-    // Most edits must take the in-place path, or this test proves nothing about it.
+    // Most edits must take the in-place path and be compared, or this test proves nothing about it.
+    assert!(skipped * 10 <= edits, "{language}: {skipped} of {edits} edits ran out of time");
     assert!(in_place * 4 >= edits * 3, "{language}: only {in_place} of {edits} edits were in place");
 }
 

@@ -26,7 +26,8 @@ changed (the edit, plus `old_tree.changed_ranges(&new_tree)`), then:
 
 It returns `false` and the full pass runs when that cannot be exact: no edit, layers left stale by a
 timed-out parse or `edit_tree`, a combined injection at its range or byte cap, or a capped document
-that fell under the cap. `compute_injection_layers` shares its match loop (`find_injections`) and
+that fell under the cap. A layer whose own parse runs out of its 20ms leaves the set incomplete, so
+the next edit builds all of them again rather than keep the hole. `compute_injection_layers` shares its match loop (`find_injections`) and
 now returns `InjectionLayers`, which carries what the next edit needs; layers sort by start, end and
 language, so equal starts come out the same on every pass. Two `#[doc(hidden)]` accessors,
 `injection_layer_ranges` and `injections_edited`, let the test compare highlighters.
@@ -34,4 +35,5 @@ language, so equal starts come out the same on every pass. Two `#[doc(hidden)]` 
 Test: `tests/injection_edits.rs`. After each of 300 seeded random edits to Rust with macros, Markdown
 with fences and inline code, and HTML with script and style, and 40 to a Rust file past the layer
 cap, the layers and styles equal a highlighter that parsed the same text from scratch, and at least
-three edits in four took the in-place path. `many_seeds` (ignored) runs 12 more seeds of 400 edits.
+three edits in four took the in-place path. A step where either side ran out of time on a layer is
+skipped, and at most one in ten may be. `many_seeds` (ignored) runs 12 more seeds of 400 edits.

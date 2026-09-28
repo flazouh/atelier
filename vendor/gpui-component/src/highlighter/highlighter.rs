@@ -792,6 +792,13 @@ impl SyntaxHighlighter {
         self.injections_current = false;
     }
 
+    /// Whether the injection layers are whole for the text: false when a layer's parse ran out of
+    /// time, or a cap dropped some; the next update then builds them all again.
+    #[doc(hidden)]
+    pub fn injections_complete(&self) -> bool {
+        self.injections_current
+    }
+
     /// Whether the last update changed the injection layers in place rather than rebuilding them.
     #[doc(hidden)]
     pub fn injections_edited(&self) -> bool {
@@ -968,6 +975,8 @@ impl SyntaxHighlighter {
         let mut combined_ranges: HashMap<SharedString, CombinedRanges> = HashMap::new();
         let mut new_layers = Vec::new();
         let mut non_combined_parses = 0usize;
+        // A layer that ran out of time is missing; the next edit then builds them all again.
+        let mut timed_out = false;
         let mut capped = false;
         for injection in found {
             if injection.combined {
@@ -1001,6 +1010,7 @@ impl SyntaxHighlighter {
                 old_tree,
                 text,
                 false,
+                &mut timed_out,
             ) {
                 new_layers.push(InjectionLayer {
                     match_range: injection.match_range,
@@ -1037,6 +1047,7 @@ impl SyntaxHighlighter {
                 old_tree,
                 text,
                 true,
+                &mut timed_out,
             ) {
                 new_layers.push(layer);
             }
@@ -1047,7 +1058,7 @@ impl SyntaxHighlighter {
             layers: new_layers,
             combined_ranges: raw_ranges,
             capped,
-            complete,
+            complete: complete && !timed_out,
         }
     }
 
@@ -1108,6 +1119,7 @@ impl SyntaxHighlighter {
 
         // Single layers the edit did not touch, moved. Combined ones are parsed again below.
         let mut kept = Vec::new();
+        let mut timed_out = false;
         for layer in &self.injection_layers {
             if layer.combined {
                 continue;
@@ -1222,6 +1234,7 @@ impl SyntaxHighlighter {
                 None,
                 &self.text,
                 true,
+                &mut timed_out,
             ) {
                 combined_layers.push(layer);
             }
@@ -1235,6 +1248,7 @@ impl SyntaxHighlighter {
                 None,
                 &self.text,
                 false,
+                &mut timed_out,
             ) {
                 kept.push(InjectionLayer {
                     match_range: injection.match_range,
@@ -1247,6 +1261,8 @@ impl SyntaxHighlighter {
         self.injection_layers = kept;
         self.combined_ranges = combined_ranges;
         self.injections_capped = capped;
+        // A layer that ran out of time is missing, so the next edit builds them all again.
+        self.injections_current = !timed_out;
         true
     }
 
@@ -1259,6 +1275,7 @@ impl SyntaxHighlighter {
         old_tree: Option<&Tree>,
         text: &Rope,
         combined: bool,
+        timed_out_any: &mut bool,
     ) -> Option<InjectionLayer> {
         let (mut parser, grammar) = LanguageRegistry::singleton().parser(language_name).ok()?;
         parser.set_language(&grammar).ok()?;
@@ -1288,6 +1305,7 @@ impl SyntaxHighlighter {
             Some(options),
         )?;
         if timed_out {
+            *timed_out_any = true;
             return None;
         }
 
