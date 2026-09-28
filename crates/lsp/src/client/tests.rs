@@ -33,6 +33,19 @@ fn a_server_error_reaches_the_waiter_as_an_error() {
 }
 
 #[test]
+fn a_server_request_with_a_string_id_is_still_a_request() {
+    // tsgo numbers its own requests "ts1", "ts2", ... and waits for the answer before it serves.
+    let message = json!({"jsonrpc": "2.0", "id": "ts1", "method": "workspace/configuration", "params": {"items": [{}]}});
+    match classify(&message) {
+        Routed::Server(ServerMessage::Request { id, method, .. }) => {
+            assert_eq!(id, json!("ts1"), "the answer must carry the id as it came");
+            assert_eq!(method, "workspace/configuration");
+        }
+        other => panic!("a request with a string id must be answered, got {}", name(&other)),
+    }
+}
+
+#[test]
 fn a_request_from_the_server_is_not_mistaken_for_a_reply() {
     // It has an id and a method. Routing it as a reply would wake the wrong waiter.
     let message = json!({"jsonrpc": "2.0", "id": 1, "method": "workspace/configuration", "params": {"items": [{}]}});

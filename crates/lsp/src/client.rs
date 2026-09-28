@@ -382,15 +382,17 @@ enum Routed {
 
 /// Sorts one message. Pulled out of the read loop so it can be tested without a server.
 fn classify(message: &Value) -> Routed {
+    // A server request carries an id and a method; only a reply has no method. The server picks the
+    // id, and it may be a string (tsgo's are "ts1", "ts2", ...), so it is sent back as it came.
+    if let (Some(id), Some(method)) = (message.get("id"), message.get("method").and_then(Value::as_str)) {
+        return Routed::Server(ServerMessage::Request {
+            id: id.clone(),
+            method: method.to_string(),
+            params: message.get("params").cloned().unwrap_or(Value::Null),
+        });
+    }
+    // Replies answer lathe's own requests, which it numbers.
     if let Some(id) = message.get("id").and_then(Value::as_i64) {
-        // A server request also carries a method; only a reply has none.
-        if let Some(method) = message.get("method").and_then(Value::as_str) {
-            return Routed::Server(ServerMessage::Request {
-                id: message["id"].clone(),
-                method: method.to_string(),
-                params: message.get("params").cloned().unwrap_or(Value::Null),
-            });
-        }
         if let Some(error) = message.get("error") {
             let code = error.get("code").and_then(Value::as_i64).unwrap_or(0);
             let text = error.get("message").and_then(Value::as_str).unwrap_or("no reason given");
