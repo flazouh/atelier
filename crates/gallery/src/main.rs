@@ -18,6 +18,7 @@ mod agent_panel;
 mod agent_parts;
 mod editor_lsp;
 mod editor_story;
+mod load_story;
 mod pr_story;
 mod review_story;
 
@@ -55,10 +56,11 @@ enum Story {
     Editor,
     Select,
     Prompt,
+    Load,
 }
 
 impl Story {
-    const ALL: [Story; 24] = [
+    const ALL: [Story; 25] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -83,6 +85,7 @@ impl Story {
         Story::Editor,
         Story::Select,
         Story::Prompt,
+        Story::Load,
     ];
 
     fn title(self) -> &'static str {
@@ -111,6 +114,7 @@ impl Story {
             Story::Editor => "Editor",
             Story::Select => "Select",
             Story::Prompt => "Prompt input",
+            Story::Load => "Highlight load",
         }
     }
 }
@@ -163,6 +167,8 @@ struct Gallery {
     review: Entity<review_story::ReviewStory>,
     /// The Pull request story: its rail, its bar and its diff.
     pull_request: Entity<pr_story::PrStory>,
+    /// Built the first time it shows: it holds a 10k-line file.
+    load: Option<Entity<load_story::LoadStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -262,10 +268,12 @@ impl Gallery {
             editors,
             review,
             pull_request,
+            load: None,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
             gallery.editors.open(cx);
         }
+        gallery.open_load(window, cx);
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
         }
@@ -273,6 +281,13 @@ impl Gallery {
             gallery.toggle_live(cx);
         }
         gallery
+    }
+
+    /// Builds the Highlight load story the first time it is picked.
+    fn open_load(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.story == Story::Load && self.load.is_none() {
+            self.load = Some(cx.new(|cx| load_story::LoadStory::new(window, cx)));
+        }
     }
 
     fn is_live(&self) -> bool {
@@ -354,11 +369,12 @@ impl Gallery {
                     .text_size(TextSize::Sm.font_size())
                     .when(selected, |d| d.bg(theme.card_strong).font_weight(FontWeight::MEDIUM))
                     .when(!selected, |d| d.text_color(theme.muted_foreground).hover(move |s| s.bg(hover)))
-                    .on_click(cx.listener(move |this, _, _, cx| {
+                    .on_click(cx.listener(move |this, _, window, cx| {
                         this.story = story;
                         if story == Story::Editor {
                             this.editors.open(cx);
                         }
+                        this.open_load(window, cx);
                         cx.notify();
                     }))
                     .child(story.title())
@@ -391,6 +407,7 @@ impl Gallery {
             Story::ModelBadge => agent_parts::model_badge_story().into_any_element(),
             Story::Review => review_story::element(&self.review),
             Story::PullRequest => pr_story::element(&self.pull_request),
+            Story::Load => self.load.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequests => pr_story::pull_requests().into_any_element(),
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
