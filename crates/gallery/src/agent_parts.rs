@@ -1,0 +1,217 @@
+//! Stories for the agent panel parts, and the fixtures the Agent panel story shares with them.
+//!
+//! `tick` is the live clock: `GALLERY_LIVE=1`, or Play live in a story, advances it every
+//! [`LIVE_STEP`], so the live tool call, the tool count, the strip's rows, and the arriving files move.
+//! With it still, every story shows one fixed frame.
+
+use std::time::Duration;
+
+use beui::{
+    Button, ButtonSize, ButtonVariant, ChangedFile, ChangedFiles, Checks, FileChange, ModelBadge, PrCard, PrChip,
+    PrChipData, PrState, ReviewState, SubagentCard, SubagentRow, SubagentStrip, ToolCall, ToolStatus,
+    AgentText, AgentTextStatus,
+};
+use gpui_kit::{Context, IntoElement, ParentElement, SharedString, Styled, div, px};
+use lathe_agents::claude;
+
+use super::{Gallery, narrow, row, section};
+
+/// How often the live clock ticks.
+pub const LIVE_STEP: Duration = Duration::from_millis(900);
+
+/// The ticks in one pass of the script. It starts over after this.
+const LOOP: usize = 14;
+
+const TOOLS: [&str; 5] = [
+    "Read crates/beui/src/theme.rs",
+    "Grep hunk_starts",
+    "Read crates/beui/src/file_diff.rs",
+    "Edit crates/beui/src/file_diff.rs",
+    "Bash cargo test -p beui",
+];
+
+/// The live tool call at `tick`.
+pub fn live_tool(tick: usize, offset: usize) -> &'static str {
+    TOOLS[(tick + offset) % TOOLS.len()]
+}
+
+/// The files a turn changes, in the order it touches them.
+pub fn changed_files() -> Vec<ChangedFile> {
+    vec![
+        ChangedFile::new("crates/beui/src/file_diff.rs", 18, 6),
+        ChangedFile::new("crates/beui/src/file_diff/tests.rs", 42, 0),
+        ChangedFile::new("crates/beui/src/inline_review.rs", 3, 3),
+        ChangedFile::new("crates/beui/src/hunk.rs", 64, 0).change(FileChange::Added),
+        ChangedFile::new("crates/beui/src/theme.rs", 2, 1),
+        ChangedFile::new("crates/gallery/src/main.rs", 12, 4),
+        ChangedFile::new("docs/diff-view.md", 0, 31).change(FileChange::Deleted),
+        ChangedFile::new("crates/beui/src/line_numbers.rs", 5, 5).change(FileChange::Renamed { from: "crates/beui/src/gutter.rs".into() }),
+        ChangedFile::new("crates/beui/src/code_editor.rs", 7, 2),
+        ChangedFile::new("crates/beui/src/lib.rs", 1, 0),
+        ChangedFile::new("Cargo.lock", 4, 4),
+        ChangedFile::new("README.md", 2, 0),
+    ]
+}
+
+/// The session's pull request.
+pub fn pr_3344() -> PrChipData {
+    PrChipData {
+        number: 3344,
+        repo: "flazouh/lathe".into(),
+        title: "Fix the off-by-one in the diff view's line numbers".into(),
+        state: PrState::Open,
+        url: "https://github.com/flazouh/lathe/pull/3344".into(),
+    }
+}
+
+/// What the app knows: only #3344 is a real pull request here.
+pub fn resolve_pr(number: u64) -> Option<PrChipData> {
+    (number == 3344).then(pr_3344)
+}
+
+pub const PR_TEXT: &str = "This fixes the bug from #3344: the header line no longer counts. The failure in \
+#9999 is unrelated, and `git show #3344` in code stays plain.";
+
+/// The subagents at `tick`: Explore runs the whole time, Test runner joins at 2 and finishes at 8, and
+/// Review joins at 4.
+pub fn strip_rows(tick: usize) -> Vec<SubagentRow> {
+    let t = tick % LOOP;
+    let look = claude::look();
+    let mut rows = vec![
+        SubagentRow::new("sa-explore", look.clone(), "Explore", "Find every caller of hunk_starts")
+            .tool(live_tool(t, 0))
+            .tool_calls(3 + t as u64)
+            .elapsed(format!("{}s", 12 + t)),
+    ];
+    if (2..11).contains(&t) {
+        let test = SubagentRow::new("sa-test", look.clone(), "Test runner", "Run the diff parser tests").tool_calls(t as u64);
+        rows.push(if t >= 8 { test.finished(Some(9)) } else { test.tool(live_tool(t, 4)).elapsed(format!("{}s", t - 1)) });
+    }
+    if t >= 4 {
+        rows.push(
+            SubagentRow::new("sa-review", look, "Review", "Check the off-by-one fix")
+                .tool(live_tool(t, 2))
+                .tool_calls(t as u64 - 3)
+                .elapsed(format!("{}s", t - 3)),
+        );
+    }
+    rows
+}
+
+/// A running subagent card at `tick`.
+pub fn running_card(id: &'static str, tick: usize) -> SubagentCard {
+    SubagentCard::new(id, claude::look(), "Explore", "Find every caller of hunk_starts")
+        .model("Haiku 4.5")
+        .elapsed(format!("{}s", 12 + tick % LOOP))
+        .tool_calls(12 + (tick % LOOP) as u64)
+        .live_tool(live_tool(tick, 0))
+        .calls(sample_calls())
+}
+
+fn sample_calls() -> Vec<ToolCall> {
+    vec![
+        ToolCall::new("sc-read", "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done),
+        ToolCall::new("sc-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done),
+        ToolCall::new("sc-read2", "Read file").tool("crates/beui/src/theme.rs").status(ToolStatus::Running),
+    ]
+}
+
+/// Play live, or Pause while it plays.
+fn live_button(cx: &mut Context<Gallery>) -> impl IntoElement {
+    let playing = cx.entity().read(cx).is_live();
+    Button::new("live")
+        .label(if playing { "Pause" } else { "Play live" })
+        .variant(ButtonVariant::Secondary)
+        .size(ButtonSize::Sm)
+        .on_click(cx.listener(|this, _, _, cx| this.toggle_live(cx)))
+}
+
+pub fn changed_files_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
+    let files = changed_files();
+    // While it runs, a file arrives on each tick.
+    let arrived = (3 + tick % LOOP).min(files.len());
+    let running = arrived < files.len();
+    div()
+        .child(section("Live", row().child(live_button(cx))))
+        .child(section(
+            "Finished turn, folded",
+            narrow(ChangedFiles::new("cf-done", files.clone()).on_open_file(|path, _, _| println!("open {path}")).on_review(|path, _, _| println!("review from {path}"))),
+        ))
+        .child(section(
+            if running { "Running turn" } else { "Running turn (all files in)" },
+            narrow(ChangedFiles::new("cf-running", files.iter().take(arrived).cloned().collect()).running(running)),
+        ))
+        .child(section("Short list", narrow(ChangedFiles::new("cf-short", files.into_iter().take(2).collect()))))
+}
+
+pub fn subagent_card_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
+    let done = SubagentCard::new("sc-done", claude::look(), "Review", "Check the off-by-one fix")
+        .model("Opus 5.5")
+        .tool_calls(12)
+        .finished(Some(38))
+        .calls(sample_calls());
+    div()
+        .child(section("Live", row().child(live_button(cx))))
+        .child(section("Running, press to open its tool calls", narrow(running_card("sc-running", tick))))
+        .child(section("Done", narrow(done)))
+        .child(section(
+            "Before its first tool call",
+            narrow(SubagentCard::new("sc-new", claude::look(), "Plan", "Split the review into steps").model("Sonnet 5").elapsed("1s")),
+        ))
+}
+
+pub fn subagent_strip_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
+    div()
+        .child(section("Live: rows join, finish, hold, and leave", row().child(live_button(cx))))
+        .child(section("Above the composer", narrow(SubagentStrip::new("strip", strip_rows(tick)))))
+}
+
+pub fn pr_card_story() -> impl IntoElement {
+    let card = |id: &'static str, state: PrState, checks: Checks, review: ReviewState| {
+        PrCard::new(id, PrChipData { state, ..pr_3344() }).checks(checks).review(review).on_open(|pr, _, _| println!("open #{}", pr.number))
+    };
+    div()
+        .child(section("Open, checks passed, approved", narrow(card("pc-open", PrState::Open, Checks { passed: 3, ..Default::default() }, ReviewState::Approved))))
+        .child(section("Draft, checks running", narrow(card("pc-draft", PrState::Draft, Checks { passed: 1, running: 2, ..Default::default() }, ReviewState::None))))
+        .child(section("Open, one failing, changes asked", narrow(card("pc-fail", PrState::Open, Checks { passed: 2, failed: 1, running: 0 }, ReviewState::ChangesRequested))))
+        .child(section("Merged", narrow(card("pc-merged", PrState::Merged, Checks { passed: 3, ..Default::default() }, ReviewState::Approved))))
+        .child(section("Closed, review asked", narrow(card("pc-closed", PrState::Closed, Checks::default(), ReviewState::Requested))))
+}
+
+pub fn pr_chip_story() -> impl IntoElement {
+    let chip = |id: &'static str, state: PrState| PrChip::new(id, PrChipData { state, ..pr_3344() }).on_open(|pr, _, _| println!("open #{}", pr.number));
+    div()
+        .child(section(
+            "Each state",
+            row()
+                .child(chip("chip-open", PrState::Open))
+                .child(chip("chip-draft", PrState::Draft))
+                .child(chip("chip-merged", PrState::Merged))
+                .child(chip("chip-closed", PrState::Closed)),
+        ))
+        .child(section(
+            "In agent text: #3344 is known, #9999 is not",
+            narrow(
+                AgentText::new("chip-text", PR_TEXT)
+                    .status(AgentTextStatus::Complete)
+                    .pr_resolver(resolve_pr)
+                    .on_open_pr(|pr, _, _| println!("open #{}", pr.number)),
+            ),
+        ))
+}
+
+pub fn model_badge_story() -> impl IntoElement {
+    let label: [SharedString; 3] = ["Opus 5.5".into(), "Sonnet 5".into(), "Haiku 4.5".into()];
+    div()
+        .child(section("Models", row().children(label.into_iter().map(ModelBadge::new))))
+        .child(section(
+            "In a turn header",
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .text_size(px(13.))
+                .child("Claude")
+                .child(ModelBadge::new("Opus 5.5")),
+        ))
+}

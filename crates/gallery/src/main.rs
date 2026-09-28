@@ -4,24 +4,25 @@
 
 use beui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
-    CodeBlock, CodeBlockStatus, DiffLine, EntranceList, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
+    CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
-    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spinner, SubagentRow, TextSize, Thinking,
+    PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spinner, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
     CodeEditor, Decision, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
-    pane_header,
 };
 use lathe_agents::claude::{self, SparkState};
 use std::time::{Duration, Instant};
 
 
+mod agent_panel;
+mod agent_parts;
 mod editor_lsp;
 mod editor_story;
 
 use gpui_kit::base::input::InputEvent;
 
 use gpui_kit::{
-    AnyElement, App, AppContext, Bounds, Context, ElementId, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
+    AnyElement, App, AppContext, Bounds, Context, Entity, FontWeight, Hsla, InteractiveElement, IntoElement,
     ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, WindowBounds, WindowOptions, div,
     Task, prelude::FluentBuilder, px, size,
 };
@@ -29,6 +30,12 @@ use gpui_kit::{
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Story {
     AgentPanel,
+    ChangedFiles,
+    SubagentCard,
+    SubagentStrip,
+    PrCard,
+    PrChip,
+    ModelBadge,
     Colors,
     Typography,
     Icons,
@@ -46,8 +53,14 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 15] = [
+    const ALL: [Story; 21] = [
         Story::AgentPanel,
+        Story::ChangedFiles,
+        Story::SubagentCard,
+        Story::SubagentStrip,
+        Story::PrCard,
+        Story::PrChip,
+        Story::ModelBadge,
         Story::Colors,
         Story::Typography,
         Story::Icons,
@@ -67,6 +80,12 @@ impl Story {
     fn title(self) -> &'static str {
         match self {
             Story::AgentPanel => "Agent panel",
+            Story::ChangedFiles => "Changed files",
+            Story::SubagentCard => "Subagent card",
+            Story::SubagentStrip => "Subagent strip",
+            Story::PrCard => "PR card",
+            Story::PrChip => "PR chip",
+            Story::ModelBadge => "Model badge",
             Story::Colors => "Colors",
             Story::Typography => "Typography",
             Story::Icons => "Icons",
@@ -139,6 +158,10 @@ struct Gallery {
     replay: Option<Replay>,
     /// Counts replays, so each one is a new list whose items all enter again.
     replays: usize,
+    /// The live clock for the agent parts: see [`agent_parts`].
+    tick: usize,
+    /// Advances `tick` while the stories play live.
+    live: Option<Task<()>>,
     _system: [gpui_kit::Subscription; 2],
 }
 
@@ -220,14 +243,41 @@ impl Gallery {
             inline_history: Default::default(),
             _inline_edits,
             editors,
-            prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, _system };
+            prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
             gallery.editors.open(cx);
         }
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
         }
+        if std::env::var("GALLERY_LIVE").is_ok_and(|v| v == "1") {
+            gallery.toggle_live(cx);
+        }
         gallery
+    }
+
+    fn is_live(&self) -> bool {
+        self.live.is_some()
+    }
+
+    /// Starts or stops the live clock.
+    fn toggle_live(&mut self, cx: &mut Context<Self>) {
+        if self.live.take().is_none() {
+            self.live = Some(cx.spawn(async move |this, cx| {
+                loop {
+                    cx.background_executor().timer(agent_parts::LIVE_STEP).await;
+                    if this.update(cx, |g, cx| {
+                        g.tick += 1;
+                        cx.notify();
+                    })
+                    .is_err()
+                    {
+                        break;
+                    }
+                }
+            }));
+        }
+        cx.notify();
     }
 
     /// Clears the Agent panel, then adds its items back one by one every [`REPLAY_STEP`].
@@ -241,7 +291,7 @@ impl Gallery {
                         let Some(replay) = g.replay.as_mut() else { return false };
                         replay.shown += 1;
                         cx.notify();
-                        replay.shown < SESSION_LEN
+                        replay.shown < agent_panel::SESSION_LEN
                     })
                     .unwrap_or(false);
                 if !more {
@@ -311,9 +361,15 @@ impl Gallery {
     fn story(&self, cx: &mut Context<Self>) -> AnyElement {
         match self.story {
             Story::AgentPanel => {
-                let shown = self.replay.as_ref().map_or(SESSION_LEN, |r| r.shown);
-                agent_panel(&self.panel_prompt, self.started, self.replays, shown, cx).into_any_element()
+                let shown = self.replay.as_ref().map_or(agent_panel::SESSION_LEN, |r| r.shown);
+                agent_panel::agent_panel(&self.panel_prompt, self.started, self.replays, shown, self.tick, cx).into_any_element()
             }
+            Story::ChangedFiles => agent_parts::changed_files_story(self.tick, cx).into_any_element(),
+            Story::SubagentCard => agent_parts::subagent_card_story(self.tick, cx).into_any_element(),
+            Story::SubagentStrip => agent_parts::subagent_strip_story(self.tick, cx).into_any_element(),
+            Story::PrCard => agent_parts::pr_card_story().into_any_element(),
+            Story::PrChip => agent_parts::pr_chip_story().into_any_element(),
+            Story::ModelBadge => agent_parts::model_badge_story().into_any_element(),
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
             Story::Icons => icons(cx).into_any_element(),
@@ -889,106 +945,6 @@ fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoEl
                 }).ok();
             }),
     )
-}
-
-fn sample_plan() -> Vec<Todo> {
-    vec![
-        Todo::new("find", "Find where hunk numbers start", TodoStatus::Done),
-        Todo::new("fix", "Fix the off-by-one in hunk_starts", TodoStatus::Done),
-        Todo::new("test-line-1", "Add a test for a hunk at line 1", TodoStatus::InProgress),
-        Todo::new("suite", "Run the full test suite", TodoStatus::Pending),
-    ]
-}
-
-/// How many items the Agent panel's session holds.
-const SESSION_LEN: usize = 9;
-
-/// The session's first `shown` chat items, as the panel lists them. The two reads stack tight in their
-/// own list, so each still enters on its own.
-fn session_list(started: Instant, replay: usize, shown: usize) -> EntranceList {
-    let tools = [
-        ("s-read", ToolCall::new("s-read", "Read file").tool("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
-        ("s-grep", ToolCall::new("s-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
-    ];
-    let tools = tools.into_iter().take(shown.saturating_sub(1)).fold(
-        EntranceList::new(ElementId::NamedInteger("session-tools".into(), replay as u64), div().flex().flex_col()),
-        |list, (id, item)| list.item(id, item),
-    );
-    let items: [(&'static str, AnyElement); SESSION_LEN - 1] = [
-        ("s-user", MessageBubble::text("s-user", "The line numbers in the diff view are off by one. Can you fix it?").variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End).into_any_element()),
-        ("s-tools", tools.into_any_element()),
-        ("s-reply", AgentText::new("s-reply", REPLY).status(AgentTextStatus::Complete).copy_text(REPLY).into_any_element()),
-        ("s-plan", TodoList::new("s-plan", sample_plan()).into_any_element()),
-        ("s-diff", FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF)).status(FileDiffStatus::Complete).into_any_element()),
-        ("s-test", ToolCall::new("s-test", "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT).into_any_element()),
-        (
-            "s-push",
-            ToolApproval::new("s-push", "git push origin main")
-                .description("Push the fix so CI can run the full test suite.")
-                .parameter("Directory", "~/Documents/lathe")
-                .default_open(true)
-                .on_approve(|_, _, _| {})
-                .on_always_allow(|_, _, _| {})
-                .on_deny(|_, _, _| {})
-                .into_any_element(),
-        ),
-        ("s-think", Thinking::new("s-think", claude::look(), thinking_for(started, 18)).elapsed("18s").tokens(3_400).subagents(2).into_any_element()),
-    ];
-    // The two reads share one row of this list, so once both show it holds one item fewer.
-    let rows = if shown >= 3 { shown - 1 } else { shown };
-    items.into_iter().take(rows).fold(
-        EntranceList::new(ElementId::NamedInteger("session-list".into(), replay as u64), div().flex().flex_col().gap(px(16.))),
-        |list, (id, item)| list.item(id, item),
-    )
-}
-
-/// A whole session as the panel will show it, at the panel's width. `replay` names the list, so each
-/// replay starts a fresh one; `shown` is how many items it holds so far.
-fn agent_panel(prompt: &Entity<PromptInput>, started: Instant, replay: usize, shown: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
-    let theme = cx.theme().clone();
-    let header = pane_header("Claude Code", cx)
-        .child(Badge::new("Sonnet 5"))
-        .child(div().flex_1())
-        .child(
-            Button::new("p-replay")
-                .label("Replay session")
-                .variant(ButtonVariant::Ghost)
-                .size(ButtonSize::Sm)
-                .on_click(cx.listener(|this, _, _, cx| this.start_replay(cx))),
-        )
-        .child(Button::new("p-new").icon(IconName::Plus).variant(ButtonVariant::Ghost).size(ButtonSize::Icon))
-        .child(Button::new("p-more").icon(IconName::Ellipsis).variant(ButtonVariant::Ghost).size(ButtonSize::Icon));
-
-    let list = session_list(started, replay, shown);
-    let session = div().id("session").flex_1().overflow_y_scroll().px(px(20.)).py(px(20.)).child(list);
-
-    // One row per subagent, above the composer. They arrive with the rest of the replay.
-    let subagents = [
-        SubagentRow::new("sa-explore", claude::look(), "Explore", "Find every caller of hunk_starts").elapsed("12s"),
-        SubagentRow::new("sa-test", claude::look(), "Test runner", "Run the diff parser tests").elapsed("5s"),
-        SubagentRow::new("sa-review", claude::look(), "Review", "Check the off-by-one fix").finished(Some(38)),
-    ];
-    let agents = subagents.into_iter().enumerate().filter(|(i, _)| shown >= SESSION_LEN.saturating_sub(3) + i).fold(
-        EntranceList::new(ElementId::NamedInteger("subagents".into(), replay as u64), div().flex().flex_col().gap(px(4.))),
-        |list, (i, row)| list.item(("subagent", i), row),
-    );
-
-    div()
-        .flex()
-        .justify_center()
-        .size_full()
-        .bg(theme.card)
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .w(px(560.))
-                .h_full()
-                .bg(theme.background)
-                .child(header)
-                .child(session)
-                .child(div().flex().flex_col().gap(px(8.)).p(px(12.)).child(agents).child(prompt.clone())),
-        )
 }
 
 fn main() {
