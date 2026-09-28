@@ -146,3 +146,11 @@ Code: `GutterWidget`, `set_gutter_widget`, `hovered_row` and `set_hovered_row` i
 `src/input/base/state.rs`; `layout_gutter_widget` and the listener in `TextElement::paint` in
 `src/input/base/element.rs`.
 Test: `test_the_gutter_widget_follows_the_row_under_the_pointer`.
+
+## 14. A read-only input says so in its key context
+
+An input's key context was `Input` whether it could be typed in or not, so an owner that lets bare
+letters through only when nobody is typing (lathe's review keys: `s`, `w`, `u`) could not tell a
+read-only editor, such as a pull request's diff, from one being typed in. A read-only input's context
+is now `Input readonly`; bindings on `Input` still match it.
+Test: `test_a_read_only_input_says_so_in_its_key_context`.

@@ -4381,9 +4381,16 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
             self._pending_update = false;
         }
 
+        // lathe patch: a read-only input says so in its key context, so an owner can tell reading
+        // from typing and let bare letters through.
+        let mut key_context = gpui::KeyContext::default();
+        key_context.add(CONTEXT);
+        if self.readonly {
+            key_context.add("readonly");
+        }
         let element = div()
             .id("input-state")
-            .key_context(CONTEXT)
+            .key_context(key_context)
             .track_focus(&self.focus_handle)
             .when(self.is_editable(), |this| {
                 this.on_action(window.listener_for(&entity, InputBaseState::backspace))
@@ -7328,6 +7335,26 @@ mod tests {
         assert_eq!(ranges(&mut cx), vec![0..2, 7..9, 10..12], "and stops once every match is taken");
         cx.simulate_keystrokes("x");
         assert_cursors(&mut cx, &view.input, "x| abc x|\nx|");
+    }
+
+    /// lathe patch: a read-only editor adds `readonly` to its key context; an editable one does not.
+    #[gpui::test]
+    fn test_a_read_only_input_says_so_in_its_key_context(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        let focused_context = |cx: &mut VisualTestContext| {
+            cx.run_until_parked();
+            cx.update(|window, _| {
+                let stack = window.context_stack();
+                let input = stack.iter().rev().find(|c| c.contains(CONTEXT)).cloned();
+                input.map(|c| c.contains("readonly"))
+            })
+        };
+        cx.update(|window, cx| view.input.update(cx, |state, cx| state.focus(window, cx)));
+        assert_eq!(focused_context(&mut cx), Some(false), "an editable input is plain Input");
+        cx.update(|_, cx| view.input.update(cx, |state, cx| state.set_readonly(true, cx)));
+        assert_eq!(focused_context(&mut cx), Some(true), "a read-only one adds readonly");
     }
 
     /// lathe patch: Shift+Up/Down keep the goal column, and past the edge select to the very start or end.
