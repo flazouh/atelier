@@ -364,9 +364,9 @@ impl Gallery {
                 let shown = self.replay.as_ref().map_or(agent_panel::SESSION_LEN, |r| r.shown);
                 agent_panel::agent_panel(&self.panel_prompt, self.started, self.replays, shown, self.tick, cx).into_any_element()
             }
-            Story::ChangedFiles => agent_parts::changed_files_story(self.tick, cx).into_any_element(),
-            Story::SubagentCard => agent_parts::subagent_card_story(self.tick, cx).into_any_element(),
-            Story::SubagentStrip => agent_parts::subagent_strip_story(self.tick, cx).into_any_element(),
+            Story::ChangedFiles => agent_parts::changed_files_story(self.tick, self.is_live(), cx).into_any_element(),
+            Story::SubagentCard => agent_parts::subagent_card_story(self.tick, self.is_live(), cx).into_any_element(),
+            Story::SubagentStrip => agent_parts::subagent_strip_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::PrCard => agent_parts::pr_card_story().into_any_element(),
             Story::PrChip => agent_parts::pr_chip_story().into_any_element(),
             Story::ModelBadge => agent_parts::model_badge_story().into_any_element(),

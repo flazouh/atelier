@@ -117,8 +117,7 @@ fn sample_calls() -> Vec<ToolCall> {
 }
 
 /// Play live, or Pause while it plays.
-fn live_button(cx: &mut Context<Gallery>) -> impl IntoElement {
-    let playing = cx.entity().read(cx).is_live();
+fn live_button(playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     Button::new("live")
         .label(if playing { "Pause" } else { "Play live" })
         .variant(ButtonVariant::Secondary)
@@ -126,13 +125,13 @@ fn live_button(cx: &mut Context<Gallery>) -> impl IntoElement {
         .on_click(cx.listener(|this, _, _, cx| this.toggle_live(cx)))
 }
 
-pub fn changed_files_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
+pub fn changed_files_story(tick: usize, playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     let files = changed_files();
     // While it runs, a file arrives on each tick.
     let arrived = (3 + tick % LOOP).min(files.len());
     let running = arrived < files.len();
     div()
-        .child(section("Live", row().child(live_button(cx))))
+        .child(section("Live", row().child(live_button(playing, cx))))
         .child(section(
             "Finished turn, folded",
             narrow(ChangedFiles::new("cf-done", files.clone()).on_open_file(|path, _, _| println!("open {path}")).on_review(|path, _, _| println!("review from {path}"))),
@@ -144,14 +143,14 @@ pub fn changed_files_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoE
         .child(section("Short list", narrow(ChangedFiles::new("cf-short", files.into_iter().take(2).collect()))))
 }
 
-pub fn subagent_card_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
+pub fn subagent_card_story(tick: usize, playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     let done = SubagentCard::new("sc-done", claude::look(), "Review", "Check the off-by-one fix")
         .model("Opus 5.5")
         .tool_calls(12)
         .finished(Some(38))
         .calls(sample_calls());
     div()
-        .child(section("Live", row().child(live_button(cx))))
+        .child(section("Live", row().child(live_button(playing, cx))))
         .child(section("Running, press to open its tool calls", narrow(running_card("sc-running", tick))))
         .child(section("Done", narrow(done)))
         .child(section(
@@ -160,9 +159,9 @@ pub fn subagent_card_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoE
         ))
 }
 
-pub fn subagent_strip_story(tick: usize, cx: &mut Context<Gallery>) -> impl IntoElement {
+pub fn subagent_strip_story(tick: usize, playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     div()
-        .child(section("Live: rows join, finish, hold, and leave", row().child(live_button(cx))))
+        .child(section("Live: rows join, finish, hold, and leave", row().child(live_button(playing, cx))))
         .child(section("Above the composer", narrow(SubagentStrip::new("strip", strip_rows(tick)))))
 }
 

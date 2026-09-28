@@ -193,7 +193,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
                 ),
         )
         .child(div().on_action(find_key).child(CodeEditor::new(&state).height(px(380.))))
-        .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(session.read(cx).status()))
+        .child(div().flex().gap(px(beui::SEGMENT_GAP)).text_size(TextSize::Xs.font_size()).text_color(muted).children(session.read(cx).status()))
         .when(!references.is_empty(), |d| d.child(references_list(&references, &session, cx)))
         .into_any_element()
 }

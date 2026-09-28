@@ -157,11 +157,12 @@ impl EditorSession {
         self.check(cx);
     }
 
-    /// What the status line says: the server's state, then what the last check found.
-    pub fn status(&self) -> SharedString {
+    /// What the status line says: the server's state, then what the last check found. The segments
+    /// part by space when shown, never by a glyph.
+    pub fn status(&self) -> Vec<SharedString> {
         match self.problems.is_empty() {
-            true => self.server.clone(),
-            false => format!("{} · {}", self.server, self.problems).into(),
+            true => vec![self.server.clone()],
+            false => vec![self.server.clone(), self.problems.clone()],
         }
     }
 
