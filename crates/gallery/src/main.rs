@@ -18,6 +18,7 @@ mod agent_panel;
 mod agent_parts;
 mod editor_lsp;
 mod editor_story;
+mod pr_story;
 mod review_story;
 
 use gpui_kit::base::input::InputEvent;
@@ -38,6 +39,8 @@ enum Story {
     PrChip,
     ModelBadge,
     Review,
+    PullRequest,
+    PullRequests,
     Colors,
     Typography,
     Icons,
@@ -55,7 +58,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 22] = [
+    const ALL: [Story; 24] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -64,6 +67,8 @@ impl Story {
         Story::PrChip,
         Story::ModelBadge,
         Story::Review,
+        Story::PullRequest,
+        Story::PullRequests,
         Story::Colors,
         Story::Typography,
         Story::Icons,
@@ -90,6 +95,8 @@ impl Story {
             Story::PrChip => "PR chip",
             Story::ModelBadge => "Model badge",
             Story::Review => "Review",
+            Story::PullRequest => "Pull request",
+            Story::PullRequests => "Pull requests",
             Story::Colors => "Colors",
             Story::Typography => "Typography",
             Story::Icons => "Icons",
@@ -154,6 +161,8 @@ struct Gallery {
     editors: editor_story::EditorTabs,
     /// The Review story, which keeps its own files, hunks and comments.
     review: Entity<review_story::ReviewStory>,
+    /// The Pull request story: its rail, its bar and its diff.
+    pull_request: Entity<pr_story::PrStory>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -239,6 +248,7 @@ impl Gallery {
         });
         let editors = editor_story::EditorTabs::new(window, cx);
         let review = cx.new(|cx| review_story::ReviewStory::new(window, cx));
+        let pull_request = cx.new(|cx| pr_story::PrStory::new(window, cx));
         let mut gallery =
             Self {
             story,
@@ -251,6 +261,7 @@ impl Gallery {
             _inline_edits,
             editors,
             review,
+            pull_request,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
             gallery.editors.open(cx);
@@ -379,6 +390,8 @@ impl Gallery {
             Story::PrChip => agent_parts::pr_chip_story().into_any_element(),
             Story::ModelBadge => agent_parts::model_badge_story().into_any_element(),
             Story::Review => review_story::element(&self.review),
+            Story::PullRequest => pr_story::element(&self.pull_request),
+            Story::PullRequests => pr_story::pull_requests().into_any_element(),
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
             Story::Icons => icons(cx).into_any_element(),
@@ -400,7 +413,8 @@ impl Gallery {
 impl Render for Gallery {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let panel = self.story == Story::AgentPanel;
+        // These draw edge to edge, as a real pane does, with no title or padding around them.
+        let panel = matches!(self.story, Story::AgentPanel | Story::PullRequest | Story::PullRequests);
         div()
             .flex()
             .size_full()
@@ -964,7 +978,12 @@ fn main() {
             Ok("light") => beui::theme::set_appearance(Appearance::Light, cx),
             _ => {}
         }
-        let bounds = Bounds::centered(None, size(px(1100.), px(860.)), cx);
+        // GALLERY_SIZE=1500x900 opens a larger window, for a story laid out like a full screen.
+        let (w, h) = std::env::var("GALLERY_SIZE")
+            .ok()
+            .and_then(|v| v.split_once('x').and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))))
+            .unwrap_or((1100., 860.));
+        let bounds = Bounds::centered(None, size(px(w), px(h)), cx);
         cx.open_window(
             WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() },
             |window, cx| {
