@@ -18,6 +18,7 @@ mod agent_panel;
 mod agent_parts;
 mod editor_lsp;
 mod editor_story;
+mod review_story;
 
 use gpui_kit::base::input::InputEvent;
 
@@ -36,6 +37,7 @@ enum Story {
     PrCard,
     PrChip,
     ModelBadge,
+    Review,
     Colors,
     Typography,
     Icons,
@@ -53,7 +55,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 21] = [
+    const ALL: [Story; 22] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -61,6 +63,7 @@ impl Story {
         Story::PrCard,
         Story::PrChip,
         Story::ModelBadge,
+        Story::Review,
         Story::Colors,
         Story::Typography,
         Story::Icons,
@@ -86,6 +89,7 @@ impl Story {
             Story::PrCard => "PR card",
             Story::PrChip => "PR chip",
             Story::ModelBadge => "Model badge",
+            Story::Review => "Review",
             Story::Colors => "Colors",
             Story::Typography => "Typography",
             Story::Icons => "Icons",
@@ -148,6 +152,8 @@ struct Gallery {
     _inline_edits: gpui_kit::Subscription,
     /// The Editor story's tabs: a real file per language, each with its language server.
     editors: editor_story::EditorTabs,
+    /// The Review story, which keeps its own files, hunks and comments.
+    review: Entity<review_story::ReviewStory>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -232,6 +238,7 @@ impl Gallery {
             }
         });
         let editors = editor_story::EditorTabs::new(window, cx);
+        let review = cx.new(|cx| review_story::ReviewStory::new(window, cx));
         let mut gallery =
             Self {
             story,
@@ -243,6 +250,7 @@ impl Gallery {
             inline_history: Default::default(),
             _inline_edits,
             editors,
+            review,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
             gallery.editors.open(cx);
@@ -370,6 +378,7 @@ impl Gallery {
             Story::PrCard => agent_parts::pr_card_story().into_any_element(),
             Story::PrChip => agent_parts::pr_chip_story().into_any_element(),
             Story::ModelBadge => agent_parts::model_badge_story().into_any_element(),
+            Story::Review => review_story::element(&self.review),
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
             Story::Icons => icons(cx).into_any_element(),
