@@ -1056,13 +1056,15 @@ impl SyntaxHighlighter {
             .map(|layer| (layer.language_name.clone(), layer.highlight_query.clone()))
             .collect();
         let mut resolved_languages = HashMap::new();
+        // A layer that only touches the region is dropped, and the query needs a node to
+        // overlap its range, so it runs a byte wider still and finds that layer again.
         let mut found = Vec::new();
         for range in &region {
             found.extend(find_injections(
                 &data,
                 new_tree,
                 &self.text,
-                Some(range.clone()),
+                Some(range.start.saturating_sub(1)..(range.end + 1).min(text_len)),
                 &mut highlight_queries,
                 &mut resolved_languages,
             ));
