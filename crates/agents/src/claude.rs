@@ -20,7 +20,6 @@ pub fn mark() -> Mark {
     Mark {
         working: SparkState::Thinking.strip(),
         orbiting: SparkState::Orbiting.strip(),
-        rest: SparkState::Thinking.strip(),
         color: color(CLAY),
     }
 }

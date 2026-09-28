@@ -10,9 +10,8 @@ fn claudes_look_uses_the_clis_clay_and_names_claude() {
 }
 
 #[test]
-fn the_spark_thinks_orbits_and_rests_on_the_first_thinking_frame() {
+fn the_spark_thinks_while_claude_works_and_orbits_while_subagents_run() {
     let mark = mark();
     assert_eq!(mark.working, SparkState::Thinking.strip());
     assert_eq!(mark.orbiting, SparkState::Orbiting.strip());
-    assert_eq!(mark.rest, SparkState::Thinking.strip());
 }
