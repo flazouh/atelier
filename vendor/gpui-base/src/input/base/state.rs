@@ -149,6 +149,10 @@ pub struct RowBlock {
     pub render: Rc<dyn Fn(&mut Window, &mut App) -> gpui::AnyElement>,
 }
 
+/// lathe patch: draws an element in the gutter of the row under the pointer, given that row. A review's
+/// "add a comment" button is one. See [`InputBaseState::set_gutter_widget`].
+pub type GutterWidget = Rc<dyn Fn(usize, &mut Window, &mut App) -> gpui::AnyElement>;
+
 /// lathe patch: empty space above one buffer row, `rows` row heights tall, which pushes that row and
 /// every row below it down. An owner that shrinks it frame by frame slides those rows up into the
 /// place of rows it just deleted. See [`InputBaseState::set_row_gaps`].
@@ -463,6 +467,9 @@ pub struct InputBaseState<M: InputModeKind> {
     row_gaps: Vec<RowGap>,
     /// lathe patch: elements in gaps below rows. See `set_row_blocks`.
     row_blocks: Vec<RowBlock>,
+    /// lathe patch: the element in the hovered row's gutter, and that row. See `set_gutter_widget`.
+    gutter_widget: Option<GutterWidget>,
+    hovered_row: Option<usize>,
     /// lathe patch: a style the owner pinned. While it is set, `set_editor_style` applies it in place
     /// of whatever it was given, so a wrapper that sets a theme style on every render cannot replace
     /// the owner's.
@@ -791,6 +798,8 @@ impl<M: InputModeKind> InputBaseState<M> {
             row_covers: Vec::new(),
             row_gaps: Vec::new(),
             row_blocks: Vec::new(),
+            gutter_widget: None,
+            hovered_row: None,
             diagnostic_popover: None,
             context_menu_handler: None,
             pending_context_menu: None,
@@ -2990,6 +2999,30 @@ impl<M: InputModeKind> InputBaseState<M> {
 
     pub(super) fn row_blocks(&self) -> &[RowBlock] {
         &self.row_blocks
+    }
+
+    /// lathe patch: an element the editor draws at the left of the gutter, centred on the row under
+    /// the pointer, and moves as the pointer does. `None` removes it.
+    pub fn set_gutter_widget(&mut self, widget: Option<GutterWidget>) {
+        self.gutter_widget = widget;
+    }
+
+    pub(super) fn gutter_widget(&self) -> Option<&GutterWidget> {
+        self.gutter_widget.as_ref()
+    }
+
+    /// lathe patch: the buffer row under the pointer, while a gutter widget is set.
+    pub fn hovered_row(&self) -> Option<usize> {
+        self.hovered_row
+    }
+
+    /// lathe patch: the row the pointer is over, redrawing when it changes.
+    pub(super) fn set_hovered_row(&mut self, position: Option<Point<Pixels>>, cx: &mut Context<Self>) {
+        let row = position.map(|p| self.text.offset_to_point(self.index_for_mouse_position(p).0).row);
+        if self.hovered_row != row {
+            self.hovered_row = row;
+            cx.notify();
+        }
     }
 
     /// lathe patch: every selection as a byte range, in text order.
@@ -7176,6 +7209,52 @@ mod tests {
         view.input.read_with(&cx, |state, _| assert_eq!(state.cursor(), 3, "a press in the block leaves the caret"));
         cx.simulate_click(on_row_2, gpui::Modifiers::default());
         view.input.read_with(&cx, |state, _| assert_eq!(state.cursor(), row_2, "a press on row 2 lands on row 2"));
+    }
+
+    /// lathe patch: the gutter widget shows on the row under the pointer, follows it, and leaves with it.
+    #[gpui::test]
+    fn test_the_gutter_widget_follows_the_row_under_the_pointer(cx: &mut TestAppContext) {
+        cx.update(crate::init);
+        let view = InputView::<EditorMode>::new(cx);
+        let mut cx = VisualTestContext::from_window(view.window_handle.into(), cx);
+        let drawn = Rc::new(std::cell::RefCell::new(Vec::<usize>::new()));
+        let seen = drawn.clone();
+        cx.update(|window, cx| {
+            view.input.update(cx, |state, cx| {
+                state.set_value("one\ntwo\nthree\nfour", window, cx);
+                state.set_gutter_widget(Some(Rc::new(move |row, _, _| {
+                    seen.borrow_mut().push(row);
+                    div().size(px(10.)).into_any_element()
+                })));
+            })
+        });
+        cx.run_until_parked();
+        assert!(drawn.borrow().is_empty(), "nothing shows before the pointer arrives");
+        let over = |cx: &mut VisualTestContext, row: usize| {
+            view.input.read_with(cx, |state, _| {
+                let bounds = state.last_bounds.expect("painted");
+                let layout = state.last_layout.as_ref().unwrap();
+                let (_, top, height) = layout.row_rects(None)[row];
+                point(bounds.origin.x + layout.line_number_width + px(4.), bounds.origin.y + top + height / 2.)
+            })
+        };
+        let row_2 = over(&mut cx, 2);
+        cx.simulate_mouse_move(row_2, None, gpui::Modifiers::default());
+        cx.run_until_parked();
+        view.input.read_with(&cx, |state, _| assert_eq!(state.hovered_row(), Some(2)));
+        assert_eq!(drawn.borrow().last(), Some(&2), "it draws on the row under the pointer");
+        let row_0 = over(&mut cx, 0);
+        cx.simulate_mouse_move(row_0, None, gpui::Modifiers::default());
+        cx.run_until_parked();
+        assert_eq!(drawn.borrow().last(), Some(&0), "it follows the pointer");
+        drawn.borrow_mut().clear();
+        cx.simulate_mouse_move(point(px(-50.), px(-50.)), None, gpui::Modifiers::default());
+        cx.run_until_parked();
+        view.input.read_with(&cx, |state, _| assert_eq!(state.hovered_row(), None));
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        assert!(drawn.borrow().is_empty(), "it leaves with the pointer");
     }
 
     /// lathe patch: every selection can be read and put back as byte ranges.

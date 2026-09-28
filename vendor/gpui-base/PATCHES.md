@@ -132,3 +132,15 @@ on a folded row gets no gap.
 Code: `RowBlock` and `set_row_blocks` in `src/input/base/state.rs`, `measure_row_blocks` and
 `place_row_blocks` in `src/input/base/element.rs`.
 Test: `test_a_row_block_opens_a_gap_below_its_row`.
+
+## 13. A gutter widget on the row under the pointer
+
+A review opens a comment from a "+" in the gutter of the row the pointer is over, as GitHub does.
+`set_gutter_widget` takes a function of the row; the editor tracks the row under the pointer
+(`hovered_row`) from a window-level mouse-move listener gated on its own hitbox, redraws when it
+changes, and draws the widget at the gutter's left edge, centred on that row. The row clears when
+the pointer leaves the editor or moves over a row block, which blocks the editor's hitbox.
+Code: `GutterWidget`, `set_gutter_widget`, `hovered_row` and `set_hovered_row` in
+`src/input/base/state.rs`; `layout_gutter_widget` and the listener in `TextElement::paint` in
+`src/input/base/element.rs`.
+Test: `test_the_gutter_widget_follows_the_row_under_the_pointer`.

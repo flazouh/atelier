@@ -1479,6 +1479,24 @@ impl<M: InputModeKind> TextElement<M> {
             .collect()
     }
 
+    /// lathe patch: lays out the gutter widget at the gutter's left edge, centred on the hovered row.
+    fn layout_gutter_widget(
+        &self,
+        gutter_x: Pixels,
+        bounds: &Bounds<Pixels>,
+        last_layout: &LastLayout,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<AnyElement> {
+        let state = self.state.read(cx);
+        let (widget, row) = (state.gutter_widget()?.clone(), state.hovered_row()?);
+        let (_, top, height) = last_layout.row_rects(None).into_iter().find(|(r, _, _)| *r == row)?;
+        let mut element = widget(row, window, cx);
+        let measured = element.layout_as_root(gpui::AvailableSpace::min_size(), window, cx);
+        element.prepaint_at(point(gutter_x + px(2.), bounds.origin.y + top + (height - measured.height).half()), window, cx);
+        Some(element)
+    }
+
     /// Paint fold icons using prepaint hitboxes.
     ///
     /// This handles:
@@ -1817,6 +1835,8 @@ pub(super) struct PrepaintState {
     row_widgets: Vec<AnyElement>,
     /// lathe patch: the owner's row blocks, laid out for this frame.
     row_blocks: Vec<AnyElement>,
+    /// lathe patch: the owner's gutter widget on the hovered row, laid out for this frame.
+    gutter_widget: Option<AnyElement>,
     /// lathe patch: the text area, right of the gutter, where the pointer is an I-beam.
     text_hitbox: Hitbox,
     // Inline completion rendering data
@@ -2339,6 +2359,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
         let hitbox = window.insert_hitbox(input_bounds, HitboxBehavior::Normal);
         // lathe patch: after the editor's hitboxes, so a block's own hitbox is on top of them.
         let row_blocks = Self::place_row_blocks(row_blocks, &bounds, &last_layout, window, cx);
+        let gutter_widget = self.layout_gutter_widget(original_x, &bounds, &last_layout, window, cx);
 
         PrepaintState {
             hitbox,
@@ -2358,6 +2379,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             fold_icon_layout,
             row_widgets,
             row_blocks,
+            gutter_widget,
             text_hitbox,
             ghost_first_line,
             ghost_lines,
@@ -2703,6 +2725,17 @@ impl<M: InputModeKind> Element for TextElement<M> {
             window,
             cx,
         );
+        // lathe patch: with a gutter widget, follow the row under the pointer. Over a row block the
+        // editor is not hovered, so the widget goes, as it does when the pointer leaves.
+        if self.state.read(cx).gutter_widget().is_some() {
+            let (hitbox, state) = (prepaint.hitbox.clone(), self.state.clone());
+            window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
+                if phase == gpui::DispatchPhase::Bubble {
+                    let over = hitbox.is_hovered(window).then_some(event.position);
+                    state.update(cx, |state, cx| state.set_hovered_row(over, cx));
+                }
+            });
+        }
         // lathe patch: row widgets sit above the text and stay inside the editor.
         window.with_content_mask(Some(gpui::ContentMask { bounds: input_bounds }), |window| {
             for widget in prepaint.row_widgets.iter_mut() {
@@ -2710,6 +2743,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
             }
             for block in prepaint.row_blocks.iter_mut() {
                 block.paint(window, cx);
+            }
+            if let Some(widget) = prepaint.gutter_widget.as_mut() {
+                widget.paint(window, cx);
             }
         });
 
