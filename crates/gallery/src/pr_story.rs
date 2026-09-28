@@ -263,8 +263,13 @@ impl PrStory {
         beui::code_editor::set_diagnostics(&self.editor, Vec::new(), cx);
         self.place = place;
         let this = cx.entity().downgrade();
+        // gpui-base asks while it updates the editor, and a jump replaces the editor's text, so it waits
+        // until that update is over.
         let elsewhere: Elsewhere = Rc::new(move |jump: Jump, window: &mut Window, cx: &mut gpui_kit::App| {
-            this.update(cx, |story, cx| story.jump(jump, window, cx)).ok();
+            let this = this.clone();
+            window.defer(cx, move |window, cx| {
+                this.update(cx, |story, cx| story.jump(jump, window, cx)).ok();
+            });
         });
         let (editor, path) = (self.editor.clone(), self.path_on_disk());
         let session = cx.new(|cx| EditorSession::for_review(editor, path, rows, Some(elsewhere), cx));
