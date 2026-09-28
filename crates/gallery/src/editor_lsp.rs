@@ -12,7 +12,7 @@
 //! ([`Elsewhere`]) when there is one; otherwise the status line names the place.
 
 use std::{
-    path::{Path, PathBuf},
+    path::PathBuf,
     rc::Rc,
     sync::{Arc, Mutex, OnceLock},
     time::Duration,

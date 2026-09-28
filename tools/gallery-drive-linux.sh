@@ -2,7 +2,8 @@
 # Drives one gallery story on a headless Linux box and screenshots it: the screen is the window's size,
 # so the window sits at 0,0 and the xdotool script's coordinates are the window's.
 # Build first: cargo build -p beui-gallery.
-# Usage: tools/gallery-drive-linux.sh "<story>" light|dark <width>x<height> out.png ["<xdotool script>"]
+# Usage: tools/gallery-drive-linux.sh "<story>" light|dark <width>x<height> out.png|out.mp4 ["<xdotool script>"]
+# With out.mp4 it records while the script runs, instead of taking a shot after it.
 # GALLERY_WAIT=<seconds> sets how long the story runs before the script (a language server needs a while).
 set -euo pipefail
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
@@ -15,6 +16,16 @@ DISPLAY=$DISPLAY_NUM WAYLAND_DISPLAY= GALLERY_SIZE=$3 GALLERY_THEME=$2 GALLERY_S
 GALLERY=$!
 sleep "${GALLERY_WAIT:-8}"
 export DISPLAY=$DISPLAY_NUM
+if [[ "$4" == *.mp4 ]]; then
+  ffmpeg -v error -y -f x11grab -framerate 30 -video_size "$3" -i "$DISPLAY_NUM" -pix_fmt yuv420p "$4" &
+  REC=$!
+  sleep 0.5
+fi
 if [ $# -ge 5 ]; then eval "$5"; fi
 sleep 1
-import -window root "$4"
+if [[ "$4" == *.mp4 ]]; then
+  kill -INT $REC
+  wait $REC || true
+else
+  import -window root "$4"
+fi
