@@ -1,11 +1,7 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     ops::Range,
     rc::Rc,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
     time::Duration,
 };
 
@@ -15,9 +11,9 @@ use gpui_base::input::{
     InputHighlighterFactory,
 };
 use ropey::Rope;
-use tree_sitter::{InputEdit, ParseOptions, Point};
+use tree_sitter::{InputEdit, Point};
 
-use super::{LanguageRegistry, SyntaxHighlighter};
+use super::{LanguageRegistry, ParseQueue, SyntaxHighlighter};
 
 pub(crate) fn input_highlighter_factory() -> InputHighlighterFactory {
     Rc::new(|language| {
@@ -30,6 +26,9 @@ pub(crate) fn input_highlighter_factory() -> InputHighlighterFactory {
 struct TreeSitterInputHighlighter {
     inner: Rc<RefCell<SyntaxHighlighter>>,
     parse_task: Rc<RefCell<Option<Task<()>>>>,
+    queue: Rc<RefCell<ParseQueue>>,
+    /// Whether the editor wants fold ranges, as its latest update said.
+    folding: Rc<Cell<bool>>,
 }
 
 impl TreeSitterInputHighlighter {
@@ -37,6 +36,8 @@ impl TreeSitterInputHighlighter {
         Self {
             inner: Rc::new(RefCell::new(SyntaxHighlighter::new(language))),
             parse_task: Rc::new(RefCell::new(None)),
+            queue: Rc::default(),
+            folding: Rc::default(),
         }
     }
 }
@@ -57,6 +58,9 @@ impl InputHighlighter for TreeSitterInputHighlighter {
         self.inner.borrow().language().clone()
     }
 
+    /// lathe patch: the UI thread only applies the edit, which moves the old colours with the
+    /// text. Every parse, whatever the text's size, runs on a background thread, one at a time;
+    /// keystrokes during it coalesce into one next parse, and a result for an older text is dropped.
     fn update(
         &mut self,
         edit: Option<BaseInputEdit>,
@@ -65,96 +69,45 @@ impl InputHighlighter for TreeSitterInputHighlighter {
         window: &mut gpui::Window,
         cx: &mut gpui::Context<EditorState>,
     ) {
-        const SYNC_PARSE_TIMEOUT: Duration = Duration::from_millis(2);
-        const SYNC_PARSE_MAX_BYTES: usize = 256 * 1024;
-        const PARSE_DEBOUNCE: Duration = Duration::from_millis(150);
-
-        let edit = edit.map(to_tree_sitter_edit);
-        let completed = {
+        {
             let mut highlighter = self.inner.borrow_mut();
-            if text.len() > SYNC_PARSE_MAX_BYTES {
-                highlighter.edit_tree(edit, text);
-                false
-            } else {
-                highlighter.update(edit, text, Some(SYNC_PARSE_TIMEOUT))
+            match edit.map(to_tree_sitter_edit) {
+                Some(edit) => highlighter.edit_tree(Some(edit), text),
+                None => highlighter.reset_tree(text),
             }
-        };
-        if completed {
-            self.parse_task.borrow_mut().take();
+        }
+        self.folding.set(folding);
+        if !self.queue.borrow_mut().request() {
             return;
         }
 
-        let highlighter = self.inner.clone();
-        let parse_task = self.parse_task.clone();
-        let language = highlighter.borrow().language().clone();
-        let old_tree = highlighter.borrow().tree().cloned();
-        let injection_data = highlighter.borrow().injection_parse_data();
-        let text = text.clone();
-        let text_for_apply = text.clone();
-        let cancel = Arc::new(AtomicBool::new(false));
-
+        let (highlighter, queue, folding) = (self.inner.clone(), self.queue.clone(), self.folding.clone());
         let task = cx.spawn_in(window, async move |entity, cx| {
-            struct CancelOnDrop(Arc<AtomicBool>);
-            impl Drop for CancelOnDrop {
-                fn drop(&mut self) {
-                    self.0.store(true, Ordering::Relaxed);
+            loop {
+                let job = highlighter.borrow().background_parse();
+                let fold = folding.get();
+                let parsed = cx
+                    .background_executor()
+                    .spawn(async move {
+                        let parsed = job?.run()?;
+                        let folds = if fold { extract_fold_ranges(parsed.tree()) } else { Vec::new() };
+                        Some((parsed, folds))
+                    })
+                    .await;
+                if let Some((parsed, folds)) = parsed {
+                    if highlighter.borrow_mut().apply_parsed(parsed) {
+                        let _ = entity.update(cx, |state, cx| {
+                            state.apply_highlighter_fold_candidates(folds, cx);
+                            cx.notify();
+                        });
+                    }
+                }
+                if !queue.borrow_mut().finish() {
+                    break;
                 }
             }
-            let _cancel_guard = CancelOnDrop(cancel.clone());
-            cx.background_executor().timer(PARSE_DEBOUNCE).await;
-
-            let parse_cancel = cancel.clone();
-            let result = cx
-                .background_executor()
-                .spawn(async move {
-                    let (mut parser, grammar) =
-                        LanguageRegistry::singleton().parser(&language).ok()?;
-                    parser.set_language(&grammar).ok()?;
-                    let mut progress = |_: &tree_sitter::ParseState| {
-                        if parse_cancel.load(Ordering::Relaxed) {
-                            std::ops::ControlFlow::Break(())
-                        } else {
-                            std::ops::ControlFlow::Continue(())
-                        }
-                    };
-                    let options = ParseOptions::new().progress_callback(&mut progress);
-                    let tree = parser.parse_with_options(
-                        &mut |offset, _| {
-                            if offset >= text.len() {
-                                ""
-                            } else {
-                                let (chunk, chunk_byte_ix) = text.chunk(offset);
-                                &chunk[offset - chunk_byte_ix..]
-                            }
-                        },
-                        old_tree.as_ref(),
-                        Some(options),
-                    )?;
-                    if parse_cancel.load(Ordering::Relaxed) {
-                        return None;
-                    }
-                    let injections = injection_data.map_or_else(Default::default, |data| {
-                        SyntaxHighlighter::compute_injection_layers(data, &tree, &text)
-                    });
-                    let folds = if folding {
-                        extract_fold_ranges(&tree)
-                    } else {
-                        Vec::new()
-                    };
-                    Some((tree, injections, folds))
-                })
-                .await;
-
-            if let Some((tree, injections, folds)) = result {
-                highlighter
-                    .borrow_mut()
-                    .apply_background_tree(tree, &text_for_apply, injections);
-                let _ = entity.update(cx, |state, cx| {
-                    state.apply_highlighter_fold_candidates(folds, cx);
-                });
-            }
         });
-        parse_task.borrow_mut().replace(task);
+        self.parse_task.borrow_mut().replace(task);
     }
 
     fn styles(

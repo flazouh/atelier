@@ -87,7 +87,140 @@ pub(crate) struct InjectionLayer {
     match_range: Range<usize>,
 }
 
+/// One parse at a time for an editor. A request while one runs waits as a single queued parse,
+/// however many come, so the keystrokes during a parse coalesce into the next one.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ParseQueue {
+    running: bool,
+    queued: bool,
+}
+
+impl ParseQueue {
+    /// A parse is wanted: `true` when it starts now, `false` when it waits behind the running one.
+    pub fn request(&mut self) -> bool {
+        if self.running {
+            self.queued = true;
+            return false;
+        }
+        self.running = true;
+        true
+    }
+
+    /// The running parse ended: `true` when the queued one starts now.
+    pub fn finish(&mut self) -> bool {
+        if self.queued {
+            self.queued = false;
+            return true;
+        }
+        self.running = false;
+        false
+    }
+}
+
+/// A parse to run on another thread: see [`SyntaxHighlighter::background_parse`].
+pub struct BackgroundParse {
+    language: SharedString,
+    old_tree: Option<Tree>,
+    text: Rope,
+    injections: Option<InjectionParseData>,
+}
+
+/// A finished background parse, for [`SyntaxHighlighter::apply_parsed`].
+pub struct ParsedTree {
+    tree: Tree,
+    text: Rope,
+    injections: InjectionLayers,
+}
+
+impl ParsedTree {
+    pub fn tree(&self) -> &Tree {
+        &self.tree
+    }
+}
+
+impl BackgroundParse {
+    /// Parses the text on the old tree, as edited, then builds its injection layers. No budget:
+    /// it runs off the UI thread.
+    pub fn run(self) -> Option<ParsedTree> {
+        let (mut parser, grammar) = LanguageRegistry::singleton().parser(&self.language).ok()?;
+        parser.set_language(&grammar).ok()?;
+        let text = &self.text;
+        let tree = parser.parse_with_options(
+            &mut |offset, _| {
+                if offset >= text.len() {
+                    ""
+                } else {
+                    let (chunk, chunk_byte_ix) = text.chunk(offset);
+                    &chunk[offset - chunk_byte_ix..]
+                }
+            },
+            self.old_tree.as_ref(),
+            None,
+        )?;
+        let injections = match self.injections {
+            Some(data) => SyntaxHighlighter::compute_injection_layers(data, &tree, text),
+            None => InjectionLayers::default(),
+        };
+        Some(ParsedTree { tree, text: self.text, injections })
+    }
+}
+
+/// Where an offset lands after `edit`: before it, it stays; after it, it moves by the edit's
+/// length change; inside the replaced text, a range's start goes to the end of the new text and its
+/// end to the start of the edit, so the range keeps only what the edit left of it.
+fn follow_offset(offset: usize, edit: &InputEdit, start: bool) -> usize {
+    if offset <= edit.start_byte {
+        offset
+    } else if offset >= edit.old_end_byte {
+        offset - edit.old_end_byte + edit.new_end_byte
+    } else if start {
+        edit.new_end_byte
+    } else {
+        edit.start_byte
+    }
+}
+
+fn follow_point(point: Point, offset: usize, edit: &InputEdit, start: bool) -> Point {
+    if offset <= edit.start_byte {
+        point
+    } else if offset >= edit.old_end_byte {
+        shift_point(point, edit)
+    } else if start {
+        edit.new_end_position
+    } else {
+        edit.start_position
+    }
+}
+
+/// `range` after `edit`, as [`follow_offset`] moves its ends; an edit inside it makes it grow or
+/// shrink with the text.
+pub fn follow_range(range: &Range<usize>, edit: &InputEdit) -> Range<usize> {
+    let start = follow_offset(range.start, edit, true);
+    start..follow_offset(range.end, edit, false).max(start)
+}
+
 impl InjectionLayer {
+    /// Moves this layer with `edit` without parsing: its tree is edited and its ranges follow.
+    fn follow(&mut self, edit: &InputEdit) {
+        if self.byte_range.end >= edit.start_byte {
+            self.tree.edit(edit);
+        }
+        for range in &mut self.ranges {
+            let start_byte = follow_offset(range.start_byte, edit, true);
+            let end_byte = follow_offset(range.end_byte, edit, false).max(start_byte);
+            *range = tree_sitter::Range {
+                start_point: follow_point(range.start_point, range.start_byte, edit, true),
+                end_point: follow_point(range.end_point, range.end_byte, edit, false),
+                start_byte,
+                end_byte,
+            };
+        }
+        if let Some(bytes) = bounding_byte_range(&self.ranges) {
+            self.byte_range = bytes;
+        }
+        self.match_range = follow_range(&self.match_range, edit);
+    }
+
     /// This layer moved by `edit`, or `None` when the edit touches its match.
     fn edited(&self, edit: &InputEdit) -> Option<InjectionLayer> {
         let match_range = shift_bytes(&self.match_range, edit)?;
@@ -791,13 +924,51 @@ impl SyntaxHighlighter {
     }
 
     /// Apply only the structural `edit` to the existing tree and update the stored text,
-    /// without re-parsing.
+    /// without re-parsing. The injection layers move with it, so until a parse lands the old
+    /// colours stand where their text went (see [`Self::background_parse`]).
     pub fn edit_tree(&mut self, edit: Option<InputEdit>, text: &Rope) {
         if let (Some(edit), Some(tree)) = (edit, self.tree.as_mut()) {
             tree.edit(&edit);
         }
+        if let Some(edit) = edit {
+            for layer in &mut self.injection_layers {
+                layer.follow(&edit);
+            }
+        }
         self.text = text.clone();
         self.injections_current = false;
+    }
+
+    /// The text replaced whole: the tree and layers describe another text, so they go, and the
+    /// rows draw plain until a parse lands.
+    pub fn reset_tree(&mut self, text: &Rope) {
+        self.tree = None;
+        self.set_injection_layers(InjectionLayers::default());
+        self.text = text.clone();
+        self.injections_current = false;
+    }
+
+    /// What a parse on another thread needs: this highlighter's tree, as edited, its text and its
+    /// injections. `None` for a language with no grammar.
+    pub fn background_parse(&self) -> Option<BackgroundParse> {
+        self.parser.language()?;
+        Some(BackgroundParse {
+            language: self.language.clone(),
+            old_tree: self.tree.clone(),
+            text: self.text.clone(),
+            injections: self.injection_parse_data(),
+        })
+    }
+
+    /// Takes a background parse when it was for the text held now, and says whether it did; one
+    /// for an older text is dropped, and the moved colours stay until a newer one lands.
+    pub fn apply_parsed(&mut self, parsed: ParsedTree) -> bool {
+        if !self.text.eq(&parsed.text) {
+            return false;
+        }
+        self.tree = Some(parsed.tree);
+        self.set_injection_layers(parsed.injections);
+        true
     }
 
     /// How long one injection layer's parse may take: 20ms by default, `None` for as long as it
@@ -1343,25 +1514,6 @@ impl SyntaxHighlighter {
             tree: new_tree,
             combined,
         })
-    }
-
-    /// Apply a tree that was parsed on a background thread.
-    ///
-    /// `injection_layers` must also be pre-computed in the background via
-    /// [`compute_injection_layers`] to avoid blocking the main thread.
-    pub(crate) fn apply_background_tree(
-        &mut self,
-        tree: Tree,
-        text: &Rope,
-        injection_layers: InjectionLayers,
-    ) {
-        // Only apply if the text still matches what was parsed.
-        if !self.text.eq(text) {
-            return;
-        }
-
-        self.tree = Some(tree);
-        self.set_injection_layers(injection_layers);
     }
 
     fn set_injection_layers(&mut self, injections: InjectionLayers) {
