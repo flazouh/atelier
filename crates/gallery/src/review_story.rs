@@ -9,7 +9,7 @@ use std::{collections::HashSet, time::Instant};
 
 use beui::{
     ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer,
-    LineComposerEvent, ReviewBar, ReviewHandlers, ReviewProgress,
+    LineComposerEvent, ReviewBar, ReviewFileHeader, ReviewHandlers, ReviewProgress,
     file_tree::FileTree,
     inline_review::{self, DecisionHistory},
     review::{step, whole_file},
@@ -367,7 +367,7 @@ impl Render for ReviewStory {
         let body = if self.review_mode { f32::from(window.viewport_size().height) - 32. - 52. } else { 560. };
         let review = InlineReview::new("review-editor", &self.editor, hunks.clone())
             .on_card(true)
-            .height(px(body - 12.))
+            .height(px(body - 12. - 40.))
             .when_some(hunks.first(), |r, h| r.current(h.id.clone()))
             .resolving(self.resolving.clone())
             .row_blocks(blocks)
@@ -377,6 +377,8 @@ impl Render for ReviewStory {
 
         // The tree and the diff each sit in the same card, under the bar.
         let card = || div().h(px(body)).bg(theme.card).rounded(radius::LG).p(px(6.));
+        let file = &self.files[self.current];
+        let header = ReviewFileHeader::new("review-file", file.path.clone(), file.added, file.removed, handlers.clone());
         // The story's width, less the gallery's sidebar (220) and its padding (2 x 40), so the bar fits
         // to the pane rather than the pane growing to the bar. Review mode takes the window, less 32.
         let viewport = window.viewport_size().width;
@@ -395,7 +397,8 @@ impl Render for ReviewStory {
                     .flex()
                     .gap(px(8.))
                     .child(card().flex_none().w(px(220.)).child(tree))
-                    .child(card().flex_1().min_w_0().child(review)),
+                    // The file's own card: its head stays put while the text under it scrolls.
+                    .child(card().flex_1().min_w_0().flex().flex_col().child(header).child(review)),
             );
         let pane = handlers.keys(pane, &self.focus);
         if !self.review_mode {
