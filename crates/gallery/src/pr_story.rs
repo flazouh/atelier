@@ -305,7 +305,7 @@ impl Render for PrStory {
                 }
             }))
             .child(ChecksPanel::new("pr-checks", checks()))
-            .child(div().flex().flex_col().rounded(radius::LG).bg(theme.card).child(ConversationList::new("pr-conversation", threads, remarks)).child(self.composer.clone()))
+            .child(div().flex().flex_col().flex_none().rounded(radius::LG).bg(theme.card).child(ConversationList::new("pr-conversation", threads, remarks)).child(self.composer.clone()))
             .child(self.verdict.clone())
             .child(CommitsSummary::new("pr-commits", commits()));
 
