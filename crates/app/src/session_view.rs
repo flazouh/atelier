@@ -226,7 +226,8 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
                     .items_center()
                     .gap(px(8.))
                     .child(Icon::new(IconName::Error).size(px(14.)).color(theme.danger))
-                    .child(div().flex_1().child(why))
+                    // The reason wraps inside the box instead of running past the panel.
+                    .child(div().flex_1().min_w_0().whitespace_normal().child(why))
                     .children(details.is_some().then(|| {
                         Button::new(gpui_kit::ElementId::Name(format!("{}-show-details", s.key).into()))
                             .label(if shown { "Hide details" } else { "Show details" })
@@ -291,7 +292,7 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
             .gap(px(4.))
             .child(div().text_size(TextSize::Sm.font_size()).child(if starting { "Starting…" } else { "A new session" }))
             .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(format!("Ask {agent_name} anything about this project.")))
-            .children(s.can_choose_agent().then(|| agent_picker(session, cx)))
+            .children(s.can_choose_agent().then(|| agent_picker(session, cx)).flatten())
             .into_any_element()
     } else {
         div().flex_1().min_h_0().pt(px(12.)).child(rows).into_any_element()
@@ -332,7 +333,7 @@ fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> 
         .iter()
         .map(|a| {
             let option = SelectOption::from(a.name);
-            match a.mark {
+            match a.mark.clone() {
                 Some(mark) => option.mark(mark),
                 None => option,
             }
