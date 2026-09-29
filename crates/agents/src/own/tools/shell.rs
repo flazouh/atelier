@@ -17,6 +17,47 @@ const MAX_TIMEOUT: u64 = 600;
 /// so the process never blocks on a full pipe.
 const KEEP: usize = 256 * 1024;
 
+/// What the command wrote, kept up to [`KEEP`] bytes, with its group id taken off the front.
+#[derive(Default)]
+struct Output {
+    bytes: Vec<u8>,
+    total: usize,
+    /// The first line, until it is whole.
+    head: Vec<u8>,
+    seen_head: bool,
+    group: Option<String>,
+}
+
+impl Output {
+    fn take(&mut self, mut chunk: &[u8]) {
+        if !self.seen_head {
+            self.head.extend_from_slice(chunk);
+            let Some(end) = self.head.iter().position(|b| *b == b'\n') else { return };
+            self.seen_head = true;
+            let head = std::mem::take(&mut self.head);
+            let line = String::from_utf8_lossy(&head[..end]).into_owned();
+            match line.strip_prefix("@@lathe-group ") {
+                Some(group) => self.group = Some(group.trim().to_string()),
+                // Not the word we expect: it is the command's output, whole.
+                None => self.push(&head[..=end]),
+            }
+            let rest = head[end + 1..].to_vec();
+            self.push(&rest);
+            return;
+        }
+        if chunk.is_empty() {
+            chunk = &[];
+        }
+        self.push(chunk);
+    }
+
+    fn push(&mut self, chunk: &[u8]) {
+        let room = KEEP.saturating_sub(self.bytes.len());
+        self.bytes.extend_from_slice(&chunk[..chunk.len().min(room)]);
+        self.total += chunk.len();
+    }
+}
+
 pub struct Shell;
 
 impl Tool for Shell {
@@ -53,15 +94,17 @@ impl Tool for Shell {
     fn run(&self, ctx: &ToolContext<'_>, input: &Value) -> ToolResult {
         let Some(line) = input["command"].as_str().filter(|c| !c.trim().is_empty()) else { return ToolResult::err("`command` is required") };
         let timeout = Duration::from_secs(input["timeout_secs"].as_u64().unwrap_or(DEFAULT_TIMEOUT).clamp(1, MAX_TIMEOUT));
-        // stderr joins stdout, so the model sees the two in the order they were written.
-        let script = format!("exec 2>&1\n{line}");
-        let command = Command::new("sh").args(["-c", script.as_str()]);
+        // The shell's first word is its own process id, so that stopping the command can stop everything it
+        // started, and not only the shell (see below). stderr joins stdout, so the model sees the two in the
+        // order they were written.
+        const SCRIPT: &str = "printf '@@lathe-group %s\\n' \"$$\"\nexec 2>&1\nexec sh -c \"$1\"";
+        let command = Command::new("sh").args(["-c", SCRIPT, "sh", line]);
         let mut process = match ctx.project.spawn(&command) {
             Ok(process) => process,
             Err(e) => return ToolResult::err(format!("cannot start the shell: {e}")),
         };
         drop(std::mem::replace(&mut process.stdin, Box::new(std::io::sink())));
-        let out = Arc::new(Mutex::new((Vec::<u8>::new(), 0usize)));
+        let out = Arc::new(Mutex::new(Output::default()));
         let sink = out.clone();
         let mut stdout = std::mem::replace(&mut process.stdout, Box::new(std::io::empty()));
         let reader = thread::Builder::new().name("lathe-shell-out".into()).spawn(move || {
@@ -70,10 +113,7 @@ impl Tool for Shell {
                 if n == 0 {
                     break;
                 }
-                let mut kept = sink.lock().unwrap_or_else(|p| p.into_inner());
-                let room = KEEP.saturating_sub(kept.0.len());
-                kept.0.extend_from_slice(&chunk[..n.min(room)]);
-                kept.1 += n;
+                sink.lock().unwrap_or_else(|p| p.into_inner()).take(&chunk[..n]);
             }
         });
         let started = Instant::now();
@@ -90,15 +130,31 @@ impl Tool for Shell {
             thread::sleep(Duration::from_millis(10));
         }
         if stopped.is_some() {
+            let root = out.lock().unwrap_or_else(|p| p.into_inner()).group.clone();
+            if let Some(root) = root.filter(|g| g.chars().all(|c| c.is_ascii_digit())) {
+                // Children first, then the shell, through the project so it reaches an SSH host too. Without
+                // `pgrep` on the host only the shell stops.
+                let tree = "k() { for c in $(pgrep -P \"$1\" 2>/dev/null); do k \"$c\"; done; kill -KILL \"$1\" 2>/dev/null; }; k \"$1\"";
+                if let Ok(mut killer) = ctx.project.spawn(&Command::new("sh").args(["-c", tree, "sh", root.as_str()])) {
+                    let _ = killer.control.wait();
+                }
+            }
             let _ = process.control.kill();
         }
         let code = process.control.wait().ok().flatten();
         if let Ok(reader) = reader {
-            let _ = reader.join();
+            // A process that got away from the kill may hold the pipe; do not wait for it for long.
+            let give_up = Instant::now() + Duration::from_secs(1);
+            while !reader.is_finished() && Instant::now() < give_up {
+                thread::sleep(Duration::from_millis(5));
+            }
+            if reader.is_finished() {
+                let _ = reader.join();
+            }
         }
         let (bytes, total) = {
             let kept = out.lock().unwrap_or_else(|p| p.into_inner());
-            (kept.0.clone(), kept.1)
+            (kept.bytes.clone(), kept.total)
         };
         let mut text = String::from_utf8_lossy(&bytes).into_owned();
         if total > bytes.len() {
