@@ -217,3 +217,22 @@ fn a_review_opened_again_keeps_an_accepted_hunk(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(hunk_ids(&again, cx), [ids[1].clone()], "only the hunk not decided is left");
 }
+
+/// The pane makes a new editor for each file and each scope; when the reader's keys were in the old
+/// one, they go to the new one, so the next key still reaches the review.
+#[gpui_kit::test]
+fn the_keys_follow_the_editor_to_the_next_scope(cx: &mut TestAppContext) {
+    let (pane, _, _, _, cx) = reviewing(cx);
+    let shown = pane.clone();
+    cx.update(|window, cx| _ = window.replace_root(cx, |_, _| Shown(shown)));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        let editor = pane.read(cx).editor.clone();
+        editor.update(cx, |e, cx| e.focus(window, cx));
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.switch_scope(window, cx)));
+    cx.run_until_parked();
+    let focused = cx.update(|window, cx| pane.read(cx).editor.read(cx).focus_handle(cx).is_focused(window));
+    assert!(focused, "the new editor has the keys");
+}

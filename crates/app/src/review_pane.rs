@@ -186,6 +186,16 @@ impl ReviewPane {
         (editor, edits)
     }
 
+    /// Puts the open file in a new editor. When the reader's keys were in the old one, they go to the
+    /// new one, or the next key would reach nothing.
+    fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let had_keys = self.editor.focus_handle(cx).is_focused(window);
+        (self.editor, self._edits) = Self::editor_for(self.files.get(self.current), window, cx);
+        if had_keys {
+            focus_once_painted(self.editor.focus_handle(cx), 3, window, cx);
+        }
+    }
+
     /// The editor's text changed. The pane's own edits leave it equal to the file's merged text; an undo
     /// of a decision brings back the file as it was before it; anything else is the reader's typing, and
     /// the hunks move with it.
@@ -304,7 +314,7 @@ impl ReviewPane {
         self.current = at;
         self.resolving.clear();
         self.composer = None;
-        (self.editor, self._edits) = Self::editor_for(self.files.get(at), window, cx);
+        self.load_editor(window, cx);
         cx.notify();
     }
 
@@ -428,7 +438,7 @@ impl ReviewPane {
         self.current = path.and_then(|p| self.files.iter().position(|f| f.review.path == p)).unwrap_or(0);
         self.resolving.clear();
         self.composer = None;
-        (self.editor, self._edits) = Self::editor_for(self.files.get(self.current), window, cx);
+        self.load_editor(window, cx);
         self.check_disk(self.files.iter().map(|f| f.review.path.clone()).collect(), window, cx);
         cx.notify();
     }
