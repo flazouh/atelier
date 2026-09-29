@@ -88,10 +88,41 @@ impl PaneFile {
         self.merged.as_ref().map_or(&[], |m| m.hunks())
     }
 
-    /// The text to write, when it differs from the disk: the file with what the reader decided.
-    fn to_write(&self) -> Option<String> {
-        let text = self.merged.as_ref()?.current();
-        (text != self.on_disk.as_deref().unwrap_or("")).then_some(text)
+    /// What the disk needs to hold what the reader decided, when it does not yet: the file's text, or no
+    /// file at all for one the agent made and the reader rejected whole.
+    fn to_disk(&self) -> Option<DiskChange> {
+        let merged = self.merged.as_ref()?;
+        let text = merged.current();
+        let rejected_whole = self.review.before.is_none() && merged.hunks().is_empty() && text.is_empty();
+        match (rejected_whole, &self.on_disk) {
+            (true, None) => None,
+            (true, Some(_)) => Some(DiskChange::Remove),
+            (false, on_disk) => (text != on_disk.as_deref().unwrap_or("")).then_some(DiskChange::Write(text)),
+        }
+    }
+}
+
+/// A change the pane makes on disk.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum DiskChange {
+    Write(String),
+    Remove,
+}
+
+impl DiskChange {
+    /// The file on disk once this is done.
+    fn on_disk(&self) -> Option<String> {
+        match self {
+            Self::Write(text) => Some(text.clone()),
+            Self::Remove => None,
+        }
+    }
+
+    fn apply(&self, project: &dyn Project, path: &str) -> std::io::Result<()> {
+        match self {
+            Self::Write(text) => project.write(path, text.as_bytes()),
+            Self::Remove => project.remove(path),
+        }
     }
 }
 
@@ -241,9 +272,9 @@ impl ReviewPane {
         let mut writes = Vec::new();
         let count = self.files.len();
         for &i in at.iter().filter(|i| **i < count) {
-            if let Some(text) = self.files[i].to_write() {
-                self.files[i].on_disk = Some(text.clone());
-                writes.push((self.files[i].review.path.clone(), text));
+            if let Some(change) = self.files[i].to_disk() {
+                self.files[i].on_disk = change.on_disk();
+                writes.push((self.files[i].review.path.clone(), change));
             }
             self.keep(i, cx);
         }
@@ -252,7 +283,7 @@ impl ReviewPane {
         }
         let project = self.project.clone();
         let written = cx.background_spawn(async move {
-            writes.into_iter().filter_map(|(path, text)| project.write(&path, text.as_bytes()).err().map(|e| format!("Could not write {path}: {e}"))).collect::<Vec<_>>()
+            writes.into_iter().filter_map(|(path, change)| change.apply(project.as_ref(), &path).err().map(|e| format!("Could not write {path}: {e}"))).collect::<Vec<_>>()
         });
         cx.spawn(async move |this, cx| {
             for error in written.await {
@@ -268,9 +299,9 @@ impl ReviewPane {
         if self.writing.take().is_none() {
             return;
         }
-        let Some(text) = self.files.get(self.current).and_then(PaneFile::to_write) else { return };
+        let Some(change) = self.files.get(self.current).and_then(PaneFile::to_disk) else { return };
         let (project, path) = (self.project.clone(), self.files[self.current].review.path.clone());
-        cx.background_spawn(async move { drop(project.write(&path, text.as_bytes())) }).detach();
+        cx.background_spawn(async move { drop(change.apply(project.as_ref(), &path)) }).detach();
     }
 
     /// Files of the project changed on disk: those under review are read again, and the ones the agent
