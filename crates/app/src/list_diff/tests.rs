@@ -22,3 +22,12 @@ fn a_streaming_text_changes_its_fingerprint() {
     let b = Item::Text { block: lathe_agents::session::BlockId(1), text: "Hello".into() };
     assert_ne!(fingerprint(&a), fingerprint(&b));
 }
+
+#[test]
+fn a_turns_card_follows_the_item_its_turn_ended_at() {
+    use Row::*;
+    assert_eq!(rows(0, &[]), []);
+    assert_eq!(rows(3, &[(2, 0), (3, 1)]), [Item(0), Item(1), Changes { turn: 0 }, Item(2), Changes { turn: 1 }]);
+    // Two turns that ended at the same item keep their order.
+    assert_eq!(rows(1, &[(1, 0), (1, 1)]), [Item(0), Changes { turn: 0 }, Changes { turn: 1 }]);
+}

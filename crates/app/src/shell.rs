@@ -355,6 +355,15 @@ impl Shell {
         }
     }
 
+    /// Opens `path` of `project` in the editor, and makes that project the one shown.
+    fn open_in(&mut self, project: &Entity<OpenProject>, path: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(i) = self.projects.iter().position(|p| p == project) {
+            self.active = i;
+        }
+        project.update(cx, |p, cx| p.open_file(path, window, cx));
+        cx.notify();
+    }
+
     fn add(&mut self, location: Location, project: Arc<dyn lathe_project::Project>, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(i) = self.projects.iter().position(|p| p.read(cx).location == location) {
             self.active = i;
@@ -362,8 +371,15 @@ impl Shell {
             return;
         }
         let entity = cx.new(|cx| OpenProject::new(location.clone(), project, window, cx));
-        self._subscriptions.push(cx.subscribe(&entity, |this, _, event: &ProjectEvent, cx| match event {
+        self._subscriptions.push(cx.subscribe_in(&entity, window, |this, project, event: &ProjectEvent, window, cx| match event {
             ProjectEvent::Said(line) => this.say(line.to_string(), cx),
+            ProjectEvent::Open(path) => this.open_in(project, path, window, cx),
+            // The review pane comes next (M3); until then Review opens the file.
+            ProjectEvent::Review { path, .. } => {
+                if let Some(path) = path {
+                    this.open_in(project, path, window, cx);
+                }
+            }
             ProjectEvent::Sessions => this.sync(cx),
             ProjectEvent::Renamed { id, name } => {
                 this.names.insert(id.0.clone(), name.to_string());

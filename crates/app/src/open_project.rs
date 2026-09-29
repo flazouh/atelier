@@ -81,6 +81,10 @@ pub enum ProjectEvent {
     Sessions,
     /// The reader named a session.
     Renamed { id: SessionId, name: SharedString },
+    /// The reader asked to review a session's turn (`None`: the whole session), at a file.
+    Review { session: Entity<AgentSession>, turn: Option<usize>, path: Option<String> },
+    /// The reader asked to open a file, by its path in the project.
+    Open(String),
 }
 
 impl EventEmitter<ProjectEvent> for OpenProject {}
@@ -185,6 +189,10 @@ impl OpenProject {
         self._session_events.push(cx.subscribe(&session, |_, session, event: &SessionEvent, cx| {
             match event {
                 SessionEvent::Changed => {}
+                SessionEvent::Review { turn, path } => {
+                    return cx.emit(ProjectEvent::Review { session, turn: *turn, path: path.clone() });
+                }
+                SessionEvent::OpenFile(path) => return cx.emit(ProjectEvent::Open(path.clone())),
                 SessionEvent::Renamed => {
                     let s = session.read(cx);
                     if let (Some(id), Some(name)) = (s.id.clone(), s.name.clone()) {
