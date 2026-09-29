@@ -79,6 +79,21 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
                     }),
             )
     });
+    // A file still being read shows as a pending tab, so a slow host is seen to be working.
+    let opening = p.opening().enumerate().map(|(i, path)| {
+        let name = path.rsplit('/').next().unwrap_or(path).to_string();
+        div()
+            .flex()
+            .flex_none()
+            .items_center()
+            .gap(px(6.))
+            .h(px(28.))
+            .px(px(10.))
+            .text_size(TextSize::Sm.font_size())
+            .text_color(muted)
+            .child(beui::spinner::Spinner::new(("opening", i)).size(px(12.)).color(muted))
+            .child(name)
+    });
     let body = match p.active_buffer() {
         None => div()
             .flex()
@@ -138,7 +153,18 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         .flex()
         .flex_col()
         .size_full()
-        .child(div().id("tabs").flex().flex_none().gap(px(2.)).px(px(6.)).pb(px(6.)).overflow_x_scroll().children(tabs))
+        .child(
+            div()
+                .id("tabs")
+                .flex()
+                .flex_none()
+                .gap(px(2.))
+                .px(px(6.))
+                .pb(px(6.))
+                .overflow_x_scroll()
+                .children(tabs)
+                .children(opening),
+        )
         .child(body)
 }
 

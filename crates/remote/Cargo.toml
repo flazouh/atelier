@@ -13,6 +13,7 @@ path = "src/bin/lathe-remote.rs"
 lathe-project.workspace = true
 postcard = { version = "1", features = ["use-std"] }
 serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
 
 [dev-dependencies]
 tempfile = "3"

@@ -1,4 +1,5 @@
-//! lathe, the app. `lathe [folder…]` opens the window, with each folder named as a project in it.
+//! lathe, the app. `lathe [folder…]` opens the window, with each folder named as a project in it;
+//! `ssh://host/path` names a folder on an SSH host (`ssh://hp-agent/~/code/lathe`).
 //!
 //! `LATHE_TIMINGS=1` prints when the first frame showed, counted from the start of the process.
 
@@ -9,6 +10,7 @@ use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions,
 mod editor_pane;
 mod open_project;
 mod shell;
+mod ssh_form;
 mod tabs;
 mod tree;
 mod tree_view;
@@ -18,6 +20,7 @@ fn main() {
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
     let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
+    let folders: Vec<Opening> = folders.into_iter().map(Opening::from).collect();
     gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
         beui::init(cx);
         shell::bind_keys(cx);
@@ -42,7 +45,10 @@ fn main() {
             let shell = cx.new(|cx| shell::Shell::new(recent, cx));
             window.focus(&shell.read(cx).focus_handle(), cx);
             for folder in folders {
-                shell.update(cx, |s, cx| s.open_local(folder, window, cx));
+                shell.update(cx, |s, cx| match folder {
+                    Opening::Local(path) => s.open_local(path, window, cx),
+                    Opening::Ssh { host, path } => s.open_remote(host, path, window, cx),
+                });
             }
             // Closing the window with unsaved edits asks first.
             let asking = shell.downgrade();
@@ -77,4 +83,22 @@ fn main() {
         .expect("open the window");
         cx.activate(true);
     });
+}
+
+/// A folder named on the command line.
+enum Opening {
+    Local(PathBuf),
+    Ssh { host: String, path: String },
+}
+
+impl From<PathBuf> for Opening {
+    /// `ssh://host/path` is a folder on a host: `ssh://hp-agent/~/code` is `~/code` there, and
+    /// `ssh://hp-agent/home/alex` is `/home/alex`.
+    fn from(arg: PathBuf) -> Self {
+        let text = arg.to_string_lossy();
+        let Some(rest) = text.strip_prefix("ssh://") else { return Opening::Local(arg) };
+        let (host, path) = rest.split_once('/').unwrap_or((rest, "~"));
+        let path = if path.starts_with('~') { path.to_string() } else { format!("/{path}") };
+        Opening::Ssh { host: host.to_string(), path }
+    }
 }
