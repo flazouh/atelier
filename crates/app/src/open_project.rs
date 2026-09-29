@@ -353,3 +353,6 @@ impl OpenProject {
         Some((path, self.buffers.get(path)?))
     }
 }
+
+#[cfg(test)]
+mod tests;
