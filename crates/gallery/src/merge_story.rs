@@ -113,11 +113,10 @@ impl MergeStory {
         Choice { method, ..self.choices[i] }
     }
 
-    fn button(&self, i: usize, id: impl Into<gpui_kit::ElementId>, compact: bool, cx: &mut Context<Self>) -> MergeButton {
+    fn button(&self, i: usize, cx: &mut Context<Self>) -> MergeButton {
         let (acted, chose) = (cx.entity().downgrade(), cx.entity().downgrade());
         let name = self.states[i].0;
-        MergeButton::new(id, self.states[i].1.clone(), self.choice(i))
-            .compact(compact)
+        MergeButton::new(("merge-state", i), self.states[i].1.clone(), self.choice(i))
             .on_action(move |action, _, cx| {
                 acted.update(cx, |s, cx| s.report(format!("{} on \"{name}\"", action.word()), cx)).ok();
             })
@@ -155,8 +154,9 @@ impl Render for MergeStory {
                 .h(px(40.))
                 .child(div().w(px(170.)).flex_none().text_size(TextSize::Sm.font_size()).child(*name))
                 .child(div().flex_1().min_w_0().truncate().text_size(TextSize::Xs.font_size()).text_color(muted).child(standing))
-                .child(self.button(i, ("merge-state", i), false, cx))
-        });
+                .child(self.button(i, cx))
+        })
+        .collect::<Vec<_>>();
         let cards = [(0, PrState::Open, Checks { passed: 3, ..Default::default() }, ReviewState::Approved), (13, PrState::Merged, Checks { passed: 3, ..Default::default() }, ReviewState::Approved)]
             .map(|(i, state, checks, review)| {
                 let (acted, chose) = (cx.entity().downgrade(), cx.entity().downgrade());
