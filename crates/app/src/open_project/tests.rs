@@ -193,3 +193,23 @@ fn closing_a_dirty_tab_asks_first(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(cx.update(|_, cx| project.read(cx).buffers.is_empty()), "Don't Save closes it");
 }
+
+/// The watch reporting lathe's own save, after the reader has typed on, is not a change on disk:
+/// the file holds what the tab last saved.
+#[gpui_kit::test]
+fn our_own_save_is_not_a_change_on_disk(cx: &mut TestAppContext) {
+    let (_dir, project, sink, cx) = open(cx, &[("a.txt", "one\n")]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("a.txt", window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        let editor = project.read(cx).buffers["a.txt"].editor.clone();
+        editor.update(cx, |e, cx| e.set_value("two\n", window, cx));
+    });
+    cx.update(|_, cx| project.update(cx, |p, cx| p.save(cx)));
+    cx.run_until_parked();
+    // Typing on after the save, before the watch has said anything.
+    cx.update(|_, cx| project.update(cx, |p, _| p.buffers.get_mut("a.txt").unwrap().dirty = true));
+    changed(&sink, &["a.txt"]);
+    cx.run_until_parked();
+    assert!(!cx.update(|_, cx| project.read(cx).buffers["a.txt"].changed_on_disk), "lathe's own write is not news");
+}
