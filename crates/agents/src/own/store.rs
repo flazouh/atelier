@@ -139,7 +139,7 @@ pub fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> 
         }
     }
     // A moved session has the time of its move; the time in its meta is the one that says when it was last used.
-    out.sort_by(|a, b| b.updated.cmp(&a.updated));
+    out.sort_by_key(|s| std::cmp::Reverse(s.updated));
     Ok(out)
 }
 pub fn history(project: &dyn Project, session: &SessionId) -> Result<Vec<Event>, SessionError> {
