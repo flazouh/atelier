@@ -158,7 +158,7 @@ impl Render for MergeStory {
                 .items_center()
                 .gap(px(12.))
                 .h(px(40.))
-                .child(div().w(px(170.)).flex_none().text_size(TextSize::Sm.font_size()).child(*name))
+                .child(div().w(px(210.)).flex_none().text_size(TextSize::Sm.font_size()).child(*name))
                 .child(div().flex_1().min_w_0().truncate().text_size(TextSize::Xs.font_size()).text_color(muted).child(standing))
                 .child(self.button(i, cx))
         })
