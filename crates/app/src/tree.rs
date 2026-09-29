@@ -56,10 +56,6 @@ impl ProjectTree {
         self.entries.iter().filter(|e| !e.dir).count()
     }
 
-    pub fn is_dir(&self, path: &str) -> bool {
-        self.entries.iter().any(|e| e.dir && e.path == path)
-    }
-
     /// The rows that show with the folders in `open` open.
     pub fn rows(&self, open: &HashSet<String>) -> Vec<Row> {
         let mut rows = Vec::new();
