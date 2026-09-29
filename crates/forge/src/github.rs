@@ -26,6 +26,7 @@ use self::{
     wire::{Page, Root},
 };
 use crate::{
+    UpdateMethod,
     ChangedFile, Check, Comment, Forge, ForgeError, ForgeResult, HeldComment, Involved, Job, JobRef, MergeOutcome,
     MergeRequest, NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate, Remark, RepoRef, Repository, Reviewer,
     Thread, ThreadId, Verdict,
@@ -193,6 +194,26 @@ impl Forge for GitHub {
 
     fn merge(&self, reference: &PullRef, request: &MergeRequest) -> ForgeResult<MergeOutcome> {
         self.write_merge(reference, request)
+    }
+
+    fn update_branch(&self, reference: &PullRef, method: UpdateMethod, expected_head: &str) -> ForgeResult<()> {
+        self.write_update_branch(reference, method, expected_head)
+    }
+
+    fn cancel_auto_merge(&self, reference: &PullRef) -> ForgeResult<()> {
+        self.write_cancel_auto_merge(reference)
+    }
+
+    fn dequeue(&self, reference: &PullRef) -> ForgeResult<()> {
+        self.write_dequeue(reference)
+    }
+
+    fn delete_branch(&self, reference: &PullRef) -> ForgeResult<()> {
+        self.write_delete_branch(reference)
+    }
+
+    fn revert(&self, reference: &PullRef) -> ForgeResult<PullRef> {
+        self.write_revert(reference)
     }
 
     fn request_review(&self, reference: &PullRef, reviewers: &[Reviewer]) -> ForgeResult<()> {

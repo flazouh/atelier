@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use super::{GitHub, client::Client, testing::Fixtures, transport::TransportError};
 use crate::{
     Forge, ForgeError, MergeMethod, MergeOutcome, MergeRequest, NewLine, NewPull, PullRef, PullUpdate, RepoRef,
-    Reviewer, Side, ThreadId, Verdict,
+    Reviewer, Side, ThreadId, UpdateMethod, Verdict,
 };
 
 fn github(fixtures: &Fixtures) -> GitHub {
@@ -267,4 +267,77 @@ fn a_signed_out_gh_and_an_offline_one_reach_the_caller_as_their_own_errors() {
     assert_eq!(github(&out).merge(&pull(), &merge_request(MergeMethod::Merge)).err().unwrap(), ForgeError::NotSignedIn);
     let off = Fixtures::new().fails("ForWrite", TransportError::Offline);
     assert_eq!(github(&off).merge(&pull(), &merge_request(MergeMethod::Merge)).err().unwrap(), ForgeError::Offline);
+}
+
+#[test]
+fn updating_the_branch_names_the_way_and_the_head_the_reader_saw() {
+    let fixtures = Fixtures::new().ok("ForWrite", for_write(false, false)).ok("UpdateBranch", data(json!({})));
+    let forge = github(&fixtures);
+    forge.update_branch(&pull(), UpdateMethod::Rebase, "def456").unwrap();
+    assert_eq!(
+        input(&fixtures, "UpdateBranch"),
+        json!({"pullRequestId": "PR_1", "expectedHeadOid": "def456", "updateMethod": "REBASE"})
+    );
+    let merge = Fixtures::new().ok("ForWrite", for_write(false, false)).ok("UpdateBranch", data(json!({})));
+    github(&merge).update_branch(&pull(), UpdateMethod::Merge, "abc").unwrap();
+    assert_eq!(input(&merge, "UpdateBranch")["updateMethod"], "MERGE");
+}
+
+#[test]
+fn a_refused_branch_update_says_why() {
+    let refused = json!({"data": null, "errors": [{"type": "UNPROCESSABLE", "message": "Head branch was modified"}]}).to_string();
+    let fixtures = Fixtures::new().ok("ForWrite", for_write(false, false)).ok("UpdateBranch", refused);
+    let error = github(&fixtures).update_branch(&pull(), UpdateMethod::Merge, "old").err().unwrap();
+    assert_eq!(error, ForgeError::Rejected("Head branch was modified".into()));
+}
+
+#[test]
+fn cancelling_merge_when_ready_and_leaving_the_queue_each_send_their_own_mutation() {
+    let fixtures = Fixtures::new()
+        .ok("ForWrite", for_write(true, false))
+        .ok("DisableAutoMerge", data(json!({})))
+        .ok("Dequeue", data(json!({})));
+    let forge = github(&fixtures);
+    forge.cancel_auto_merge(&pull()).unwrap();
+    forge.dequeue(&pull()).unwrap();
+    assert_eq!(input(&fixtures, "DisableAutoMerge"), json!({"pullRequestId": "PR_1"}));
+    assert_eq!(input(&fixtures, "Dequeue"), json!({"id": "PR_1"}));
+}
+
+#[test]
+fn deleting_the_branch_alone_uses_the_rest_call_and_never_touches_a_fork() {
+    let fixtures = Fixtures::new().ok("ForWrite", for_write(false, false)).ok("DELETE-repos-o-r-git-refs-heads-feat", "");
+    github(&fixtures).delete_branch(&pull()).unwrap();
+    assert_eq!(fixtures.sent_for("DELETE-repos-o-r-git-refs-heads-feat").len(), 1);
+    let fork = Fixtures::new().ok("ForWrite", for_write(false, true));
+    let error = github(&fork).delete_branch(&pull()).err().unwrap();
+    assert!(matches!(error, ForgeError::Rejected(_)), "{error:?}");
+    assert_eq!(fork.sent().len(), 1, "only the read was sent");
+}
+
+#[test]
+fn a_revert_opens_a_pull_request_and_says_which() {
+    let made = data(json!({"revertPullRequest": {"revertPullRequest": {"number": 44, "repository": {"nameWithOwner": "o/r"}}}}));
+    let fixtures = Fixtures::new().ok("ForWrite", for_write(false, false)).ok("Revert", made);
+    let reverted = github(&fixtures).revert(&pull()).unwrap();
+    assert_eq!((reverted.number, reverted.repo.slug()), (44, "o/r".to_string()));
+    assert_eq!(input(&fixtures, "Revert"), json!({"pullRequestId": "PR_1"}));
+}
+
+#[test]
+fn a_check_carries_how_its_run_ended() {
+    use super::{read, wire::ContextNode};
+    let node = |suite: Value| -> ContextNode {
+        serde_json::from_value(json!({
+            "__typename": "CheckRun", "databaseId": 9, "name": "flaky", "status": "COMPLETED", "conclusion": "FAILURE",
+            "checkSuite": suite,
+        }))
+        .unwrap()
+    };
+    let repo = RepoRef::new("github.com", "o", "r");
+    let run = json!({"databaseId": 1, "runNumber": 3, "event": "push", "workflow": {"name": "ci"}});
+    let allowed = read::check(&repo, &node(json!({"conclusion": "SUCCESS", "workflowRun": run.clone()})));
+    assert_eq!(allowed.run.unwrap().suite, Some(crate::Conclusion::Success));
+    let unknown = read::check(&repo, &node(json!({"workflowRun": run})));
+    assert_eq!(unknown.run.unwrap().suite, None, "no ending told: nothing is excused");
 }

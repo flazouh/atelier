@@ -57,6 +57,15 @@ pub struct MergeRequest {
     pub delete_branch: bool,
 }
 
+/// How "Update branch" brings the base into the branch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum UpdateMethod {
+    /// A merge commit of the base into the branch.
+    Merge,
+    /// The branch's commits replayed on the base.
+    Rebase,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MergeOutcome {
     Merged,

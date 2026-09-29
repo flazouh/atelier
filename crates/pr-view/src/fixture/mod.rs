@@ -8,7 +8,7 @@ use std::{
 
 use lathe_forge::{
     Author, ChangedFile, Check, Comment, Forge, ForgeError, ForgeResult, HeldComment, Involved, Job, JobRef, MergeOutcome,
-    MergeRequest, MergeSettings, NewLine, NewPull, Opinion, Pull, PullBrief, PullRef, PullState, PullUpdate, Remark, RepoRef,
+    MergeRequest, MergeSettings, MergeState, UpdateMethod, NewLine, NewPull, Opinion, Pull, PullBrief, PullRef, PullState, PullUpdate, Remark, RepoRef,
     Repository, ReviewDecision, Reviewer, Thread, ThreadId, Verdict,
 };
 
@@ -30,6 +30,11 @@ pub enum Write {
     Merge { reference: PullRef, request: MergeRequest },
     RequestReview { reference: PullRef, reviewers: Vec<Reviewer> },
     Update { reference: PullRef, update: PullUpdate },
+    UpdateBranch { reference: PullRef, method: UpdateMethod, expected_head: String },
+    CancelAutoMerge(PullRef),
+    Dequeue(PullRef),
+    DeleteBranch(PullRef),
+    Revert(PullRef),
     Create(NewPull),
 }
 
@@ -222,6 +227,47 @@ impl Forge for FixtureForge {
         }
         pull.state = PullState::Merged;
         Ok(MergeOutcome::Merged)
+    }
+
+    fn update_branch(&self, reference: &PullRef, method: UpdateMethod, expected_head: &str) -> ForgeResult<()> {
+        let mut state = self.enter("update_branch")?;
+        state.writes.push(Write::UpdateBranch { reference: reference.clone(), method, expected_head: expected_head.to_string() });
+        let pull = state.pulls.get_mut(reference).and_then(|d| d.pull.as_mut()).ok_or_else(|| missing(reference))?;
+        if pull.head_sha != expected_head {
+            return Err(ForgeError::Rejected("Head branch was modified. Read it again.".into()));
+        }
+        pull.merge_state = MergeState::Clean;
+        Ok(())
+    }
+
+    fn cancel_auto_merge(&self, reference: &PullRef) -> ForgeResult<()> {
+        let mut state = self.enter("cancel_auto_merge")?;
+        state.writes.push(Write::CancelAutoMerge(reference.clone()));
+        let pull = state.pulls.get_mut(reference).and_then(|d| d.pull.as_mut()).ok_or_else(|| missing(reference))?;
+        pull.auto_merge = false;
+        Ok(())
+    }
+
+    fn dequeue(&self, reference: &PullRef) -> ForgeResult<()> {
+        let mut state = self.enter("dequeue")?;
+        state.writes.push(Write::Dequeue(reference.clone()));
+        let pull = state.pulls.get_mut(reference).and_then(|d| d.pull.as_mut()).ok_or_else(|| missing(reference))?;
+        pull.queue = None;
+        Ok(())
+    }
+
+    fn delete_branch(&self, reference: &PullRef) -> ForgeResult<()> {
+        let mut state = self.enter("delete_branch")?;
+        state.writes.push(Write::DeleteBranch(reference.clone()));
+        state.pulls.get(reference).ok_or_else(|| missing(reference))?;
+        Ok(())
+    }
+
+    fn revert(&self, reference: &PullRef) -> ForgeResult<PullRef> {
+        let mut state = self.enter("revert")?;
+        state.writes.push(Write::Revert(reference.clone()));
+        state.next += 1;
+        Ok(PullRef { repo: reference.repo.clone(), number: 9_000 + state.next })
     }
 
     fn request_review(&self, reference: &PullRef, reviewers: &[Reviewer]) -> ForgeResult<()> {

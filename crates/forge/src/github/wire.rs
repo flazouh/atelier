@@ -253,6 +253,7 @@ pub(super) struct ContextNode {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Suite {
+    pub conclusion: Option<String>,
     pub workflow_run: Option<WorkflowRun>,
 }
 

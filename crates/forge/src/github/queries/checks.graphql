@@ -20,6 +20,7 @@ query Checks($owner: String!, $name: String!, $number: Int!, $after: String) {
                     completedAt
                     isRequired(pullRequestNumber: $number)
                     checkSuite {
+                      conclusion
                       workflowRun {
                         databaseId
                         runNumber

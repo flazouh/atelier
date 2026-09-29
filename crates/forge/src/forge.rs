@@ -4,8 +4,9 @@
 use crate::{
     ChangedFile, Check, Comment, ForgeResult, HeldComment, Involved, Job, JobRef, MergeOutcome, MergeRequest,
     NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate, RepoRef, Repository, Remark, Reviewer, Thread, ThreadId,
-    Verdict,
+    UpdateMethod, Verdict,
 };
+use crate::ForgeError;
 
 pub trait Forge: Send + Sync {
     /// The repository a git remote URL names.
@@ -48,6 +49,27 @@ pub trait Forge: Send + Sync {
 
     fn merge(&self, reference: &PullRef, request: &MergeRequest) -> ForgeResult<MergeOutcome>;
 
+    /// Brings the base branch into the pull request's branch, by a merge commit or by a rebase. The
+    /// forge refuses it when the branch moved since the reader looked (`expected_head`).
+    fn update_branch(&self, _reference: &PullRef, _method: UpdateMethod, _expected_head: &str) -> ForgeResult<()> {
+        Err(ForgeError::Rejected("This forge cannot update a branch.".into()))
+    }
+    /// Turns off "merge when ready".
+    fn cancel_auto_merge(&self, _reference: &PullRef) -> ForgeResult<()> {
+        Err(ForgeError::Rejected("This forge cannot cancel merge when ready.".into()))
+    }
+    /// Takes the pull request out of the merge queue.
+    fn dequeue(&self, _reference: &PullRef) -> ForgeResult<()> {
+        Err(ForgeError::Rejected("This forge cannot take a pull request out of the queue.".into()))
+    }
+    /// Deletes the pull request's branch, after it merged or closed. A branch in a fork is refused.
+    fn delete_branch(&self, _reference: &PullRef) -> ForgeResult<()> {
+        Err(ForgeError::Rejected("This forge cannot delete a branch.".into()))
+    }
+    /// Opens a new pull request that reverts a merged one, and says which.
+    fn revert(&self, _reference: &PullRef) -> ForgeResult<PullRef> {
+        Err(ForgeError::Rejected("This forge cannot revert a pull request.".into()))
+    }
     fn request_review(&self, reference: &PullRef, reviewers: &[Reviewer]) -> ForgeResult<()>;
 
     /// A remark on the pull request as a whole.

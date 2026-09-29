@@ -1,5 +1,7 @@
-//! lathe's own record of a session: with no external store, the conversation is kept with the project, in
-//! `.lathe/agent/sessions/`, written through `Project::write` so a remote project keeps it on its host.
+//! lathe's own record of a session: with no external store, the conversation is kept in the project's data
+//! folder (`Project::data_write`), outside the repository and on the project's host, so it never shows in
+//! `git status`, in `agent/sessions/`. Sessions written by an older lathe into the project's own
+//! `.lathe/agent/sessions/` are moved there the first time the list is read ([`migrate`]).
 //! Two files per session: `<id>.jsonl` holds one message a line, and `<id>.meta` holds the title and the
 //! time, small enough to read for a list. `history` turns the messages into the events a UI shows.
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -16,7 +18,10 @@ use crate::{
     subprocess,
 };
 
-pub const DIR: &str = ".lathe/agent/sessions";
+/// Where the record lives, in the data folder.
+pub const DIR: &str = "agent/sessions";
+/// Where an older lathe wrote it, in the project itself.
+const LEGACY_DIR: &str = ".lathe/agent/sessions";
 const LIST_LIMIT: usize = 50;
 const TITLE_CHARS: usize = 100;
 
@@ -47,40 +52,39 @@ fn path(id: &str, ext: &str) -> String {
     format!("{DIR}/{id}.{ext}")
 }
 
-pub fn ensure_dir(project: &dyn Project) -> Result<(), String> {
-    let target = project.root().join(DIR);
-    let command = Command::new("mkdir").args(["-p", "--"]).args([target.to_string_lossy().into_owned()]);
-    let mut process = project.spawn(&command).map_err(|e| e.to_string())?;
-    drop(std::mem::replace(&mut process.stdin, Box::new(std::io::sink())));
-    match process.control.wait() {
-        Ok(Some(0)) => Ok(()),
-        _ => Err(process.control.stderr().trim().to_string()),
+/// Moves the record an older lathe left in the project (`.lathe/agent/sessions/`) into the data folder, and
+/// removes what it moved. Once a session is in both places the one in the data folder wins. Gives the number
+/// of sessions moved. A project with nothing to move costs one `ls`.
+pub fn migrate(project: &dyn Project) -> Result<usize, String> {
+    let command = Command::new("sh").args(["-c", "ls -1 -- \"$1\" 2>/dev/null; true", "sh", LEGACY_DIR]);
+    let names = subprocess::output(project, &command).map_err(|e| e.to_string())?;
+    let mut ids: Vec<String> = names
+        .lines()
+        .filter_map(|n| n.trim().strip_suffix(".meta").or_else(|| n.trim().strip_suffix(".jsonl")))
+        .filter(|id| valid_id(id))
+        .map(str::to_string)
+        .collect();
+    ids.sort();
+    ids.dedup();
+    let mut moved = 0;
+    for id in ids {
+        // A session with no messages is not a session: leave it be. The messages go first, then the meta, as
+        // `save` does, so a listed session always has its messages.
+        let (jsonl, meta) = (format!("{LEGACY_DIR}/{id}.jsonl"), format!("{LEGACY_DIR}/{id}.meta"));
+        let (Ok(lines), Ok(info)) = (project.read(&jsonl), project.read(&meta)) else { continue };
+        for (ext, bytes, old) in [("jsonl", lines, jsonl), ("meta", info, meta)] {
+            if project.data_read(&path(&id, ext)).is_err() {
+                project.data_write(&path(&id, ext), &bytes).map_err(|e| e.to_string())?;
+            }
+            let _ = project.remove(&old);
+        }
+        let whole = true;
+        moved += usize::from(whole);
     }
-}
-
-/// Keeps `.lathe/` out of the repository's `git status`: adds it to the repository's own
-/// `.git/info/exclude`, which is local and never committed. Does nothing when the project is not a git
-/// repository, or the line is there. `true` when it added the line.
-///
-/// Short term. The right place for the record is a data folder outside the repository (see
-/// `docs/agents.md`, "Where the record lives").
-pub fn exclude_from_git(project: &dyn Project) -> Result<bool, String> {
-    let found = project.git(&["rev-parse", "--git-path", "info/exclude"]).map_err(|e| e.to_string())?;
-    let path = found.stdout.trim();
-    if !found.ok() || path.is_empty() {
-        return Ok(false);
-    }
-    // The path is the host's, relative to the project folder or absolute (a worktree shares its main
-    // repository's file), so the shell that writes it runs on the host.
-    let script = "grep -qxF '.lathe/' \"$1\" 2>/dev/null && exit 3; mkdir -p \"$(dirname \"$1\")\" && { [ ! -s \"$1\" ] || [ -z \"$(tail -c1 \"$1\")\" ] || printf '\\n' >> \"$1\"; } && printf '.lathe/\\n' >> \"$1\"";
-    let command = Command::new("sh").args(["-c", script, "sh", path]);
-    let mut process = project.spawn(&command).map_err(|e| e.to_string())?;
-    drop(std::mem::replace(&mut process.stdin, Box::new(std::io::sink())));
-    match process.control.wait() {
-        Ok(Some(0)) => Ok(true),
-        Ok(Some(3)) => Ok(false),
-        _ => Err(process.control.stderr().trim().to_string()),
-    }
+    // The folders are left behind empty: take them away, but only while they are empty.
+    let tidy = Command::new("sh").args(["-c", "rmdir -- \"$1\" .lathe/agent .lathe 2>/dev/null; true", "sh", LEGACY_DIR]);
+    let _ = subprocess::output(project, &tidy);
+    Ok(moved)
 }
 
 /// Writes the whole record. The messages first, then the meta, so a listed session always has its messages.
@@ -90,16 +94,22 @@ pub fn save(project: &dyn Project, meta: &Meta, messages: &[Message]) -> Result<
         lines.push_str(&serde_json::to_string(message).map_err(|e| e.to_string())?);
         lines.push('\n');
     }
-    project.write(&path(&meta.id, "jsonl"), lines.as_bytes()).map_err(|e| e.to_string())?;
+    project.data_write(&path(&meta.id, "jsonl"), lines.as_bytes()).map_err(|e| e.to_string())?;
     let bytes = serde_json::to_vec(meta).map_err(|e| e.to_string())?;
-    project.write(&path(&meta.id, "meta"), &bytes).map_err(|e| e.to_string())
+    project.data_write(&path(&meta.id, "meta"), &bytes).map_err(|e| e.to_string())
 }
 
 pub fn load(project: &dyn Project, id: &str) -> Result<(Meta, Vec<Message>), SessionError> {
     if !valid_id(id) {
         return Err(SessionError::Read(format!("{id} is not a session id")));
     }
-    let read = |ext: &str| project.read(&path(id, ext)).map_err(|e| SessionError::Read(format!("session {id}: {e}")));
+    let read = |ext: &str| {
+        project.data_read(&path(id, ext)).or_else(|first| {
+            // A session an older lathe wrote is moved when the list is read; one asked for by id first is moved now.
+            if first.kind() == std::io::ErrorKind::NotFound && migrate(project).is_ok() { project.data_read(&path(id, ext)) } else { Err(first) }
+        })
+        .map_err(|e| SessionError::Read(format!("session {id}: {e}")))
+    };
     let meta: Meta = serde_json::from_slice(&read("meta")?).map_err(|e| SessionError::Read(format!("session {id}: {e}")))?;
     let text = String::from_utf8_lossy(&read("jsonl")?).into_owned();
     let mut messages = Vec::new();
@@ -111,12 +121,16 @@ pub fn load(project: &dyn Project, id: &str) -> Result<(Meta, Vec<Message>), Ses
 
 /// The project's sessions, newest first.
 pub fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
-    let script = format!("ls -t {DIR}/*.meta 2>/dev/null | head -n {LIST_LIMIT}");
-    let command = Command::new("sh").args(["-c", script.as_str()]);
-    let names = subprocess::output(project, &command)?;
+    // A record left by an older lathe comes into the data folder first. A failure to move it is not one to list.
+    let _ = migrate(project);
+    let entries = match project.data_list(DIR) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(SessionError::Read(error.to_string())),
+    };
     let mut out = Vec::new();
-    for line in names.lines().filter(|l| !l.trim().is_empty()) {
-        let Some(bytes) = line.trim().strip_prefix(&format!("{DIR}/")).and_then(|n| project.read(&format!("{DIR}/{n}")).ok()) else { continue };
+    for entry in entries.iter().filter(|e| e.path.ends_with(".meta")).take(LIST_LIMIT) {
+        let Ok(bytes) = project.data_read(&entry.path) else { continue };
         if let Ok(meta) = serde_json::from_slice::<Meta>(&bytes)
             && valid_id(&meta.id)
             && !meta.title.is_empty()
@@ -124,9 +138,10 @@ pub fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> 
             out.push(SessionSummary { id: SessionId::new(meta.id), title: meta.title, updated: Some(meta.updated) });
         }
     }
+    // A moved session has the time of its move; the time in its meta is the one that says when it was last used.
+    out.sort_by_key(|s| std::cmp::Reverse(s.updated));
     Ok(out)
 }
-
 pub fn history(project: &dyn Project, session: &SessionId) -> Result<Vec<Event>, SessionError> {
     let (_, messages) = load(project, session.as_str())?;
     Ok(events_of(&messages))

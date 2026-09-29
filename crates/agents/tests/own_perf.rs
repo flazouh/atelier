@@ -143,7 +143,16 @@ impl Project for NoRecord {
         self.0.read(path)
     }
     fn write(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
-        if path.starts_with(".lathe/") { Ok(()) } else { self.0.write(path, bytes) }
+        self.0.write(path, bytes)
+    }
+    fn data_write(&self, _: &str, _: &[u8]) -> io::Result<()> {
+        Ok(())
+    }
+    fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
+        Err(io::Error::new(io::ErrorKind::NotFound, path.to_string()))
+    }
+    fn data_list(&self, _: &str) -> io::Result<Vec<lathe_project::DataEntry>> {
+        Ok(Vec::new())
     }
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
         self.0.watch(sink)

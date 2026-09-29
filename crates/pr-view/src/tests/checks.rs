@@ -138,3 +138,34 @@ fn the_recorded_log_of_a_real_job_splits_into_the_steps_the_runner_reported() {
     assert!(segments[1][0].contains("##[group]Run actions/github-script"));
     assert!(segments[2][0].contains("Cleaning up orphan processes"));
 }
+
+#[test]
+fn a_job_that_failed_in_a_run_that_succeeded_was_allowed_to_fail() {
+    use crate::checks::tolerated_or;
+    use lathe_forge::RunInfo;
+    let run = |suite| Some(RunInfo { id: 1, workflow: "ci".into(), number: 3, event: "push".into(), suite });
+    let mut allowed = sample::check("flaky", CheckStatus::Done, Some(Conclusion::Failure));
+    allowed.run = run(Some(Conclusion::Success));
+    assert_eq!(tolerated_or(&allowed), Ui::Tolerated, "failed job, succeeded run");
+    let mut broken = sample::check("tests", CheckStatus::Done, Some(Conclusion::Failure));
+    broken.run = run(Some(Conclusion::Failure));
+    assert_eq!(tolerated_or(&broken), Ui::Failed, "the run failed too: this is why it is red");
+    let mut unknown = sample::check("tests", CheckStatus::Done, Some(Conclusion::Failure));
+    unknown.run = run(None);
+    assert_eq!(tolerated_or(&unknown), Ui::Failed, "a run with no known ending is not a reason to excuse a failure");
+    let bare = sample::check("status", CheckStatus::Done, Some(Conclusion::Failure));
+    assert_eq!(tolerated_or(&bare), Ui::Failed, "a commit status has no run");
+    let passed = sample::check("ok", CheckStatus::Done, Some(Conclusion::Success));
+    assert_eq!(tolerated_or(&passed), Ui::Passed);
+}
+
+#[test]
+fn a_tolerated_job_still_has_its_fault_read_and_shown_apart() {
+    use lathe_forge::RunInfo;
+    let mut allowed = sample::check("flaky", CheckStatus::Done, Some(Conclusion::Failure));
+    allowed.job = Some(JobRef { repo: RepoRef::new("github.com", "o", "r"), id: 7 });
+    allowed.run = Some(RunInfo { id: 1, workflow: "ci".into(), number: 3, event: "push".into(), suite: Some(Conclusion::Success) });
+    assert!(wants_log(&allowed).is_some(), "its log is read for its Fault");
+    let rows = check_runs(&[allowed], &HashMap::new());
+    assert_eq!(rows[0].state, Ui::Tolerated);
+}

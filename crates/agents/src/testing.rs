@@ -47,6 +47,22 @@ impl Project for Locked {
         self.0.write(path, bytes)
     }
 
+    fn remove(&self, path: &str) -> io::Result<()> {
+        self.0.remove(path)
+    }
+
+    fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
+        self.0.data_read(path)
+    }
+
+    fn data_write(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
+        self.0.data_write(path, bytes)
+    }
+
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<lathe_project::DataEntry>> {
+        self.0.data_list(prefix)
+    }
+
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
         self.0.watch(sink)
     }
