@@ -267,6 +267,13 @@ impl PrModel {
         (open_first(threads), self.data.remarks.iter().map(|r| present::remark_summary(r, now)).collect())
     }
 
+    /// The threads in the order the conversation list shows them: open first, each group in its own order.
+    /// The list reports a press by its place in this order.
+    pub fn threads_in_list_order(&self) -> Vec<&lathe_forge::Thread> {
+        let (resolved, open): (Vec<_>, Vec<_>) = self.data.threads.iter().partition(|t| t.resolved);
+        open.into_iter().chain(resolved).collect()
+    }
+
     /// What merging needs. `conflicting` are the files the reader found in a local merge, when known.
     pub fn merge_facts(&self, conflicting: &[String]) -> Option<MergeFacts> {
         let pull = self.pull()?;

@@ -22,12 +22,19 @@ pub struct Cadence {
     error_max: Duration,
     unchanged: u32,
     failures: u32,
+    /// The wait the last answer or failure asked for.
+    wait: Duration,
 }
 
 impl Cadence {
     /// Asks every `base` while things happen.
     pub fn new(base: Duration) -> Self {
-        Self { base, quiet_max: base * 4, error_max: Duration::from_secs(300), unchanged: 0, failures: 0 }
+        Self { base, quiet_max: base * 4, error_max: Duration::from_secs(300), unchanged: 0, failures: 0, wait: base }
+    }
+
+    /// The wait before the next question, as the last answer or failure set it.
+    pub fn next_wait(&self) -> Duration {
+        self.wait
     }
 
     /// The wait after an answer. Something changed: `base` again. Nothing did: a little longer each time,
@@ -36,10 +43,12 @@ impl Cadence {
         self.failures = 0;
         if changed {
             self.unchanged = 0;
-            return self.base;
+            self.wait = self.base;
+            return self.wait;
         }
         self.unchanged += 1;
-        (self.base + self.base * (self.unchanged / 2)).min(self.quiet_max)
+        self.wait = (self.base + self.base * (self.unchanged / 2)).min(self.quiet_max);
+        self.wait
     }
 
     /// The wait after a failure, or `None` when asking again cannot help until the reader acts: the sign-in,
@@ -50,11 +59,13 @@ impl Cadence {
             ForgeError::RateLimited { retry_after } => {
                 self.failures += 1;
                 let asked = retry_after.map_or(Duration::ZERO, |s| Duration::from_secs(s + 1));
-                Some(asked.max(self.backoff()).min(Duration::from_secs(3600)))
+                self.wait = asked.max(self.backoff()).min(Duration::from_secs(3600));
+                Some(self.wait)
             }
             _ => {
                 self.failures += 1;
-                Some(self.backoff())
+                self.wait = self.backoff();
+                Some(self.wait)
             }
         }
     }

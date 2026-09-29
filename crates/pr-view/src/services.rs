@@ -1,0 +1,113 @@
+//! What every view of this crate shares: the forge, git, the caches on disk and the reader's settings.
+use std::{
+    path::PathBuf,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+use lathe_forge::Forge;
+use lathe_lsp::Workers;
+use lathe_project::Project;
+
+use crate::{
+    git::PrGit,
+    snapshot::{ListSnapshot, Snapshots},
+    state::Reviewed,
+};
+
+/// What the app tells the view, all as data.
+#[derive(Clone)]
+pub struct PrConfig {
+    /// The reader's login, for "yours" and for the verdict box.
+    pub me: String,
+    /// Every write button says so and does nothing. Set until a scratch repository is approved.
+    pub read_only: bool,
+    /// The folder on the project's host for the cache repositories and the head checkouts. Absolute, or
+    /// starting with `~/`.
+    pub remote_data: String,
+    /// The folder on this machine for the reviewed-state database and the snapshots.
+    pub local_data: PathBuf,
+    /// The language servers, the pool the editor uses. `None`: no language features in the diff.
+    pub workers: Option<Arc<Workers>>,
+    /// How often an open pull request is asked about while things happen.
+    pub refresh: Duration,
+    /// How often the list is refreshed.
+    pub list_refresh: Duration,
+    /// Where to fetch pull requests from, when it is not the project's own remote for the repository.
+    /// For a mirror, or a test.
+    pub fetch_url: Option<String>,
+}
+
+impl PrConfig {
+    pub fn new(me: impl Into<String>, local_data: impl Into<PathBuf>) -> Self {
+        Self {
+            me: me.into(),
+            read_only: false,
+            remote_data: "~/.local/share/lathe/pr".into(),
+            local_data: local_data.into(),
+            workers: None,
+            refresh: Duration::from_secs(30),
+            list_refresh: Duration::from_secs(60),
+            fetch_url: None,
+        }
+    }
+
+    pub fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
+    }
+
+    pub fn workers(mut self, workers: Arc<Workers>) -> Self {
+        self.workers = Some(workers);
+        self
+    }
+
+    pub fn fetch_url(mut self, url: impl Into<String>) -> Self {
+        self.fetch_url = Some(url.into());
+        self
+    }
+
+    pub fn remote_data(mut self, folder: impl Into<String>) -> Self {
+        self.remote_data = folder.into();
+        self
+    }
+
+    pub fn refresh(mut self, refresh: Duration, list: Duration) -> Self {
+        self.refresh = refresh;
+        self.list_refresh = list;
+        self
+    }
+}
+
+pub struct Services {
+    pub forge: Arc<dyn Forge>,
+    pub git: Arc<PrGit>,
+    pub snapshots: Snapshots,
+    pub list_snapshot: ListSnapshot,
+    pub reviewed: Arc<Reviewed>,
+    pub config: PrConfig,
+}
+
+impl Services {
+    /// Opens the reader's database and the caches. Small local files, opened at once.
+    pub fn open(project: Arc<dyn Project>, forge: Arc<dyn Forge>, config: PrConfig) -> Result<Arc<Self>, String> {
+        let dir = config.local_data.join("pr-view");
+        let reviewed = Reviewed::open(&dir.join("reviewed.sqlite")).map_err(|e| format!("could not open the reviewed-state database: {e}"))?;
+        Ok(Arc::new(Self {
+            forge,
+            git: Arc::new(match &config.fetch_url {
+                Some(url) => PrGit::new(project, &config.remote_data).with_remote(url.clone()),
+                None => PrGit::new(project, &config.remote_data),
+            }),
+            snapshots: Snapshots::new(dir.join("snapshots")),
+            list_snapshot: ListSnapshot::new(&dir),
+            reviewed: Arc::new(reviewed),
+            config,
+        }))
+    }
+}
+
+/// Seconds since the Unix epoch.
+pub fn now() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
+}

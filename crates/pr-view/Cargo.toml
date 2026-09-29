@@ -13,6 +13,8 @@ lathe-forge.workspace = true
 lathe-lsp.workspace = true
 lathe-project.workspace = true
 lathe-review.workspace = true
+futures-channel = "0.3"
+futures-util = "0.3"
 lsp-types = "0.97"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

@@ -30,7 +30,8 @@ fn the_first_file_is_open_and_next_and_previous_walk_the_tree_order() {
     assert_eq!(model.place.as_ref().unwrap().path, order[0].as_ref(), "the first file in the tree is open");
     assert!(model.step(1));
     assert_eq!(model.place.as_ref().unwrap().path, order[1].as_ref());
-    assert!(model.step(1) && model.step(1) == false || model.place.as_ref().unwrap().path == order[2].as_ref());
+    assert!(model.step(1));
+    assert_eq!(model.place.as_ref().unwrap().path, order[2].as_ref());
     assert!(model.step(-1));
     assert_eq!(model.place.as_ref().unwrap().path, order[1].as_ref());
 }

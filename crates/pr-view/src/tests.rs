@@ -1,7 +1,9 @@
+mod actions;
 mod base;
 mod checks;
 mod diff;
 mod git;
+mod layout;
 mod list;
 mod load;
 mod model;
@@ -10,4 +12,5 @@ mod present;
 mod repo;
 mod snapshot;
 mod state;
+mod view;
 mod sync;

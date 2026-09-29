@@ -69,6 +69,17 @@ impl ListModel {
         self.filed.iter().find(|(court, _)| *court == Court::NeedsYou).map_or(0, |(_, rows)| rows.len())
     }
 
+    /// The pull requests the list shows as merged or closed: their checkouts can go.
+    pub fn closed(&self) -> Vec<PullRef> {
+        self.filed
+            .iter()
+            .flat_map(|(_, rows)| rows)
+            .map(|f| &f.involved.summary.brief)
+            .filter(|b| matches!(b.state, lathe_forge::PullState::Merged | lathe_forge::PullState::Closed))
+            .map(|b| b.reference.clone())
+            .collect()
+    }
+
     /// The pull requests that are open, for a checkout cleanup: a closed one's checkout can go.
     pub fn open_numbers(&self, repo: &lathe_forge::RepoRef) -> Vec<u64> {
         self.filed
