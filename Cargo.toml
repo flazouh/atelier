@@ -15,6 +15,7 @@ beui = { path = "crates/beui" }
 lathe-agents = { path = "crates/agents" }
 lathe-lsp = { path = "crates/lsp" }
 lathe-project = { path = "crates/project" }
+lathe-settings = { path = "crates/settings" }
 
 [patch.crates-io]
 # gpui-base 0.6.6 with the editor fixes in vendor/gpui-base/PATCHES.md.

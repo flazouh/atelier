@@ -23,7 +23,6 @@ mod load_story;
 mod merge_story;
 mod pr_fixture;
 mod pr_story;
-mod settings;
 mod review_story;
 
 use gpui_kit::base::input::InputEvent;
@@ -1055,10 +1054,10 @@ fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
         .on_change(|i, _, cx| {
             let Some(picked) = beui::themes::all().get(i) else { return };
             beui::theme::set_theme(picked.clone(), cx);
-            let settings = settings::Settings { theme: Some(picked.name.to_string()) };
-            if let Some(path) = settings::path() {
+            let name = picked.name.to_string();
+            if let Some(path) = lathe_settings::path() {
                 cx.background_spawn(async move {
-                    if let Err(error) = settings::save(&path, &settings) {
+                    if let Err(error) = lathe_settings::update(&path, |s| s.theme = Some(name)) {
                         eprintln!("could not save the theme: {error}");
                     }
                 })
@@ -1068,7 +1067,7 @@ fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
 }
 
 /// The theme to start in: `GALLERY_THEME`, then the one saved last time; `None` follows the system.
-fn starting_theme(saved: &settings::Settings) -> Option<beui::Theme> {
+fn starting_theme(saved: &lathe_settings::Settings) -> Option<beui::Theme> {
     let by_name = |name: &str| match name {
         "light" => Some(beui::themes::lathe(Appearance::Light).clone()),
         "dark" => Some(beui::themes::lathe(Appearance::Dark).clone()),
@@ -1085,7 +1084,7 @@ fn starting_theme(saved: &settings::Settings) -> Option<beui::Theme> {
 
 fn main() {
     // Read before the event loop starts, so the UI thread never waits on the disk.
-    let saved = settings::path().map(|p| settings::load(&p)).unwrap_or_default();
+    let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
     gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
         beui::init(cx);
         if let Some(theme) = starting_theme(&saved) {
