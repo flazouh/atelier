@@ -3686,6 +3686,7 @@ dependencies = [
  "lathe-lsp",
  "lathe-project",
  "lathe-settings",
+ "tempfile",
 ]
 
 [[package]]
