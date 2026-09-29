@@ -17,8 +17,8 @@ use std::time::{Duration, Instant};
 
 mod agent_panel;
 mod agent_parts;
-mod editor_lsp;
 mod editor_story;
+mod workers;
 mod load_story;
 mod merge_story;
 mod pr_fixture;

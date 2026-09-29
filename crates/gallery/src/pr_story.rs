@@ -44,11 +44,12 @@ use gpui_kit::{
     component::input::EditorState,
     deferred, div, prelude::FluentBuilder, px,
 };
+use lathe_editor::{EditorSession, Elsewhere, Jump};
 use lathe_lsp::{LspError, canonical, client::uri_to_path};
 use lsp_types::Position;
 
 use crate::{
-    editor_lsp::{EditorSession, Elsewhere, Jump},
+    workers::workers,
     pr_fixture::Fixture,
 };
 
@@ -319,7 +320,7 @@ impl PrStory {
             });
         });
         let (editor, path) = (self.editor.clone(), self.path_on_disk());
-        let session = cx.new(|cx| EditorSession::for_review(editor, path, rows, Some(elsewhere), cx));
+        let session = cx.new(|cx| EditorSession::for_review(workers(), editor, path, rows, Some(elsewhere), cx));
         self._session = Some(cx.observe_in(&session, window, |story, session, window, cx| {
             // A ⌘-click on a declaration lists its uses: in this view, as the Uses lookup.
             let uses = session.read(cx).references().to_vec();
