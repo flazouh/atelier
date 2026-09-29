@@ -1,4 +1,4 @@
-//! lathe, the app. `lathe [folder]` opens the window, with the folder when one is named.
+//! lathe, the app. `lathe [folder…]` opens the window, with each folder named as a project in it.
 //!
 //! `LATHE_TIMINGS=1` prints when the first frame showed, counted from the start of the process.
 
@@ -17,7 +17,7 @@ fn main() {
     let started = Instant::now();
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
-    let folder = std::env::args_os().nth(1).map(PathBuf::from);
+    let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
     gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
         beui::init(cx);
         shell::bind_keys(cx);
@@ -41,7 +41,7 @@ fn main() {
         cx.open_window(options, move |window, cx| {
             let shell = cx.new(|cx| shell::Shell::new(recent, cx));
             window.focus(&shell.read(cx).focus_handle(), cx);
-            if let Some(folder) = folder {
+            for folder in folders {
                 shell.update(cx, |s, cx| s.open_local(folder, window, cx));
             }
             if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
