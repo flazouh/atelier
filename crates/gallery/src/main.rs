@@ -23,6 +23,7 @@ mod load_story;
 mod panels_story;
 mod sidebar_story;
 mod pr_view_story;
+mod motion_story;
 mod tasks_story;
 mod replay_story;
 mod merge_story;
@@ -70,11 +71,12 @@ enum Story {
     AgentPanels,
     AgentReplay,
     Tasks,
+    Motion,
     PullRequestView,
 }
 
 impl Story {
-    const ALL: [Story; 31] = [
+    const ALL: [Story; 32] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -106,6 +108,7 @@ impl Story {
         Story::AgentReplay,
         Story::Tasks,
         Story::PullRequestView,
+        Story::Motion,
     ];
 
     fn title(self) -> &'static str {
@@ -141,6 +144,7 @@ impl Story {
             Story::AgentReplay => "Agent replay",
             Story::PullRequestView => "Pull request view",
             Story::Tasks => "Tasks",
+            Story::Motion => "Motion",
         }
     }
 }
@@ -202,6 +206,7 @@ struct Gallery {
     agent_replay: Option<Entity<replay_story::ReplayStory>>,
     pr_view: Option<Entity<pr_view_story::PrViewStory>>,
     tasks: Option<Entity<tasks_story::TasksStory>>,
+    motion: Option<Entity<motion_story::MotionStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -307,6 +312,7 @@ impl Gallery {
             agent_sidebar: None,
             pr_view: None,
             tasks: None,
+            motion: None,
             agent_panels: None,
             agent_replay: None,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
@@ -330,6 +336,9 @@ impl Gallery {
         }
         if self.story == Story::AgentSidebar && self.agent_sidebar.is_none() {
             self.agent_sidebar = Some(cx.new(|cx| sidebar_story::SidebarStory::new(window, cx)));
+        }
+        if self.story == Story::Motion && self.motion.is_none() {
+            self.motion = Some(cx.new(|cx| motion_story::MotionStory::new(window, cx)));
         }
         if self.story == Story::Tasks && self.tasks.is_none() {
             self.tasks = Some(cx.new(|cx| tasks_story::TasksStory::new(window, cx)));
@@ -455,6 +464,7 @@ impl Gallery {
             Story::AgentSidebar => self.agent_sidebar.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentPanels => self.agent_panels.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Tasks => self.tasks.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::Motion => self.motion.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequestView => self.pr_view.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequests => pr_story::pull_requests().into_any_element(),
