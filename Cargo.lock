@@ -588,6 +588,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "beui",
+ "dirs 6.0.0",
  "futures-channel",
  "futures-util",
  "gpui-kit",
@@ -595,6 +596,8 @@ dependencies = [
  "lathe-agents",
  "lathe-lsp",
  "lsp-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
