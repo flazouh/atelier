@@ -7,6 +7,7 @@ pub mod claude;
 pub mod claude_code;
 pub mod coding_agents;
 pub mod labs;
+pub mod registry;
 pub mod session;
 pub mod subprocess;
 
