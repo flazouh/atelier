@@ -43,6 +43,20 @@ const RESOLVE: &str = "mutation Resolve($input: ResolveReviewThreadInput!) {
 const UNRESOLVE: &str = "mutation Unresolve($input: UnresolveReviewThreadInput!) {
   unresolveReviewThread(input: $input) { thread { id } } }";
 
+/// A branch name for a URL path: each segment percent-encoded, the slashes between them kept. A name may hold
+/// `#`, `%`, `?` or spaces, none of which may stand in a path as they are.
+pub(super) fn encode_ref(name: &str) -> String {
+    name.split('/')
+        .map(|segment| {
+            segment
+                .bytes()
+                .map(|b| if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') { (b as char).to_string() } else { format!("%{b:02X}") })
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 fn method_name(method: MergeMethod) -> &'static str {
     match method {
         MergeMethod::Merge => "MERGE",
@@ -69,6 +83,8 @@ fn side_name(side: Side) -> &'static str {
 /// What a write needs to know about a pull request.
 struct Target {
     id: String,
+    /// OPEN, CLOSED or MERGED.
+    state: String,
     head: String,
     head_sha: String,
     same_repo: bool,
@@ -87,6 +103,7 @@ impl GitHub {
         match (text("id"), text("headRefName"), text("headRefOid")) {
             (Some(id), Some(head), Some(head_sha)) => Ok(Target {
                 id,
+                state: text("state").unwrap_or_default(),
                 head,
                 head_sha,
                 same_repo: pull["isCrossRepository"] == Value::Bool(false),
@@ -162,7 +179,7 @@ impl GitHub {
         self.mutate(MERGE, input)?;
         // The branch goes only after the merge landed, and never when it lives in a fork.
         if request.delete_branch && target.same_repo {
-            let path = format!("repos/{}/git/refs/heads/{}", reference.repo.slug(), target.head);
+            let path = format!("repos/{}/git/refs/heads/{}", reference.repo.slug(), encode_ref(&target.head));
             self.client.rest("DELETE", &path, None)?;
         }
         Ok(MergeOutcome::Merged)
@@ -192,7 +209,11 @@ impl GitHub {
         if !target.same_repo {
             return Err(ForgeError::Rejected("The branch lives in a fork; only its owner can delete it.".into()));
         }
-        let path = format!("repos/{}/git/refs/heads/{}", reference.repo.slug(), target.head);
+        // GitHub closes an open pull request whose head branch is deleted: only a finished one may lose it.
+        if !matches!(target.state.as_str(), "MERGED" | "CLOSED") {
+            return Err(ForgeError::Rejected("The pull request is still open, and deleting its branch would close it.".into()));
+        }
+        let path = format!("repos/{}/git/refs/heads/{}", reference.repo.slug(), encode_ref(&target.head));
         self.client.rest("DELETE", &path, None).map(drop)
     }
 

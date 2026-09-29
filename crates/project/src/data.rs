@@ -43,6 +43,11 @@ impl DataFolder {
         Some(Self { dir: data.join("projects").join(format!("{readable}-{:016x}", fnv1a(name.as_bytes()))) })
     }
 
+    /// The folder itself.
+    pub fn path(&self) -> &Path {
+        &self.dir
+    }
+
     pub fn read(&self, path: &str) -> io::Result<Vec<u8>> {
         fs::read(host_path(&self.dir, path)?)
     }

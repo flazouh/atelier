@@ -63,6 +63,10 @@ impl Project for Locked {
         self.0.data_list(prefix)
     }
 
+    fn data_path(&self) -> Option<std::path::PathBuf> {
+        self.0.data_path()
+    }
+
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
         self.0.watch(sink)
     }

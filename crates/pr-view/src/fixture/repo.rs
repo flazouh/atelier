@@ -113,7 +113,7 @@ impl Repo {
     }
 
     pub fn project(&self) -> Arc<dyn Project> {
-        Arc::new(LocalProject::open(&self.work).unwrap())
+        Arc::new(LocalProject::open(&self.work).unwrap().with_data_dir(&self.root().join("project-data")))
     }
 
     pub fn prgit(&self) -> PrGit {
