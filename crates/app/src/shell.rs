@@ -16,7 +16,7 @@ use beui::{
     typography::{FONT_FAMILY, TextSize},
 };
 use gpui_kit::{
-    App, AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement, KeyBinding, KeyDownEvent, ParentElement,
+    App, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, KeyDownEvent, ParentElement,
     PathPromptOptions, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea, actions,
     base::{ResizeHandleRenderer, h_resizable, resizable_panel},
