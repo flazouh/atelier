@@ -561,15 +561,19 @@ fn focus_once_painted(handle: FocusHandle, frames: usize, window: &mut Window, c
     }
 }
 
-/// With `LATHE_TIMINGS=1`, prints what an action cost: its own `work`, the layout and paint of the frame
-/// that shows it (with `LATHE_FRAMES=1`), and how long after `since` that frame was drawn, which adds
-/// the wait for the display.
+/// With `LATHE_TIMINGS=1`, prints what an action cost: its own `work`, how long after `since` the frame
+/// that shows it began (the wait for the display), and that frame's layout and paint (with
+/// `LATHE_FRAMES=1`). A next-frame callback runs as a frame begins, before it is drawn, so the frame's
+/// cost is read at the start of the one after it.
 fn timing(window: &Window, what: String, since: Instant, work: Duration) {
     if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
         let ms = |d: Duration| d.as_secs_f64() * 1000.;
-        window.on_next_frame(move |_, _| {
-            let frame = crate::frame_meter::last_frame();
-            eprintln!("{what}: work {:.1} ms, its frame {:.1} ms, drawn after {:.1} ms", ms(work), ms(frame), ms(since.elapsed()));
+        window.on_next_frame(move |window, _| {
+            let began = since.elapsed();
+            window.on_next_frame(move |_, _| {
+                let frame = crate::frame_meter::last_frame();
+                eprintln!("{what}: work {:.1} ms, its frame began after {:.1} ms and took {:.1} ms", ms(work), ms(began), ms(frame));
+            });
         });
     }
 }
