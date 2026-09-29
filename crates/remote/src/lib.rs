@@ -4,5 +4,6 @@
 pub mod client;
 pub mod protocol;
 pub mod server;
+pub mod ssh;
 
 pub use client::{Connection, Dial, RemoteProject, Timeouts};
