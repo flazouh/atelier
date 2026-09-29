@@ -186,7 +186,7 @@ impl Render for MergeStory {
             });
         div()
             .child(div().pb(px(20.)).child(heard))
-            .child(section("The button, in each state", narrow(div().flex().flex_col().children(rows))))
+            .child(section("The button, in each state", div().max_w(px(720.)).flex().flex_col().children(rows)))
             .child(section("The PR card, open and merged", narrow(div().flex().flex_col().gap(px(8.)).children(cards))))
             .child(section(
                 "The merge box: ready, blocked, merged",
