@@ -1,0 +1,68 @@
+query Pull($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    id
+    nameWithOwner
+    mergeCommitAllowed
+    squashMergeAllowed
+    rebaseMergeAllowed
+    autoMergeAllowed
+    deleteBranchOnMerge
+    viewerDefaultMergeMethod
+    viewerPermission
+    mergeQueue { id }
+    pullRequest(number: $number) {
+      id
+      number
+      title
+      body
+      state
+      isDraft
+      merged
+      url
+      createdAt
+      updatedAt
+      author { login }
+      baseRefName
+      headRefName
+      headRefOid
+      mergeable
+      mergeStateStatus
+      reviewDecision
+      additions
+      deletions
+      changedFiles
+      comments { totalCount }
+      viewerCanUpdate
+      viewerCanMergeAsAdmin
+      viewerLatestReview { state commit { oid } submittedAt }
+      isInMergeQueue
+      mergeQueueEntry { position }
+      autoMergeRequest { enabledAt }
+      reviewRequests(first: 30) {
+        nodes {
+          requestedReviewer {
+            __typename
+            ... on User { login }
+            ... on Team { slug }
+            ... on Bot { login }
+          }
+        }
+      }
+      latestReviews(first: 30) { nodes { author { login } state } }
+      commits(last: 1) {
+        nodes {
+          commit {
+            oid
+            statusCheckRollup {
+              state
+              contexts(first: 1) {
+                checkRunCountsByState { state count }
+                statusContextCountsByState { state count }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

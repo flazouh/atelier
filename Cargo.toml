@@ -14,6 +14,7 @@ gpui-kit = "0.6.6"
 beui = { path = "crates/beui" }
 lathe-agents = { path = "crates/agents" }
 lathe-editor = { path = "crates/editor" }
+lathe-forge = { path = "crates/forge" }
 lathe-lsp = { path = "crates/lsp" }
 lathe-project = { path = "crates/project" }
 lathe-remote = { path = "crates/remote" }

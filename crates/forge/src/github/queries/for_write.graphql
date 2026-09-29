@@ -1,0 +1,11 @@
+query ForWrite($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    mergeQueue { id }
+    pullRequest(number: $number) {
+      id
+      headRefName
+      headRefOid
+      isCrossRepository
+    }
+  }
+}

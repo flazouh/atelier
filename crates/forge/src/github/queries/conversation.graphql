@@ -1,0 +1,10 @@
+query Conversation($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      comments(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id body createdAt author { login __typename } }
+      }
+    }
+  }
+}

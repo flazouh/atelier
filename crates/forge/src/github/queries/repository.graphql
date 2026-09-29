@@ -1,0 +1,16 @@
+query Repository($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    id
+    nameWithOwner
+    url
+    defaultBranchRef { name }
+    mergeCommitAllowed
+    squashMergeAllowed
+    rebaseMergeAllowed
+    autoMergeAllowed
+    deleteBranchOnMerge
+    viewerDefaultMergeMethod
+    viewerPermission
+    mergeQueue { id }
+  }
+}
