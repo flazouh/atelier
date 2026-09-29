@@ -17,9 +17,9 @@ use beui::{
 };
 use gpui_kit::{
     App, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, KeyDownEvent, ParentElement,
-    PathPromptOptions, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
+    PathPromptOptions, Pixels, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea, actions,
-    base::{ResizeHandleRenderer, h_resizable, resizable_panel},
+    base::{ResizableState, ResizeHandleRenderer, h_resizable, resizable_panel},
     deferred, div, prelude::FluentBuilder, px,
 };
 use lathe_project::LocalProject;
@@ -86,8 +86,18 @@ pub struct Shell {
     names: BTreeMap<String, String>,
     /// With `LATHE_FRAMES=1`, times every frame.
     meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
+    /// The widths of the sidebar, the agent panel and the right pane.
+    splits: Entity<ResizableState>,
+    /// The right pane's width before a review widened it, to give back when the review closes.
+    before_review: Option<Pixels>,
     _subscriptions: Vec<Subscription>,
 }
+
+/// The right pane's width a review opens at, room for its tree beside the file: less when the window
+/// has not got it, since the agent panel keeps its least width.
+const REVIEW_WIDTH: f32 = 860.;
+/// The agent panel's least width.
+const AGENT_LEAST: f32 = 320.;
 
 impl Shell {
     pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
@@ -113,6 +123,8 @@ impl Shell {
             panels,
             names: saved.session_names.clone(),
             meter: crate::frame_meter::enabled().then(Default::default),
+            splits: cx.new(|_| ResizableState::default()),
+            before_review: None,
             _subscriptions: Vec::new(),
         }
     }
@@ -356,6 +368,20 @@ impl Shell {
         }
     }
 
+    /// Gives the right pane the width a review wants, taken from the agent panel down to its least.
+    fn widen_for_review(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let sizes = self.splits.read(cx).sizes().clone();
+        let (Some(&right), Some(last)) = (sizes.last(), sizes.len().checked_sub(1)) else { return };
+        let others = sizes[..last].iter().fold(px(0.), |a, b| a + *b);
+        let sidebar = if self.sidebar { sizes[0] } else { px(0.) };
+        let room = right + others - sidebar - px(AGENT_LEAST);
+        let want = px(REVIEW_WIDTH).min(room);
+        if right < want {
+            self.before_review.get_or_insert(right);
+            self.splits.update(cx, |s, cx| s.resize_panel(last, want, window, cx));
+        }
+    }
+
     /// Opens `path` of `project` in the editor, and makes that project the one shown.
     fn open_in(&mut self, project: &Entity<OpenProject>, path: &str, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(i) = self.projects.iter().position(|p| p == project) {
@@ -382,7 +408,14 @@ impl Shell {
                 let scope = turn.map_or(Scope::Whole, Scope::Turn);
                 project.update(cx, |p, cx| p.open_review(session.clone(), scope, path.as_deref(), window, cx));
                 this.right = true;
+                this.widen_for_review(window, cx);
                 cx.notify();
+            }
+            ProjectEvent::ReviewClosed => {
+                if let Some(width) = this.before_review.take() {
+                    let last = this.splits.read(cx).sizes().len().saturating_sub(1);
+                    this.splits.update(cx, |s, cx| s.resize_panel(last, width, window, cx));
+                }
             }
             ProjectEvent::Sessions => this.sync(cx),
             ProjectEvent::Renamed { id, name } => {
@@ -744,9 +777,10 @@ impl Shell {
         let body = match self.active().cloned() {
             None => self.start_screen(cx).into_any_element(),
             Some(project) => h_resizable("shell-splits")
+                .with_state(&self.splits)
                 .with_handle_appearance(borderless_handle(&theme))
                 .child(resizable_panel().visible(self.sidebar).size(px(260.)).size_range(px(180.)..px(480.)).flex_none().child(self.sidebar(cx)))
-                .child(resizable_panel().size_range(px(320.)..px(4000.)).child(self.agent_panel(cx)))
+                .child(resizable_panel().size_range(px(AGENT_LEAST)..px(4000.)).child(self.agent_panel(cx)))
                 .child(
                     resizable_panel()
                         .visible(self.right)
