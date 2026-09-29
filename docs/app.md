@@ -279,6 +279,10 @@ in place of the editor on the right; a file's name opens it in the editor.
   the keys to the pane, and from the pane closes review mode, then the review. ⌃⇧T: one turn or the
   whole session. The bar and the header show each cap. When the pane puts a new file in a new editor,
   the keys follow it.
+- **A language server** on the open file, the same servers the editor's tabs use
+  (`OpenProject::language_for`). The server reads the file without the rows the agent removed
+  (`RowMap`); each decision, edit or rebase gives it the new map (`EditorSession::set_rows`). Hover,
+  ⌘-click and F12 work on the review's text, and the status line shows the server's words.
 - **The status line** shows the branch and how many files differ from the last commit
   (`git status --porcelain -z`, read off the UI thread after each change on disk): "main, 2 files
   changed", or "main, clean".
@@ -287,7 +291,6 @@ Limits:
 
 - A file's `+a -r` in the tree and the header stay as the turn left them; the bar's count of reviewed
   files moves.
-- The review's editor has syntax colours but no language server: its text holds both sides of each hunk.
 
 ## QA, M3
 

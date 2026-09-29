@@ -15,7 +15,7 @@
 use std::{collections::HashSet, sync::Arc, time::{Duration, Instant}};
 
 use beui::{
-    ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer, LineComposerEvent,
+    ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer, LineComposerEvent, RowMap,
     ReviewBar, ReviewFileHeader, ReviewHandlers, ReviewProgress,
     file_tree::FileTree,
     inline_review,
