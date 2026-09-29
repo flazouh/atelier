@@ -261,7 +261,18 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
     };
     let composer = s.composer.clone();
     let header = header(session, cx);
+    let interrupt = session.clone();
     div()
+        .key_context("AgentSession")
+        // Escape while the agent works interrupts its turn; otherwise it goes on to the input.
+        .on_action(move |_: &gpui_kit::base::input::Escape, _, cx| {
+            if interrupt.read(cx).conversation.working() {
+                cx.stop_propagation();
+                interrupt.update(cx, |s, cx| s.interrupt(cx));
+            } else {
+                cx.propagate();
+            }
+        })
         .flex()
         .flex_col()
         .size_full()

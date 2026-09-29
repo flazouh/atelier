@@ -111,7 +111,8 @@ impl AgentSession {
                 }
             })
             .collect();
-        let composer = cx.new(|cx| PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models));
+        let modes: Vec<SharedString> = agent.backend.capabilities().permission_modes.into_iter().map(|m| mode_word(m).into()).collect();
+        let composer = cx.new(|cx| PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes));
         let _composer = cx.subscribe(&composer, |this, _, event: &PromptInputEvent, cx| match event {
             PromptInputEvent::Submit(text) => this.send(text.to_string(), cx),
             PromptInputEvent::Stop => this.interrupt(cx),
