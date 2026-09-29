@@ -7,7 +7,7 @@ publish.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true
-beui = { workspace = true, features = ["cursor-themes"] }
+beui.workspace = true
 lathe-agents.workspace = true
 lathe-lsp.workspace = true
 dirs = "6"

@@ -105,7 +105,7 @@ request_layout and prepaint; "diff paint" is building its scene on the CPU.
 Loading every theme at start (`themes::all()`: lathe's two files parsed, eight VS Code files
 imported), once, before the first window opens. Load average 0.16:
 
-    cargo test --release -p beui --features cursor-themes --test theme_bench -- --ignored --nocapture
+    cargo test --release -p beui --test theme_bench -- --ignored --nocapture
 
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
