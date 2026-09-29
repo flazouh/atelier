@@ -281,7 +281,33 @@ The board, on the HP (`TASKS_VIEW=board`, scrolled up and down and sideways ever
 75 and 225): layout and prepaint median 3.2 ms, p95 11.5 ms, 62 of 298 frames over 8.33 ms under a load
 average of 8; the frames with a filter took 2.7 ms in layout; paint median 1.1 ms; at most 827 layout
 nodes. A column's card list reads shared data (`Rc`), so a frame clones a pointer and the cards in view,
-not the column; before that change the median was 4.0 ms. The Mac row for the board is still to be run.
+not the column; before that change the median was 4.0 ms. The Mac row is alex-9c's run (M4 Pro, release, window in front, 5,000 tasks, scrolling every way):
+
+| Case (5,000 tasks) | Frame, median | p95 | Layout and prepaint, median | p95 | max | Paint, median | Layout nodes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Board, Mac | 8.33 ms (120 Hz) | 8.85 ms | 1.09 ms | 1.49 ms | 1.88 ms, 0 frames over budget | 0.42 ms | 119 to 827 |
+
+So the HP's spikes were load.
+
+## Our own agent
+`crates/agents/tests/own_perf.rs`, release, on the HP (shared; the load average was 24). Each number is the
+median and p95 of 15 runs. No network: the model is a scripted stand-in, so the numbers are lathe's own work.
+
+    cargo test -p lathe-agents --release --test own_perf -- --ignored --nocapture --test-threads=1
+
+| Case | Target | Median | p95 | Result |
+| --- | --- | --- | --- | --- |
+| Parse a 10 MB Messages API stream (83,890 events): SSE, JSON, the reply | < 500 ms, < 20 µs an event | 133 ms (75 MB/s, 1.6 µs an event) | 241 ms | Passes |
+| 100 tool calls (`read` of a small file), instant model, the record not written | < 1 ms a call | 4.5 ms in all, 45 µs a call | 6.5 ms | Passes |
+| The same with the record written after every message (a whole-file write) | | 10.6 ms in all, 106 µs a call | 14.3 ms | |
+
+- The loop's own cost per tool call is 45 µs: the request, the events, the permission check, the tool and the
+  results. The record adds about 60 µs a call here, and grows with the conversation because a write is the
+  whole file.
+- A model streams about 100 events a second, so a stream costs 0.016% of a core.
+- An earlier build made the record's folder (a process) after every message and took 3 ms a call. The folder is
+  made once a session now.
+- The real API is not in these numbers: a call takes seconds, and the stall is the model's.
 
 ## Remote projects
 
