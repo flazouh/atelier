@@ -112,3 +112,15 @@ imported), once, before the first window opens. Load average 0.16:
 | All 10 themes loaded | < 30 ms | 23.26 ms | 23.54 ms | Passes |
 
 A switch reads the loaded theme; it parses nothing.
+
+## Merging
+
+The merge model for one pull request (its blockers, the button and the standing line), which
+MergeBox and MergeButton each work out on every render. It reads plain facts the app hands over: no
+disk, network or process work. The case is the worst one, every blocker at once. Load average 0.22:
+
+    cargo test --release -p beui --test merge_bench -- --ignored --nocapture
+
+| Case | Target | Median | p95 | Result |
+| --- | --- | --- | --- | --- |
+| Merge model, every blocker | < 50 µs | 0.64 µs | 0.68 µs | Passes |
