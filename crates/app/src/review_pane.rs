@@ -536,13 +536,10 @@ impl ReviewPane {
     }
 }
 
-/// Focuses `handle` now and again on each of the next `frames` frames until it holds: a composer in a
-/// row block is painted only once the editor has laid it out, and a handle not yet painted loses the
-/// focus the press gave it.
+/// Focuses `handle` now and again at each of the next `frames` frames: a composer in a row block is
+/// painted only once the editor has laid it out, a frame or two later, and a frame that does not paint
+/// the focused handle drops the focus. It counts as focused until then, so the retry cannot ask.
 fn focus_once_painted(handle: FocusHandle, frames: usize, window: &mut Window, cx: &mut gpui_kit::App) {
-    if handle.is_focused(window) {
-        return;
-    }
     handle.focus(window, cx);
     if frames > 0 {
         window.on_next_frame(move |window, cx| focus_once_painted(handle, frames - 1, window, cx));
@@ -608,7 +605,7 @@ impl Render for ReviewPane {
         };
         let bar = ReviewBar::new("review-bar", progress, handlers.clone())
             .review_mode(self.review_mode)
-            .scopes(["This turn".into(), "Whole session".into()], scope);
+            .scopes([("This turn".into(), "Turn".into()), ("Whole session".into(), "Session".into())], scope);
 
         let Some(file) = self.files.get(self.current) else {
             let empty = div()

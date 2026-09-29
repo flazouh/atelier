@@ -164,3 +164,20 @@ fn a_new_comment_takes_the_keys_at_once(cx: &mut TestAppContext) {
     let focused = cx.update(|window, cx| pane.read(cx).composer.as_ref().is_some_and(|(_, c, _)| c.focus_handle(cx).is_focused(window)));
     assert!(focused, "the composer has the keys");
 }
+
+/// What is typed in a new comment's composer is what it sends, and its key sends it.
+#[gpui_kit::test]
+fn a_comment_typed_and_sent_with_its_key_is_kept_whole(cx: &mut TestAppContext) {
+    let (pane, session, _, _, cx) = reviewing(cx);
+    let shown = pane.clone();
+    cx.update(|window, cx| _ = window.replace_root(cx, |_, _| Shown(shown)));
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.open_composer(2, window, cx)));
+    cx.run_until_parked();
+    cx.simulate_input("Why upper case?");
+    cx.run_until_parked();
+    cx.simulate_keystrokes("secondary-enter");
+    cx.run_until_parked();
+    let bodies = cx.update(|_, cx| session.read(cx).comments.all().iter().map(|c| c.body.clone()).collect::<Vec<_>>());
+    assert_eq!(bodies, ["Why upper case?"]);
+}
