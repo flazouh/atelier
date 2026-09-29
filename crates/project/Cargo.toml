@@ -1,0 +1,15 @@
+[package]
+name = "lathe-project"
+description = "The Project interface: a project's files, search, processes and git, wherever it lives."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+ignore = "0.4.33"
+notify = "7"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"
