@@ -66,7 +66,9 @@ fn an_edit_inside_a_hunk_is_what_accepting_it_writes(cx: &mut TestAppContext) {
     cx.run_until_parked();
     let ids = hunk_ids(&pane, cx);
     assert_eq!(ids.len(), 2, "the typing moved the hunk, it did not end it");
-    cx.update(|window, cx| pane.update(cx, |p, cx| drop(p.decide_hunk(&ids[0], Decision::Accept, window, cx))));
+    cx.update(|window, cx| pane.update(cx, |p, cx| {
+        p.decide_hunk(&ids[0], Decision::Accept, window, cx);
+    }));
     cx.run_until_parked();
     assert!(read(&dir, "a.txt").starts_with("1\nTWO!\n3\n"), "{}", read(&dir, "a.txt"));
 }
