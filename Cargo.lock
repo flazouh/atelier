@@ -601,6 +601,7 @@ dependencies = [
  "lathe-agents",
  "lathe-editor",
  "lathe-lsp",
+ "lathe-pr-view",
  "lathe-project",
  "lathe-settings",
  "lsp-types",
