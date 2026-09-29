@@ -93,3 +93,71 @@ recordings and stills are in `~/shots/m1/` on the HP.
 | Go to file | `goto-1.png` ("openpro" finds `open_project.rs`), `goto.png` (Enter opens it) |
 | Changed on disk | `disk-*.png`: a clean tab reloads; a dirty one asks; Keep mine and Reload |
 | Recording | `qa-local.mp4`, `multi.mp4`, `disk.mp4` |
+
+## Remote projects (M1b)
+
+A project on an SSH host is a `RemoteProject` (`crates/remote`): every `Project` call becomes a
+request to `lathe-remote`, which runs on the host and answers with a `LocalProject` there. Nothing
+above the interface knows the difference: the tree, the editor, search, git and the language
+servers all go through the same calls. The servers run on the host, started through the remote
+`spawn`, found by the host's `PATH` (`Store::on_host`), each at the project's root
+(`Workers::at_project_root`); lathe downloads nothing onto a host.
+
+### The protocol
+
+- Frames: a four-byte little-endian length, then postcard bytes (`crates/remote/src/protocol.rs`).
+  postcard over JSON because a file crosses as raw bytes (no base64), frames stay small, and the
+  frames are the interface's own serde types. A frame over 256 MB is refused.
+- The app sends `Request { id, call }`; the host answers `Response { id, result }` and on its own
+  sends `Event`s: a watch's `Changes`, a process's `Output`, its `Exited`. The first call is
+  `Hello { version, root }`; a version the host does not speak fails the hello.
+- The host runs each request on a thread of its own, so a slow search never holds up a read. A
+  process's stdin is fed in order by a thread of its own. Its stderr's last 64 KB is kept.
+- Every call has a timeout: 60 s for a listing, a search or git, 30 s for the rest. A timeout is an
+  error that names the host ("hp-agent did not answer in 30 s").
+
+### Connecting
+
+`ssh -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3`, the
+user's own ssh with their config, keys and agent; `BatchMode` makes a host that wants a password
+fail at once, in ssh's words, instead of waiting on a prompt nobody sees.
+
+1. Probe: `uname -sm` and `$HOME`.
+2. Deploy: `~/.cache/lathe/remote/<version>-<hash>/lathe-remote`, where the hash is of the copy the
+   app would upload, must answer `--version`. If not, the copy goes up over ssh: `cat` into a
+   `.part` file, `chmod +x`, and a rename, so a half copy never runs. This needs no `scp`.
+3. Dial: `ssh <host> <that path> --stdio`. On the host, lathe-remote takes its `PATH` from the
+   user's login shell, and adds `~/.cargo/bin` and `~/.local/bin` if missing, so it finds the
+   language servers the user installed.
+
+The copy to upload comes from `$LATHE_REMOTE_DIR/<system>-<arch>/lathe-remote` (`linux-x86_64`,
+`darwin-aarch64`), or, for a host like this machine, the `lathe-remote` beside the app. In
+development the HP builds the linux-x86_64 copy (`cargo build --release -p lathe-remote`); a Mac
+app that opens a project on the HP points `LATHE_REMOTE_DIR` at a folder holding that file as
+`linux-x86_64/lathe-remote`.
+
+### Failures
+
+| Failure | What the app does |
+| --- | --- |
+| Host unreachable | The form shows ssh's words: "ssh: Could not resolve hostname …". |
+| Auth fails | The form shows "Permission denied (publickey)." |
+| The connection drops, or lathe-remote crashes | Every waiting call fails at once. A banner says "Lost hp-agent:/path (why). Reconnecting; your unsaved edits are kept here." The client dials again, backing off from 0.5 s to 30 s; back, it says hello, restores the watch, lists the tree, and starts each open file's language server again. Tabs keep their text and dirty marks, and a save after the reconnect writes them. |
+| A slow link | A file being read shows as a pending tab with a spinner; a call that runs out of time says so in the status line. |
+
+Opening: the start screen's "Open over SSH…" (⌘⇧O) offers the hosts in `~/.ssh/config` as chips
+under a Host field, and a folder field (`~` works). `lathe ssh://host/path` opens one from the
+command line. Recent remote projects reopen from the start screen.
+
+## QA, M1b
+
+On the HP under Xvfb, the app opening `/tmp/qa-lathe` over `ssh hp-agent` (the HP to itself).
+The shots and recordings are in `~/shots/m1b/` on the HP.
+
+| What | Seen |
+| --- | --- |
+| Open over ssh | `remote-open.png`: `hp-agent:/tmp/qa-lathe`, main, 1008 files listed in 12 ms |
+| Open a file, hover, definition, edit, save | `qa-remote.mp4`, `qa-*.png`: rust-analyzer running on the host; `Instant`'s card; `bind_keys` opens `shell.rs`; "Saved crates/app/src/shell.rs"; `git diff` on the host shows the line |
+| The connection drops mid-edit (lathe-remote killed with -9) | `failures.mp4`, `f-1-down.png` (the banner), `f-2-back.png` ("Reconnected", the dirty dot kept), `f-3-saved.png` (the edit saved after), `f-6-server-back.png` (rust-analyzer ready again) |
+| A stalled host (SIGSTOP) | `f-4-pending.png` (the pending tab), `f-5-timeout.png` ("hp-agent did not answer in 30 s") |
+| The form | `form-*.png`: the config's hosts; an unknown host; `nobody@hp-agent` refused; connecting; open |
