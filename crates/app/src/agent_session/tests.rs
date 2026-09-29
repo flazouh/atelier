@@ -155,3 +155,55 @@ fn a_stream_folds_into_one_row(cx: &mut TestAppContext) {
     assert_eq!(items, 2, "the message and one text");
     assert_eq!(rows, items, "the list holds a row for each");
 }
+
+/// What a long session costs: 2,000 messages (the reader's and the agent's, and a tool call every
+/// tenth) folded and drawn in the panel, then scrolled a frame at a time. Target: every frame under
+/// 8 ms. Layout and prepaint on the CPU; the harness paints no pixels.
+///     cargo test --release -p lathe-app -- --ignored --nocapture a_long_session_scrolls
+#[gpui_kit::test]
+#[ignore]
+fn a_long_session_scrolls_under_a_frame(cx: &mut TestAppContext) {
+    use std::time::{Duration, Instant};
+    let mut turn = Vec::new();
+    for i in 0..1000u64 {
+        turn.push(Event::UserMessage { text: format!("Question {i}: what does this part of the relay do when the client goes away?") });
+        turn.push(Event::Text { block: lathe_agents::session::BlockId(i), delta: format!("Answer {i}. {}", "It detaches the byte stream, so a second write does nothing. ".repeat(3)) });
+        if i % 10 == 0 {
+            let call = ToolCall { id: ToolId::new(format!("t{i}")), name: "Read".into(), kind: ToolKind::Read, input: serde_json::json!({}), file: Some("src/relay.rs".into()), parent: None, status: ToolStatus::Done };
+            turn.push(Event::ToolStarted(call));
+        }
+    }
+    turn.push(ended());
+    let (session, _, cx) = start(cx, vec![turn], false);
+    let opened = Instant::now();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("go".into(), cx)));
+    cx.run_until_parked();
+    let folded = opened.elapsed();
+    struct Panel(Entity<AgentSession>);
+    impl gpui_kit::Render for Panel {
+        fn render(&mut self, window: &mut gpui_kit::Window, cx: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
+            use gpui_kit::{ParentElement, Styled};
+            gpui_kit::div().w(gpui_kit::px(480.)).h(gpui_kit::px(820.)).child(crate::session_view::session_view(&self.0, window, cx))
+        }
+    }
+    let shown = session.clone();
+    let (_panel, cx) = cx.add_window_view(move |_, _| Panel(shown));
+    let first = Instant::now();
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let first = first.elapsed();
+    let items = cx.update(|_, cx| session.read(cx).conversation.items().len());
+    let mut frames: Vec<Duration> = Vec::new();
+    for step in 0..200 {
+        let list = cx.update(|_, cx| session.read(cx).list.clone());
+        list.scroll_by(gpui_kit::px(if step < 100 { -240. } else { 240. }));
+        let at = Instant::now();
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        frames.push(at.elapsed());
+    }
+    frames.sort();
+    let ms = |d: Duration| d.as_secs_f64() * 1000.;
+    println!(
+        "{items} items: folded in {:.1} ms, first draw {:.2} ms; scroll frames median {:.2} ms, p95 {:.2} ms, worst {:.2} ms, over 8 ms: {}",
+        ms(folded), ms(first), ms(frames[100]), ms(frames[190]), ms(frames[199]), frames.iter().filter(|f| **f > Duration::from_millis(8)).count()
+    );
+}
