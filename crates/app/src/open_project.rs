@@ -21,6 +21,7 @@ use gpui_kit::{
     component::input::EditorState,
 };
 use lathe_editor::{ASK, EditorSession, Elsewhere, Jump, READY};
+use lathe_pr_view::hub::{PrEvent, PrHub};
 use lathe_lsp::{Store, Workers};
 use lathe_project::{Change, ChangeKind, Link, Project, Watch};
 use lathe_settings::Location;
@@ -29,6 +30,7 @@ use lathe_agents::{registry::Agent, session::{SessionId, SessionSummary}};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
+    pulls::{self, Pulls},
     review_pane::{PaneEvent, ReviewPane, Scope, SessionFor},
     tabs::Tabs,
     tree::{ProjectTree, ancestors},
@@ -114,6 +116,9 @@ pub struct OpenProject {
     _session_events: Vec<Subscription>,
     /// The review of a session's changes, shown in place of the editor while it is open.
     pub review: Option<(Entity<ReviewPane>, Subscription)>,
+    /// The project's pull requests, once asked for (`pulls.rs`).
+    pub pulls: Option<Pulls>,
+    opening_pulls: Task<()>,
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
     reading_dirty: Task<()>,
@@ -153,6 +158,8 @@ impl OpenProject {
             past: Vec::new(),
             _session_events: Vec::new(),
             review: None,
+            pulls: None,
+            opening_pulls: Task::ready(()),
             dirty: None,
             reading_dirty: Task::ready(()),
             opening: HashSet::new(),
@@ -305,6 +312,48 @@ impl OpenProject {
                 }
             });
         });
+    }
+
+    /// Shows the project's pull requests in place of the editor, or hides them. The first time, the
+    /// reader's login and the view's services are read off the UI thread.
+    pub fn toggle_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(pulls) = &mut self.pulls {
+            pulls.shown = !pulls.shown;
+            return cx.notify();
+        }
+        let (project, workers) = (self.project.clone(), self.workers.clone());
+        let Some(local) = lathe_settings::path().and_then(|p| p.parent().map(std::path::Path::to_path_buf)) else {
+            return cx.emit(ProjectEvent::Said("Pull requests need a data folder on this machine".into()));
+        };
+        cx.emit(ProjectEvent::Said("Reading pull requests…".into()));
+        let opening = cx.background_spawn(async move {
+            let me = pulls::login(project.as_ref()).unwrap_or_default();
+            pulls::open_services(project, me, local, workers)
+        });
+        self.opening_pulls = cx.spawn_in(window, async move |this, cx| {
+            let services = opening.await;
+            _ = this.update_in(cx, |p, window, cx| match services {
+                Ok(services) => p.mount_pulls(services, window, cx),
+                Err(error) => cx.emit(ProjectEvent::Said(format!("Pull requests: {error}").into())),
+            });
+        });
+    }
+
+    fn mount_pulls(&mut self, services: std::sync::Arc<lathe_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
+        let hub = cx.new(|cx| PrHub::with_services(services, cx));
+        let _events = cx.subscribe_in(&hub, window, |this, _, event: &PrEvent, window, cx| match event {
+            // A file at the pull request's head opens in the editor, as it is in this project.
+            PrEvent::OpenFile { path, line, .. } => {
+                if let Some(pulls) = &mut this.pulls {
+                    pulls.shown = false;
+                }
+                let position = lsp_types::Position { line: line.unwrap_or(1).saturating_sub(1), character: 0 };
+                this.jump(Jump { path: this.project.root().join(path), position }, window, cx);
+            }
+            PrEvent::OpenSession(_) | PrEvent::Closed(_) => {}
+        });
+        self.pulls = Some(Pulls { hub, shown: true, _events });
+        cx.notify();
     }
 
     /// Opens the review of `session` at `path`, in place of the editor.

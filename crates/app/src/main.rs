@@ -16,6 +16,7 @@ mod fake_agent;
 mod frame_meter;
 mod list_diff;
 mod open_project;
+mod pulls;
 mod review_pane;
 mod review_state;
 mod review_text;

@@ -50,10 +50,14 @@ impl EventEmitter<PrEvent> for PrHub {}
 impl PrHub {
     /// Opens the reader's database and the caches (small local files) and starts reading the list.
     pub fn new(project: Arc<dyn Project>, forge: Arc<dyn Forge>, config: PrConfig, cx: &mut Context<Self>) -> Result<Self, String> {
-        let services = Services::open(project, forge, config)?;
+        Ok(Self::with_services(Services::open(project, forge, config)?, cx))
+    }
+
+    /// The hub on services the app opened itself, off the UI thread (`Services::open` reads files).
+    pub fn with_services(services: Arc<Services>, cx: &mut Context<Self>) -> Self {
         let list = cx.new(|cx| PullList::new(services.clone(), cx));
         let subscriptions = vec![cx.subscribe(&list, |_, _, _: &ListEvent, _| {}), cx.observe(&list, |hub, list, cx| hub.sweep(&list, cx))];
-        Ok(Self { services, list, open: None, linked: Vec::new(), swept: HashSet::new(), _subscriptions: subscriptions })
+        Self { services, list, open: None, linked: Vec::new(), swept: HashSet::new(), _subscriptions: subscriptions }
     }
 
     /// The list, for an app that wants to open it in a pane of its own.
