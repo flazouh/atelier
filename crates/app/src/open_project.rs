@@ -29,7 +29,7 @@ use lathe_agents::{registry::Agent, session::{SessionId, SessionSummary}};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
-    review_pane::{PaneEvent, ReviewPane, Scope},
+    review_pane::{PaneEvent, ReviewPane, Scope, SessionFor},
     tabs::Tabs,
     tree::{ProjectTree, ancestors},
 };
@@ -309,8 +309,8 @@ impl OpenProject {
 
     /// Opens the review of `session` at `path`, in place of the editor.
     pub fn open_review(&mut self, session: Entity<AgentSession>, scope: Scope, path: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
-        let project = self.project.clone();
-        let pane = cx.new(|cx| ReviewPane::new(session, project, scope, path, window, cx));
+        let (project, language) = (self.project.clone(), self.language_for(cx));
+        let pane = cx.new(|cx| ReviewPane::new(session, project, scope, path, window, cx).with_language(language, window, cx));
         let sub = cx.subscribe(&pane, |this, _, event: &PaneEvent, cx| match event {
             PaneEvent::Close => {
                 this.review = None;
@@ -533,13 +533,22 @@ impl OpenProject {
 
     /// The language server session for `path`'s editor, with jumps to other files opening them here.
     fn session_for(&self, path: &str, editor: Entity<EditorState>, cx: &mut Context<Self>) -> Entity<EditorSession> {
-        let host = self.project.root().join(path);
-        let workers = self.workers.clone();
+        (self.language_for(cx))(path, editor, beui::RowMap::default(), cx)
+    }
+
+    /// Makes the language server session for a file of this project, shown with `rows` over it, from
+    /// the project's servers: a jump into another file opens it here.
+    pub fn language_for(&self, cx: &mut Context<Self>) -> SessionFor {
+        let (workers, root) = (self.workers.clone(), self.project.root().to_path_buf());
         let this = cx.entity().downgrade();
-        let elsewhere: Elsewhere = std::rc::Rc::new(move |jump, window, cx| {
-            this.update(cx, |p, cx| p.jump(jump, window, cx)).ok();
-        });
-        cx.new(|cx| EditorSession::for_review(workers, editor, host, beui::RowMap::default(), Some(elsewhere), cx))
+        std::rc::Rc::new(move |path, editor, rows, cx| {
+            let this = this.clone();
+            let elsewhere: Elsewhere = std::rc::Rc::new(move |jump, window, cx| {
+                this.update(cx, |p, cx| p.jump(jump, window, cx)).ok();
+            });
+            let (workers, host) = (workers.clone(), root.join(path));
+            cx.new(|cx| EditorSession::for_review(workers, editor, host, rows, Some(elsewhere), cx))
+        })
     }
 
     fn add_buffer(&mut self, path: String, text: String, window: &mut Window, cx: &mut Context<Self>) {
