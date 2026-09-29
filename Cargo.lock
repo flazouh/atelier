@@ -595,6 +595,7 @@ dependencies = [
  "ignore",
  "lathe-agents",
  "lathe-lsp",
+ "lathe-project",
  "lsp-types",
  "serde",
  "serde_json",
@@ -3680,6 +3681,7 @@ dependencies = [
 name = "lathe-lsp"
 version = "0.1.0"
 dependencies = [
+ "lathe-project",
  "lsp-types",
  "serde",
  "serde_json",
