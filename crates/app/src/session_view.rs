@@ -166,9 +166,11 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
         list(s.list.clone(), move |ix, _, cx| item_row(&session, ix, cx)).size_full()
     };
     // Why it stopped: the reason, and the agent's own last words behind a fold.
-    let failure = match (&s.status, &s.problem) {
-        (SessionStatus::Failed(why), _) => Some(why.clone()),
-        (_, Some(problem)) => Some(problem.clone()),
+    // The whole reason: the row keeps the cut one.
+    let failure = match (&s.problem, &s.status, &s.stderr) {
+        (Some(problem), _, _) => Some(problem.clone()),
+        (None, SessionStatus::Failed(_), Some(stderr)) => Some(crate::status::last_line(stderr).to_string().into()),
+        (None, SessionStatus::Failed(why), None) => Some(why.clone()),
         _ => None,
     };
     let details = s.stderr.clone();
