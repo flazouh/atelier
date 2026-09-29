@@ -6,9 +6,11 @@ use std::{
     collections::HashMap,
     fmt,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::Duration,
 };
+
+use lathe_project::Project;
 
 use crate::{LspError, LspWorker, Store, Unavailable, find_root, language_id, server_for};
 
@@ -41,6 +43,8 @@ impl fmt::Display for NoServer {
 
 /// Every server lathe has started, by (server name, project root).
 pub struct Workers {
+    /// Where the servers start: the project they serve.
+    project: Arc<dyn Project>,
     running: Mutex<HashMap<(&'static str, PathBuf), LspWorker>>,
     store: Store,
     ready: Duration,
@@ -48,9 +52,10 @@ pub struct Workers {
 }
 
 impl Workers {
-    /// Servers come from `store`. `ready` bounds each server's handshake, `ask` each request.
-    pub fn new(store: Store, ready: Duration, ask: Duration) -> Self {
-        Self { running: Mutex::default(), store, ready, ask }
+    /// Servers come from `store` and start through `project`. `ready` bounds each server's handshake,
+    /// `ask` each request.
+    pub fn new(project: Arc<dyn Project>, store: Store, ready: Duration, ask: Duration) -> Self {
+        Self { project, running: Mutex::default(), store, ready, ask }
     }
 
     /// The worker for `path`'s language and project: the one already running there, or a new one
@@ -75,7 +80,7 @@ impl Workers {
         if let Some(worker) = running.get(&key).filter(|w| w.is_alive()) {
             return Ok(worker.clone());
         }
-        let worker = LspWorker::start(spec, &launch, key.1.clone(), self.ready, self.ask)
+        let worker = LspWorker::start(&*self.project, spec, &launch, key.1.clone(), self.ready, self.ask)
             .map_err(|error| NoServer::Failed { server: spec.name, error })?;
         running.insert(key, worker.clone());
         Ok(worker)

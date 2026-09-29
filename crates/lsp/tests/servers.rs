@@ -177,7 +177,9 @@ fn workers() -> Workers {
     } else {
         Store::new(std::env::temp_dir().join("lathe-lsp-no-downloads"), search_dirs(), true)
     };
-    Workers::new(store, READY, ASK)
+    // The whole disk as one project: each test's server starts in its own fixture folder.
+    let project = std::sync::Arc::new(lathe_project::LocalProject::open("/").expect("the disk opens"));
+    Workers::new(project, store, READY, ASK)
 }
 
 /// Prints each download, so a slow first run says why.

@@ -46,7 +46,11 @@ type LastNavigation = Arc<Mutex<Option<Navigation>>>;
 /// user has not installed is downloaded into lathe's folder, unless `LATHE_OFFLINE` is set.
 fn workers() -> &'static Workers {
     static WORKERS: OnceLock<Workers> = OnceLock::new();
-    WORKERS.get_or_init(|| Workers::new(Store::from_env(), READY, ASK))
+    // The gallery's files sit in fixture folders all over the disk, so its project is the disk.
+    WORKERS.get_or_init(|| {
+        let disk = Arc::new(lathe_project::LocalProject::open("/").expect("the disk opens"));
+        Workers::new(disk, Store::from_env(), READY, ASK)
+    })
 }
 
 /// A jump out of this file: the file, and the place in it, in that file's own rows.

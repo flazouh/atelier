@@ -10,6 +10,7 @@ gpui-kit.workspace = true
 beui.workspace = true
 lathe-agents.workspace = true
 lathe-lsp.workspace = true
+lathe-project.workspace = true
 dirs = "6"
 ignore = "0.4.33"
 serde = { version = "1", features = ["derive"] }

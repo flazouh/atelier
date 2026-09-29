@@ -2,7 +2,8 @@ use super::*;
 
 fn workers() -> Workers {
     let store = Store::new(std::env::temp_dir().join("lathe-pool-tests"), vec![], true);
-    Workers::new(store, Duration::from_secs(1), Duration::from_secs(1))
+    let project = std::sync::Arc::new(lathe_project::LocalProject::open("/").unwrap());
+    Workers::new(project, store, Duration::from_secs(1), Duration::from_secs(1))
 }
 
 #[test]

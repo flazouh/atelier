@@ -26,6 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use lathe_project::Project;
 use lsp_types::{Diagnostic, Hover, Position, Range, Uri};
 
 use crate::{
@@ -134,12 +135,19 @@ pub struct LspWorker {
 }
 
 impl LspWorker {
-    /// Starts `program` as the server `spec` describes, for the project at `root`, and moves it onto
+    /// Starts `program` through `project` as the server `spec` describes, for the folder at `root`, and moves it onto
     /// its own thread once it has shaken hands. It blocks for the handshake, so call it off the UI
     /// thread. `ready` bounds the handshake, `ask` each request.
-    pub fn start(spec: &ServerSpec, launch: &Launch, root: PathBuf, ready: Duration, ask: Duration) -> Result<Self, LspError> {
+    pub fn start(
+        project: &dyn Project,
+        spec: &ServerSpec,
+        launch: &Launch,
+        root: PathBuf,
+        ready: Duration,
+        ask: Duration,
+    ) -> Result<Self, LspError> {
         let options = (spec.initialization_options)(launch.server_file(), &root);
-        let (client, init) = LspClient::spawn(&launch.program, &launch.args(spec), &root, options, ready)?;
+        let (client, init) = LspClient::spawn(project, &launch.program, &launch.args(spec), &root, options, ready)?;
         let name = init.server_info.map(|i| i.name).unwrap_or_else(|| spec.name.to_string());
         let capabilities = init.capabilities;
         let alive = Arc::new(AtomicBool::new(true));

@@ -8,7 +8,6 @@ use std::{
     collections::HashMap,
     io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
-    process::{Child, ChildStdin, Command, Stdio},
     sync::{
         Arc, Mutex,
         atomic::{AtomicI64, Ordering},
@@ -27,6 +26,8 @@ use lsp_types::{
 };
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
+
+use lathe_project::{Command, Control, Project};
 
 use crate::framing::{read_message, write_message};
 
@@ -91,8 +92,8 @@ type Pending = Arc<Mutex<HashMap<i64, Sender<Result<Value, LspError>>>>>;
 type Writer<W> = Arc<Mutex<W>>;
 
 pub struct LspClient {
-    child: Child,
-    stdin: Writer<BufWriter<ChildStdin>>,
+    control: Box<dyn Control>,
+    stdin: Writer<BufWriter<Box<dyn Write + Send>>>,
     next_id: AtomicI64,
     pending: Pending,
     /// What the server says on its own. The caller drains it.
@@ -100,25 +101,18 @@ pub struct LspClient {
 }
 
 impl LspClient {
-    /// Starts `program` with `args` and shakes hands for `root`. On success the server is ready for
-    /// documents.
+    /// Starts `program` with `args` in `root`, through `project`, so the server runs where the project
+    /// lives, and shakes hands for `root`. On success the server is ready for documents.
     pub fn spawn(
+        project: &dyn Project,
         program: &Path,
         args: &[String],
         root: &Path,
         options: Option<Value>,
         timeout: Duration,
     ) -> Result<(Self, InitializeResult), LspError> {
-        let mut child = Command::new(program)
-            .args(args)
-            .current_dir(root)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(LspError::Spawn)?;
-        let stdout = child.stdout.take().expect("stdout was piped");
-        let stdin = child.stdin.take().expect("stdin was piped");
+        let process = project.spawn(&Command::new(program).args(args.iter().cloned()).cwd(root)).map_err(LspError::Spawn)?;
+        let (stdin, stdout, control) = (process.stdin, process.stdout, process.control);
         let pending: Pending = Arc::default();
         let (tx, messages) = mpsc::channel();
         let stdin = Arc::new(Mutex::new(BufWriter::new(stdin)));
@@ -128,7 +122,7 @@ impl LspClient {
         });
 
         let mut client = Self {
-            child,
+            control,
             stdin,
             next_id: AtomicI64::new(1),
             pending,
@@ -316,7 +310,7 @@ impl LspClient {
     pub fn shutdown(mut self, timeout: Duration) -> Result<(), LspError> {
         let _ = self.request::<lsp_types::request::Shutdown>((), timeout);
         let _ = self.notify::<lsp_types::notification::Exit>(());
-        let _ = self.child.wait();
+        let _ = self.control.wait();
         Ok(())
     }
 
@@ -370,8 +364,8 @@ fn send_on(writer: &Writer<impl Write>, body: &Value) -> Result<(), LspError> {
 impl Drop for LspClient {
     fn drop(&mut self) {
         // A server left running would hold the workspace lock, so it is killed if shutdown never ran.
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        let _ = self.control.kill();
+        let _ = self.control.wait();
     }
 }
 
