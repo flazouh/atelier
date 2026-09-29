@@ -69,3 +69,61 @@ fn a_jump_outside_the_project_is_named(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(cx.update(|_, cx| project.read(cx).buffers.is_empty()));
 }
+
+/// Waits, drawing frames, until `done` holds or two seconds pass: a watch batch arrives on its own.
+fn until(cx: &mut VisualTestContext, done: impl Fn(&mut VisualTestContext) -> bool) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while !done(cx) && std::time::Instant::now() < deadline {
+        cx.run_until_parked();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+/// A file changed on disk reloads in a clean tab; a dirty tab keeps its edits and says so.
+#[gpui_kit::test]
+fn a_change_on_disk_reloads_a_clean_tab_and_asks_in_a_dirty_one(cx: &mut TestAppContext) {
+    let (dir, project, cx) = open(cx, &[("clean.txt", "one\n"), ("dirty.txt", "one\n")]);
+    cx.update(|window, cx| {
+        project.update(cx, |p, cx| {
+            p.open_file("clean.txt", window, cx);
+            p.open_file("dirty.txt", window, cx);
+        })
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        let editor = project.read(cx).buffers["dirty.txt"].editor.clone();
+        editor.update(cx, |e, cx| e.set_value("mine\n", window, cx));
+    });
+    cx.run_until_parked();
+    // set_value is not an edit the user typed, so mark it as one would.
+    cx.update(|_, cx| project.update(cx, |p, _| p.buffers.get_mut("dirty.txt").unwrap().dirty = true));
+    std::fs::write(dir.path().join("clean.txt"), "two\n").unwrap();
+    std::fs::write(dir.path().join("dirty.txt"), "two\n").unwrap();
+    until(cx, |cx| cx.update(|_, cx| project.read(cx).buffers["dirty.txt"].changed_on_disk));
+    until(cx, |cx| cx.update(|_, cx| project.read(cx).buffers["clean.txt"].editor.read(cx).value().as_ref() == "two\n"));
+    cx.update(|_, cx| {
+        let p = project.read(cx);
+        assert_eq!(p.buffers["clean.txt"].editor.read(cx).value().as_ref(), "two\n", "the clean tab reloaded");
+        assert!(!p.buffers["clean.txt"].dirty);
+        assert!(p.buffers["dirty.txt"].changed_on_disk, "the dirty tab says the file changed");
+        assert_eq!(p.buffers["dirty.txt"].editor.read(cx).value().as_ref(), "mine\n", "and keeps its edits");
+    });
+    // Keep mine, then save: the tab's text wins on disk.
+    cx.update(|_, cx| project.update(cx, |p, cx| p.keep_mine("dirty.txt", cx)));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("dirty.txt", window, cx)));
+    cx.update(|_, cx| project.update(cx, |p, cx| p.save(cx)));
+    until(cx, |_| std::fs::read_to_string(dir.path().join("dirty.txt")).unwrap() == "mine\n");
+    assert_eq!(std::fs::read_to_string(dir.path().join("dirty.txt")).unwrap(), "mine\n");
+}
+
+/// A folder with no git says so, and an empty one lists nothing.
+#[gpui_kit::test]
+fn an_empty_folder_with_no_git_says_both(cx: &mut TestAppContext) {
+    let (_dir, project, cx) = open(cx, &[]);
+    until(cx, |cx| cx.update(|_, cx| project.read(cx).git != Git::Unknown && !matches!(project.read(cx).listing, Listing::Loading)));
+    cx.update(|_, cx| {
+        let p = project.read(cx);
+        assert_eq!(p.git, Git::None);
+        assert!(matches!(&p.listing, Listing::Ready(tree) if tree.is_empty()));
+    });
+}
