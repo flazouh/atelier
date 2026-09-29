@@ -268,7 +268,8 @@ impl AgentSession {
         if text.trim().is_empty() {
             return;
         }
-        if self.conversation.items().is_empty() && self.id.is_none() {
+        // The first message of an empty conversation names it; a resumed one keeps its title.
+        if self.conversation.items().is_empty() {
             self.title = text.lines().next().unwrap_or("").chars().take(80).collect::<String>().into();
         }
         self.conversation.user_sent(text.clone());

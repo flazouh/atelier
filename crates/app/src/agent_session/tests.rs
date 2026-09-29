@@ -92,13 +92,16 @@ fn start(cx: &mut TestAppContext, turns: Vec<Vec<Event>>, fail_first: bool) -> (
     let (_root, cx) = cx.add_window_view(|window, cx| {
         let session = cx.new(|cx| AgentSession::start("k".into(), agent, project, None, window, cx));
         made = Some(session.clone());
-        Root(session)
+        Root { _session: session }
     });
     cx.run_until_parked();
     (made.unwrap(), fake, cx)
 }
 
-struct Root(Entity<AgentSession>);
+/// Keeps the session alive in the window.
+struct Root {
+    _session: Entity<AgentSession>,
+}
 
 impl gpui_kit::Render for Root {
     fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
