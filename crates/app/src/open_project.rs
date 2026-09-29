@@ -21,7 +21,10 @@ use gpui_kit::{
     component::input::EditorState,
 };
 use lathe_editor::{ASK, EditorSession, Elsewhere, Jump, READY};
-use lathe_pr_view::hub::{PrEvent, PrHub};
+use lathe_pr_view::{
+    hub::{PrEvent, PrHub},
+    list_view::ListEvent,
+};
 use lathe_lsp::{Store, Workers};
 use lathe_project::{Change, ChangeKind, Link, Project, Watch};
 use lathe_settings::Location;
@@ -352,7 +355,15 @@ impl OpenProject {
             }
             PrEvent::OpenSession(_) | PrEvent::Closed(_) => {}
         });
-        self.pulls = Some(Pulls { hub, shown: true, _events });
+        // A row of the list opens its pull request in the hub; opening needs the window.
+        let list = hub.read(cx).list().clone();
+        let opener = hub.clone();
+        let _opens = cx.subscribe_in(&list, window, move |_, _, event: &ListEvent, window, cx| {
+            let ListEvent::Open(reference) = event;
+            opener.update(cx, |hub, cx| hub.open(reference.clone(), window, cx));
+        });
+        self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens] });
+        cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
         cx.notify();
     }
 

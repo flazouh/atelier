@@ -15,7 +15,8 @@ pub struct Pulls {
     pub hub: Entity<PrHub>,
     /// In the right pane now; the hub keeps its state while hidden.
     pub shown: bool,
-    pub _events: Subscription,
+    /// The hub's events, and the list's opens.
+    pub _events: [Subscription; 2],
 }
 
 /// The reader's GitHub login, from `gh` on the project's host; `None` when gh is missing or signed out.
