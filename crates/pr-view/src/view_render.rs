@@ -90,18 +90,21 @@ impl PullView {
     fn rail(&mut self, height: f32, width: f32, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let theme = cx.theme().clone();
         let now = now();
-        let (threads, remarks) = self.model.conversation(now);
+        let page = self.model.conversation_page(now, self.page.0, self.page.1);
         let commits = crate::present::commit_data(&self.model.commits, now);
         let checks = self.model.check_rows();
         let unsent = self.model.unsent();
         let this = cx.entity().downgrade();
         let (weak_open, weak_reply, weak_resolve, weak_send) = (this.clone(), this.clone(), this.clone(), this.clone());
-        let ordered: Vec<lathe_forge::ThreadId> = self.model.threads_in_list_order().into_iter().map(|t| t.id.clone()).collect();
+        let listed: Vec<&lathe_forge::Thread> = self.model.threads_in_list_order().into_iter().take(self.page.0).collect();
+        let ordered: Vec<lathe_forge::ThreadId> = listed.iter().map(|t| t.id.clone()).collect();
         let (for_open, for_reply, for_resolve) = (ordered.clone(), ordered.clone(), ordered);
-        let paths: Vec<String> = self.model.threads_in_list_order().into_iter().map(|t| t.path.clone()).collect();
+        let paths: Vec<String> = listed.iter().map(|t| t.path.clone()).collect();
+        let (more_threads, more_remarks) = (this.clone(), this.clone());
         let header = self.header(cx);
         div()
             .id("pr-rail")
+            .track_scroll(&self.rail_scroll)
             .flex()
             .flex_col()
             .flex_none()
@@ -124,7 +127,14 @@ impl PullView {
                     .rounded(radius::LG)
                     .bg(theme.card)
                     .child(
-                        ConversationList::new("pr-conversation", threads, remarks)
+                        ConversationList::new("pr-conversation", page.threads, page.remarks)
+                            .totals(page.open, page.resolved, page.remark_total)
+                            .more_threads(page.hidden_threads, move |_, cx| {
+                                more_threads.update(cx, |view, cx| view.show_more(false, cx)).ok();
+                            })
+                            .more_remarks(page.hidden_remarks, move |_, cx| {
+                                more_remarks.update(cx, |view, cx| view.show_more(true, cx)).ok();
+                            })
                             .on_open(move |i, window, cx| {
                                 let (Some(id), Some(path)) = (for_open.get(i.min(10_000)).cloned(), paths.get(i).cloned()) else { return };
                                 let _ = id;
@@ -302,6 +312,7 @@ impl Render for PullView {
                 &self.focus,
             );
         }
+        self.mark_time("first frame with data");
         let layout = self.layout();
         let progress = self.model.progress();
         let files = self.model.files();

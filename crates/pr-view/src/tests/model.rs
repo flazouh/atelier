@@ -190,3 +190,23 @@ fn failing_jobs_are_read_a_few_at_a_time_and_only_once() {
     assert!(!next.contains(&1) && next.len() == 8 && next[0] == 2);
     let _ = Commit { sha: String::new(), title: String::new(), author: String::new(), at: 0 };
 }
+
+#[test]
+fn a_long_conversation_lists_a_page_and_counts_all_of_it() {
+    let mut model = model_with(&[("a.rs", "1")]);
+    model.data.threads = (0..50)
+        .map(|i| {
+            let mut t = sample::thread(&format!("t{i}"), "a.rs", 1, vec![sample::comment(&format!("c{i}"), "Ada", "x", 1)]);
+            t.resolved = i % 5 == 0;
+            t
+        })
+        .collect();
+    model.data.remarks = (0..7).map(|i| sample::comment(&format!("r{i}"), "bot", "built", 3)).collect();
+    let page = model.conversation_page(sample::NOW, 20, 5);
+    assert_eq!((page.threads.len(), page.remarks.len()), (20, 5));
+    assert_eq!((page.open, page.resolved, page.remark_total), (40, 10, 7), "the counts are of all of it");
+    assert_eq!((page.hidden_threads, page.hidden_remarks), (30, 2));
+    assert!(page.threads.iter().all(|t| !t.resolved), "the page is the first in list order: open threads lead");
+    let all = model.conversation_page(sample::NOW, 100, 100);
+    assert_eq!((all.hidden_threads, all.hidden_remarks), (0, 0));
+}

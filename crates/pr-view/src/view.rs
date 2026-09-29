@@ -14,14 +14,14 @@ use std::{
 };
 
 use beui::{
-    CommentComposer, CommentComposerEvent, Filter, Finder, FinderEvent, FinderItem, LineComment, LineComposer, LineComposerEvent, MergeBox, MergeBoxEvent,
+    Button, ButtonSize, ButtonVariant, CommentComposer, CommentComposerEvent, Filter, Finder, FinderEvent, FinderItem, LineComment, LineComposer, LineComposerEvent, MergeBox, MergeBoxEvent,
     ReviewHandlers, VerdictBox, VerdictEvent,
     verdict::Verb,
 };
 use futures_channel::mpsc;
 use futures_util::StreamExt;
 use gpui_kit::{
-    AnyElement, AppContext, Context, Entity, EventEmitter, FocusHandle, IntoElement, ParentElement, SharedString, Styled,
+    AnyElement, AppContext, Context, Entity, EventEmitter, FocusHandle, IntoElement, ParentElement, ScrollHandle, SharedString, Styled,
     Subscription, Task, Window,
     base::input::RowBlock,
     component::input::EditorState,
@@ -150,6 +150,15 @@ pub struct PullView {
     /// A copy of the data before a refresh, to tell what changed.
     before_refresh: Option<PullData>,
     pub(crate) first_load_done: bool,
+    /// When the first of each step happened, since the view was made: the numbers of the opening.
+    /// The rail's scroll, held so a measuring run can move it.
+    pub(crate) rail_scroll: ScrollHandle,
+    /// How many threads and remarks the rail lists: a page, and more when the reader asks.
+    pub(crate) page: (usize, usize),
+    /// Long threads the reader opened up in the diff.
+    unfolded: HashSet<ThreadId>,
+    pub timeline: Vec<(&'static str, std::time::Duration)>,
+    opened: std::time::Instant,
     /// The notice is the error of a failed read, so the next good read clears it.
     sync_failed: bool,
     cadence: Cadence,
@@ -240,6 +249,11 @@ impl PullView {
             before_refresh: None,
             first_load_done: false,
             sync_failed: false,
+            rail_scroll: ScrollHandle::new(),
+            page: (crate::layout::PAGE, crate::layout::PAGE),
+            unfolded: HashSet::new(),
+            timeline: Vec::new(),
+            opened: std::time::Instant::now(),
             refreshing: false,
             stopped: false,
             focus: cx.focus_handle(),
@@ -338,6 +352,13 @@ impl PullView {
         cx.notify();
     }
 
+    /// Writes down when a step first happened.
+    pub(crate) fn mark_time(&mut self, step: &'static str) {
+        if !self.timeline.iter().any(|(s, _)| *s == step) {
+            self.timeline.push((step, self.opened.elapsed()));
+        }
+    }
+
     pub(crate) fn take(&mut self, msg: Msg, window: &mut Window, cx: &mut Context<Self>) {
         match msg {
             Msg::Cached { data, marks } => {
@@ -345,6 +366,7 @@ impl PullView {
                 // The disk draws only until the forge has answered.
                 if let Some(data) = data.filter(|_| !self.model.ready()) {
                     self.model.data = data;
+                    self.mark_time("cached data read");
                     self.sync_boxes(window, cx);
                     self.prepare_git(cx);
                 }
@@ -402,6 +424,7 @@ impl PullView {
                 let head = prepared.head.clone();
                 self.prepared = Some(prepared);
                 self.model.set_git(entries, commits, base, head);
+                self.mark_time("git answered");
                 self.model.git_error = None;
                 self.prefetch(cx);
                 self.show(window, cx);
@@ -428,6 +451,7 @@ impl PullView {
                 cx.notify();
             }
             Msg::File { key, view } => {
+                self.mark_time("first file read");
                 self.loading.remove(&key);
                 self.failed.remove(&key);
                 self.views.retain(|(k, _)| *k != key);
@@ -602,6 +626,11 @@ impl PullView {
         self.views.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone())
     }
 
+    /// Whether the diff of the file on screen has been read.
+    pub fn shows_a_file(&self) -> bool {
+        self.current_view().is_some()
+    }
+
     /// The diff of the file on screen, when it has been read.
     pub(crate) fn current_view(&self) -> Option<Arc<FileView>> {
         let place = self.model.place.as_ref().filter(|p| !p.brought_in)?;
@@ -766,6 +795,34 @@ impl PullView {
     pub(crate) fn bring_in(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.model.jump_to(path, None);
         self.show(window, cx);
+        cx.notify();
+    }
+
+    /// One frame of a measuring run: the rail scrolls, and every tenth frame the walk goes on to the next
+    /// file. Gives `true` on the frames that changed the file.
+    pub fn measure_step(&mut self, frame: usize, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        self.rail_scroll.set_offset(gpui_kit::point(gpui_kit::px(0.), gpui_kit::px(-((frame % 150) as f32) * 40.)));
+        let switch = frame % 10 == 9;
+        if switch {
+            self.step(1, window, cx);
+        }
+        cx.notify();
+        switch
+    }
+
+    /// The rail lists another page of threads (`remarks` false) or of remarks.
+    /// Shows every comment of a long thread in the diff.
+    pub(crate) fn unfold(&mut self, thread: ThreadId, cx: &mut Context<Self>) {
+        self.unfolded.insert(thread);
+        cx.notify();
+    }
+
+    pub(crate) fn show_more(&mut self, remarks: bool, cx: &mut Context<Self>) {
+        if remarks {
+            self.page.1 += crate::layout::PAGE;
+        } else {
+            self.page.0 += crate::layout::PAGE;
+        }
         cx.notify();
     }
 
@@ -1056,19 +1113,40 @@ impl PullView {
             let thread = self.model.data.threads[*index].clone();
             let (weak_reply, weak_resolve) = (this.clone(), this.clone());
             let (id_reply, id_resolve) = (thread.id.clone(), thread.id.clone());
-            let comments: Vec<beui::Comment> = thread.comments.iter().map(|c| crate::present::comment(c, now)).collect();
+            let all: Vec<beui::Comment> = thread.comments.iter().map(|c| crate::present::comment(c, now)).collect();
+            // A long thread shows its first and last comments until the reader asks for the rest.
+            let hidden = if all.len() > crate::layout::FOLD_AFTER && !self.unfolded.contains(&thread.id) { all.len() - 2 } else { 0 };
+            let comments: Vec<beui::Comment> = if hidden > 0 { vec![all[0].clone(), all[all.len() - 1].clone()] } else { all };
+            let (weak_unfold, id_unfold) = (this.clone(), thread.id.clone());
             let resolved = thread.resolved;
             let element_id = SharedString::from(format!("pr-thread-{}", thread.id.0));
             let build: Rc<dyn Fn() -> AnyElement> = Rc::new(move || {
                 let (weak_reply, weak_resolve, id_reply, id_resolve) = (weak_reply.clone(), weak_resolve.clone(), id_reply.clone(), id_resolve.clone());
-                LineComment::new(element_id.clone(), comments.clone())
+                let (weak_unfold, id_unfold) = (weak_unfold.clone(), id_unfold.clone());
+                let comment = LineComment::new(element_id.clone(), comments.clone())
                     .resolved(resolved)
                     .on_reply(move |_, window, cx| {
                         weak_reply.update(cx, |view, cx| view.open_reply(&id_reply, window, cx)).ok();
                     })
                     .on_resolve(move |_, _, cx| {
                         weak_resolve.update(cx, |view, cx| view.resolve(id_resolve.clone(), true, cx)).ok();
-                    })
+                    });
+                if hidden == 0 {
+                    return comment.into_any_element();
+                }
+                div()
+                    .flex()
+                    .flex_col()
+                    .child(comment)
+                    .child(
+                        Button::new(gpui_kit::ElementId::Name(format!("{element_id}-unfold").into()))
+                            .label(format!("Show {hidden} more comments"))
+                            .variant(ButtonVariant::Ghost)
+                            .size(ButtonSize::Sm)
+                            .on_click(move |_, _, cx| {
+                                weak_unfold.update(cx, |view, cx| view.unfold(id_unfold.clone(), cx)).ok();
+                            }),
+                    )
                     .into_any_element()
             });
             match by_row.iter_mut().find(|(r, _)| r == row) {

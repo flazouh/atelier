@@ -29,3 +29,9 @@ pub fn fit(width: f32, rail: bool, tree: Option<bool>) -> Fit {
     let rail = rail.then(|| (width - PADDING - RAIL_GAP - tree_space - DIFF_MIN).clamp(RAIL_MIN, RAIL_MAX));
     Fit { rail, tree }
 }
+
+/// How many threads (and how many remarks) the rail lists at first, and each time the reader asks for more.
+pub const PAGE: usize = 20;
+
+/// A thread with more comments than this shows its first and last in the diff, and a line to show the rest.
+pub const FOLD_AFTER: usize = 3;

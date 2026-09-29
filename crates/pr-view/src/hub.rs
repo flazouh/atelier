@@ -66,6 +66,11 @@ impl PrHub {
         self.open.as_ref().map(|o| &o.reference)
     }
 
+    /// The view of the pull request on screen, if one is open.
+    pub fn view(&self) -> Option<&Entity<PullView>> {
+        self.open.as_ref().map(|o| &o.view)
+    }
+
     /// Shows a pull request. From a PR card, a PR chip, or a row of the list.
     pub fn open(&mut self, reference: PullRef, window: &mut Window, cx: &mut Context<Self>) {
         if self.open.as_ref().is_some_and(|o| o.reference == reference) {

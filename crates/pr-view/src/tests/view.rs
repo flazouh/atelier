@@ -28,6 +28,20 @@ pub fn harness() -> Harness {
     harness_with(|config| config)
 }
 
+impl Harness {
+    /// A harness over a repository and a forge the caller made.
+    pub fn over(repo: Scenario, forge: Arc<FixtureForge>, reference: PullRef, head: String) -> Harness {
+        let base = repo.main_tip();
+        let local = tempfile::tempdir().unwrap();
+        let config = PrConfig::new("alex", local.path())
+            .remote_data(repo.data.to_str().unwrap())
+            .fetch_url(repo.origin.to_str().unwrap())
+            .refresh(Duration::from_secs(60), Duration::from_secs(60));
+        let services = Services::open(repo.project(), forge.clone() as Arc<dyn Forge>, config).unwrap();
+        Harness { _scenario: repo, forge, services, reference, head, base, _local: local }
+    }
+}
+
 pub fn harness_with(tune: impl FnOnce(PrConfig) -> PrConfig) -> Harness {
     let scenario = Scenario::new(&[("README.md", "readme\n"), ("src/a.rs", "fn one() {}\nfn two() {}\nfn three() {}\n")]);
     let base = scenario.main_tip();
@@ -272,5 +286,22 @@ fn since_last_review_is_the_opening_choice_only_when_a_review_point_is_known(cx:
     view.read_with(cx, |v, _| {
         // The sample has no review by the reader: the whole pull request.
         assert_eq!(v.model.base.as_ref().unwrap().choice, crate::base::BaseChoice::Whole);
+    });
+}
+
+#[gpui_kit::test]
+fn the_rail_lists_a_page_of_threads_and_shows_more_when_asked(cx: &mut TestAppContext) {
+    setup(cx);
+    let h = harness();
+    h.forge.edit(&h.reference, |d| {
+        d.threads = (0..45).map(|i| sample::thread(&format!("T{i}"), "src/a.rs", 2, vec![sample::comment(&format!("c{i}"), "Ada", "x", sample::NOW - 60)])).collect();
+    });
+    let (view, cx) = open(&h, cx);
+    settle(&view, cx, |v| v.current_view().is_some() && v.model.data.threads.len() == 45);
+    view.read_with(cx, |v, _| assert_eq!(v.page.0, crate::layout::PAGE));
+    view.update(cx, |v, cx| v.show_more(false, cx));
+    view.read_with(cx, |v, _| {
+        assert_eq!(v.page.0, 2 * crate::layout::PAGE);
+        assert_eq!(v.model.conversation_page(sample::NOW, v.page.0, v.page.1).hidden_threads, 45 - 2 * crate::layout::PAGE);
     });
 }

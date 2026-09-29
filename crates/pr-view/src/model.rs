@@ -17,6 +17,17 @@ use crate::{
     sync::keep_place,
 };
 
+/// What the rail's conversation holds now: a page of it, and the numbers of all of it.
+pub struct Page {
+    pub threads: Vec<ThreadSummary>,
+    pub remarks: Vec<RemarkSummary>,
+    pub open: usize,
+    pub resolved: usize,
+    pub remark_total: usize,
+    pub hidden_threads: usize,
+    pub hidden_remarks: usize,
+}
+
 /// The file on screen: a changed file, or one brought in to read beside them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Place {
@@ -265,6 +276,22 @@ impl PrModel {
     pub fn conversation(&self, now: u64) -> (Vec<ThreadSummary>, Vec<RemarkSummary>) {
         let threads = self.data.threads.iter().map(|t| present::thread_summary(t, now)).collect();
         (open_first(threads), self.data.remarks.iter().map(|r| present::remark_summary(r, now)).collect())
+    }
+
+    /// A page of the conversation: the first `threads` threads in list order and the first `remarks`
+    /// remarks, with the counts of all of it. A long conversation costs only the page.
+    pub fn conversation_page(&self, now: u64, threads: usize, remarks: usize) -> Page {
+        let ordered = self.threads_in_list_order();
+        let resolved = ordered.iter().filter(|t| t.resolved).count();
+        Page {
+            threads: ordered.iter().take(threads).map(|t| present::thread_summary(t, now)).collect(),
+            remarks: self.data.remarks.iter().take(remarks).map(|r| present::remark_summary(r, now)).collect(),
+            open: ordered.len() - resolved,
+            resolved,
+            remark_total: self.data.remarks.len(),
+            hidden_threads: ordered.len().saturating_sub(threads),
+            hidden_remarks: self.data.remarks.len().saturating_sub(remarks),
+        }
     }
 
     /// The threads in the order the conversation list shows them: open first, each group in its own order.

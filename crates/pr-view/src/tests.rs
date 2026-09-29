@@ -7,6 +7,7 @@ mod layout;
 mod list;
 mod load;
 mod model;
+mod perf;
 mod place;
 mod present;
 mod repo;
