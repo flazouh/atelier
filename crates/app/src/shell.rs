@@ -749,8 +749,11 @@ impl Shell {
                 };
                 parts.push(format!("{files}, listed in {} ms", took.as_millis()).into());
             }
-            if let Some((_, buffer)) = p.active_buffer() {
-                parts.extend(buffer.session.read(cx).status());
+            // The review's server while it shows, else the open tab's.
+            match (&p.review, p.active_buffer()) {
+                (Some((pane, _)), _) => parts.extend(pane.read(cx).status(cx)),
+                (None, Some((_, buffer))) => parts.extend(buffer.session.read(cx).status()),
+                (None, None) => {}
             }
         }
         parts.extend(self.said.clone());

@@ -52,20 +52,29 @@ pub struct Jump {
 /// What the owner does with a jump out of the file.
 pub type Elsewhere = Rc<dyn Fn(Jump, &mut Window, &mut App)>;
 
-/// The file's rows as shown: which the server's rows are, and back.
+/// The file's rows as shown: which the server's rows are, and back. A review's hunks move as the reader
+/// decides them, so the map can change ([`EditorSession::set_rows`]); every holder shares it.
 #[derive(Clone)]
 struct Rows {
     path: PathBuf,
-    map: Arc<RowMap>,
+    map: Arc<Mutex<RowMap>>,
 }
 
 impl Rows {
+    fn new(path: PathBuf, map: RowMap) -> Self {
+        Self { path, map: Arc::new(Mutex::new(map)) }
+    }
+
+    fn map(&self) -> std::sync::MutexGuard<'_, RowMap> {
+        self.map.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
     fn to_head(&self, position: Position) -> Option<Position> {
-        Some(Position { line: self.map.to_head(position.line as usize)? as u32, ..position })
+        Some(Position { line: self.map().to_head(position.line as usize)? as u32, ..position })
     }
 
     fn to_view(&self, position: Position) -> Position {
-        Position { line: self.map.to_view(position.line as usize) as u32, ..position }
+        Position { line: self.map().to_view(position.line as usize) as u32, ..position }
     }
 
     fn range_to_view(&self, range: lsp_types::Range) -> lsp_types::Range {
@@ -88,7 +97,7 @@ impl Rows {
     }
 
     fn doc(&self, shown: &str) -> Doc {
-        Doc { path: self.path.clone(), text: self.map.head_text(shown) }
+        Doc { path: self.path.clone(), text: self.map().head_text(shown) }
     }
 }
 
@@ -138,7 +147,7 @@ impl EditorSession {
         cx: &mut Context<Self>,
     ) -> Self {
         let path = canonical(&path);
-        let rows = Rows { path: path.clone(), map: Arc::new(rows) };
+        let rows = Rows::new(path.clone(), rows);
         let mut starting = start(workers, path.clone(), cx);
         let _start = cx.spawn(async move |this, cx| {
             loop {
@@ -228,6 +237,13 @@ impl EditorSession {
         self.server = format!("{} is ready: hold {SECONDARY} and click a symbol, or press F12", worker.name()).into();
         self.worker = Some(worker);
         self.check(cx);
+    }
+
+    /// The shown rows the file does not have changed: a review's hunk was decided, or its text edited.
+    /// The server reads the file with the new map from the next question on, and checks it again.
+    pub fn set_rows(&mut self, rows: RowMap, cx: &mut Context<Self>) {
+        *self.rows.map() = rows;
+        self.schedule_recheck(cx);
     }
 
     /// What the status line says: the server's state, then what the last check found. The segments
@@ -498,3 +514,6 @@ pub fn file_name(uri: &Uri) -> String {
         None => uri.as_str().to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests;

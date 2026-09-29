@@ -30,6 +30,7 @@ use gpui_kit::{
     component::input::EditorState,
     div, prelude::FluentBuilder, px,
 };
+use lathe_editor::EditorSession;
 use lathe_project::Project;
 use lathe_review::{Content, FileReview, Merged};
 
@@ -38,6 +39,9 @@ use crate::{
     review_state::Decided,
     review_text::{moved_caret, row_of, splice},
 };
+
+/// Makes the language server session for a file of the project, shown with the given rows over it.
+pub type SessionFor = std::rc::Rc<dyn Fn(&str, Entity<EditorState>, RowMap, &mut gpui_kit::App) -> Entity<EditorSession>>;
 
 /// How long after the reader's last key the file is written.
 const WRITE_AFTER: Duration = Duration::from_millis(300);
@@ -149,6 +153,10 @@ pub struct ReviewPane {
     changed: Vec<ChangedFile>,
     pub current: usize,
     editor: Entity<EditorState>,
+    /// The project's language servers, when the review has them: the open file's session on its
+    /// merged text, which the server reads without the removed rows.
+    language: Option<SessionFor>,
+    lsp: Option<Entity<EditorSession>>,
     focus: FocusHandle,
     pub review_mode: bool,
     resolving: Vec<beui::Resolve>,
@@ -209,6 +217,8 @@ impl ReviewPane {
             files,
             current,
             editor,
+            language: None,
+            lsp: None,
             focus: cx.focus_handle(),
             review_mode: false,
             resolving: Vec::new(),
@@ -242,11 +252,35 @@ impl ReviewPane {
         (editor, edits)
     }
 
+    /// The review with the project's language servers on each file it shows.
+    pub fn with_language(mut self, language: SessionFor, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        self.language = Some(language);
+        self.load_editor(window, cx);
+        self
+    }
+
+    /// The server's words for the status line, when the open file has one.
+    pub fn status(&self, cx: &gpui_kit::App) -> Vec<SharedString> {
+        self.lsp.as_ref().map(|lsp| lsp.read(cx).status()).unwrap_or_default()
+    }
+
+    /// Tells the open file's server which shown rows the file does not have, after its hunks moved.
+    fn sync_rows(&self, cx: &mut Context<Self>) {
+        if let (Some(lsp), Some(file)) = (&self.lsp, self.files.get(self.current)) {
+            let rows = RowMap::new(file.hunks());
+            lsp.update(cx, |s, cx| s.set_rows(rows, cx));
+        }
+    }
+
     /// Puts the open file in a new editor. When the reader's keys were in the old one, they go to the
     /// new one, or the next key would reach nothing.
     fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let had_keys = self.editor.focus_handle(cx).is_focused(window);
         (self.editor, self._edits) = Self::editor_for(self.files.get(self.current), window, cx);
+        self.lsp = match (&self.language, self.files.get(self.current)) {
+            (Some(language), Some(file)) if file.merged.is_some() => Some(language(&file.review.path, self.editor.clone(), RowMap::new(file.hunks()), cx)),
+            _ => None,
+        };
         if had_keys {
             focus_once_painted(self.editor.focus_handle(cx), 3, window, cx);
         }
@@ -270,6 +304,7 @@ impl ReviewPane {
             }
             None => merged.edited(&text),
         });
+        self.sync_rows(cx);
         let this = cx.entity().downgrade();
         let timer = cx.background_executor().timer(WRITE_AFTER);
         self.writing = Some(cx.spawn(async move |_, cx| {
@@ -368,6 +403,7 @@ impl ReviewPane {
         if at == self.current {
             self.resolving.clear();
             put_text(&self.editor, &new_text, window, cx);
+            self.sync_rows(cx);
         }
         cx.notify();
     }
@@ -438,6 +474,7 @@ impl ReviewPane {
         file.merged = Some(decided);
         if at == self.current {
             inline_review::apply(&self.editor, decisions, window, cx);
+            self.sync_rows(cx);
         }
         true
     }
