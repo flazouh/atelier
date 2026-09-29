@@ -3,7 +3,7 @@
 //! and the checks, and a job's log only when a reader opens it.
 use crate::{
     ChangedFile, Check, Comment, ForgeResult, HeldComment, Involved, Job, JobRef, MergeOutcome, MergeRequest,
-    NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate, RepoRef, Repository, Reviewer, Thread, ThreadId,
+    NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate, RepoRef, Repository, Remark, Reviewer, Thread, ThreadId,
     Verdict,
 };
 
@@ -21,7 +21,7 @@ pub trait Forge: Send + Sync {
     fn threads(&self, reference: &PullRef) -> ForgeResult<Vec<Thread>>;
 
     /// Remarks: comments on the pull request as a whole.
-    fn remarks(&self, reference: &PullRef) -> ForgeResult<Vec<Comment>>;
+    fn remarks(&self, reference: &PullRef) -> ForgeResult<Vec<Remark>>;
 
     /// The checks on the pull request's head, each with its job when it has one.
     fn checks(&self, reference: &PullRef) -> ForgeResult<Vec<Check>>;

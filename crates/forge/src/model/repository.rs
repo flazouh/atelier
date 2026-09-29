@@ -52,3 +52,6 @@ pub struct Repository {
     /// The reader may open a pull request or push here.
     pub can_write: bool,
 }
+
+#[cfg(test)]
+mod tests;

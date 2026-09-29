@@ -33,7 +33,8 @@ struct State {
     sent: Vec<Request>,
 }
 
-/// Replays queued answers. Each key answers its queue in order; the last one repeats.
+/// Replays queued answers. Each key answers its queue in order and starts over at the end, so a test
+/// can read the same pages again.
 #[derive(Clone, Default)]
 pub struct Fixtures(Arc<Mutex<State>>);
 
@@ -86,6 +87,12 @@ impl Fixtures {
         fixtures
     }
 
+    /// The size of every queued answer, in bytes.
+    pub fn bytes(&self) -> usize {
+        let state = self.0.lock().unwrap();
+        state.replies.values().flatten().filter_map(|r| r.as_ref().ok()).map(|r| r.body.len()).sum()
+    }
+
     /// The requests sent so far.
     pub fn sent(&self) -> Vec<Request> {
         self.0.lock().unwrap().sent.clone()
@@ -103,7 +110,9 @@ impl Transport for Fixtures {
         state.sent.push(request.clone());
         let key = key_of(request);
         let queue = state.replies.get_mut(&key).unwrap_or_else(|| panic!("no fixture for `{key}`"));
-        if queue.len() > 1 { queue.pop_front().unwrap() } else { queue.front().cloned().unwrap() }
+        let reply = queue.pop_front().unwrap();
+        queue.push_back(reply.clone());
+        reply
     }
 }
 

@@ -164,3 +164,30 @@ The input is the captured runs in `crates/agents/tests/fixtures/claude_code`, re
   mapper's memory per session is the todo list, the open blocks and the running calls.
 - A live session, on the HP: the reader and writer threads sleep on the pipes. A `send` only queues a
   line. It never waits for the agent.
+## The forge
+What runs when lathe reads GitHub. Every call runs off the UI thread. The cases below run on answers held
+in memory, so they measure lathe's own work (the request, the JSON, the mapping) and not the network.
+Machine and method as above; load average 1.8, 20 runs.
+
+    cargo test -p lathe-forge --release --test perf -- --ignored --nocapture --test-threads=1
+
+| Case | Target | Median | p95 | Result |
+| --- | --- | --- | --- | --- |
+| Lookup of 50 `#N`: build the one request, read and map the answer | < 1 ms | 0.17 ms | 0.22 ms | Passes |
+| Read a 300-file pull request with 500 threads and 5,000 comments (12.7 MB of JSON, 16 pages) | < 100 ms | 37.4 ms | 40.6 ms | Passes |
+| File 500 pull requests into Courts and map them to rows | < 5 ms | 0.82 ms | 0.90 ms | Passes |
+
+The 5,000 comments are the recorded 1.2 KB comment, so the payload is larger than most real ones. Before
+the parser stopped copying each page's subtree, the same case took 84 ms at a load average of 16.
+
+Live, against GitHub through `gh` on the HP (`cargo test -p lathe-forge --test live -- --ignored
+--nocapture`, one run each, so not medians):
+
+| Case | Time |
+| --- | --- |
+| 50 pull numbers of `oven-sh/bun`, one request | 749 ms |
+| The reader's working set: ten searches at once, 54 pull requests | 5.2 s |
+
+The working set is the slow one, and it is network and GitHub's own time: each search reads the checks of
+every row. It never runs on the UI thread, and the UI can show the remembered list first. Fewer fields per
+row would cut it; that is open.

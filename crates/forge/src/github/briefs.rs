@@ -1,0 +1,52 @@
+//! The batched lookup: many pull numbers of one repository in one request, each under its own alias.
+use std::collections::{HashMap, HashSet};
+
+use serde_json::{Value, json};
+
+use super::{client::Client, queries};
+use crate::{ForgeError, ForgeResult, PullBrief, PullRef, PullState, RepoRef};
+
+/// How many pull numbers one query carries.
+const MOST_ALIASES: usize = 100;
+
+/// The chip fields of many numbers of one repository. One request per hundred numbers. A number that is
+/// not a pull request, or is not there, is `None`.
+pub(super) fn briefs(client: &Client, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+    let mut unique: Vec<u64> = Vec::new();
+    let mut seen = HashSet::new();
+    for number in numbers {
+        if seen.insert(*number) {
+            unique.push(*number);
+        }
+    }
+    let mut found = HashMap::with_capacity(unique.len());
+    for chunk in unique.chunks(MOST_ALIASES) {
+        let vars = json!({"owner": repo.owner, "name": repo.name});
+        let graph = client.graphql(&queries::briefs(chunk), vars)?;
+        // A number that is an issue, or nothing, comes back null with a NOT_FOUND error at its alias:
+        // that is an answer, not a failure. Any other error fails the call.
+        if let Some(error) = graph.errors.into_iter().find(|e| e.kind.as_deref() != Some("NOT_FOUND")) {
+            return Err(error.into());
+        }
+        let repository = &graph.data["repository"];
+        if repository.is_null() {
+            return Err(ForgeError::NotFound(repo.slug()));
+        }
+        for number in chunk {
+            found.insert(*number, brief(repo, *number, &repository[format!("p{number}")]));
+        }
+    }
+    Ok(numbers.iter().map(|n| found.get(n).cloned().flatten()).collect())
+}
+
+fn brief(repo: &RepoRef, number: u64, node: &Value) -> Option<PullBrief> {
+    let text = |key: &str| node.get(key)?.as_str().map(str::to_string);
+    let flag = |key: &str| node.get(key).and_then(Value::as_bool).unwrap_or(false);
+    let state = match (text("state")?.as_str(), flag("merged"), flag("isDraft")) {
+        (_, true, _) | ("MERGED", ..) => PullState::Merged,
+        ("CLOSED", ..) => PullState::Closed,
+        (_, _, true) => PullState::Draft,
+        _ => PullState::Open,
+    };
+    Some(PullBrief { reference: PullRef { repo: repo.clone(), number }, title: text("title")?, state, url: text("url")? })
+}

@@ -1,4 +1,7 @@
 //! Shared by the replay, present and perf tests: the recorded answers, and small ways to bend them.
+//! Each test binary uses some of it.
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 
 use lathe_forge::{

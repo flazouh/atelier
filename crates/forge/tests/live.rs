@@ -73,4 +73,21 @@ fn reads_a_public_pull_end_to_end() {
     assert_eq!(briefs.len(), 3);
     assert_eq!(briefs[0].as_ref().unwrap().state, PullState::Merged);
     assert!(briefs[1].is_none(), "#1 is not a pull request");
+
+    // Fifty numbers, one request: how long GitHub takes to answer it.
+    let numbers: Vec<u64> = (44_100..44_150).collect();
+    let start = std::time::Instant::now();
+    let fifty = forge.briefs(&reference.repo, &numbers).unwrap();
+    println!("50 numbers, one request: {} pull requests found, {:.0} ms", fifty.iter().flatten().count(), start.elapsed().as_secs_f64() * 1000.);
+
+    // The reader's own working set reads private data, so it is counted and never recorded.
+    if std::env::var("LATHE_FORGE_RECORD").is_err() {
+        let start = std::time::Instant::now();
+        let involved = forge.involved().unwrap();
+        let mut shelves = std::collections::BTreeMap::new();
+        for row in &involved {
+            *shelves.entry(format!("{:?}", row.shelf)).or_insert(0) += 1;
+        }
+        println!("working set: {} pull requests {shelves:?}, {:.0} ms", involved.len(), start.elapsed().as_secs_f64() * 1000.);
+    }
 }

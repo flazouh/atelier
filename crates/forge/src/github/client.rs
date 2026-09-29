@@ -136,18 +136,18 @@ impl Client {
         unreachable!("the last try returns")
     }
 
-    /// Every item of a paged GraphQL list. `page` reads one page's data into its items and the cursor
-    /// of the next, when there is one; the query takes the cursor as `$after`.
+    /// Every item of a paged GraphQL list. `page` takes one page's data and gives its items and the
+    /// cursor of the next, when there is one; the query takes the cursor as `$after`.
     pub fn pages<T>(
         &self,
         query: &str,
         mut variables: Value,
-        page: impl Fn(&Value) -> ForgeResult<(Vec<T>, Option<String>)>,
+        page: impl Fn(Value) -> ForgeResult<(Vec<T>, Option<String>)>,
     ) -> ForgeResult<Vec<T>> {
         let mut items = Vec::new();
         for _ in 0..MOST_PAGES {
             let data = self.graphql(query, variables.clone())?.whole()?;
-            let (mut found, next) = page(&data)?;
+            let (mut found, next) = page(data)?;
             items.append(&mut found);
             match next {
                 Some(cursor) => variables["after"] = Value::String(cursor),

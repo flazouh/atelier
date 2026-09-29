@@ -151,7 +151,7 @@ fn pages_follow_the_cursor_until_the_last_and_stop_at_the_cap() {
     };
     let fixtures = Fixtures::new().ok("Q", page(&[1, 2], Some("c1"))).ok("Q", page(&[3], Some("c2"))).ok("Q", page(&[4], None));
     let (client, _) = client(&fixtures);
-    let read = |data: &serde_json::Value| {
+    let read = |data: serde_json::Value| {
         let items: Vec<u32> = serde_json::from_value(data["n"].clone()).unwrap();
         Ok((items, data["next"].as_str().map(str::to_string)))
     };

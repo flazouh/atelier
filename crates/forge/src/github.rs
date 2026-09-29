@@ -5,7 +5,8 @@ mod client;
 mod gh_cli;
 mod queries;
 mod read;
-mod shelves;
+mod briefs;
+mod involved;
 mod transport;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
@@ -26,8 +27,8 @@ use self::{
 };
 use crate::{
     ChangedFile, Check, Comment, Forge, ForgeError, ForgeResult, HeldComment, Involved, Job, JobRef, MergeOutcome,
-    MergeRequest, NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate, RepoRef, Repository, Reviewer, Thread,
-    ThreadId, Verdict,
+    MergeRequest, NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate, Remark, RepoRef, Repository, Reviewer,
+    Thread, ThreadId, Verdict,
 };
 
 pub struct GitHub {
@@ -67,8 +68,8 @@ impl GitHub {
         let more = self.client.pages(
             queries::THREAD_COMMENTS,
             json!({"thread": thread.id.0, "after": after}),
-            |data| {
-                let page: Page<wire::CommentNode> = decode(data["node"]["comments"].clone())?;
+            |mut data| {
+                let page: Page<wire::CommentNode> = decode(data["node"]["comments"].take())?;
                 let next = page.page_info.next();
                 Ok((page.nodes.into_iter().flatten().map(|n| read::comment(&n)).collect(), next))
             },
@@ -102,16 +103,16 @@ impl Forge for GitHub {
     }
 
     fn files(&self, reference: &PullRef) -> ForgeResult<Vec<ChangedFile>> {
-        self.client.pages(queries::FILES, Self::vars(reference), |data| {
-            let page = pull_field::<Page<wire::FileNode>>(data, "files", reference)?;
+        self.client.pages(queries::FILES, Self::vars(reference), |mut data| {
+            let page = pull_field::<Page<wire::FileNode>>(&mut data, "files", reference)?;
             let next = page.page_info.next();
             Ok((page.nodes.iter().flatten().map(read::file).collect(), next))
         })
     }
 
     fn threads(&self, reference: &PullRef) -> ForgeResult<Vec<Thread>> {
-        let pages = self.client.pages(queries::THREADS, Self::vars(reference), |data| {
-            let page = pull_field::<Page<wire::ThreadNode>>(data, "reviewThreads", reference)?;
+        let pages = self.client.pages(queries::THREADS, Self::vars(reference), |mut data| {
+            let page = pull_field::<Page<wire::ThreadNode>>(&mut data, "reviewThreads", reference)?;
             let next = page.page_info.next();
             let threads = page
                 .nodes
@@ -132,24 +133,23 @@ impl Forge for GitHub {
             .collect()
     }
 
-    fn remarks(&self, reference: &PullRef) -> ForgeResult<Vec<Comment>> {
-        self.client.pages(queries::CONVERSATION, Self::vars(reference), |data| {
-            let page = pull_field::<Page<wire::CommentNode>>(data, "comments", reference)?;
+    fn remarks(&self, reference: &PullRef) -> ForgeResult<Vec<Remark>> {
+        self.client.pages(queries::CONVERSATION, Self::vars(reference), |mut data| {
+            let page = pull_field::<Page<wire::CommentNode>>(&mut data, "comments", reference)?;
             let next = page.page_info.next();
             Ok((page.nodes.iter().flatten().map(read::comment).collect(), next))
         })
     }
 
     fn checks(&self, reference: &PullRef) -> ForgeResult<Vec<Check>> {
-        self.client.pages(queries::CHECKS, Self::vars(reference), |data| {
-            let pull = pull_node(data, reference)?;
-            let commits: wire::Nodes<Value> = decode(pull["commits"].clone())?;
-            let Some(Some(commit)) = commits.nodes.into_iter().last() else { return Ok((Vec::new(), None)) };
-            let contexts = &commit["commit"]["statusCheckRollup"]["contexts"];
+        self.client.pages(queries::CHECKS, Self::vars(reference), |mut data| {
+            let commits: wire::Nodes<Value> = pull_field(&mut data, "commits", reference)?;
+            let Some(Some(mut commit)) = commits.nodes.into_iter().last() else { return Ok((Vec::new(), None)) };
+            let contexts = commit["commit"]["statusCheckRollup"]["contexts"].take();
             if contexts.is_null() {
                 return Ok((Vec::new(), None));
             }
-            let page: Page<wire::ContextNode> = decode(contexts.clone())?;
+            let page: Page<wire::ContextNode> = decode(contexts)?;
             let next = page.page_info.next();
             Ok((page.nodes.iter().flatten().map(|n| read::check(&reference.repo, n)).collect(), next))
         })
@@ -176,11 +176,11 @@ impl Forge for GitHub {
     }
 
     fn involved(&self) -> ForgeResult<Vec<Involved>> {
-        shelves::involved(&self.client)
+        involved::involved(&self.client)
     }
 
     fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
-        shelves::briefs(&self.client, repo, numbers)
+        briefs::briefs(&self.client, repo, numbers)
     }
 
     fn create_pull(&self, repo: &RepoRef, new: &NewPull) -> ForgeResult<PullRef> {
@@ -236,18 +236,13 @@ impl Forge for GitHub {
     }
 }
 
-/// `repository.pullRequest` of a query's data, or "not found".
-fn pull_node<'a>(data: &'a Value, reference: &PullRef) -> ForgeResult<&'a Value> {
-    let pull = &data["repository"]["pullRequest"];
+/// One field of the pull request in a query's data, taken out of it.
+fn pull_field<T: serde::de::DeserializeOwned>(data: &mut Value, field: &str, reference: &PullRef) -> ForgeResult<T> {
+    let pull = &mut data["repository"]["pullRequest"];
     if pull.is_null() {
         return Err(not_found(&format!("{}#{}", reference.repo.slug(), reference.number)));
     }
-    Ok(pull)
-}
-
-/// One field of the pull request in a query's data.
-fn pull_field<T: serde::de::DeserializeOwned>(data: &Value, field: &str, reference: &PullRef) -> ForgeResult<T> {
-    decode(pull_node(data, reference)?[field].clone())
+    decode(pull[field].take())
 }
 
 #[cfg(test)]

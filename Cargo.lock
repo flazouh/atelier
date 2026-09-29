@@ -3707,6 +3707,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "lathe-forge"
+version = "0.1.0"
+dependencies = [
+ "beui",
+ "gpui-kit",
+ "lathe-forge",
+ "lathe-project",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "lathe-lsp"
 version = "0.1.0"
 dependencies = [

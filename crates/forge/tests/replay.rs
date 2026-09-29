@@ -38,7 +38,7 @@ fn a_pull_is_read_into_the_glossarys_terms() {
     assert_eq!(pull.rights, Rights::Cannot);
     assert!(!pull.can_update && !pull.conflicting && pull.queue.is_none() && !pull.auto_merge);
     assert_eq!(pull.merge_state, MergeState::Unknown, "GitHub does not compute it for a merged pull");
-    assert_eq!(pull.body.chars().count(), 13_219, "the body arrives whole");
+    assert_eq!(pull.body.len(), 13_219, "the body arrives whole");
 }
 
 #[test]
