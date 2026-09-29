@@ -171,3 +171,23 @@ fn a_host_that_never_answers_times_out() {
     assert_eq!(error.to_string(), "slow did not answer in 200 ms");
     assert!(at.elapsed() < Duration::from_secs(2));
 }
+
+/// After a reconnect the host numbers its processes from the start again; a new process must not
+/// meet the old one's pipes.
+#[test]
+fn a_process_starts_after_a_reconnect() {
+    let dir = folder(&[]);
+    let (host, dial) = host();
+    let remote = connect(&dir, dial);
+    let (tx, links) = mpsc::channel();
+    remote.on_link(Box::new(move |link| drop(tx.send(link))));
+    let mut before = remote.spawn(&Command::new("sleep").args(["30"])).unwrap();
+    lock(&host.cuts.recv().unwrap().0).take();
+    assert!(matches!(links.recv_timeout(Duration::from_secs(2)).unwrap(), Link::Down(_)));
+    assert_eq!(before.control.wait().unwrap(), None, "the old process ended with its connection");
+    assert_eq!(links.recv_timeout(Duration::from_secs(10)).unwrap(), Link::Up);
+    let mut after = remote.spawn(&Command::new("echo").args(["again"])).unwrap();
+    let mut out = String::new();
+    after.stdout.read_to_string(&mut out).unwrap();
+    assert_eq!(out, "again\n");
+}
