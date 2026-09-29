@@ -155,6 +155,10 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
 pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let muted = theme.muted_foreground;
+    // The "Show details" fold keeps its state across frames, by the session's key.
+    let key = session.read(cx).key.clone();
+    let open = window.use_keyed_state(gpui_kit::ElementId::Name(format!("{key}-details").into()), cx, |_, _| false);
+    let shown = *open.read(cx);
     let s = session.read(cx);
     let empty = s.conversation.items().is_empty();
     let rows = {
@@ -169,8 +173,6 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
     };
     let details = s.stderr.clone();
     let failure = failure.map(|why| {
-        let open = window.use_keyed_state(gpui_kit::ElementId::Name(format!("{}-details", s.key).into()), cx, |_, _| false);
-        let shown = *open.read(cx);
         div()
             .mx(px(12.))
             .mb(px(8.))
