@@ -336,6 +336,24 @@ is passed, and it says so in a `Warning`.
 (one message a line) and `<id>.meta` (title, model, time). `sessions` lists them newest first, `history` maps them
 to events, and resume loads the messages back. An id is letters, digits and dashes, so it is never a path. A save
 that fails warns once and the session goes on. Both files are rewritten whole after each message.
+**Where the record lives.** Now inside the project, in `.lathe/`. That would show in the user's `git status`, so
+the first time a session writes there it adds `.lathe/` to the repository's own `.git/info/exclude` (local,
+never committed; found with `git rev-parse --git-path info/exclude`, so a linked worktree writes the shared
+file). It adds the line once, keeps what was in the file, and does nothing when the project is not a git
+repository. This is a short-term fix. The right place is a data folder outside the repository, on the
+project's host, like the task tracker's database. That needs a method on `Project` (`crates/project`):
+
+    /// A folder for lathe's own data about this project, on the project's host and outside the
+    /// repository, made when first asked for. The same project always gets the same folder. Paths in the
+    /// three calls below are relative to it; `..` and absolute paths are refused, as in `read` and `write`.
+    fn data_read(&self, path: &str) -> io::Result<Vec<u8>>;
+    fn data_write(&self, path: &str, bytes: &[u8]) -> io::Result<()>;
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<Entry>>;   // newest first, with the time
+
+A local project keeps it under the app's data folder (`<data>/projects/<hash of the root>/`); an SSH project
+under `~/.local/share/lathe/projects/<hash of the root>/` on the host, through the same connection. `list`
+would replace the `ls -t` this store runs now. The store then writes `agent/sessions/<id>.jsonl` there, and
+`exclude_from_git` goes away.
 **Interrupt.** `Command::Interrupt` sets a flag that the HTTP read, the retry wait, the permission wait and a
 running command all look at. What streamed before it stays in the conversation as text. A message sent while a
 turn runs waits and runs next.

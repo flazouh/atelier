@@ -137,3 +137,81 @@ fn a_session_that_cannot_save_says_so_once_and_keeps_working() {
     assert_eq!(events.iter().filter(|e| matches!(e, Event::Warning(w) if w.contains("not being saved"))).count(), 1);
     assert_eq!(super::support::turn_ends(&events).len(), 2);
 }
+
+fn git(dir: &std::path::Path, args: &[&str]) -> String {
+    let out = std::process::Command::new("git").args(args).current_dir(dir).output().unwrap();
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+fn repo() -> super::support::Rig {
+    let rig = rig(vec![super::server::Step::Sse(super::server::says("one")), super::server::Step::Sse(super::server::says("two"))], PermissionMode::Ask);
+    git(rig.dir.path(), &["init", "-q"]);
+    rig
+}
+
+/// The record lives in the project. It must not show up as something to commit.
+#[test]
+fn a_session_in_a_git_repository_leaves_git_status_clean() {
+    let _guard = crate::testing::spawn_lock();
+    let rig = repo();
+    drop(_guard);
+    rig.send("hello");
+    rig.turns(1);
+    assert!(rig.dir.path().join(".lathe/agent/sessions").is_dir(), "the record was written");
+    assert_eq!(git(rig.dir.path(), &["status", "--porcelain"]), "", "and git does not see it");
+    let exclude = std::fs::read_to_string(rig.dir.path().join(".git/info/exclude")).unwrap();
+    assert_eq!(exclude.lines().filter(|l| *l == ".lathe/").count(), 1);
+    assert!(git(rig.dir.path(), &["ls-files", "--others", "--exclude-standard"]).is_empty());
+}
+
+#[test]
+fn the_line_is_added_once_and_what_was_there_stays() {
+    let _guard = crate::testing::spawn_lock();
+    let rig = repo();
+    drop(_guard);
+    // A file with no final newline, as an editor may leave it.
+    std::fs::write(rig.dir.path().join(".git/info/exclude"), "# mine\n*.log").unwrap();
+    rig.send("a");
+    rig.turns(1);
+    rig.send("b");
+    rig.turns(2);
+    let exclude = std::fs::read_to_string(rig.dir.path().join(".git/info/exclude")).unwrap();
+    assert_eq!(exclude, "# mine\n*.log\n.lathe/\n");
+    assert!(store::exclude_from_git(rig.project.as_ref()).unwrap() == false, "asked again, it finds the line");
+    assert_eq!(git(rig.dir.path(), &["status", "--porcelain"]), "");
+}
+
+#[test]
+fn a_project_that_is_not_a_git_repository_gets_no_git_folder_and_no_error() {
+    let rig = rig(vec![super::server::Step::Sse(super::server::says("one"))], PermissionMode::Ask);
+    rig.send("hi");
+    let events = rig.turns(1);
+    assert!(!rig.dir.path().join(".git").exists());
+    assert!(rig.dir.path().join(".lathe/agent/sessions").is_dir());
+    assert!(!events.iter().any(|e| matches!(e, Event::Warning(_))));
+    assert_eq!(store::exclude_from_git(rig.project.as_ref()), Ok(false));
+}
+
+#[test]
+fn a_linked_worktree_writes_the_shared_exclude_file() {
+    let _guard = crate::testing::spawn_lock();
+    let main = tempfile::tempdir().unwrap();
+    git(main.path(), &["init", "-q"]);
+    git(main.path(), &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "first"]);
+    // A linked worktree, laid out by hand: a machine may forbid `git worktree add`, and this is all it is.
+    // The worktree has a `.git` file that points at a folder in the main repository's `.git/worktrees`.
+    let tree = tempfile::tempdir().unwrap();
+    let path = tree.path().join("wt");
+    let admin = main.path().join(".git/worktrees/wt");
+    std::fs::create_dir_all(&path).unwrap();
+    std::fs::create_dir_all(&admin).unwrap();
+    std::fs::write(path.join(".git"), format!("gitdir: {}\n", admin.display())).unwrap();
+    std::fs::write(admin.join("HEAD"), std::fs::read(main.path().join(".git/HEAD")).unwrap()).unwrap();
+    std::fs::write(admin.join("commondir"), "../..\n").unwrap();
+    std::fs::write(admin.join("gitdir"), format!("{}\n", path.join(".git").display())).unwrap();
+    assert!(git(&path, &["rev-parse", "--git-path", "info/exclude"]).trim().ends_with("info/exclude"));
+    let project: std::sync::Arc<dyn lathe_project::Project> = std::sync::Arc::new(lathe_project::LocalProject::open(&path).unwrap());
+    assert_eq!(store::exclude_from_git(project.as_ref()), Ok(true));
+    assert_eq!(std::fs::read_to_string(main.path().join(".git/info/exclude")).unwrap().lines().filter(|l| *l == ".lathe/").count(), 1);
+}

@@ -206,6 +206,10 @@ impl Runner {
         if !self.dir_made {
             // A failure to make the folder shows up as a failure to save, and is tried again.
             self.dir_made = store::ensure_dir(self.project.as_ref()).is_ok();
+            if self.dir_made {
+                // Not the user's to commit: keep the record out of `git status`.
+                let _ = store::exclude_from_git(self.project.as_ref());
+            }
         }
         if let Err(why) = store::save(self.project.as_ref(), &self.meta, &self.messages)
             && !self.save_warned
