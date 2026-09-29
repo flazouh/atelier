@@ -120,7 +120,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
                 .flex_1()
                 .min_h_0()
                 .children(banner)
-                .child(div().flex_1().min_h_0().child(CodeEditor::new(&buffer.editor).on_card(true)))
+                .child(div().flex_1().min_h_0().child(CodeEditor::new(&buffer.editor).on_card(true).fill(true)))
                 .into_any_element()
         }
     };
