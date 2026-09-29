@@ -1,5 +1,6 @@
 //! Shows every beui component in each state, in light and dark. Run with `cargo run -p beui-gallery`.
-//! `GALLERY_STORY=<title>` opens a story and `GALLERY_THEME=light|dark` overrides the system theme, so a script can screenshot them.
+//! `GALLERY_STORY=<title>` opens a story and `GALLERY_THEME=<theme name>` (or `light`, `dark`) picks the theme, so a script can
+//! screenshot any of them. Without it, the theme last picked in the sidebar comes back (`settings`).
 //! `GALLERY_REPLAY=1` starts the Agent panel's "Replay session" on launch, so a capture can see the entrances.
 
 use beui::{
@@ -21,6 +22,7 @@ mod editor_story;
 mod load_story;
 mod pr_fixture;
 mod pr_story;
+mod settings;
 mod review_story;
 
 use gpui_kit::base::input::InputEvent;
@@ -340,7 +342,6 @@ impl Gallery {
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let dark = theme.appearance == Appearance::Dark;
         div()
             .flex()
             .flex_col()
@@ -381,17 +382,7 @@ impl Gallery {
                     .child(story.title())
             }))
             .child(div().flex_1())
-            .child(
-                Button::new("appearance")
-                    .icon(if dark { IconName::LightMode } else { IconName::DarkMode })
-                    .label(if dark { "Light" } else { "Dark" })
-                    .variant(ButtonVariant::Ghost)
-                    .size(ButtonSize::Sm)
-                    .on_click(move |_, _, cx| {
-                        let next = if dark { Appearance::Light } else { Appearance::Dark };
-                        beui::theme::set_appearance(next, cx);
-                    }),
-            )
+            .child(theme_picker(&theme))
     }
 
     fn story(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -990,13 +981,52 @@ fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoEl
     )
 }
 
+/// The theme picker at the sidebar's foot: every theme by name, grouped by family. A pick is live, and
+/// remembered for the next launch.
+fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
+    let all = beui::themes::all();
+    let options = all.iter().map(|t| beui::select::SelectOption::from(t.name.clone()).group(t.family.clone()));
+    Select::new("theme", options)
+        .selected(all.iter().position(|t| t.name == theme.name))
+        .upward(true)
+        .on_change(|i, _, cx| {
+            let Some(picked) = beui::themes::all().get(i) else { return };
+            beui::theme::set_theme(picked.clone(), cx);
+            let settings = settings::Settings { theme: Some(picked.name.to_string()) };
+            if let Some(path) = settings::path() {
+                cx.background_spawn(async move {
+                    if let Err(error) = settings::save(&path, &settings) {
+                        eprintln!("could not save the theme: {error}");
+                    }
+                })
+                .detach();
+            }
+        })
+}
+
+/// The theme to start in: `GALLERY_THEME`, then the one saved last time; `None` follows the system.
+fn starting_theme(saved: &settings::Settings) -> Option<beui::Theme> {
+    let by_name = |name: &str| match name {
+        "light" => Some(beui::themes::lathe(Appearance::Light).clone()),
+        "dark" => Some(beui::themes::lathe(Appearance::Dark).clone()),
+        name => beui::themes::named(name).cloned(),
+    };
+    match std::env::var("GALLERY_THEME") {
+        Ok(name) => by_name(&name).or_else(|| {
+            eprintln!("GALLERY_THEME {name:?} names no theme");
+            None
+        }),
+        Err(_) => saved.theme.as_deref().and_then(by_name),
+    }
+}
+
 fn main() {
-    gpui_kit::application().with_assets(lathe_agents::Assets).run(|cx| {
+    // Read before the event loop starts, so the UI thread never waits on the disk.
+    let saved = settings::path().map(|p| settings::load(&p)).unwrap_or_default();
+    gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
         beui::init(cx);
-        match std::env::var("GALLERY_THEME").as_deref() {
-            Ok("dark") => beui::theme::set_appearance(Appearance::Dark, cx),
-            Ok("light") => beui::theme::set_appearance(Appearance::Light, cx),
-            _ => {}
+        if let Some(theme) = starting_theme(&saved) {
+            beui::theme::set_theme(theme, cx);
         }
         // GALLERY_SIZE=1500x900 opens a larger window, for a story laid out like a full screen.
         let (w, h) = std::env::var("GALLERY_SIZE")
