@@ -652,12 +652,17 @@ fn buttons() -> impl IntoElement {
                 .child(Button::new("chip-xl").label("Get started").chip(IconName::ArrowForward).size(ButtonSize::Xl)),
         ))
         .child(section(
-            "Icon buttons",
+            "Icon buttons: Icon (28) and IconSm (24), beside Small and Medium text buttons",
             row()
                 .child(Button::new("i-send").icon(IconName::ArrowUp).size(ButtonSize::Icon))
                 .child(Button::new("i-stop").icon(IconName::Square).size(ButtonSize::Icon).variant(ButtonVariant::Secondary))
                 .child(Button::new("i-attach").icon(IconName::AttachFile).size(ButtonSize::Icon).variant(ButtonVariant::Ghost))
-                .child(Button::new("i-more").icon(IconName::MoreHoriz).size(ButtonSize::Icon).variant(ButtonVariant::Ghost)),
+                .child(Button::new("i-more").icon(IconName::MoreHoriz).size(ButtonSize::Icon).variant(ButtonVariant::Ghost))
+                .child(Button::new("i-text-sm").label("Small").variant(ButtonVariant::Secondary))
+                .child(Button::new("is-more").icon(IconName::MoreHoriz).size(ButtonSize::IconSm).variant(ButtonVariant::Ghost))
+                .child(Button::new("is-add").icon(IconName::Add).size(ButtonSize::IconSm).variant(ButtonVariant::Ghost))
+                .child(Button::new("is-fill").icon(IconName::Close).size(ButtonSize::IconSm).variant(ButtonVariant::Secondary))
+                .child(Button::new("i-text-md").label("Medium").size(ButtonSize::Md).variant(ButtonVariant::Secondary)),
         ))
         .child(section("Disabled", row().child(Button::new("disabled").label("Send").disabled(true))))
         .child(section(
