@@ -28,10 +28,10 @@ use lathe_agents::{
     },
 };
 use lathe_project::Project;
-use lathe_review::{Comments, Reviewed, SessionReview, TurnReview, TurnTracker};
+use lathe_review::{Comments, Merged, Reviewed, SessionReview, TurnReview, TurnTracker};
 use std::sync::Mutex;
 
-use crate::{list_diff, status};
+use crate::{list_diff, review_pane::Scope, status};
 
 /// How far past the view the list lays out rows.
 const OVERDRAW: f32 = 160.;
@@ -101,6 +101,9 @@ pub struct AgentSession {
     pub sent_comments: Vec<(lathe_review::ReviewComment, bool)>,
     /// After how many conversation items each finished turn's changed files show, and which turn.
     pub turn_marks: Vec<(usize, usize)>,
+    /// Each reviewed file as the review left it, by scope and path: its hunks after the reader's
+    /// decisions and edits, and the text the review last wrote or read on disk.
+    pub decided: HashMap<(Scope, String), (Option<Merged>, Option<String>)>,
     pub composer: Entity<PromptInput>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
@@ -194,6 +197,7 @@ impl AgentSession {
             comments: Comments::new(),
             sent_comments: Vec::new(),
             turn_marks: Vec::new(),
+            decided: HashMap::new(),
             composer,
             renaming: None,
             _renaming: None,

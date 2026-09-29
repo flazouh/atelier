@@ -9,10 +9,15 @@ use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions,
 
 mod agent_session;
 mod agents_view;
+mod dirty;
 mod editor_pane;
+#[cfg(test)]
+mod fake_agent;
 mod frame_meter;
 mod list_diff;
 mod open_project;
+mod review_pane;
+mod review_text;
 mod session_view;
 mod shell;
 mod ssh_form;

@@ -40,6 +40,7 @@ use crate::{
     ssh_form::{Phase, SshForm, SshFormEvent},
     editor_pane::editor_pane,
     open_project::{Git, Listing, OpenProject, ProjectEvent},
+    review_pane::Scope,
     tree_view::tree_view,
 };
 
@@ -374,11 +375,14 @@ impl Shell {
         self._subscriptions.push(cx.subscribe_in(&entity, window, |this, project, event: &ProjectEvent, window, cx| match event {
             ProjectEvent::Said(line) => this.say(line.to_string(), cx),
             ProjectEvent::Open(path) => this.open_in(project, path, window, cx),
-            // The review pane comes next (M3); until then Review opens the file.
-            ProjectEvent::Review { path, .. } => {
-                if let Some(path) = path {
-                    this.open_in(project, path, window, cx);
+            ProjectEvent::Review { session, turn, path } => {
+                if let Some(i) = this.projects.iter().position(|p| p == project) {
+                    this.active = i;
                 }
+                let scope = turn.map_or(Scope::Whole, Scope::Turn);
+                project.update(cx, |p, cx| p.open_review(session.clone(), scope, path.as_deref(), window, cx));
+                this.right = true;
+                cx.notify();
             }
             ProjectEvent::Sessions => this.sync(cx),
             ProjectEvent::Renamed { id, name } => {
@@ -690,7 +694,12 @@ impl Shell {
             parts.push(match &p.git {
                 Git::Unknown => "…".into(),
                 Git::None => "No git repository".into(),
-                Git::Branch(b) => b.clone(),
+                Git::Branch(b) => match p.dirty {
+                    Some(0) => format!("{b}, clean").into(),
+                    Some(1) => format!("{b}, 1 file changed").into(),
+                    Some(n) => format!("{b}, {n} files changed").into(),
+                    None => b.clone(),
+                },
             });
             if let (Listing::Ready(tree), Some(took)) = (&p.listing, p.listed_in) {
                 let files = match tree.files() {
@@ -744,9 +753,11 @@ impl Shell {
                         .size(px(560.))
                         .size_range(px(320.)..px(2400.))
                         .flex_none()
-                        .child(div().size_full().pr(px(8.)).pb(px(2.)).child(
-                            div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(&project, cx)),
-                        )),
+                        .child(div().size_full().pr(px(8.)).pb(px(2.)).child(match project.read(cx).review.as_ref() {
+                            // The review draws its own cards on the page.
+                            Some((pane, _)) => div().size_full().pt(px(6.)).child(pane.clone()),
+                            None => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(&project, cx)),
+                        })),
                 )
                 .into_any_element(),
         };

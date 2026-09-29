@@ -16,7 +16,7 @@ use std::{
 use futures_channel::mpsc;
 use futures_util::StreamExt;
 use gpui_kit::{
-    AppContext, Context, Entity, EventEmitter, PromptLevel, SharedString, Subscription, Task, Window,
+    AppContext, Context, Entity, EventEmitter, Focusable, PromptLevel, SharedString, Subscription, Task, Window,
     base::input::{InputEvent, Position},
     component::input::EditorState,
 };
@@ -29,6 +29,7 @@ use lathe_agents::{registry::Agent, session::{SessionId, SessionSummary}};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
+    review_pane::{PaneEvent, ReviewPane, Scope},
     tabs::Tabs,
     tree::{ProjectTree, ancestors},
 };
@@ -109,6 +110,11 @@ pub struct OpenProject {
     /// The agent's past sessions in this project, newest first, less the ones open.
     pub past: Vec<SessionSummary>,
     _session_events: Vec<Subscription>,
+    /// The review of a session's changes, shown in place of the editor while it is open.
+    pub review: Option<(Entity<ReviewPane>, Subscription)>,
+    /// How many files differ from the last commit, from `git status`: the status line shows it.
+    pub dirty: Option<usize>,
+    reading_dirty: Task<()>,
     /// Files being read for a tab, so a second click does not read them twice.
     opening: HashSet<String>,
     /// Where the caret goes in a file still being read, after a jump to it.
@@ -144,6 +150,9 @@ impl OpenProject {
             sessions: Vec::new(),
             past: Vec::new(),
             _session_events: Vec::new(),
+            review: None,
+            dirty: None,
+            reading_dirty: Task::ready(()),
             opening: HashSet::new(),
             caret_at: HashMap::new(),
             _watch: None,
@@ -239,6 +248,7 @@ impl OpenProject {
     }
 
     fn read_git(&mut self, cx: &mut Context<Self>) {
+        self.read_dirty(cx);
         let project = self.project.clone();
         let asked = cx.background_spawn(async move { project.git(&["rev-parse", "--abbrev-ref", "HEAD"]) });
         cx.spawn(async move |this, cx| {
@@ -251,6 +261,41 @@ impl OpenProject {
                 cx.notify();
             });
         }).detach();
+    }
+
+    /// Counts the files that differ from the last commit, off the UI thread. A burst of changes asks
+    /// once: a new ask drops the one before it.
+    fn read_dirty(&mut self, cx: &mut Context<Self>) {
+        let project = self.project.clone();
+        let asked = cx.background_spawn(async move { project.git(&["status", "--porcelain", "-z", "--untracked-files=all"]) });
+        self.reading_dirty = cx.spawn(async move |this, cx| {
+            let dirty = match asked.await {
+                Ok(out) if out.ok() => Some(crate::dirty::count(&out.stdout)),
+                _ => None,
+            };
+            _ = this.update(cx, |this, cx| {
+                if this.dirty != dirty {
+                    this.dirty = dirty;
+                    cx.notify();
+                }
+            });
+        });
+    }
+
+    /// Opens the review of `session` at `path`, in place of the editor.
+    pub fn open_review(&mut self, session: Entity<AgentSession>, scope: Scope, path: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
+        let project = self.project.clone();
+        let pane = cx.new(|cx| ReviewPane::new(session, project, scope, path, window, cx));
+        let sub = cx.subscribe(&pane, |this, _, event: &PaneEvent, cx| match event {
+            PaneEvent::Close => {
+                this.review = None;
+                cx.notify();
+            }
+            PaneEvent::Said(line) => cx.emit(ProjectEvent::Said(line.clone())),
+        });
+        pane.focus_handle(cx).focus(window, cx);
+        self.review = Some((pane, sub));
+        cx.notify();
     }
 
     fn watch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -309,6 +354,11 @@ impl OpenProject {
     fn changed(&mut self, batch: Vec<Change>, window: &mut Window, cx: &mut Context<Self>) {
         if batch.iter().any(|c| c.kind != ChangeKind::Changed) {
             self.relist(cx);
+        }
+        self.read_dirty(cx);
+        if let Some((pane, _)) = &self.review {
+            let paths = batch.iter().map(|c| c.path.clone()).collect();
+            pane.update(cx, |p, cx| p.check_disk(paths, window, cx));
         }
         for change in batch {
             let Some(buffer) = self.buffers.get_mut(&change.path) else { continue };
