@@ -106,7 +106,6 @@ pub fn agent_panel(
             Button::new("p-replay")
                 .label("Replay session")
                 .variant(ButtonVariant::Ghost)
-                .size(ButtonSize::Md)
                 .on_click(cx.listener(|this, _, _, cx| this.start_replay(cx))),
         )
         .child(Button::new("p-new").icon(IconName::Add).variant(ButtonVariant::Ghost).size(ButtonSize::Icon))

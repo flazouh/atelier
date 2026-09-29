@@ -588,10 +588,10 @@ fn buttons() -> impl IntoElement {
             })),
         ))
         .child(section(
-            "Sizes: Small, Medium (the default), Large and Xl",
+            "Sizes: Small (the default), Medium for an action that must stand out, Large and Xl",
             row()
-                .child(Button::new("size-sm").label("Small").size(ButtonSize::Sm))
-                .child(Button::new("size-md").label("Medium"))
+                .child(Button::new("size-sm").label("Small"))
+                .child(Button::new("size-md").label("Medium").size(ButtonSize::Md))
                 .child(Button::new("size-lg").label("Large").size(ButtonSize::Lg))
                 .child(Button::new("size-xl").label("Xl").size(ButtonSize::Xl)),
         ))
@@ -607,8 +607,8 @@ fn buttons() -> impl IntoElement {
         .child(section(
             "With a chip: hover to slide the arrow",
             row()
-                .child(Button::new("chip-sm").label("Add").chip(IconName::ArrowForward).size(ButtonSize::Sm))
-                .child(Button::new("chip-md").label("New session").chip(IconName::ArrowForward))
+                .child(Button::new("chip-sm").label("Add").chip(IconName::ArrowForward))
+                .child(Button::new("chip-md").label("New session").chip(IconName::ArrowForward).size(ButtonSize::Md))
                 .child(Button::new("chip-lg").label("Continue").chip(IconName::ArrowForward).size(ButtonSize::Lg))
                 .child(Button::new("chip-xl").label("Get started").chip(IconName::ArrowForward).size(ButtonSize::Xl)),
         ))
