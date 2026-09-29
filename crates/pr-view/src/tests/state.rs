@@ -63,3 +63,16 @@ fn a_database_from_a_newer_lathe_is_refused() {
     rusqlite::Connection::open(&path).unwrap().pragma_update(None, "user_version", 99).unwrap();
     assert!(Reviewed::open(&path).is_err());
 }
+
+#[test]
+fn when_a_pull_request_was_last_opened_is_kept() {
+    let store = Reviewed::in_memory().unwrap();
+    let (one, two) = (sample::reference(1), sample::reference(2));
+    assert!(store.opened_at().unwrap().is_empty());
+    store.opened(&one, 100).unwrap();
+    store.opened(&two, 200).unwrap();
+    store.opened(&one, 300).unwrap();
+    let opened = store.opened_at().unwrap();
+    assert_eq!(opened.get(&(one.repo.slug(), 1)), Some(&300));
+    assert_eq!(opened.get(&(two.repo.slug(), 2)), Some(&200));
+}

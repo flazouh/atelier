@@ -15,6 +15,14 @@ const STEPS: &[&str] = &["CREATE TABLE reviewed (
         version TEXT NOT NULL,
         at INTEGER NOT NULL,
         PRIMARY KEY (host, repo, number, path)
+    );",
+    // 2: when the reader last opened a pull request, for "unread" in the list.
+    "CREATE TABLE opened (
+        host TEXT NOT NULL,
+        repo TEXT NOT NULL,
+        number INTEGER NOT NULL,
+        at INTEGER NOT NULL,
+        PRIMARY KEY (host, repo, number)
     );"];
 
 pub struct Reviewed {
@@ -74,6 +82,22 @@ impl Reviewed {
         let conn = self.conn();
         let mut stmt = conn.prepare_cached("SELECT path, version FROM reviewed WHERE host = ?1 AND repo = ?2 AND number = ?3")?;
         let rows = stmt.query_map(params![pull.repo.host, pull.repo.slug(), pull.number as i64], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?;
+        rows.collect()
+    }
+
+    /// The reader opened the pull request at `at`.
+    pub fn opened(&self, pull: &PullRef, at: u64) -> rusqlite::Result<()> {
+        self.conn()
+            .prepare_cached("INSERT INTO opened (host, repo, number, at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT (host, repo, number) DO UPDATE SET at = ?4")?
+            .execute(params![pull.repo.host, pull.repo.slug(), pull.number as i64, at as i64])?;
+        Ok(())
+    }
+
+    /// When each pull request was last opened, by `(repo slug, number)`.
+    pub fn opened_at(&self) -> rusqlite::Result<HashMap<(String, u64), u64>> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare_cached("SELECT repo, number, at FROM opened")?;
+        let rows = stmt.query_map([], |r| Ok(((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64), r.get::<_, i64>(2)? as u64)))?;
         rows.collect()
     }
 

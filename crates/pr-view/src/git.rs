@@ -144,8 +144,11 @@ pub struct Prepared {
 /// git for one project.
 pub struct PrGit {
     project: Arc<dyn Project>,
-    /// The folder on the host that holds the caches and the checkouts. Absolute.
-    data: String,
+    /// The folder for caches and checkouts as it was given: absolute, or starting with `~/` or `$HOME/`.
+    given: String,
+    /// The same, absolute, once the host has been asked for its home. Asking starts a process, so it waits
+    /// for the first use, which is on a background thread.
+    data: std::sync::OnceLock<Result<String, GitError>>,
     /// The URL to fetch from, when it is not the one the project's remotes give.
     remote: Option<String>,
 }
@@ -159,23 +162,8 @@ struct Ran {
 impl PrGit {
     /// `data` is the folder for caches and checkouts on the project's host: an absolute path, or one that
     /// starts with `~/` or `$HOME/`, which the host's own home replaces.
-    pub fn new(project: Arc<dyn Project>, data: &str) -> GitResult<Self> {
-        let mut git = Self { project, data: String::new(), remote: None };
-        git.data = match data.strip_prefix("~/").or_else(|| data.strip_prefix("$HOME/")) {
-            Some(rest) => {
-                let home = git.sh("printf %s \"$HOME\"", &[])?;
-                let home = String::from_utf8_lossy(&home.stdout).trim().to_string();
-                if home.is_empty() {
-                    return Err(GitError::Spawn("the host has no home folder".into()));
-                }
-                format!("{}/{rest}", home.trim_end_matches('/'))
-            }
-            None => data.to_string(),
-        };
-        if !git.data.starts_with('/') {
-            return Err(GitError::Invalid(format!("the data folder {}", git.data)));
-        }
-        Ok(git)
+    pub fn new(project: Arc<dyn Project>, data: &str) -> Self {
+        Self { project, given: data.to_string(), data: std::sync::OnceLock::new(), remote: None }
     }
 
     /// Fetches from `url` in place of the project's remotes.
@@ -184,8 +172,25 @@ impl PrGit {
         self
     }
 
-    pub fn data(&self) -> &str {
-        &self.data
+    /// The data folder, absolute. Asks the host for its home the first time, when the folder starts with one.
+    pub fn data(&self) -> GitResult<String> {
+        self.data
+            .get_or_init(|| {
+                let given = self.given.as_str();
+                let data = match given.strip_prefix("~/").or_else(|| given.strip_prefix("$HOME/")) {
+                    Some(rest) => {
+                        let home = self.sh("printf %s \"$HOME\"", &[])?;
+                        let home = String::from_utf8_lossy(&home.stdout).trim().to_string();
+                        if home.is_empty() {
+                            return Err(GitError::Spawn("the host has no home folder".into()));
+                        }
+                        format!("{}/{rest}", home.trim_end_matches('/'))
+                    }
+                    None => given.to_string(),
+                };
+                if data.starts_with('/') { Ok(data) } else { Err(GitError::Invalid(format!("the data folder {data}"))) }
+            })
+            .clone()
     }
 
     /// Runs `command`, writes `input` to it, and reads it to the end. Kills it after `timeout`.
@@ -259,12 +264,12 @@ impl PrGit {
         raw.chars().map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '-' }).collect()
     }
 
-    fn cache_path(&self, repo: &RepoRef) -> String {
-        format!("{}/{}/cache.git", self.data, Self::key(repo))
+    fn cache_path(&self, repo: &RepoRef) -> GitResult<String> {
+        Ok(format!("{}/{}/cache.git", self.data()?, Self::key(repo)))
     }
 
-    fn checkout_path(&self, reference: &PullRef) -> String {
-        format!("{}/{}/head-{}", self.data, Self::key(&reference.repo), reference.number)
+    fn checkout_path(&self, reference: &PullRef) -> GitResult<String> {
+        Ok(format!("{}/{}/head-{}", self.data()?, Self::key(&reference.repo), reference.number))
     }
 
     /// The URL to fetch `repo` from: the one told to [`PrGit::with_remote`], else the project's own remote
@@ -280,13 +285,13 @@ impl PrGit {
 
     /// Makes the cache repository if it is not there.
     fn ensure_cache(&self, repo: &RepoRef) -> GitResult<String> {
-        let cache = self.cache_path(repo);
+        let cache = self.cache_path(repo)?;
         let exists = self.run(&["--git-dir", &cache, "rev-parse", "--is-bare-repository"], None, QUICK)?;
         if exists.code == Some(0) {
             return Ok(cache);
         }
         let root = self.project.root().to_string_lossy().into_owned();
-        let parent = format!("{}/{}", self.data, Self::key(repo));
+        let parent = format!("{}/{}", self.data()?, Self::key(repo));
         let made = self.sh("mkdir -p \"$1\"", &[&parent])?;
         if made.code != Some(0) {
             return Err(GitError::Failed { what: "make the cache folder", stderr: made.stderr });
@@ -406,7 +411,7 @@ impl PrGit {
     /// The head as files on the host, for the language server. Made with `git archive` into a folder of
     /// the cache's own; kept while the head stays the same and made again when it moves. Returns the folder.
     pub fn checkout(&self, prepared: &Prepared) -> GitResult<String> {
-        let dir = self.checkout_path(&prepared.reference);
+        let dir = self.checkout_path(&prepared.reference)?;
         let marker = format!("{dir}.sha");
         let script = "if [ \"$(cat \"$2\" 2>/dev/null)\" = \"$3\" ] && [ -d \"$1\" ]; then exit 0; fi\n\
                       set -e\n\
@@ -431,8 +436,8 @@ impl PrGit {
     /// Forgets a pull request: its checkout and the refs it fetched. The cache repository stays for the
     /// next one.
     pub fn remove(&self, reference: &PullRef) -> GitResult<()> {
-        let dir = self.checkout_path(reference);
-        let cache = self.cache_path(&reference.repo);
+        let dir = self.checkout_path(reference)?;
+        let cache = self.cache_path(&reference.repo)?;
         let number = reference.number.to_string();
         let script = "rm -rf \"$1\" \"$1.sha\"\n\
                       if [ -d \"$2\" ]; then git --git-dir \"$2\" update-ref -d \"refs/lathe/pr/$3/head\" 2>/dev/null; fi\n\
@@ -444,7 +449,7 @@ impl PrGit {
     /// Removes the checkouts of pull requests not in `keep`: what a cleanup after a closed pull request
     /// does. Only folders named `head-<number>` under this repository's folder are touched.
     pub fn sweep(&self, repo: &RepoRef, keep: &[u64]) -> GitResult<Vec<u64>> {
-        let folder = format!("{}/{}", self.data, Self::key(repo));
+        let folder = format!("{}/{}", self.data()?, Self::key(repo));
         let listing = self.sh("ls -1 \"$1\" 2>/dev/null", &[&folder])?;
         let mut gone = Vec::new();
         for name in String::from_utf8_lossy(&listing.stdout).lines() {

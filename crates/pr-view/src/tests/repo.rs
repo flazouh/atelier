@@ -103,7 +103,7 @@ impl Scenario {
     }
 
     pub fn prgit(&self) -> PrGit {
-        PrGit::new(self.project(), self.data.to_str().unwrap()).unwrap().with_remote(self.origin.to_str().unwrap())
+        PrGit::new(self.project(), self.data.to_str().unwrap()).with_remote(self.origin.to_str().unwrap())
     }
 
     /// The pull request as the forge would tell it.

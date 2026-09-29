@@ -284,9 +284,10 @@ fn the_remote_that_names_the_repository_is_the_one_fetched_from() {
 #[test]
 fn the_data_folder_is_resolved_on_the_host() {
     let s = scenario();
-    let home = PrGit::new(s.project(), "~/lathe-test-data").unwrap();
-    assert!(home.data().starts_with('/') && home.data().ends_with("/lathe-test-data") && !home.data().contains('~'));
-    assert!(PrGit::new(s.project(), "relative/folder").is_err());
+    let home = PrGit::new(s.project(), "~/lathe-test-data").data().unwrap();
+    assert!(home.starts_with('/') && home.ends_with("/lathe-test-data") && !home.contains('~'));
+    assert!(PrGit::new(s.project(), "relative/folder").data().is_err());
+    assert_eq!(PrGit::new(s.project(), "/abs/folder").data().unwrap(), "/abs/folder");
 }
 
 #[test]

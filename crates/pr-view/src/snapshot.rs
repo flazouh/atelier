@@ -60,3 +60,37 @@ impl Snapshots {
         &self.dir
     }
 }
+
+/// The reader's working set kept on disk, so the list draws before the forge answers.
+pub struct ListSnapshot {
+    file: PathBuf,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ListEnvelope {
+    version: u32,
+    fetched_at: u64,
+    items: Vec<lathe_forge::Involved>,
+}
+
+impl ListSnapshot {
+    pub fn new(dir: impl Into<PathBuf>) -> Self {
+        Self { file: dir.into().join("involved.json") }
+    }
+
+    /// The items and when they were read, or `None`.
+    pub fn load(&self) -> Option<(Vec<lathe_forge::Involved>, u64)> {
+        let envelope: ListEnvelope = serde_json::from_slice(&fs::read(&self.file).ok()?).ok()?;
+        (envelope.version == VERSION).then_some((envelope.items, envelope.fetched_at))
+    }
+
+    pub fn save(&self, items: &[lathe_forge::Involved], fetched_at: u64) -> io::Result<()> {
+        if let Some(dir) = self.file.parent() {
+            fs::create_dir_all(dir)?;
+        }
+        let temporary = self.file.with_extension("json.saving");
+        let bytes = serde_json::to_vec(&ListEnvelope { version: VERSION, fetched_at, items: items.to_vec() }).map_err(io::Error::other)?;
+        fs::write(&temporary, bytes)?;
+        fs::rename(&temporary, &self.file)
+    }
+}
