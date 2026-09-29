@@ -3,6 +3,7 @@ query ForWrite($owner: String!, $name: String!, $number: Int!) {
     mergeQueue { id }
     pullRequest(number: $number) {
       id
+      state
       headRefName
       headRefOid
       isCrossRepository

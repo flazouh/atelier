@@ -21,9 +21,12 @@ fn data(value: Value) -> String {
 }
 
 fn for_write(queue: bool, fork: bool) -> String {
+    for_write_of(queue, fork, "OPEN", "feat")
+}
+fn for_write_of(queue: bool, fork: bool, state: &str, head: &str) -> String {
     data(json!({"repository": {
         "mergeQueue": if queue { json!({"id": "MQ"}) } else { Value::Null },
-        "pullRequest": {"id": "PR_1", "headRefName": "feat", "headRefOid": "abc123", "isCrossRepository": fork},
+        "pullRequest": {"id": "PR_1", "state": state, "headRefName": head, "headRefOid": "abc123", "isCrossRepository": fork},
     }}))
 }
 
@@ -306,10 +309,10 @@ fn cancelling_merge_when_ready_and_leaving_the_queue_each_send_their_own_mutatio
 
 #[test]
 fn deleting_the_branch_alone_uses_the_rest_call_and_never_touches_a_fork() {
-    let fixtures = Fixtures::new().ok("ForWrite", for_write(false, false)).ok("DELETE-repos-o-r-git-refs-heads-feat", "");
+    let fixtures = Fixtures::new().ok("ForWrite", for_write_of(false, false, "MERGED", "feat")).ok("DELETE-repos-o-r-git-refs-heads-feat", "");
     github(&fixtures).delete_branch(&pull()).unwrap();
     assert_eq!(fixtures.sent_for("DELETE-repos-o-r-git-refs-heads-feat").len(), 1);
-    let fork = Fixtures::new().ok("ForWrite", for_write(false, true));
+    let fork = Fixtures::new().ok("ForWrite", for_write_of(false, true, "MERGED", "feat"));
     let error = github(&fork).delete_branch(&pull()).err().unwrap();
     assert!(matches!(error, ForgeError::Rejected(_)), "{error:?}");
     assert_eq!(fork.sent().len(), 1, "only the read was sent");
@@ -340,4 +343,30 @@ fn a_check_carries_how_its_run_ended() {
     assert_eq!(allowed.run.unwrap().suite, Some(crate::Conclusion::Success));
     let unknown = read::check(&repo, &node(json!({"workflowRun": run})));
     assert_eq!(unknown.run.unwrap().suite, None, "no ending told: nothing is excused");
+}
+
+#[test]
+fn the_branch_of_an_open_pull_request_is_never_deleted_because_that_would_close_it() {
+    let fixtures = Fixtures::new().ok("ForWrite", for_write_of(false, false, "OPEN", "feat"));
+    let error = github(&fixtures).delete_branch(&pull()).err().unwrap();
+    assert!(matches!(&error, ForgeError::Rejected(why) if why.contains("still open")), "{error:?}");
+    assert_eq!(fixtures.sent().len(), 1, "only the read was sent");
+    for state in ["MERGED", "CLOSED"] {
+        let ok = Fixtures::new().ok("ForWrite", for_write_of(false, false, state, "feat")).ok("DELETE-repos-o-r-git-refs-heads-feat", "");
+        github(&ok).delete_branch(&pull()).unwrap();
+        assert_eq!(ok.sent_for("DELETE-repos-o-r-git-refs-heads-feat").len(), 1, "{state}");
+    }
+}
+
+#[test]
+fn a_branch_name_is_encoded_a_segment_at_a_time_and_its_slashes_stay() {
+    let fixtures = Fixtures::new()
+        .ok("ForWrite", for_write_of(false, false, "MERGED", "fix/100%-#2 a?b"))
+        .ok("DELETE-repos-o-r-git-refs-heads-fix-100-25--232-20a-3Fb", "");
+    github(&fixtures).delete_branch(&pull()).unwrap();
+    let sent = fixtures.sent();
+    let path = &sent.last().unwrap().path;
+    assert_eq!(path, "repos/o/r/git/refs/heads/fix/100%25-%232%20a%3Fb");
+    assert_eq!(super::write::encode_ref("plain-name_1.x~"), "plain-name_1.x~");
+    assert_eq!(super::write::encode_ref("é/ü"), "%C3%A9/%C3%BC");
 }
