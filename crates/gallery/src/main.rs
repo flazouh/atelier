@@ -20,6 +20,8 @@ mod agent_parts;
 mod editor_story;
 mod workers;
 mod load_story;
+mod panels_story;
+mod sidebar_story;
 mod replay_story;
 mod merge_story;
 mod pr_fixture;
@@ -62,11 +64,13 @@ enum Story {
     Select,
     Prompt,
     Load,
+    AgentSidebar,
+    AgentPanels,
     AgentReplay,
 }
 
 impl Story {
-    const ALL: [Story; 27] = [
+    const ALL: [Story; 29] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -93,6 +97,8 @@ impl Story {
         Story::Select,
         Story::Prompt,
         Story::Load,
+        Story::AgentSidebar,
+        Story::AgentPanels,
         Story::AgentReplay,
     ];
 
@@ -124,6 +130,8 @@ impl Story {
             Story::Select => "Select",
             Story::Prompt => "Prompt input",
             Story::Load => "Highlight load",
+            Story::AgentSidebar => "Sidebar",
+            Story::AgentPanels => "Panels",
             Story::AgentReplay => "Agent replay",
         }
     }
@@ -181,6 +189,8 @@ struct Gallery {
     merge: Entity<merge_story::MergeStory>,
     /// Built the first time it shows: it holds a 10k-line file.
     load: Option<Entity<load_story::LoadStory>>,
+    agent_sidebar: Option<Entity<sidebar_story::SidebarStory>>,
+    agent_panels: Option<Entity<panels_story::PanelsStory>>,
     agent_replay: Option<Entity<replay_story::ReplayStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
@@ -284,6 +294,8 @@ impl Gallery {
             pull_request,
             merge,
             load: None,
+            agent_sidebar: None,
+            agent_panels: None,
             agent_replay: None,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
@@ -303,6 +315,12 @@ impl Gallery {
     fn open_load(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.story == Story::Load && self.load.is_none() {
             self.load = Some(cx.new(|cx| load_story::LoadStory::new(window, cx)));
+        }
+        if self.story == Story::AgentSidebar && self.agent_sidebar.is_none() {
+            self.agent_sidebar = Some(cx.new(|cx| sidebar_story::SidebarStory::new(window, cx)));
+        }
+        if self.story == Story::AgentPanels && self.agent_panels.is_none() {
+            self.agent_panels = Some(cx.new(|cx| panels_story::PanelsStory::new(window, cx)));
         }
         if self.story == Story::AgentReplay && self.agent_replay.is_none() {
             self.agent_replay = Some(cx.new(|cx| replay_story::ReplayStory::new(window, cx)));
@@ -416,6 +434,8 @@ impl Gallery {
             Story::Review => review_story::element(&self.review),
             Story::PullRequest => pr_story::element(&self.pull_request),
             Story::Load => self.load.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::AgentSidebar => self.agent_sidebar.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::AgentPanels => self.agent_panels.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequests => pr_story::pull_requests().into_any_element(),
             Story::Merge => self.merge.clone().into_any_element(),
