@@ -322,3 +322,28 @@ Bugs found in QA, each with a regression test in `crates/app/src/review_pane/tes
   last (`review_bar/tests.rs`).
 - Each file's first frame took 30 to 65 ms: every new editor compiled the Rust highlight queries again
   (gpui-component patch 3, `tests/shared_queries.rs`).
+
+## Pull requests in the app (M5)
+
+alex-31's pull request view (`crates/pr-view`, `docs/pr-view.md`) is mounted per project
+(`crates/app/src/pulls.rs`), in the right pane in place of the editor, as wide as a review.
+
+- **Opening it.** "Pull requests" in the project's ⋯ menu in the sidebar, or ⌘⇧P, shows or hides it. The
+  first time, the reader's login (`gh api user` on the project's host) and the view's services (a small
+  database and caches in this machine's data folder) are read off the UI thread (`PrHub::with_services`).
+  A row of the list opens its pull request; the view's back link returns to the list.
+- **From an agent's text.** A `#N` in an agent's answer is a PR chip when the list holds a pull request
+  of the project's own repository with that number (the origin remote, `RepoRef::from_remote`); a press
+  opens it. Chips appear once the reader has opened the list in this launch.
+- **To the editor.** The view's "Open in editor" opens the file in the project's editor at its line.
+- **Read-only.** `PrConfig::read_only(true)`: nothing is sent to GitHub until Alex approves a scratch
+  repository. The status line says so.
+- **Language servers.** The view gets the project's `Workers`, so its diff has hover and go to
+  definition (gopls and typescript-go were seen in QA).
+
+QA on the HP (`~/shots/m3/pulls-*.png`, `chips-*.png`, `chips.mp4`): the list of 47 pull requests, one
+opened from the list with typescript-go ready, a `#3` chip in Claude's answer in a clone of flazouh/wt
+opening that draft with gopls ready, and its file opened in the editor.
+
+Not built: the PR card in a session (no agent event names a pull request yet), a session linked to a pull
+request (`PrEvent::OpenSession`), and chips before the list has been opened.
