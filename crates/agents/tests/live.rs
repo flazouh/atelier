@@ -47,6 +47,27 @@ fn outcome(events: &[Event]) -> TurnOutcome {
     events.iter().rev().find_map(|e| if let Event::TurnEnded(end) = e { Some(end.outcome.clone()) } else { None }).unwrap()
 }
 
+/// The backend's permission questions rest on a flag that `claude --help` does not list,
+/// `--permission-prompt-tool stdio` (seen in 2.1.284). Without it the CLI denies a write by itself and
+/// sends no `control_request`. If a newer CLI drops or renames the flag, this test says so.
+#[test]
+#[ignore = "runs the real claude"]
+fn the_cli_still_asks_for_permissions_over_stdio() {
+    let dir = tempfile::tempdir().unwrap();
+    let project: Arc<dyn Project> = Arc::new(LocalProject::open(dir.path()).unwrap());
+    let request = OpenRequest { model: Some("haiku".into()), mode: Some(PermissionMode::Ask), ..OpenRequest::default() };
+    let (session, rx) = open(&project, request);
+    session.send(Command::Send { text: "Create a file named asked.txt containing hi, with the Write tool.".into() }).unwrap();
+    let mut seen = Vec::new();
+    until(&rx, &mut seen, |e| matches!(e, Event::Permission(_) | Event::TurnEnded(_)));
+    assert!(
+        matches!(seen.last(), Some(Event::Permission(_))),
+        "claude did not send a control_request for a write. The hidden flag --permission-prompt-tool stdio \
+         may be gone or renamed in this claude version; see crates/agents/src/claude_code/launch.rs. Saw: {seen:#?}"
+    );
+    assert!(!dir.path().join("asked.txt").exists(), "the write ran before anyone answered");
+}
+
 #[test]
 #[ignore = "runs the real claude"]
 fn a_real_session_end_to_end() {

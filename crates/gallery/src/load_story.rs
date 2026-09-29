@@ -2,7 +2,8 @@
 //! code blocks on the right, all highlighted. With `GALLERY_SCROLL=1` it scrolls the editor, the diff
 //! and the blocks each frame, logs what each frame took, how many layout nodes it built, what highlighting took inside it, and the
 //! diff's layout and paint apart, prints the medians after 300 frames, and quits.
-//! `LOAD_DIFF_ROWS` sets the diff's size. It backs the frame numbers in `docs/code-editor.md` ("Performance").
+//! `LOAD_DIFF_ROWS` sets the diff's size; `GALLERY_FRAME_MS` sets the frame interval that "over" counts against
+//! (8.33 ms, 120Hz, by default). It backs the frame numbers in `docs/code-editor.md` ("Performance").
 
 use std::{
     cell::RefCell,
@@ -20,6 +21,13 @@ use gpui_kit::{
 
 /// How many frames the scroll runs for.
 const FRAMES: usize = 300;
+/// The frame interval a frame must fit: 120Hz. `GALLERY_FRAME_MS` sets another, such as 16.67 for 60Hz.
+const FRAME_MS: f64 = 1000. / 120.;
+/// The interval the report counts frames over, from `GALLERY_FRAME_MS`.
+fn frame_limit() -> Duration {
+    let ms = std::env::var("GALLERY_FRAME_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(FRAME_MS);
+    Duration::from_secs_f64(ms / 1000.)
+}
 /// How far each frame scrolls.
 const STEP: f32 = 48.;
 
@@ -125,15 +133,17 @@ impl LoadStory {
 }
 
 fn report(name: &str, samples: &mut [Duration]) {
+    let limit = frame_limit();
     samples.sort();
     let ms = |d: Duration| d.as_secs_f64() * 1000.;
     let at = |q: f64| samples[((samples.len() as f64 * q).ceil() as usize).clamp(1, samples.len()) - 1];
-    let over = samples.iter().filter(|d| **d > Duration::from_millis(8)).count();
+    let over = samples.iter().filter(|d| **d > limit).count();
     println!(
-        "{name:<20} median {:>8.3} ms  p95 {:>8.3} ms  max {:>8.3} ms  over 8 ms: {over}/{}",
+        "{name:<20} median {:>8.3} ms  p95 {:>8.3} ms  max {:>8.3} ms  over {:.2} ms: {over}/{}",
         ms(at(0.5)),
         ms(at(0.95)),
         ms(*samples.last().unwrap()),
+        ms(limit),
         samples.len()
     );
 }

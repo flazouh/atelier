@@ -3671,6 +3671,10 @@ version = "0.1.0"
 dependencies = [
  "beui",
  "gpui-kit",
+ "lathe-project",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

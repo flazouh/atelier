@@ -103,6 +103,17 @@ a 500-row diff. The count before the change is not known exactly, since the stor
 highest index of a frame then (3875, with slots that taffy reuses). Frame times on the HP are software
 render and say little about the Mac.
 
+The same story on Alex's Mac (Apple M4 Pro, release, commit `b303c2d`), measured by the lead session
+with the window in front: the 500-row diff takes 8.33 ms per frame at the median (the 120Hz interval;
+p95 9.2 ms), against 12.1 ms before CodeBlock became one text per block. The 5000-row diff takes 9.8 ms
+(p95 24 ms), against 12.8 ms before. It still misses 120Hz, and what is left is in the editor and in
+FileDiff's rows. Layout nodes: 505, against about 3900. Highlight 0.017 to 0.067 ms per frame, diff
+layout 0.53 to 0.74 ms.
+
+A Mac frame run needs the window in front. A covered window is throttled by macOS to 30Hz, and the
+frames then take 33 ms whatever the code does. The story counts a frame "over" when it exceeds
+`GALLERY_FRAME_MS`, 8.33 ms (120Hz) unless set.
+
 - FileDiff's rows are a virtual list, so its layout no longer grows with the row count. Before, a
   whole frame took 192 ms with 500 rows and 592 ms with 5000.
 - The HP renders in software (Mesa's Vulkan under Xvfb), so the whole frame says little about a Mac.
