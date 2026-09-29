@@ -204,8 +204,7 @@ agent's past sessions (`Backend::sessions`, read off the UI thread); a session o
   mid-turn: "Stopped: the agent was stopped by a signal", or, when it left words on stderr, its last
   line, with the tail behind Show details. An interrupt during a question withdraws it; during a tool,
   the tool fails and the turn ends.
-- **Not in M2.** The ChangedFiles card at a turn's end needs the turn's line counts, which M3's review
-  (`crates/review`'s `TurnTracker`) gives; the PR card needs the forge.
+- **Not in M2.** The PR card needs the forge. The ChangedFiles card came with M3.
 
 ## QA, M2
 
@@ -226,3 +225,82 @@ A real Claude Code session on the HP (claude 2.1.284, logged in), in `/tmp/qa-m2
 | Rename, the mode picker, the single view, restored after a restart | `qa-10.png`, `qa-10-restored-open.png` |
 | 2,000 messages | `long-open.png`; the numbers are in docs/performance.md |
 | Recordings | `qa-session.mp4`, `qa-work.mp4`, `qa-interrupt.mp4`, `qa-resume.mp4`, `qa-ssh.mp4`, `qa-rename.mp4` |
+
+## Review in the app (M3)
+
+After each turn, the session's panel shows the files the turn changed, with their real `+a -r`
+(`ChangedFiles`, after the turn's last row). Review opens the review of that turn at the pressed file,
+in place of the editor on the right; a file's name opens it in the editor.
+
+- **The turn tracker** (`crates/app/src/agent_session.rs`). A message that starts a turn first runs
+  `TurnTracker::begin` on a background task (a git snapshot), then goes to the agent. Every event passes
+  the tracker on the agent's own thread as it arrives, so a file a tool names (`ToolTarget`) is read
+  before the tool writes it. The turn's end (`TurnEnded`, or the session's end) finishes the tracker
+  there too, and the next drain adds the turn to the session's `SessionReview`. A turn that changed
+  nothing shows no card. A message sent while a turn runs joins that turn.
+- **The review pane** (`crates/app/src/review_pane.rs`). alex-31's `ReviewBar`, `ChangedFileTree`, the
+  file card with `ReviewFileHeader`, and the real editor with `InlineReview`'s hunks from each file's
+  `Merged`. The bar's switch shows one turn or the whole session (`SessionReview::whole`). A review
+  widens the right pane to 860 px, or to what leaves the agent panel a session panel's default width,
+  and gives the old width back when it closes. Below 680 px the tree hides; review mode shows it.
+- **Decisions reach the disk.** Accept or reject a hunk, a file (the header, ⌃⇧↵ ⌃⇧⌫), or every file
+  (the bar's ⋯ menu, ⌃⌥↵ ⌃⌥⌫). The file on disk is `Merged::current()`: the pane writes it through the
+  Project at once after a decision, and 300 ms after the reader stops typing. The editor stays writable,
+  and the reader's edits move the hunks (`Merged::edited`). An undo in the editor brings back the file as
+  it was before the decision.
+- **The agent writes again.** The project's watch reports a file under review; the pane reads it off
+  the UI thread, and when it is not the pane's own write, rebases the file's hunks on it
+  (`Merged::rebased_on`) and puts the difference in the editor as one small edit, so the caret and the
+  scroll stay where they were.
+- **Kept with the session.** What the reader decided and edited, per scope and file, and the Reviewed
+  marks (`x`), per turn; the review opens again as it was left. They live in memory with the session,
+  not across launches.
+- **Comments.** The gutter's + opens a `LineComposer` on the row; ⌃↵ adds the comment to the session
+  (`Comments::add`, anchored with `Merged::anchor`), where it shows "not sent yet". The next message
+  carries every waiting comment as `Attachment::LineComment` (`Command::Send { text, attachments }`); the
+  thread then says "sent", and "answered" with Resolved once the agent's turn after it ends.
+- **Keys.** s and w: next and previous file. x: mark the file. r: review mode. Escape: the editor hands
+  the keys to the pane, and from the pane closes review mode, then the review. ⌃⇧T: one turn or the
+  whole session. The bar and the header show each cap. When the pane puts a new file in a new editor,
+  the keys follow it.
+- **The status line** shows the branch and how many files differ from the last commit
+  (`git status --porcelain -z`, read off the UI thread after each change on disk): "main, 2 files
+  changed", or "main, clean".
+
+Limits:
+
+- Rejecting a file the agent created writes it empty: the Project has no remove.
+- A file's `+a -r` in the tree and the header stay as the turn left them; the bar's count of reviewed
+  files moves.
+- The review's editor has syntax colours but no language server: its text holds both sides of each hunk.
+- The whole session is diffed on the UI thread when the switch opens it (`SessionReview::whole`).
+
+## QA, M3
+
+A real Claude Code session (claude 2.1.284) on the HP, in `~/qa/m3`, a git repository of three files.
+The shots and the recording are in `~/shots/m3/` on the HP, from the release build of `2678e25`.
+
+| What | Seen |
+| --- | --- |
+| A turn edits three files, one through a shell command (`sed`) | `final-03-card.png`: 3 files changed, +4 -2, words.rs among them |
+| Review opens at the file | `final-04-review.png`: the bar, the file card, the hunk; the tree hides at 670 px |
+| Accept a hunk | `final-05-accepted.png`: NOTES.md keeps the agent's line; 1 of 3 reviewed |
+| Reject a hunk | `final-07-rejected.png`: words.rs is back to "hello" on disk, git shows it clean |
+| Edit inside a hunk, then accept it | `final-08-typed.png`, `final-09-edit-accepted.png`: the doc comment with the typed words is on disk |
+| Comment on a line | `final-10-composer.png` (the words show as typed), `final-11-waiting.png` ("not sent yet") |
+| Send; the agent's next turn answers | `final-12-answered.png`: the agent answers the comment; the thread says answered, Resolved |
+| One turn or the whole session, x, r, the ⋯ menu, Accept all | `final-13-session.png`, `final-15-menu.png`, `final-16-accept-all.png` ("All 3 reviewed") |
+| The keys after the switch from the editor, review mode | `final-17-keys-after-switch.png` |
+| Recordings | `final.mp4` (the whole run), `final-keys.mp4` |
+
+Bugs found in QA, each with a regression test in `crates/app/src/review_pane/tests.rs`:
+
+- Typing in a new comment did not show: the composer sits in an editor row block, which is drawn only
+  with the editor (`typing_in_a_comment_draws_the_editor_again`).
+- A review opened again showed an accepted hunk again: an accept writes nothing, and the pane kept only
+  what it wrote (`a_review_opened_again_keeps_an_accepted_hunk`).
+- After a scope switch from the editor the keys reached nothing (`the_keys_follow_the_editor_to_the_next_scope`).
+- The bar cut its words at 670 px: it did not count the scope switch; it now shortens the scope words
+  last (`review_bar/tests.rs`).
+- Each file's first frame took 30 to 65 ms: every new editor compiled the Rust highlight queries again
+  (gpui-component patch 3, `tests/shared_queries.rs`).

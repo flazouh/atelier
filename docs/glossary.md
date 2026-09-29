@@ -44,3 +44,17 @@ lathe's own words, and the ones it keeps from GitQuiet. Code uses the same names
 - **Raise**: move a colour's lightness until it reaches a contrast target against the page: 4.5:1
   for text, 3:1 for marks.
 - **Mark**: a status colour on an icon or a dot, not on text, held to 3:1.
+
+## Review
+
+- **Turn**: one message and everything the agent did for it, up to its end. A message sent while a turn
+  runs joins it.
+- **Turn tracker** (`TurnTracker`): takes each file's text before the agent's first touch in a turn,
+  and the turn's changed files at its end.
+- **Changed files card**: the list of a turn's changed files, with `+a -r`, after the turn's last row.
+- **Review pane** (`ReviewPane`): the review of one turn, or of the whole session (its **scope**), in
+  place of the editor.
+- **Merged**: one file under review: both versions in one text, each hunk its old rows then its new ones.
+- **Decided**: a hunk accepted or rejected. The pane keeps each file as the reader left it, per scope.
+- **Reviewed** (`x`): the reader's mark on a file of a turn. A file with no hunk left counts as reviewed.
+- **Answered**: a comment sent with a message, once the agent's turn after it ended; it shows Resolved.
