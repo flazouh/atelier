@@ -1044,26 +1044,19 @@ fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoEl
     )
 }
 
-/// The theme picker at the sidebar's foot: every theme by name, grouped by family. A pick is live, and
-/// remembered for the next launch.
+/// The theme picker at the sidebar's foot. A pick is remembered for the next launch.
 fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
-    let all = beui::themes::all();
-    let options = all.iter().map(|t| beui::select::SelectOption::from(t.name.clone()).group(t.family.clone()));
-    Select::new("theme", options)
-        .selected(all.iter().position(|t| t.name == theme.name))
-        .on_change(|i, _, cx| {
-            let Some(picked) = beui::themes::all().get(i) else { return };
-            beui::theme::set_theme(picked.clone(), cx);
-            let name = picked.name.to_string();
-            if let Some(path) = lathe_settings::path() {
-                cx.background_spawn(async move {
-                    if let Err(error) = lathe_settings::update(&path, |s| s.theme = Some(name)) {
-                        eprintln!("could not save the theme: {error}");
-                    }
-                })
-                .detach();
-            }
-        })
+    beui::theme_picker::theme_picker("theme", theme, |picked, cx| {
+        let name = picked.name.to_string();
+        if let Some(path) = lathe_settings::path() {
+            cx.background_spawn(async move {
+                if let Err(error) = lathe_settings::update(&path, |s| s.theme = Some(name)) {
+                    eprintln!("could not save the theme: {error}");
+                }
+            })
+            .detach();
+        }
+    })
 }
 
 /// The theme to start in: `GALLERY_THEME`, then the one saved last time; `None` follows the system.
