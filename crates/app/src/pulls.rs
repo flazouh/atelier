@@ -6,6 +6,7 @@
 
 use std::{io::Read, path::PathBuf, sync::Arc};
 
+use beui::PrChipData;
 use gpui_kit::{Entity, Subscription};
 use lathe_lsp::Workers;
 use lathe_pr_view::{hub::PrHub, services::{PrConfig, Services}};
@@ -15,8 +16,8 @@ pub struct Pulls {
     pub hub: Entity<PrHub>,
     /// In the right pane now; the hub keeps its state while hidden.
     pub shown: bool,
-    /// The hub's events, and the list's opens.
-    pub _events: [Subscription; 2],
+    /// The hub's events, the list's opens, and the list feeding the chips.
+    pub _events: [Subscription; 3],
 }
 
 /// The reader's GitHub login, from `gh` on the project's host; `None` when gh is missing or signed out.
@@ -35,3 +36,12 @@ pub fn open_services(project: Arc<dyn Project>, me: String, local_data: PathBuf,
     let config = PrConfig::new(me, local_data).read_only(true).workers(workers);
     Services::open(project, forge, config)
 }
+
+/// The pull requests a `#N` in an agent's text can name: those of the project's own repository
+/// (`owner/name`), or every one the list holds when the project's repository is not known.
+pub fn chips_of(rows: impl IntoIterator<Item = PrChipData>, repo: Option<&str>) -> Vec<PrChipData> {
+    rows.into_iter().filter(|chip| repo.is_none_or(|repo| chip.repo.as_ref() == repo)).collect()
+}
+
+#[cfg(test)]
+mod tests;

@@ -91,6 +91,8 @@ pub enum ProjectEvent {
     Review { session: Entity<AgentSession>, turn: Option<usize>, path: Option<String> },
     /// The reader asked to open a file, by its path in the project.
     Open(String),
+    /// The pull requests came on screen: the shell shows the right pane.
+    PullsShown,
     /// The review closed: the editor is back.
     ReviewClosed,
 }
@@ -121,6 +123,10 @@ pub struct OpenProject {
     pub review: Option<(Entity<ReviewPane>, Subscription)>,
     /// The project's pull requests, once asked for (`pulls.rs`).
     pub pulls: Option<Pulls>,
+    /// The project's own repository on its forge (`owner/name`), from the origin remote.
+    repo: Option<String>,
+    /// What a `#N` in an agent's text can name, handed to each session.
+    pr_chips: std::rc::Rc<Vec<beui::PrChipData>>,
     opening_pulls: Task<()>,
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
@@ -162,6 +168,8 @@ impl OpenProject {
             _session_events: Vec::new(),
             review: None,
             pulls: None,
+            repo: None,
+            pr_chips: std::rc::Rc::default(),
             opening_pulls: Task::ready(()),
             dirty: None,
             reading_dirty: Task::ready(()),
@@ -214,10 +222,16 @@ impl OpenProject {
     /// A new session keyed `key` of `agent`, and the project listening to it.
     fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         let project = self.project.clone();
-        let session = cx.new(|cx| AgentSession::start(key, agent, project, resume, window, cx));
+        let chips = self.pr_chips.clone();
+        let session = cx.new(|cx| {
+            let mut session = AgentSession::start(key, agent, project, resume, window, cx);
+            session.pr_chips = chips;
+            session
+        });
         self._session_events.push(cx.subscribe_in(&session, window, |this, session, event: &SessionEvent, window, cx| {
             match event {
                 SessionEvent::Changed => {}
+                SessionEvent::OpenPull(chip) => return this.open_pull(chip, window, cx),
                 SessionEvent::ChooseAgent(backend) => {
                     if let Some(agent) = lathe_agents::registry::by_backend(backend) {
                         this.choose_agent(&session.read(cx).key.clone(), agent, window, cx);
@@ -285,6 +299,13 @@ impl OpenProject {
     fn read_git(&mut self, cx: &mut Context<Self>) {
         self.read_dirty(cx);
         let project = self.project.clone();
+        let remote = cx.background_spawn(async move { project.git(&["remote", "get-url", "origin"]) });
+        cx.spawn(async move |this, cx| {
+            let repo = remote.await.ok().filter(|out| out.ok()).and_then(|out| lathe_forge::RepoRef::from_remote(out.stdout.trim())).map(|r| r.slug());
+            _ = this.update(cx, |this, _| this.repo = repo);
+        })
+        .detach();
+        let project = self.project.clone();
         let asked = cx.background_spawn(async move { project.git(&["rev-parse", "--abbrev-ref", "HEAD"]) });
         cx.spawn(async move |this, cx| {
             let git = match asked.await {
@@ -342,6 +363,17 @@ impl OpenProject {
         });
     }
 
+    /// Opens the pull request a chip names, in the pull request pane.
+    fn open_pull(&mut self, chip: &beui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(pulls) = &mut self.pulls else { return };
+        let hub = pulls.hub.clone();
+        let Some(reference) = hub.read(cx).list().read(cx).model().reference_of(chip) else { return };
+        pulls.shown = true;
+        hub.update(cx, |hub, cx| hub.open(reference, window, cx));
+        cx.emit(ProjectEvent::PullsShown);
+        cx.notify();
+    }
+
     fn mount_pulls(&mut self, services: std::sync::Arc<lathe_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
         let hub = cx.new(|cx| PrHub::with_services(services, cx));
         let _events = cx.subscribe_in(&hub, window, |this, _, event: &PrEvent, window, cx| match event {
@@ -362,7 +394,19 @@ impl OpenProject {
             let ListEvent::Open(reference) = event;
             opener.update(cx, |hub, cx| hub.open(reference.clone(), window, cx));
         });
-        self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens] });
+        // What the list holds is what an agent's `#N` can name.
+        let _chips = cx.observe(&list, |this, list, cx| {
+            let rows = list.read(cx).model().rows(lathe_pr_view::services::now()).into_iter().map(|row| row.pr);
+            this.pr_chips = std::rc::Rc::new(pulls::chips_of(rows, this.repo.as_deref()));
+            for session in &this.sessions {
+                let chips = this.pr_chips.clone();
+                session.update(cx, |s, cx| {
+                    s.pr_chips = chips;
+                    cx.notify();
+                });
+            }
+        });
+        self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens, _chips] });
         cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
         cx.notify();
     }

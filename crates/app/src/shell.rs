@@ -432,6 +432,11 @@ impl Shell {
                 this.widen_for_review(window, cx);
                 cx.notify();
             }
+            ProjectEvent::PullsShown => {
+                this.right = true;
+                this.widen_for_review(window, cx);
+                cx.notify();
+            }
             ProjectEvent::ReviewClosed => {
                 if let Some(width) = this.before_review.take() {
                     let last = this.splits.read(cx).sizes().len().saturating_sub(1);
