@@ -162,3 +162,67 @@ The shots and recordings are in `~/shots/m1b/` on the HP.
 | The connection drops mid-edit (lathe-remote killed with -9) | `failures.mp4`, `f-1-down.png` (the banner), `f-2-back.png` ("Reconnected", the dirty dot kept), `f-3-saved.png` (the edit saved after), `f-6-server-back.png` (rust-analyzer ready again) |
 | A stalled host (SIGSTOP) | `f-4-pending.png` (the pending tab), `f-5-timeout.png` ("hp-agent did not answer in 30 s") |
 | The form | `form-*.png`: the config's hosts; an unknown host; `nobody@hp-agent` refused; connecting; open |
+
+## Agent sessions (M2)
+
+The agent comes from `lathe_agents::registry`, so the app names none. Each open project lists the
+agent's past sessions (`Backend::sessions`, read off the UI thread); a session open in the window is an
+`AgentSession` (`crates/app/src/agent_session.rs`).
+
+- **Where they show.** alex-31's `Sidebar` lists every project with its open and past sessions, each
+  with the agent's mark and its status. `AgentPanels` holds a panel per open session, side by side or
+  as tabs (⌘\), grouped by project or not (⌘⇧G). The layout, the grouping and the widths are kept in
+  the settings file (`panels`) and restored at start.
+- **Starting and resuming.** New session: the `+` on a project, ⌘N, or the empty panel's button. A
+  past session opens from the sidebar: its history is read first (`Backend::history`), then the agent
+  resumes it. A message to a session whose agent stopped (a crash, Stop) resumes it and then goes; a
+  message to one that never started (claude missing) tries the start again.
+- **Status** (`crates/app/src/status.rs`, pure): Working from a message to the end of its turn,
+  NeedsYou while a question waits, Finished (the amber dot) when a turn ends while the reader looks
+  at another panel, Idle once they look, Failed with the reason when the agent ends badly, and Idle
+  again after Stop.
+- **Streaming.** Events land in `EventQueue` on the agent's threads; the queue wakes the session once
+  when it goes from empty to not, and the session folds everything waiting and asks for one repaint,
+  so a stream costs a repaint a frame. The panel is GPUI's variable-height `list`: only the rows on
+  screen and 160 px past them lay out, and after each fold only the rows whose content changed are
+  measured again (`list_diff`), so the list keeps its scroll while text streams.
+- **The composer.** beui's PromptInput: Enter or ⌘↵ sends, Shift-Enter makes a line, Esc while the
+  agent works interrupts its turn, and a press anywhere in the box writes in it. The model picker lists
+  the agent's models with their lab's mark (`registry::model_mark`); the mode picker lists its
+  permission modes. Both come from `Capabilities`.
+- **Approvals.** A question shows `ToolApproval` in its place in the conversation, with the call's
+  file and input (long values as code). Allow once, Always allow and Deny answer with the choice of
+  that kind the agent offered. **Always allow answers for this session:** Claude Code applies the
+  rule it suggested to the running session. A lasting rule would live in the agent's own settings,
+  for Claude Code the project's `.claude/settings.local.json`; lathe writes none yet.
+- **The header.** The title (a press renames it; the name is kept in the settings file by the
+  agent's session id), what the session does, and Stop while its agent runs.
+- **Remote projects.** The agent starts through `Project::spawn`, so on an SSH project `claude` runs on
+  the host, as a child of `lathe-remote`.
+- **Failures.** claude missing on the host: "claude is not installed on this host. Install it there,
+  then start a new session." Not logged in: claude's own "Not logged in · Please run /login". A crash
+  mid-turn: "Stopped: the agent was stopped by a signal", or, when it left words on stderr, its last
+  line, with the tail behind Show details. An interrupt during a question withdraws it; during a tool,
+  the tool fails and the turn ends.
+- **Not in M2.** The ChangedFiles card at a turn's end needs the turn's line counts, which M3's review
+  (`crates/review`'s `TurnTracker`) gives; the PR card needs the forge.
+
+## QA, M2
+
+A real Claude Code session on the HP (claude 2.1.284, logged in), in `/tmp/qa-m2`, and one on
+`ssh://hp-agent/tmp/qa-m2-remote`. The shots and recordings are in `~/shots/m2/` on the HP.
+
+| What | Seen |
+| --- | --- |
+| A first message | `live-1.png`: "hello from lathe" |
+| An edit that asks, allowed | `qa-1-ask.png` (ToolApproval for Write, the sidebar says Needs approval), `qa-2-allowed.png` (the file on disk, in the tree, and the reply) |
+| Todos and a subagent | `qa-3-work-*.png`: the todo list fills in; a general-purpose subagent runs and ends |
+| Interrupt during a question | `qa-4.png`: the question withdrawn, the call failed, Idle |
+| Interrupt during a tool | `qa-5.png`: Esc while Bash runs; the call failed, Idle |
+| Resume after a restart | `qa-6r.png`: the history is back, and a follow-up is answered from it |
+| An SSH project | `qa-7-ssh-ask.png`, `qa-7-ssh-done.png`: `claude` runs as a child of `lathe-remote`; hello.txt lands on the host |
+| A crash mid-turn | `qa-8-crash.png`: claude killed with -9; "Stopped: the agent was stopped by a signal" |
+| claude missing, not logged in | `qa-9.png` |
+| Rename, the mode picker, the single view, restored after a restart | `qa-10.png`, `qa-10-restored-open.png` |
+| 2,000 messages | `long-open.png`; the numbers are in docs/performance.md |
+| Recordings | `qa-session.mp4`, `qa-work.mp4`, `qa-interrupt.mp4`, `qa-resume.mp4`, `qa-ssh.mp4`, `qa-rename.mp4` |

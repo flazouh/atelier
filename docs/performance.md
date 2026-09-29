@@ -303,3 +303,26 @@ samples each. The LAN row is alex-9c's run from Alex's Mac to the HP over Wi-Fi,
 | LAN: connect, uploading a new copy first | < 5 s | 1.4 s | Yes |
 | LAN: file open, 212 KB | < 150 ms | 19 to 49 ms median | Yes |
 | LAN: listing 1,150 files | < 500 ms | about 20 ms | Yes |
+
+## Agent sessions in the app
+
+A 2,000-message session (a synthetic transcript in claude's own format, 1,000 questions and 1,000
+answers of about 380 characters) opened from the sidebar, then scrolled with the wheel for 700 frames,
+in the release app under Xvfb at 1400×860, the panel 480 px wide. `LATHE_FRAMES=1` times each frame's
+layout and paint of the whole window on the CPU; the GPU work is not counted. Load average 4.8 to 6.5
+from alex-31's builds.
+
+    LATHE_FRAMES=1 target/release/lathe /tmp/qa-long     # then open the session and scroll
+
+| Overdraw | Frame median | p95 | Worst | Over 8.3 ms | Layout median |
+| --- | --- | --- | --- | --- | --- |
+| 600 px (first try) | 5.6 to 6.0 ms | 7.5 to 8.9 ms | 9.7 to 19.8 ms | 4 to 22 of 300 | 4.1 ms |
+| 160 px (shipped) | 5.8 to 6.0 ms | 7.6 to 7.8 ms | 8.4 to 19.2 ms | 2 to 4 of 300 | 4.0 to 4.3 ms |
+
+- The target was no frame over 8.3 ms. It is nearly met, not met: about 1% of frames go over, and
+  the worst ones reach 11 to 19 ms. Most of a frame is layout of the whole window (4 ms), not the
+  session's rows. The HP renders in software, so a Mac should be faster; alex-9c can run the same line
+  there.
+- Folding the 2,000 events and the first draw: 0.9 ms and 0.8 ms in the unit bench
+  (`cargo test --release -p lathe-app -- --ignored --nocapture a_long_session`), which shapes no text.
+- A stream costs one repaint a frame: the queue wakes the session once per batch.
