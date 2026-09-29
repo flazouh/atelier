@@ -162,3 +162,10 @@ and `None` elsewhere, so an owner can act on "the name under the pointer", as la
 in a pull request's diff. It is `index_for_mouse_position` behind the bounds check the Cmd underline
 already makes.
 Test: `test_the_offset_under_the_pointer`.
+
+## 16. The syntax styles, readable
+
+`syntax_styles(range, resolver)` returns the styles the editor's highlighter holds for a range now,
+as the editor paints them, so a test can compare them with a fresh parse after an edit that took
+the background path. lathe's `crates/beui/src/code_editor/tests.rs` (module `background`) does.
+It borrows the highlighter the editor already keeps; nothing else changes.

@@ -3016,6 +3016,17 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.hovered_row
     }
 
+    /// lathe patch: the syntax styles the highlighter holds for `range` now, as the editor paints
+    /// them; `None` without a highlighter. For a test that compares them with a fresh parse.
+    pub fn syntax_styles(
+        &self,
+        range: &Range<usize>,
+        resolver: &dyn crate::input::HighlightStyleResolver,
+    ) -> Option<Vec<(Range<usize>, gpui::HighlightStyle)>> {
+        let highlighter = self.mode.highlighter()?.borrow();
+        Some(highlighter.as_ref()?.styles(range, resolver))
+    }
+
     /// lathe patch: the text offset under the pointer, when the pointer is over the text, so a
     /// command such as "the uses of the name under the pointer" can ask for it.
     pub fn offset_at_pointer(&self, window: &Window) -> Option<usize> {
