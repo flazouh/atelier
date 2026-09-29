@@ -42,7 +42,7 @@ use gpui_kit::{
     SharedString, StatefulInteractiveElement, Styled, Subscription, Task, Window,
     base::input::RowBlock,
     component::input::EditorState,
-    deferred, div, prelude::FluentBuilder, px,
+    div, prelude::FluentBuilder, px,
 };
 use lathe_editor::{EditorSession, Elsewhere, Jump};
 use lathe_lsp::{LspError, canonical, client::uri_to_path};
@@ -787,7 +787,18 @@ impl Render for PrStory {
                     ),
             );
         let lookup = self.lookup.as_ref().map(|l| {
-            deferred(div().absolute().top(px(52.)).left_0().right_0().flex().justify_center().child(l.finder.clone())).with_priority(1)
+            let this = cx.entity().downgrade();
+            let finder_focus = gpui_kit::Focusable::focus_handle(&l.finder, cx);
+            beui::popover::Popover::new("pr-story-lookup")
+                .open(true)
+                .hang(beui::popover::Hang::Centre(52.))
+                .height(360.)
+                .panel_focus(&finder_focus)
+                .return_focus(&self.focus)
+                .on_close(move |window, cx| {
+                    this.update(cx, |story, cx| story.close_lookup(window, cx)).ok();
+                })
+                .child(l.finder.clone())
         });
         let right = div()
             .relative()

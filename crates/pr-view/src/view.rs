@@ -929,8 +929,27 @@ impl PullView {
         cx.notify();
     }
 
-    pub(crate) fn picker_element(&self) -> Option<AnyElement> {
-        self.picker.as_ref().map(|p| p.finder.clone().into_any_element())
+    /// The lookup, as a popover hung from the top of the pane: a press outside, Escape or Tab closes it.
+    pub(crate) fn picker_popover(&self, cx: &mut Context<Self>) -> Option<beui::popover::Popover> {
+        let p = self.picker.as_ref()?;
+        let finder_focus = gpui_kit::Focusable::focus_handle(&p.finder, cx);
+        let this = cx.entity().downgrade();
+        Some(
+            beui::popover::Popover::new("pr-lookup")
+                .open(true)
+                .hang(beui::popover::Hang::Centre(52.))
+                .height(360.)
+                .panel_focus(&finder_focus)
+                .return_focus(&self.focus)
+                .on_close(move |_, cx| {
+                    this.update(cx, |view, cx| {
+                        view.picker = None;
+                        cx.notify();
+                    })
+                    .ok();
+                })
+                .child(p.finder.clone()),
+        )
     }
 
     // ---- writes ----

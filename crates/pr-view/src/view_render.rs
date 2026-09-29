@@ -7,7 +7,7 @@ use beui::{
     typography::TextSize,
 };
 use gpui_kit::{
-    Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, deferred, div,
+    Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
 use lathe_forge::{ForgeError, PullState};
@@ -342,7 +342,7 @@ impl Render for PullView {
             ChangedFileTree::new("pr-tree", files).reviewed(seen).current(current).on_open(move |path, window, cx| open(path, window, cx)),
         );
         let card = self.file_card(body, cx);
-        let picker = self.picker_element().map(|finder| deferred(div().absolute().top(px(52.)).left_0().right_0().flex().justify_center().child(finder)).with_priority(1));
+        let picker = self.picker_popover(cx);
         let right = div()
             .relative()
             .flex()
