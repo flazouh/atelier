@@ -637,7 +637,8 @@ impl Shell {
     fn agent_panel(&self, cx: &mut Context<Self>) -> AnyElement {
         let open = self.projects.iter().any(|p| !p.read(cx).sessions.is_empty());
         if open {
-            return self.panels.clone().into_any_element();
+            // The strip scrolls its columns sideways; they must not draw under the sidebar.
+            return div().size_full().overflow_hidden().child(self.panels.clone()).into_any_element();
         }
         let muted = cx.theme().muted_foreground;
         div()
