@@ -195,11 +195,25 @@ impl OpenProject {
         if let Some((id, _)) = &resume {
             self.past.retain(|p| p.id != *id);
         }
-        let (agent, project) = (self.agent.clone(), self.project.clone());
+        let session = self.start_session(key, self.agent.clone(), resume, window, cx);
+        self.sessions.push(session.clone());
+        cx.emit(ProjectEvent::Sessions);
+        session
+    }
+
+    /// A new session keyed `key` of `agent`, and the project listening to it.
+    fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+        let project = self.project.clone();
         let session = cx.new(|cx| AgentSession::start(key, agent, project, resume, window, cx));
-        self._session_events.push(cx.subscribe(&session, |_, session, event: &SessionEvent, cx| {
+        self._session_events.push(cx.subscribe_in(&session, window, |this, session, event: &SessionEvent, window, cx| {
             match event {
                 SessionEvent::Changed => {}
+                SessionEvent::ChooseAgent(backend) => {
+                    if let Some(agent) = lathe_agents::registry::by_backend(backend) {
+                        this.choose_agent(&session.read(cx).key.clone(), agent, window, cx);
+                    }
+                    return;
+                }
                 SessionEvent::Review { turn, path } => {
                     return cx.emit(ProjectEvent::Review { session, turn: *turn, path: path.clone() });
                 }
@@ -213,9 +227,18 @@ impl OpenProject {
             }
             cx.emit(ProjectEvent::Sessions);
         }));
-        self.sessions.push(session.clone());
-        cx.emit(ProjectEvent::Sessions);
         session
+    }
+
+    /// The new session keyed `key` starts again with `agent`, in its place and under its key, so its
+    /// panel stays where it was. A session that has a conversation keeps its agent.
+    pub fn choose_agent(&mut self, key: &str, agent: Agent, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(at) = self.sessions.iter().position(|s| s.read(cx).key.as_ref() == key) else { return };
+        if !self.sessions[at].read(cx).can_choose_agent() {
+            return;
+        }
+        self.sessions[at] = self.start_session(key.to_string().into(), agent, None, window, cx);
+        cx.emit(ProjectEvent::Sessions);
     }
 
     /// Closes the session keyed `key`: its agent stops, and it goes back to the past list.

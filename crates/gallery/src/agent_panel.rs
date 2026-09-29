@@ -108,8 +108,8 @@ pub fn agent_panel(
                 .variant(ButtonVariant::Ghost)
                 .on_click(cx.listener(|this, _, _, cx| this.start_replay(cx))),
         )
-        .child(Button::new("p-new").icon(IconName::Add).variant(ButtonVariant::Ghost).size(ButtonSize::Icon))
-        .child(Button::new("p-more").icon(IconName::MoreHoriz).variant(ButtonVariant::Ghost).size(ButtonSize::Icon));
+        .child(Button::new("p-new").icon(IconName::Add).variant(ButtonVariant::Ghost).size(ButtonSize::IconSm))
+        .child(Button::new("p-more").icon(IconName::MoreHoriz).variant(ButtonVariant::Ghost).size(ButtonSize::IconSm));
 
     let list = session_list(started, replay, shown, tick);
     let session = div().id("session").flex_1().overflow_y_scroll().px(px(20.)).py(px(20.)).child(list);

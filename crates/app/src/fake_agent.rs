@@ -120,3 +120,12 @@ pub fn git_project(files: &[(&str, &str)]) -> PathBuf {
     git(&["commit", "-qm", "start"]);
     dir
 }
+
+/// An agent named `name` on a fake backend, for a test that starts a session itself.
+pub fn fake_agent(name: &'static str) -> lathe_agents::registry::Agent {
+    let fake = Arc::new(Fake { turns: Mutex::default(), received: Arc::default(), fail_first: Mutex::new(false), work: Mutex::default() });
+    let mut agent = lathe_agents::registry::agents().remove(0);
+    agent.backend = Arc::new(FakeBackend(fake));
+    agent.name = name;
+    agent
+}

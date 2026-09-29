@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use beui::{AgentLook, BrandMark};
 
-use crate::{claude, claude_code::ClaudeCode, coding_agents::CodingAgent, labs::Lab, session::Backend};
+use crate::{claude, claude_code::ClaudeCode, coding_agents::CodingAgent, labs::Lab, own::OwnAgent, session::Backend};
 
 #[derive(Clone)]
 pub struct Agent {
@@ -22,13 +22,18 @@ pub struct Agent {
 
 /// Every agent this build can start, the default first.
 pub fn agents() -> Vec<Agent> {
-    vec![Agent {
-        backend: Arc::new(ClaudeCode::new()),
-        name: CodingAgent::ClaudeCode.name(),
-        mark: CodingAgent::ClaudeCode.mark(),
-        look: claude::look(),
-        lab: Lab::Anthropic,
-    }]
+    vec![
+        Agent {
+            backend: Arc::new(ClaudeCode::new()),
+            name: CodingAgent::ClaudeCode.name(),
+            mark: CodingAgent::ClaudeCode.mark(),
+            look: claude::look(),
+            lab: Lab::Anthropic,
+        },
+        // lathe's own agent. With no key set it still shows, and opening it says which to set. The
+        // look is a stand-in until lathe has its own.
+        Agent { backend: Arc::new(OwnAgent::from_env()), name: "lathe", mark: None, look: claude::look(), lab: Lab::Anthropic },
+    ]
 }
 
 /// The lab that makes the model a picker names, by its id: `opus` and `claude-sonnet-4` are

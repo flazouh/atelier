@@ -13,6 +13,7 @@ use beui::{
     ToolApprovalStatus, ToolCall as ToolRow, ToolStatus as RowToolStatus,
     button::{Button, ButtonVariant},
     changed_files::ChangedFiles,
+    select::{Select, SelectOption},
     icon::{Icon, IconName},
     session_status::SessionStatus,
     theme::{ActiveTheme, radius},
@@ -290,6 +291,7 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
             .gap(px(4.))
             .child(div().text_size(TextSize::Sm.font_size()).child(if starting { "Starting…" } else { "A new session" }))
             .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(format!("Ask {agent_name} anything about this project.")))
+            .children(s.can_choose_agent().then(|| agent_picker(session, cx)))
             .into_any_element()
     } else {
         div().flex_1().min_h_0().pt(px(12.)).child(rows).into_any_element()
@@ -316,6 +318,42 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
         .children(failure)
         .child(div().flex().flex_col().gap(px(8.)).px(px(12.)).pb(px(12.)).children(todos).child(strip).child(composer))
         .into_any_element()
+}
+
+/// The agents this build can start, as a picker a new session shows until its first message.
+fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
+    let agents = lathe_agents::registry::agents();
+    if agents.len() < 2 {
+        return None;
+    }
+    let s = session.read(cx);
+    let current = agents.iter().position(|a| a.backend.name() == s.agent.backend.name());
+    let options: Vec<SelectOption> = agents
+        .iter()
+        .map(|a| {
+            let option = SelectOption::from(a.name);
+            match a.mark {
+                Some(mark) => option.mark(mark),
+                None => option,
+            }
+        })
+        .collect();
+    let backends: Vec<String> = agents.iter().map(|a| a.backend.name().to_string()).collect();
+    let pick = session.clone();
+    Some(
+        div()
+            .mt(px(12.))
+            .w(px(220.))
+            .child(
+                Select::new(gpui_kit::ElementId::Name(format!("{}-agent", s.key).into()), options)
+                    .selected(current)
+                    .on_change(move |ix, _, cx| {
+                        let Some(backend) = backends.get(ix).cloned() else { return };
+                        pick.update(cx, |_, cx| cx.emit(SessionEvent::ChooseAgent(backend)));
+                    }),
+            )
+            .into_any_element(),
+    )
 }
 
 /// The panel's top line: the title (a press renames it), what the session is doing, and Stop while

@@ -44,6 +44,8 @@ pub enum SessionEvent {
     Review { turn: Option<usize>, path: Option<String> },
     /// The reader asked to open a file in the editor.
     OpenFile(String),
+    /// The reader picked another agent for this session before its first message, by its backend's name.
+    ChooseAgent(String),
     /// The reader named it: the name is kept across launches.
     Renamed,
 }
@@ -82,6 +84,8 @@ pub struct AgentSession {
     pub starting: bool,
     /// A message written while the agent was not running: it goes once the session resumes.
     waiting_send: Option<Command>,
+    /// It resumes a past session, which keeps its agent.
+    resumed: bool,
     /// Messages sent while the turn's tracker begins: `Some` from the begin until it lands, and they go
     /// after the first, in the same turn.
     beginning: Option<Vec<Command>>,
@@ -189,6 +193,7 @@ impl AgentSession {
             starting: true,
             waiting_send: None,
             beginning: None,
+            resumed: resume.is_some(),
             // The list lays out this much past the view each frame: enough that a fast scroll never
             // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
             list: ListState::new(0, ListAlignment::Bottom, px(OVERDRAW)),
@@ -459,6 +464,11 @@ impl AgentSession {
     pub fn stop(&mut self, cx: &mut Context<Self>) {
         self.session = None;
         cx.notify();
+    }
+
+    /// A new session takes another agent until its first message: then its conversation belongs to one.
+    pub fn can_choose_agent(&self) -> bool {
+        !self.resumed && self.conversation.items().is_empty() && self.waiting_send.is_none()
     }
 
     pub fn running(&self) -> bool {
