@@ -223,7 +223,8 @@ The editor's two patches to gpui-component:
    re-queried only where the tree changed, instead of rebuilt over the whole file.
 2. The parse moved off the UI thread for every text size, one at a time per editor: the keystrokes
    during a parse coalesce into the next one, and a parse for an older text is dropped. Until one
-   lands, each old colour stands where its text went.
+   lands, each old colour stands where its text went. The background parse updates the injection
+   layers in place too, over one span that all the coalesced edits wrote.
 
 Machine: `hp-agent`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release build, at commit
 `e0e79a4`. The HP is shared with CI runners; this run started at a load average of 5.6 and ended at
@@ -231,26 +232,27 @@ Machine: `hp-agent`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release bui
 
     cargo test --release -p beui --test highlight_bench -- --ignored --nocapture --test-threads=1
 
-The editor now:
+The editor now, at commit `11e1eea` and a load average of 2.1 to 3.9:
 
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
-| Keystroke on the UI thread, flat 10k-line Rust (about 900 top-level functions) | < 1 ms | 0.37 ms | 0.58 ms | Passes |
-| The same, the functions in modules of 50 | < 1 ms | 0.35 ms | 0.59 ms | Passes |
-| The same, a 300-line file | < 1 ms | 0.34 ms | 0.49 ms | Passes |
-| Colour latency, flat 10k-line Rust | none yet | 60.4 ms | 80.5 ms | |
-| The same, the functions in modules of 50 | none yet | 51.1 ms | 56.7 ms | |
-| The same, a 300-line file | none yet | 2.96 ms | 3.81 ms | |
-| First parse of the 10k-line file and visible styles | < 50 ms, off the UI thread | 160.7 ms | 177.2 ms | Off the UI thread; over the time |
+| Keystroke on the UI thread, flat 10k-line Rust (about 900 top-level functions) | < 1 ms | 0.27 ms | 0.31 ms | Passes |
+| The same, the functions in modules of 50 | < 1 ms | 0.29 ms | 0.33 ms | Passes |
+| The same, a 300-line file | < 1 ms | 0.24 ms | 0.28 ms | Passes |
+| Colour latency, flat 10k-line Rust | none yet | 4.40 ms | 6.23 ms | |
+| The same, the functions in modules of 50 | none yet | 0.88 ms | 0.97 ms | |
+| The same, a 300-line file | none yet | 0.86 ms | 1.77 ms | |
+| First parse of the 10k-line file and visible styles | < 50 ms, off the UI thread | 132.2 ms | 134.6 ms | Off the UI thread; over the time |
 | Visible styles for a scroll step | < 0.5 ms | 0.40 ms | 0.45 ms | Passes |
 
 - "Keystroke on the UI thread" is what the UI thread does now: `edit_tree`, then the visible rows'
   styles from the moved tree.
 - "Colour latency" is the edit, the background parse with its injection layers, taking it, and the
   visible styles, run in a row. The editor adds a hop to a background thread and back, and the next
-  frame. For the 10k-line file most of it is the injection layers, rebuilt whole in the background
-  (patch 1's in-place update needs the UI thread's single edit, and a background parse may cover
-  several).
+  frame. Before the background parse updated the layers in place it rebuilt them all: 60.4 ms for the
+  flat file, 51.1 ms in modules, 3.0 ms for 300 lines, at a load average of 5.6 to 10.
+- For the flat file, what is left is tree-sitter's incremental parse and `changed_ranges`, which walk
+  the root's about 900 children; in modules the same text takes 0.88 ms.
 - The first parse is a full pass, so neither patch changes it: about 50 ms of it compiles the highlight
   and injection queries, the rest parses the file and its first 512 macro layers.
 
