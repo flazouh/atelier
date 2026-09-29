@@ -178,7 +178,7 @@ fn the_line_is_added_once_and_what_was_there_stays() {
     rig.turns(2);
     let exclude = std::fs::read_to_string(rig.dir.path().join(".git/info/exclude")).unwrap();
     assert_eq!(exclude, "# mine\n*.log\n.lathe/\n");
-    assert!(store::exclude_from_git(rig.project.as_ref()).unwrap() == false, "asked again, it finds the line");
+    assert!(!store::exclude_from_git(rig.project.as_ref()).unwrap(), "asked again, it finds the line");
     assert_eq!(git(rig.dir.path(), &["status", "--porcelain"]), "");
 }
 
