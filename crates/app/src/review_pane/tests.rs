@@ -181,3 +181,39 @@ fn a_comment_typed_and_sent_with_its_key_is_kept_whole(cx: &mut TestAppContext) 
     let bodies = cx.update(|_, cx| session.read(cx).comments.all().iter().map(|c| c.body.clone()).collect::<Vec<_>>());
     assert_eq!(bodies, ["Why upper case?"]);
 }
+
+/// The composer sits in an editor row block, and a row block is drawn only when the editor is: what is
+/// typed in it shows only if each change of the composer draws the editor again.
+#[gpui_kit::test]
+fn typing_in_a_comment_draws_the_editor_again(cx: &mut TestAppContext) {
+    let (pane, _, _, _, cx) = reviewing(cx);
+    let shown = pane.clone();
+    cx.update(|window, cx| _ = window.replace_root(cx, |_, _| Shown(shown)));
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.open_composer(2, window, cx)));
+    cx.run_until_parked();
+    let drawn = std::rc::Rc::new(std::cell::Cell::new(0));
+    let editor = cx.update(|_, cx| pane.read(cx).editor.clone());
+    let count = drawn.clone();
+    let _watch = cx.update(|_, cx| cx.observe(&editor, move |_, _| count.set(count.get() + 1)));
+    cx.simulate_input("a");
+    cx.run_until_parked();
+    assert!(drawn.get() > 0, "the editor was asked to draw again");
+}
+
+/// A decision that leaves the disk as it was (an accept) is kept too: the review opens again as it was
+/// left.
+#[gpui_kit::test]
+fn a_review_opened_again_keeps_an_accepted_hunk(cx: &mut TestAppContext) {
+    let (pane, session, _, dir, cx) = reviewing(cx);
+    let ids = hunk_ids(&pane, cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| {
+        p.decide_hunk(&ids[0], Decision::Accept, window, cx);
+    }));
+    cx.run_until_parked();
+    assert_eq!(read(&dir, "a.txt"), AFTER, "an accept writes nothing");
+    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let again = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project, Scope::Turn(0), Some("a.txt"), window, cx)));
+    cx.run_until_parked();
+    assert_eq!(hunk_ids(&again, cx), [ids[1].clone()], "only the hunk not decided is left");
+}

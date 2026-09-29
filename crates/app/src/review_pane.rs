@@ -118,7 +118,8 @@ pub struct ReviewPane {
     focus: FocusHandle,
     pub review_mode: bool,
     resolving: Vec<beui::Resolve>,
-    composer: Option<(usize, Entity<LineComposer>, Subscription)>,
+    /// The comment being written: its file, the composer, and what the pane listens to on it.
+    composer: Option<(usize, Entity<LineComposer>, [Subscription; 2])>,
     width: f32,
     writing: Option<Task<()>>,
     _edits: Subscription,
@@ -217,14 +218,17 @@ impl ReviewPane {
         self.session.update(cx, |s, _| drop(s.decided.insert((scope, file.review.path.clone()), (file.merged, file.on_disk))));
     }
 
-    /// Writes files `at` with what the reader decided, off the UI thread.
+    /// Keeps files `at` with the session and writes the ones whose text is not on disk yet, off the UI
+    /// thread. An accept leaves the disk as it is, but its decision is kept all the same.
     fn write(&mut self, at: &[usize], cx: &mut Context<Self>) {
         let mut writes = Vec::new();
-        for &i in at {
-            let Some(text) = self.files.get(i).and_then(PaneFile::to_write) else { continue };
-            self.files[i].on_disk = Some(text.clone());
+        let count = self.files.len();
+        for &i in at.iter().filter(|i| **i < count) {
+            if let Some(text) = self.files[i].to_write() {
+                self.files[i].on_disk = Some(text.clone());
+                writes.push((self.files[i].review.path.clone(), text));
+            }
             self.keep(i, cx);
-            writes.push((self.files[i].review.path.clone(), text));
         }
         if writes.is_empty() {
             return;
@@ -438,8 +442,11 @@ impl ReviewPane {
             this.composer = None;
             cx.notify();
         });
+        // The composer is drawn in a row block, which the editor draws only when it draws itself: each
+        // change of the composer draws the editor again, or what is typed would not show.
+        let redraw = cx.observe(&composer, |this, _, cx| this.editor.update(cx, |_, cx| cx.notify()));
         focus_once_painted(composer.focus_handle(cx), 3, window, cx);
-        self.composer = Some((self.current, composer, sub));
+        self.composer = Some((self.current, composer, [sub, redraw]));
         cx.notify();
     }
 
