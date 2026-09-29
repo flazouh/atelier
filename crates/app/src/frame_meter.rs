@@ -23,23 +23,31 @@ pub fn enabled() -> bool {
 #[derive(Default)]
 pub struct Meter {
     current: Duration,
+    /// This frame's layout (request_layout and prepaint), and every frame's.
+    layout: Duration,
+    layouts: Vec<Duration>,
     frames: Vec<Duration>,
 }
 
 impl Meter {
     fn frame_done(&mut self) {
         self.frames.push(std::mem::take(&mut self.current));
+        self.layouts.push(std::mem::take(&mut self.layout));
         if self.frames.len() >= FRAMES {
             let mut f = std::mem::take(&mut self.frames);
+            let mut l = std::mem::take(&mut self.layouts);
             f.sort();
+            l.sort();
             let ms = |d: Duration| d.as_secs_f64() * 1000.;
             eprintln!(
-                "frames: median {:.2} ms, p95 {:.2} ms, worst {:.2} ms, over 8.3 ms: {}/{}",
+                "frames: median {:.2} ms, p95 {:.2} ms, worst {:.2} ms, over 8.3 ms: {}/{}; layout median {:.2} ms, p95 {:.2} ms",
                 ms(f[f.len() / 2]),
                 ms(f[f.len() * 95 / 100]),
                 ms(f[f.len() - 1]),
                 f.iter().filter(|d| **d > LIMIT).count(),
-                f.len()
+                f.len(),
+                ms(l[l.len() / 2]),
+                ms(l[l.len() * 95 / 100]),
             );
         }
     }
@@ -73,14 +81,18 @@ impl Element for Timed {
     fn request_layout(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, ()) {
         let at = Instant::now();
         let id = self.child.request_layout(window, cx);
-        self.meter.borrow_mut().current += at.elapsed();
+        let mut meter = self.meter.borrow_mut();
+        meter.current += at.elapsed();
+        meter.layout += at.elapsed();
         (id, ())
     }
 
     fn prepaint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), window: &mut Window, cx: &mut App) {
         let at = Instant::now();
         self.child.prepaint(window, cx);
-        self.meter.borrow_mut().current += at.elapsed();
+        let mut meter = self.meter.borrow_mut();
+        meter.current += at.elapsed();
+        meter.layout += at.elapsed();
     }
 
     fn paint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), _: &mut (), window: &mut Window, cx: &mut App) {
