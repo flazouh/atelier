@@ -45,7 +45,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight]);
+actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -63,6 +63,8 @@ pub fn bind_keys(cx: &mut App) {
         // A shifted combo arrives with the letter either way, depending on the platform.
         KeyBinding::new("secondary-shift-b", ToggleRight, None),
         KeyBinding::new("secondary-shift-B", ToggleRight, None),
+        KeyBinding::new("secondary-shift-p", PullRequests, None),
+        KeyBinding::new("secondary-shift-P", PullRequests, None),
     ]);
 }
 
@@ -222,6 +224,12 @@ impl Shell {
                     cx.notify();
                 }
             }
+            SidebarEvent::PullRequests { project } => {
+                if let Some(at) = self.project_by_id(project, cx) {
+                    self.active = at;
+                    self.show_pulls(window, cx);
+                }
+            }
             SidebarEvent::CopyPath { project } => cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(project.to_string())),
             SidebarEvent::CloseProject { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
@@ -365,6 +373,19 @@ impl Shell {
                 cx.notify();
             });
         }
+    }
+
+    fn pull_requests_key(&mut self, _: &PullRequests, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_pulls(window, cx);
+    }
+
+    /// Shows or hides the active project's pull requests in the right pane, as wide as a review.
+    fn show_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.active().cloned() else { return };
+        project.update(cx, |p, cx| p.toggle_pulls(window, cx));
+        self.right = true;
+        self.widen_for_review(window, cx);
+        cx.notify();
     }
 
     /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
@@ -798,10 +819,15 @@ impl Shell {
                         .size(px(560.))
                         .size_range(px(320.)..px(2400.))
                         .flex_none()
-                        .child(div().size_full().pr(px(8.)).pb(px(2.)).child(match project.read(cx).review.as_ref() {
-                            // The review draws its own cards on the page.
-                            Some((pane, _)) => div().size_full().pt(px(6.)).child(pane.clone()),
-                            None => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(&project, cx)),
+                        .child(div().size_full().pr(px(8.)).pb(px(2.)).child({
+                            let p = project.read(cx);
+                            let pulls = p.pulls.as_ref().filter(|pulls| pulls.shown).map(|pulls| pulls.hub.clone());
+                            match (p.review.as_ref(), pulls) {
+                                // The review and the pull requests draw their own cards on the page.
+                                (Some((pane, _)), _) => div().size_full().pt(px(6.)).child(pane.clone()),
+                                (None, Some(hub)) => div().size_full().pt(px(6.)).child(hub),
+                                (None, None) => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(&project, cx)),
+                            }
                         })),
                 )
                 .into_any_element(),
@@ -836,6 +862,7 @@ impl Shell {
             .on_action(cx.listener(Self::close_tab))
             .on_action(cx.listener(Self::toggle_sidebar))
             .on_action(cx.listener(Self::toggle_right))
+            .on_action(cx.listener(Self::pull_requests_key))
             .on_key_down(cx.listener(Self::key_down))
             .flex()
             .flex_col()
