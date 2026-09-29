@@ -22,6 +22,7 @@ reader opens it.
 | `briefs(repo, numbers)` | Many `#N` of one repository in one request. One entry per number, in order. |
 | `create_pull`, `update_pull` | A new pull request; a change of title, body, base, draft or open state. |
 | `merge(ref, request)` | Merge now, when ready, or into the queue. Says which it did. |
+| `update_branch(ref, method, head)`, `cancel_auto_merge`, `dequeue`, `delete_branch`, `revert` | Bring the base into the branch (merge or rebase; refused if the branch moved since `head`); turn off merge when ready; leave the merge queue; delete the branch alone (never one in a fork); open a pull request that reverts this one. The trait defaults refuse, so a forge without them still compiles. Marking a draft ready is `update_pull` with `ready`. |
 | `request_review`, `comment` | Ask people or teams; a remark on the whole pull request. |
 | `hold_comment`, `held_comments`, `submit_review` | Unsent comments in the reader's review, and the verdict that sends them. |
 | `reply`, `resolve` | Answer a thread; resolve or reopen it. |
@@ -141,6 +142,7 @@ list on a busy account.
 - Merge queue: a repository that has one takes `merge` into the queue (`enqueuePullRequest`), whatever
   `when_ready` says. `delete_branch` applies to a merge that lands now, in the same repository; a branch
   in a fork is never deleted.
+- `RunInfo.suite` is how the check suite around a job ended. A job that failed in a suite that succeeded (`continue-on-error`) was allowed to fail: the pull request view shows it as Tolerated, "Allowed to fail", and it is never why the pull request is red.
 - `Pull.base_sha` is GitHub's `baseRefOid`: the tip of the base branch the pull request was last compared
   with. The pull request view takes the merge base of it and the head as the start of the diff
   (`docs/pr-view.md`). Every type in `model/` is `Serialize` and `Deserialize`, for the view's snapshots.

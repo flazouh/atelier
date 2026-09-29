@@ -42,6 +42,7 @@ the list for closed ones, and `forget_checkout` removes one at once).
 - **Showing**: the whole pull request, since the last review (the forge's Last Review Point, when the head
   has moved past it), or since any commit. If the review point is gone from history, the view shows the
   whole pull request and says so.
+- **Checks** show a job that failed in a run that succeeded as Tolerated ("Allowed to fail"). Its Fault is read like a failing job's.
 - **Reviewed State** is per file version. `x` marks the file on screen; the mark stores the new blob's id
   in SQLite (`pr-view/reviewed.sqlite` in `local_data`, migrations by `user_version`). A push that leaves
   a file's bytes alone keeps the mark; a push that changes them clears it. `Put back` clears all.
@@ -84,8 +85,7 @@ The gallery story "Pull request view" mounts the hub on one of them. `PRV_VIEW=l
 
 ## Not built
 
-- **Tolerated checks** (the reader's list of checks that may fail) are not kept.
-- The merge box's Ready for review, Update branch, Cancel, Remove from queue, Delete branch and Revert say
-  "not built yet": the `Forge` trait has no call for them.
-- Writes are tested against the fixture forge only. No test has written to GitHub.
+- Writes are tested against the fixture forge only. No test has written to GitHub. The merge box's Ready for
+  review, Update branch, Cancel merge when ready, Remove from queue, Delete branch and Revert all go through
+  `Forge` calls (`docs/forge.md`), tested on the fixture forge and on the documented GitHub shapes.
 - Uses and Names lookups in the diff.
