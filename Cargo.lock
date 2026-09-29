@@ -3788,6 +3788,7 @@ dependencies = [
  "lathe-remote",
  "lathe-review",
  "lathe-settings",
+ "serde",
  "serde_json",
  "tempfile",
 ]

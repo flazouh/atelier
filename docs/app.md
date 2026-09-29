@@ -265,8 +265,11 @@ in place of the editor on the right; a file's name opens it in the editor.
   (`Merged::rebased_on`) and puts the difference in the editor as one small edit, so the caret and the
   scroll stay where they were.
 - **Kept with the session.** What the reader decided and edited, per scope and file, and the Reviewed
-  marks (`x`), per turn; the review opens again as it was left. They live in memory with the session,
-  not across launches.
+  marks (`x`), per turn; the review opens again as it was left. The turns, their cards, the decisions,
+  the marks and the comments are kept in the project's data folder (`review/<session id>.json`, written
+  half a second after the last change, off the UI thread; `crates/app/src/review_state.rs`), so a session
+  resumed after a restart opens its review as it was left. A mark on a file that changed since stays
+  expired. A resumed session's cards sit after the conversation item they followed.
 - **Comments.** The gutter's + opens a `LineComposer` on the row; ⌃↵ adds the comment to the session
   (`Comments::add`, anchored with `Merged::anchor`), where it shows "not sent yet". The next message
   carries every waiting comment as `Attachment::LineComment` (`Command::Send { text, attachments }`); the
