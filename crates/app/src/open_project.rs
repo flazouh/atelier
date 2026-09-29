@@ -25,7 +25,10 @@ use lathe_lsp::{Store, Workers};
 use lathe_project::{Change, ChangeKind, Link, Project, Watch};
 use lathe_settings::Location;
 
+use lathe_agents::{registry::Agent, session::{SessionId, SessionSummary}};
+
 use crate::{
+    agent_session::{AgentSession, SessionEvent},
     tabs::Tabs,
     tree::{ProjectTree, ancestors},
 };
@@ -74,6 +77,10 @@ pub struct Buffer {
 pub enum ProjectEvent {
     /// A line for the status line, such as a save that failed.
     Said(SharedString),
+    /// A session started, changed or ended, or the past list came in: the sidebar draws again.
+    Sessions,
+    /// The reader named a session.
+    Renamed { id: SessionId, name: SharedString },
 }
 
 impl EventEmitter<ProjectEvent> for OpenProject {}
@@ -91,6 +98,13 @@ pub struct OpenProject {
     pub link: Link,
     pub tabs: Tabs,
     pub buffers: HashMap<String, Buffer>,
+    /// The agent new sessions start with.
+    pub agent: Agent,
+    /// The sessions open in this window, oldest first.
+    pub sessions: Vec<Entity<AgentSession>>,
+    /// The agent's past sessions in this project, newest first, less the ones open.
+    pub past: Vec<SessionSummary>,
+    _session_events: Vec<Subscription>,
     /// Files being read for a tab, so a second click does not read them twice.
     opening: HashSet<String>,
     /// Where the caret goes in a file still being read, after a jump to it.
@@ -122,6 +136,10 @@ impl OpenProject {
             link: Link::Up,
             tabs: Tabs::default(),
             buffers: HashMap::new(),
+            agent: lathe_agents::registry::agents().remove(0),
+            sessions: Vec::new(),
+            past: Vec::new(),
+            _session_events: Vec::new(),
             opening: HashSet::new(),
             caret_at: HashMap::new(),
             _watch: None,
@@ -131,9 +149,64 @@ impl OpenProject {
         };
         this.relist(cx);
         this.read_git(cx);
+        this.list_sessions(cx);
         this.watch(window, cx);
         this.follow_link(window, cx);
         this
+    }
+
+    /// Reads the agent's past sessions here, off the UI thread.
+    pub fn list_sessions(&mut self, cx: &mut Context<Self>) {
+        let (backend, project) = (self.agent.backend.clone(), self.project.clone());
+        let listing = cx.background_spawn(async move { backend.sessions(project.as_ref()) });
+        cx.spawn(async move |this, cx| {
+            let listed = listing.await;
+            _ = this.update(cx, |this, cx| {
+                match listed {
+                    Ok(past) => this.past = past,
+                    Err(error) => cx.emit(ProjectEvent::Said(format!("No past sessions: {error}").into())),
+                }
+                cx.emit(ProjectEvent::Sessions);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Starts a new session, or resumes the past one `resume`, and returns it.
+    pub fn open_session(&mut self, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let key: SharedString = format!("session-{}", NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)).into();
+        if let Some((id, _)) = &resume {
+            self.past.retain(|p| p.id != *id);
+        }
+        let (agent, project) = (self.agent.clone(), self.project.clone());
+        let session = cx.new(|cx| AgentSession::start(key, agent, project, resume, window, cx));
+        self._session_events.push(cx.subscribe(&session, |_, session, event: &SessionEvent, cx| {
+            match event {
+                SessionEvent::Changed => {}
+                SessionEvent::Renamed => {
+                    let s = session.read(cx);
+                    if let (Some(id), Some(name)) = (s.id.clone(), s.name.clone()) {
+                        cx.emit(ProjectEvent::Renamed { id, name });
+                    }
+                }
+            }
+            cx.emit(ProjectEvent::Sessions);
+        }));
+        self.sessions.push(session.clone());
+        cx.emit(ProjectEvent::Sessions);
+        session
+    }
+
+    /// Closes the session keyed `key`: its agent stops, and it goes back to the past list.
+    pub fn close_session(&mut self, key: &str, cx: &mut Context<Self>) {
+        self.sessions.retain(|s| s.read(cx).key.as_ref() != key);
+        self.list_sessions(cx);
+    }
+
+    pub fn project(&self) -> Arc<dyn Project> {
+        self.project.clone()
     }
 
     pub fn name(&self) -> String {

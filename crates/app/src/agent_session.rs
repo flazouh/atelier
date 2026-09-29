@@ -30,6 +30,8 @@ use crate::{list_diff, status};
 pub enum SessionEvent {
     /// Its title, status or id changed: the sidebar and the tabs draw it again.
     Changed,
+    /// The reader named it: the name is kept across launches.
+    Renamed,
 }
 
 impl EventEmitter<SessionEvent> for AgentSession {}
@@ -67,6 +69,9 @@ pub struct AgentSession {
     pub list: ListState,
     rows: Vec<(u8, usize, usize)>,
     pub composer: Entity<PromptInput>,
+    /// The name being typed, while the reader renames the session.
+    pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
+    _renaming: Option<Subscription>,
     /// When each thinking block began, for its live "Thinking for 12s".
     pub thinking_since: HashMap<lathe_agents::session::BlockId, Instant>,
     _composer: Subscription,
@@ -143,6 +148,8 @@ impl AgentSession {
             list: ListState::new(0, ListAlignment::Bottom, px(600.)),
             rows: Vec::new(),
             composer,
+            renaming: None,
+            _renaming: None,
             thinking_since: HashMap::new(),
             _composer,
             _pump,
@@ -315,6 +322,39 @@ impl AgentSession {
                 cx.emit(SessionEvent::Changed);
             }
         }
+    }
+
+    /// Starts renaming: an input with the name, which Enter keeps and Escape drops.
+    pub fn start_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let title = self.shown_title();
+        let input = cx.new(|cx| {
+            let mut state = gpui_kit::component::input::InputState::new(window, cx);
+            state.set_value(title, window, cx);
+            state
+        });
+        input.update(cx, |i, cx| i.focus(window, cx));
+        let sub = cx.subscribe(&input, |this, input, event: &gpui_kit::component::input::InputEvent, cx| match event {
+            gpui_kit::component::input::InputEvent::PressEnter { .. } => {
+                let name = input.read(cx).value().trim().to_string();
+                this.renaming = None;
+                this._renaming = None;
+                if !name.is_empty() {
+                    this.name = Some(name.into());
+                    cx.emit(SessionEvent::Renamed);
+                }
+                cx.emit(SessionEvent::Changed);
+                cx.notify();
+            }
+            gpui_kit::component::input::InputEvent::Blur => {
+                this.renaming = None;
+                this._renaming = None;
+                cx.notify();
+            }
+            _ => {}
+        });
+        self.renaming = Some(input);
+        self._renaming = Some(sub);
+        cx.notify();
     }
 
     /// What the row and the tab say.

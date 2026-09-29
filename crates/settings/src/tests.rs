@@ -47,3 +47,17 @@ fn opening_a_project_moves_it_first_once_and_the_list_stays_short() {
     assert_eq!(remote.name(), "lathe");
     assert_eq!(remote.place(), "hp-agent:/home/alex/code/lathe");
 }
+
+#[test]
+fn session_names_and_panels_come_back() {
+    let path = scratch("panels");
+    update(&path, |s| {
+        s.session_names.insert("abc".into(), "Fix the flaky test".into());
+        s.panels = Panels { single: true, grouped: true, widths: vec![("abc".into(), 520.)] };
+    })
+    .unwrap();
+    let back = load(&path);
+    assert_eq!(back.session_names.get("abc").map(String::as_str), Some("Fix the flaky test"));
+    assert!(back.panels.single && back.panels.grouped);
+    assert_eq!(back.panels.widths, [("abc".to_string(), 520.)]);
+}
