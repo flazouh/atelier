@@ -47,7 +47,7 @@ fn a_hunk_accepted_and_one_rejected_reach_the_disk(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(read(&dir, "a.txt"), "1\nTWO\n3\n4\n5\n6\n7\n8\n", "the accepted row stays, the rejected one goes back");
     assert_eq!(editor_text(&pane, cx), read(&dir, "a.txt"), "no hunk is left, so the buffer is the file");
-    assert_eq!(cx.update(|_, cx| pane.read(cx).progress(cx).reviewed), 1, "a file with nothing left is reviewed");
+    assert_eq!(cx.update(|_, cx| pane.read(cx).reviewed(cx).len()), 1, "a file with nothing left is reviewed");
 }
 
 #[gpui_kit::test]
@@ -137,9 +137,9 @@ fn the_whole_session_holds_every_turn_and_marks_keep_per_scope(cx: &mut TestAppC
     let paths = cx.update(|_, cx| pane.read(cx).files.iter().map(|f| f.review.path.clone()).collect::<Vec<_>>());
     assert_eq!(paths, ["a.txt", "b.txt"]);
     cx.update(|_, cx| pane.update(cx, |p, cx| p.toggle_mark(cx)));
-    assert_eq!(cx.update(|_, cx| pane.read(cx).progress(cx).reviewed), 1);
+    assert_eq!(cx.update(|_, cx| pane.read(cx).reviewed(cx).len()), 1);
     cx.update(|window, cx| pane.update(cx, |p, cx| p.switch_scope(window, cx)));
-    assert_eq!(cx.update(|_, cx| pane.read(cx).progress(cx).reviewed), 0, "the mark was on the whole session, not on the turn");
+    assert_eq!(cx.update(|_, cx| pane.read(cx).reviewed(cx).len()), 0, "the mark was on the whole session, not on the turn");
 }
 
 /// Shows the pane as the window's root, so it is laid out and painted.
@@ -235,4 +235,23 @@ fn the_keys_follow_the_editor_to_the_next_scope(cx: &mut TestAppContext) {
     cx.run_until_parked();
     let focused = cx.update(|window, cx| pane.read(cx).editor.read(cx).focus_handle(cx).is_focused(window));
     assert!(focused, "the new editor has the keys");
+}
+
+/// Typing is written a moment after the last key; a pane closed in that moment still writes it.
+#[gpui_kit::test]
+fn typing_just_before_the_review_closes_reaches_the_disk(cx: &mut TestAppContext) {
+    let (pane, _, _, dir, cx) = reviewing(cx);
+    let at = editor_text(&pane, cx).find("TWO").unwrap() + 3;
+    cx.update(|window, cx| {
+        let editor = pane.read(cx).editor.clone();
+        editor.update(cx, |e, cx| {
+            e.set_selected_range(at..at, cx);
+            e.insert("!", window, cx);
+        });
+    });
+    drop(pane);
+    // A dropped entity is released at the next flush of effects.
+    cx.update(|_, _| ());
+    cx.run_until_parked();
+    assert!(read(&dir, "a.txt").contains("TWO!"), "{}", read(&dir, "a.txt"));
 }

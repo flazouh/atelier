@@ -82,6 +82,9 @@ pub struct AgentSession {
     pub starting: bool,
     /// A message written while the agent was not running: it goes once the session resumes.
     waiting_send: Option<Command>,
+    /// Messages sent while the turn's tracker begins: `Some` from the begin until it lands, and they go
+    /// after the first, in the same turn.
+    beginning: Option<Vec<Command>>,
     pub list: ListState,
     /// What each row of the list draws, and its fingerprint.
     pub shown: Vec<list_diff::Row>,
@@ -185,6 +188,7 @@ impl AgentSession {
             stderr: None,
             starting: true,
             waiting_send: None,
+            beginning: None,
             // The list lays out this much past the view each frame: enough that a fast scroll never
             // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
             list: ListState::new(0, ListAlignment::Bottom, px(OVERDRAW)),
@@ -393,9 +397,13 @@ impl AgentSession {
     /// knows the files as they were before the agent reads the message. A message sent while a turn
     /// runs joins that turn.
     fn start_turn(&mut self, command: Command, cx: &mut Context<Self>) {
+        if let Some(waiting) = &mut self.beginning {
+            return waiting.push(command);
+        }
         if self.tracker.lock().unwrap_or_else(|p| p.into_inner()).is_some() {
             return self.command(command, cx);
         }
+        self.beginning = Some(Vec::new());
         let project = self.project.clone();
         let beginning = cx.background_spawn(async move { TurnTracker::begin(project.as_ref()) });
         cx.spawn(async move |this, cx| {
@@ -403,6 +411,9 @@ impl AgentSession {
             _ = this.update(cx, |s, cx| {
                 *s.tracker.lock().unwrap_or_else(|p| p.into_inner()) = Some(tracker);
                 s.command(command, cx);
+                for joined in s.beginning.take().unwrap_or_default() {
+                    s.command(joined, cx);
+                }
             });
         })
         .detach();
