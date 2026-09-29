@@ -41,9 +41,12 @@ fn a_turn_works_asks_and_ends_finished_unless_the_reader_looks() {
 fn a_failure_says_why_short() {
     let failed = after(&SessionStatus::Working, &turn(TurnOutcome::Failed("the agent exited with code 1\nmore".into())), true);
     assert_eq!(failed, SessionStatus::Failed("the agent exited with code 1".into()));
-    let crashed = after(&SessionStatus::Working, &Event::Ended(EndReason::Exited(Some(137))), true);
+    let exited = |code, stderr: &str| Event::Ended(EndReason::Exited { code, stderr: stderr.into() });
+    let crashed = after(&SessionStatus::Working, &exited(Some(137), ""), true);
     assert_eq!(crashed, SessionStatus::Failed("the agent exited with code 137".into()));
-    assert_eq!(after(&failed, &Event::Ended(EndReason::Exited(Some(1))), true), failed, "the first reason stays");
-    assert_eq!(after(&SessionStatus::Idle, &Event::Ended(EndReason::Exited(Some(0))), true), SessionStatus::Idle);
+    let said = after(&SessionStatus::Working, &exited(Some(1), "starting\nError: not logged in. Run claude login.\n\n"), true);
+    assert_eq!(said, SessionStatus::Failed("Error: not logged in. Run claude login.".into()), "its own last words");
+    assert_eq!(after(&failed, &exited(Some(1), ""), true), failed, "the first reason stays");
+    assert_eq!(after(&SessionStatus::Idle, &exited(Some(0), ""), true), SessionStatus::Idle);
     assert_eq!(opened(&failed), failed, "opening a failed session keeps its reason");
 }

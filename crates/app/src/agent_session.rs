@@ -58,8 +58,10 @@ pub struct AgentSession {
     pub seen: bool,
     pub model: Option<String>,
     pub mode: Option<PermissionMode>,
-    /// Why it could not start, or what it said as it failed.
+    /// Why it could not start, or a message that did not go.
     pub problem: Option<SharedString>,
+    /// What the agent wrote to stderr as it failed: the tail behind "Show details".
+    pub stderr: Option<SharedString>,
     /// Starting, or reading its history: the panel shows it.
     pub starting: bool,
     pub list: ListState,
@@ -136,6 +138,7 @@ impl AgentSession {
             model: None,
             mode: None,
             problem: None,
+            stderr: None,
             starting: true,
             list: ListState::new(0, ListAlignment::Bottom, px(600.)),
             rows: Vec::new(),
@@ -197,7 +200,15 @@ impl AgentSession {
                     self.model = started.model.clone().or(self.model.take());
                     self.mode = started.mode.or(self.mode);
                 }
-                Event::Ended(_) => self.session = None,
+                Event::Ended(end) => {
+                    self.session = None;
+                    if let lathe_agents::session::EndReason::Exited { stderr, .. } = end
+                        && !stderr.trim().is_empty()
+                        && matches!(self.status, SessionStatus::Failed(_))
+                    {
+                        self.stderr = Some(stderr.clone().into());
+                    }
+                }
                 _ => {}
             }
         }
