@@ -213,3 +213,67 @@ fn our_own_save_is_not_a_change_on_disk(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(!cx.update(|_, cx| project.read(cx).buffers["a.txt"].changed_on_disk), "lathe's own write is not news");
 }
+
+fn removed(sink: &Arc<Mutex<Option<ChangeSink>>>, path: &str, kind: ChangeKind) {
+    (sink.lock().unwrap().as_ref().expect("the project watches"))(vec![Change { path: path.into(), kind }]);
+}
+
+fn deleted(project: &Entity<OpenProject>, cx: &mut VisualTestContext, path: &str) -> Deleted {
+    cx.update(|_, cx| project.read(cx).buffers[path].deleted)
+}
+
+/// A file deleted on disk under its tab says so; Close closes the tab without asking.
+#[gpui_kit::test]
+fn a_deleted_file_says_so_and_close_closes(cx: &mut TestAppContext) {
+    let (dir, project, sink, cx) = open(cx, &[("a.txt", "one\n")]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("a.txt", window, cx)));
+    cx.run_until_parked();
+    std::fs::remove_file(dir.path().join("a.txt")).unwrap();
+    removed(&sink, "a.txt", ChangeKind::Removed);
+    cx.run_until_parked();
+    assert_eq!(deleted(&project, cx, "a.txt"), Deleted::Asking);
+    cx.update(|_, cx| project.update(cx, |p, cx| p.close("a.txt", cx)));
+    assert!(cx.update(|_, cx| project.read(cx).buffers.is_empty()));
+    assert!(!cx.has_pending_prompt());
+}
+
+/// Keep holds the text as unsaved; a save then asks before it creates the file again.
+#[gpui_kit::test]
+fn keep_holds_the_text_and_a_save_asks_to_create_the_file(cx: &mut TestAppContext) {
+    let (dir, project, sink, cx) = open(cx, &[("a.txt", "one\n")]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("a.txt", window, cx)));
+    cx.run_until_parked();
+    std::fs::remove_file(dir.path().join("a.txt")).unwrap();
+    removed(&sink, "a.txt", ChangeKind::Removed);
+    cx.run_until_parked();
+    cx.update(|_, cx| project.update(cx, |p, cx| p.keep_deleted("a.txt", cx)));
+    assert_eq!(deleted(&project, cx, "a.txt"), Deleted::Kept);
+    assert!(cx.update(|_, cx| project.read(cx).buffers["a.txt"].dirty), "the kept text is unsaved");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.save_asking(window, cx)));
+    cx.run_until_parked();
+    assert!(cx.has_pending_prompt(), "a save asks first");
+    cx.simulate_prompt_answer("Cancel");
+    cx.run_until_parked();
+    assert!(!dir.path().join("a.txt").exists(), "Cancel writes nothing");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.save_asking(window, cx)));
+    cx.run_until_parked();
+    cx.simulate_prompt_answer("Create");
+    cx.run_until_parked();
+    assert_eq!(std::fs::read_to_string(dir.path().join("a.txt")).unwrap(), "one\n");
+    assert_eq!(deleted(&project, cx, "a.txt"), Deleted::No);
+    assert!(!cx.update(|_, cx| project.read(cx).buffers["a.txt"].dirty));
+}
+
+/// A file removed and put back at once, as a checkout does, is a change, not a deletion.
+#[gpui_kit::test]
+fn a_file_put_back_is_no_longer_deleted(cx: &mut TestAppContext) {
+    let (dir, project, sink, cx) = open(cx, &[("a.txt", "one\n")]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("a.txt", window, cx)));
+    cx.run_until_parked();
+    std::fs::write(dir.path().join("a.txt"), "two\n").unwrap();
+    removed(&sink, "a.txt", ChangeKind::Removed);
+    removed(&sink, "a.txt", ChangeKind::Created);
+    cx.run_until_parked();
+    assert_eq!(deleted(&project, cx, "a.txt"), Deleted::No);
+    assert_eq!(cx.update(|_, cx| project.read(cx).buffers["a.txt"].editor.read(cx).value().to_string()), "two\n", "and it reloads");
+}
