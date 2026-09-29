@@ -73,7 +73,8 @@ fn search_finds_literal_and_regex_lines_skips_binary_and_stops_at_the_limit() {
         ("c.md", "Detach the stream."),
     ]);
     let query = |pattern: &str, regex, case_sensitive, limit| Query { pattern: pattern.into(), regex, case_sensitive, limit };
-    let hits = p.search(&query("detach()", false, true, 100)).unwrap();
+    // Literal: the parentheses are text, not a group.
+    let hits = p.search(&query("x.detach()", false, true, 100)).unwrap();
     assert_eq!(hits, [Match { path: "a.rs".into(), line: 2, text: "let y = x.detach();".into() }]);
     let hits = p.search(&query("detach", false, false, 100)).unwrap();
     assert_eq!(hits.iter().map(|m| (m.path.as_str(), m.line)).collect::<Vec<_>>(), [("a.rs", 1), ("a.rs", 2), ("c.md", 0)]);
