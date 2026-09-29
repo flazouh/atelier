@@ -16,6 +16,7 @@ lathe-agents = { path = "crates/agents" }
 lathe-editor = { path = "crates/editor" }
 lathe-lsp = { path = "crates/lsp" }
 lathe-project = { path = "crates/project" }
+lathe-remote = { path = "crates/remote" }
 lathe-settings = { path = "crates/settings" }
 
 [patch.crates-io]
