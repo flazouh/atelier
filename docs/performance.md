@@ -255,6 +255,24 @@ columns in view and a margin. The whole-frame numbers on the Mac are for the lea
 switching run counts the frames with a switch apart ("frame with a switch"); on the HP they took the same
 48 ms as the rest.
 
+## Tasks
+The gallery's "Tasks" story under a measuring run, release, on the HP: a list of 5,000 tasks scrolled a
+frame at a time, with a filter (Priority: Urgent) applied at frame 75 and taken off at frame 225. The
+frames with a filter are counted apart. The HP draws in software (48 ms a frame whatever the code does), so
+the numbers to read are our own layout, prepaint and paint. Load average 14 to 18 during these runs, so the
+worst frames vary from run to run.
+
+    GALLERY_STORY=Tasks GALLERY_SCROLL=1 TASK_COUNT=5000 target/release/beui-gallery
+
+| Case (300 frames) | Target | Layout and prepaint, median | p95 | Paint, median | Layout nodes, most |
+| --- | --- | --- | --- | --- | --- |
+| List, 5,000 tasks, scrolled | layout under 8 ms | 2.4 ms | 4.0 ms | 1.7 ms | 493 |
+| The frame that applies a filter | one frame | 2.0 ms | 5.0 ms | | |
+
+Filtering and grouping 5,000 tasks in `set_filters` took 0.3 to 0.9 ms. The node count does not grow with
+the data. A few frames in a run pass 8 ms in layout (4 to 21 in three runs; the index differs each time),
+which the run shows only under load; the lead measures the Mac. The board is not measured.
+
 ## Remote projects
 
 `RemoteProject` over a real `ssh` from the HP to itself (`hp-agent`, loopback through sshd), the
