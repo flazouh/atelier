@@ -146,7 +146,8 @@ impl Project for LocalProject {
             .build()
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e.to_string()))?;
         let mut found = Vec::new();
-        for entry in self.walker().build().flatten() {
+        // In path order, so the same search gives the same answer, and a limit cuts it the same way.
+        for entry in self.walker().sort_by_file_name(|a, b| a.cmp(b)).build().flatten() {
             if !entry.file_type().is_some_and(|t| t.is_file()) || entry.metadata().is_ok_and(|m| m.len() > SEARCH_MAX_BYTES) {
                 continue;
             }
