@@ -44,6 +44,30 @@ fn main() {
             for folder in folders {
                 shell.update(cx, |s, cx| s.open_local(folder, window, cx));
             }
+            // Closing the window with unsaved edits asks first.
+            let asking = shell.downgrade();
+            window.on_window_should_close(cx, move |window, cx| {
+                let unsaved = asking.upgrade().map_or(0, |s| s.read(cx).unsaved(cx));
+                if unsaved == 0 {
+                    return true;
+                }
+                let tabs = if unsaved == 1 { "1 tab has".to_string() } else { format!("{unsaved} tabs have") };
+                let answer = window.prompt(
+                    gpui_kit::PromptLevel::Warning,
+                    &format!("{tabs} unsaved changes."),
+                    Some("They are lost if you close the window."),
+                    &["Close Anyway", "Cancel"],
+                    cx,
+                );
+                let handle = window.window_handle();
+                cx.spawn(async move |cx| {
+                    if answer.await == Ok(0) {
+                        _ = handle.update(cx, |_, window, _| window.remove_window());
+                    }
+                })
+                .detach();
+                false
+            });
             if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
                 window.on_next_frame(move |_, _| eprintln!("first frame after {:.1} ms", started.elapsed().as_secs_f64() * 1000.));
             }

@@ -73,9 +73,9 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
                             .child(Icon::new(IconName::Close).size(px(12.))),
                     )
                     .hover(|s| s.bg(theme.muted_hover()))
-                    .on_click(move |_, _, cx| {
+                    .on_click(move |_, window, cx| {
                         cx.stop_propagation();
-                        close.update(cx, |p, cx| p.close(&close_path, cx));
+                        close.update(cx, |p, cx| p.close_asking(&close_path, window, cx));
                     }),
             )
     });

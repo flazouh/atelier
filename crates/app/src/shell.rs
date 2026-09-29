@@ -157,14 +157,19 @@ impl Shell {
         }
     }
 
-    fn close_tab(&mut self, _: &CloseTab, _: &mut Window, cx: &mut Context<Self>) {
+    fn close_tab(&mut self, _: &CloseTab, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(p) = self.active().cloned() {
             p.update(cx, |p, cx| {
                 if let Some(path) = p.tabs.active().map(str::to_string) {
-                    p.close(&path, cx);
+                    p.close_asking(&path, window, cx);
                 }
             });
         }
+    }
+
+    /// Tabs with unsaved edits, across every project in the window.
+    pub fn unsaved(&self, cx: &App) -> usize {
+        self.projects.iter().map(|p| p.read(cx).unsaved()).sum()
     }
 
     fn toggle_sidebar(&mut self, _: &ToggleSidebar, _: &mut Window, cx: &mut Context<Self>) {

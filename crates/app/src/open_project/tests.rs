@@ -163,3 +163,33 @@ fn an_empty_folder_with_no_git_says_both(cx: &mut TestAppContext) {
         assert!(matches!(&p.listing, Listing::Ready(tree) if tree.is_empty()));
     });
 }
+
+/// Closing a tab with unsaved edits asks; Cancel keeps it, Don't Save drops it, and a clean tab
+/// closes without asking.
+#[gpui_kit::test]
+fn closing_a_dirty_tab_asks_first(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n"), ("b.txt", "b\n")]);
+    cx.update(|window, cx| {
+        project.update(cx, |p, cx| {
+            p.open_file("a.txt", window, cx);
+            p.open_file("b.txt", window, cx);
+        })
+    });
+    cx.run_until_parked();
+    cx.update(|_, cx| project.update(cx, |p, _| p.buffers.get_mut("a.txt").unwrap().dirty = true));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.close_asking("b.txt", window, cx)));
+    cx.run_until_parked();
+    assert!(!cx.has_pending_prompt(), "a clean tab closes without asking");
+    assert!(cx.update(|_, cx| !project.read(cx).buffers.contains_key("b.txt")));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.close_asking("a.txt", window, cx)));
+    cx.run_until_parked();
+    assert!(cx.has_pending_prompt());
+    cx.simulate_prompt_answer("Cancel");
+    cx.run_until_parked();
+    assert!(cx.update(|_, cx| project.read(cx).buffers.contains_key("a.txt")), "Cancel keeps the tab");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.close_asking("a.txt", window, cx)));
+    cx.run_until_parked();
+    cx.simulate_prompt_answer("Don't Save");
+    cx.run_until_parked();
+    assert!(cx.update(|_, cx| project.read(cx).buffers.is_empty()), "Don't Save closes it");
+}
