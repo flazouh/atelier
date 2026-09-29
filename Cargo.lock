@@ -577,6 +577,7 @@ dependencies = [
  "core-foundation-sys",
  "gpui-kit",
  "lsp-types",
+ "serde",
  "serde_json",
  "tree-sitter",
 ]
