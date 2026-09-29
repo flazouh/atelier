@@ -246,6 +246,10 @@ name = "injection_edits"
 path = "tests/injection_edits.rs"
 
 [[test]]
+name = "shared_queries"
+path = "tests/shared_queries.rs"
+
+[[test]]
 name = "base_compat"
 path = "tests/base_compat.rs"
 
