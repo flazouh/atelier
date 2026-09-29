@@ -127,6 +127,9 @@ pub struct Store {
     dir: PathBuf,
     search: Vec<PathBuf>,
     offline: bool,
+    /// The servers live on another host, whose `PATH` finds them; nothing is looked up or
+    /// downloaded here.
+    on_host: bool,
     /// One download at a time, so two files never fetch the same server twice.
     downloading: Mutex<()>,
 }
@@ -139,12 +142,22 @@ impl Store {
     }
 
     pub fn new(dir: PathBuf, search: Vec<PathBuf>, offline: bool) -> Self {
-        Self { dir, search, offline, downloading: Mutex::new(()) }
+        Self { dir, search, offline, on_host: false, downloading: Mutex::new(()) }
+    }
+
+    /// For a project on another host: each server by its program's name, for the host's `PATH` to
+    /// find when the project starts it there. A server the host does not have fails to start, and
+    /// says so; lathe downloads nothing onto a host.
+    pub fn on_host() -> Self {
+        Self { on_host: true, ..Self::new(PathBuf::new(), Vec::new(), true) }
     }
 
     /// How to run `spec`: the copy the user installed, else lathe's own, downloaded now if need be.
     /// It can block for a download, so call it off the UI thread. `report` hears each download start.
     pub fn launch(&self, spec: &ServerSpec, report: &dyn Fn(String)) -> Result<Launch, Unavailable> {
+        if self.on_host {
+            return Ok(Launch::direct(PathBuf::from(spec.program)));
+        }
         if let Some(program) = find_program_in(spec.program, &self.search) {
             return Ok(Launch::direct(program));
         }

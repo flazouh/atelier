@@ -378,13 +378,6 @@ impl OpenProject {
         .detach();
     }
 
-    /// Writes the tab showing.
-    pub fn save(&mut self, cx: &mut Context<Self>) {
-        if let Some(path) = self.tabs.active().map(str::to_string) {
-            self.save_path(path, false, cx);
-        }
-    }
-
     /// Writes `path`'s tab; with `then_close`, closes it once the write lands.
     fn save_path(&mut self, path: String, then_close: bool, cx: &mut Context<Self>) {
         let Some(buffer) = self.buffers.get(&path) else { return };

@@ -44,6 +44,17 @@ pub struct Change {
 /// Where a watch sends its batches. It runs on the watch's own thread.
 pub type ChangeSink = Box<dyn Fn(Vec<Change>) + Send>;
 
+/// Whether the project's host can be reached. A project on this machine is always up.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Link {
+    Up,
+    /// The connection dropped, for this reason; the project is reconnecting.
+    Down(String),
+}
+
+/// Hears the link go down and come back up, on a thread of the project's.
+pub type LinkSink = Box<dyn Fn(Link) + Send>;
+
 /// Watching lasts as long as this lives.
 pub struct Watch(#[allow(dead_code)] Box<dyn Send>);
 
@@ -100,6 +111,13 @@ pub trait Project: Send + Sync {
     fn search(&self, query: &Query) -> io::Result<Vec<Match>>;
     fn spawn(&self, command: &Command) -> io::Result<Process>;
     fn git(&self, args: &[&str]) -> io::Result<GitOutput>;
+    /// Tells `sink` each time the link to the project's host goes down or comes back. A project on
+    /// this machine has no link, so it never calls it.
+    fn on_link(&self, _sink: LinkSink) {}
+    /// A remote project's host, as `ssh` names it; `None` for one on this machine.
+    fn host(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// The host path of a root-relative `path`. A path that climbs out of the root (`..`), or names a

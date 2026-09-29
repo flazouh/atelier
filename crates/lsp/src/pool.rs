@@ -45,6 +45,9 @@ impl fmt::Display for NoServer {
 pub struct Workers {
     /// Where the servers start: the project they serve.
     project: Arc<dyn Project>,
+    /// Every server runs at the project's root, instead of the folder of the marker nearest a file,
+    /// which only a local disk can be searched for.
+    at_project_root: bool,
     running: Mutex<HashMap<(&'static str, PathBuf), LspWorker>>,
     store: Store,
     ready: Duration,
@@ -55,7 +58,13 @@ impl Workers {
     /// Servers come from `store` and start through `project`. `ready` bounds each server's handshake,
     /// `ask` each request.
     pub fn new(project: Arc<dyn Project>, store: Store, ready: Duration, ask: Duration) -> Self {
-        Self { project, running: Mutex::default(), store, ready, ask }
+        Self { project, at_project_root: false, running: Mutex::default(), store, ready, ask }
+    }
+
+    /// Runs every server at the project's root, for a project on another host.
+    pub fn at_project_root(mut self) -> Self {
+        self.at_project_root = true;
+        self
     }
 
     /// The worker for `path`'s language and project: the one already running there, or a new one
@@ -68,7 +77,11 @@ impl Workers {
         let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_string();
         let language = language_id(path).ok_or(NoServer::UnknownLanguage(extension))?;
         let spec = server_for(language).ok_or(NoServer::NoServerFor(language))?;
-        let key = (spec.name, find_root(&crate::worker::canonical(path), spec.root_markers));
+        let root = match self.at_project_root {
+            true => self.project.root().to_path_buf(),
+            false => find_root(&crate::worker::canonical(path), spec.root_markers),
+        };
+        let key = (spec.name, root);
         if let Some(worker) = self.running(&key) {
             return Ok(worker);
         }

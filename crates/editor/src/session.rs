@@ -139,7 +139,7 @@ impl EditorSession {
     ) -> Self {
         let path = canonical(&path);
         let rows = Rows { path: path.clone(), map: Arc::new(rows) };
-        let mut starting = start(workers, path.clone());
+        let mut starting = start(workers, path.clone(), cx);
         let _start = cx.spawn(async move |this, cx| {
             loop {
                 let started = match starting.next().await {
@@ -393,16 +393,18 @@ pub fn go_to_definition(editor: &Entity<EditorState>, window: &mut Window, cx: &
     window.dispatch_action(Box::new(input::GoToDefinition), cx);
 }
 
-/// Finds or starts the server for `path` on a thread, so the window opens at once. Anything that
-/// stops it, such as a language lathe has no server for or one that is not installed, comes back as
-/// the sentence the status line shows.
-fn start(workers: Arc<Workers>, path: PathBuf) -> mpsc::UnboundedReceiver<Starting> {
+/// Finds or starts the server for `path` on the background executor, so the window opens at once.
+/// Anything that stops it, such as a language lathe has no server for or one that is not installed,
+/// comes back as the sentence the status line shows. The executor, not a thread of its own, runs it,
+/// so a test's scheduler sees every wake.
+fn start(workers: Arc<Workers>, path: PathBuf, cx: &App) -> mpsc::UnboundedReceiver<Starting> {
     let (tx, rx) = mpsc::unbounded();
-    std::thread::spawn(move || {
+    cx.background_spawn(async move {
         let report = |line| drop(tx.unbounded_send(Starting::Downloading(line)));
         let started = workers.for_file(&path, &report).map_err(|e| e.to_string());
         drop(tx.unbounded_send(Starting::Done(started)));
-    });
+    })
+    .detach();
     rx
 }
 

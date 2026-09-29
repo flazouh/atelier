@@ -148,7 +148,7 @@ fn a_change_on_disk_reloads_a_clean_tab_and_asks_in_a_dirty_one(cx: &mut TestApp
     // Keep mine, then save: the tab's text wins on disk.
     cx.update(|_, cx| project.update(cx, |p, cx| p.keep_mine("dirty.txt", cx)));
     cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("dirty.txt", window, cx)));
-    cx.update(|_, cx| project.update(cx, |p, cx| p.save(cx)));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.save_asking(window, cx)));
     cx.run_until_parked();
     assert_eq!(std::fs::read_to_string(dir.path().join("dirty.txt")).unwrap(), "mine\n");
 }
@@ -205,7 +205,7 @@ fn our_own_save_is_not_a_change_on_disk(cx: &mut TestAppContext) {
         let editor = project.read(cx).buffers["a.txt"].editor.clone();
         editor.update(cx, |e, cx| e.set_value("two\n", window, cx));
     });
-    cx.update(|_, cx| project.update(cx, |p, cx| p.save(cx)));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.save_asking(window, cx)));
     cx.run_until_parked();
     // Typing on after the save, before the watch has said anything.
     cx.update(|_, cx| project.update(cx, |p, _| p.buffers.get_mut("a.txt").unwrap().dirty = true));
