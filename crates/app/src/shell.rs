@@ -383,7 +383,9 @@ impl Render for Shell {
                         .visible(self.right)
                         .size(px(560.))
                         .size_range(px(320.)..px(2400.))
-                        .child(div().size_full().pr(px(8.)).child(editor_pane(&project, cx))),
+                        .child(div().size_full().pr(px(8.)).pb(px(2.)).child(
+                            div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(&project, cx)),
+                        )),
                 )
                 .into_any_element(),
         };

@@ -3674,6 +3674,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "lathe-app"
+version = "0.1.0"
+dependencies = [
+ "beui",
+ "futures-channel",
+ "futures-util",
+ "gpui-kit",
+ "lathe-agents",
+ "lathe-editor",
+ "lathe-lsp",
+ "lathe-project",
+ "lathe-settings",
+]
+
+[[package]]
 name = "lathe-editor"
 version = "0.1.0"
 dependencies = [

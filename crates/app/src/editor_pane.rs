@@ -43,7 +43,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
             .cursor_pointer()
             .text_size(TextSize::Sm.font_size())
             .text_color(if shown { theme.foreground } else { muted })
-            .when(shown, |d| d.bg(theme.card))
+            .when(shown, |d| d.bg(theme.card_strong))
             .hover(|s| s.text_color(theme.foreground))
             .tooltip(beui::tooltip::Tooltip::text(path.clone()))
             .on_click(move |_, window, cx| open.update(cx, |p, cx| p.open_file(&open_path, window, cx)))
@@ -120,7 +120,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
                 .flex_1()
                 .min_h_0()
                 .children(banner)
-                .child(div().flex_1().min_h_0().child(CodeEditor::new(&buffer.editor)))
+                .child(div().flex_1().min_h_0().child(CodeEditor::new(&buffer.editor).on_card(true)))
                 .into_any_element()
         }
     };
