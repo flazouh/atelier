@@ -26,6 +26,9 @@ use lathe_project::Project;
 
 use crate::{list_diff, status};
 
+/// How far past the view the list lays out rows.
+const OVERDRAW: f32 = 160.;
+
 /// What the session tells the shell.
 pub enum SessionEvent {
     /// Its title, status or id changed: the sidebar and the tabs draw it again.
@@ -149,7 +152,9 @@ impl AgentSession {
             stderr: None,
             starting: true,
             waiting_send: None,
-            list: ListState::new(0, ListAlignment::Bottom, px(600.)),
+            // The list lays out this much past the view each frame: enough that a fast scroll never
+            // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
+            list: ListState::new(0, ListAlignment::Bottom, px(OVERDRAW)),
             rows: Vec::new(),
             composer,
             renaming: None,
