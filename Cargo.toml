@@ -19,6 +19,7 @@ lathe-lsp = { path = "crates/lsp" }
 lathe-project = { path = "crates/project" }
 lathe-remote = { path = "crates/remote" }
 lathe-settings = { path = "crates/settings" }
+lathe-tracker = { path = "crates/tracker" }
 
 [patch.crates-io]
 # gpui-base 0.6.6 with the editor fixes in vendor/gpui-base/PATCHES.md.
