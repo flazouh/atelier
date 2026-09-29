@@ -5,7 +5,9 @@ fn a_host_is_named_as_builds_are() {
     assert_eq!(Platform::from_uname("Linux x86_64").unwrap().name(), "linux-x86_64");
     assert_eq!(Platform::from_uname("Darwin arm64\n").unwrap().name(), "darwin-aarch64");
     assert_eq!(Platform::from_uname(""), None);
-    assert_eq!(remote_binary("0.1.0"), ".cache/lathe/remote/0.1.0/lathe-remote");
+    assert_eq!(remote_binary("0.1.0", "abc123"), ".cache/lathe/remote/0.1.0-abc123/lathe-remote");
+    assert_eq!(short_hash(b"lathe").len(), 12);
+    assert_ne!(short_hash(b"one build"), short_hash(b"another"), "a new build gets its own folder");
 }
 
 #[test]

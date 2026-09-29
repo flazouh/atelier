@@ -5,8 +5,10 @@
 //! Connecting is three steps:
 //!
 //! 1. Probe: `uname -sm` names the host's system and architecture, and `$HOME` its home.
-//! 2. Deploy: `~/.cache/lathe/remote/<version>/lathe-remote` must answer `--version` with this
-//!    app's version. If it does not, the copy built for that platform goes up over the same `ssh`
+//! 2. Deploy: `~/.cache/lathe/remote/<version>-<hash>/lathe-remote` must answer `--version` with
+//!    this app's version; the hash is of the copy this app would upload, so a new build of the same
+//!    version goes up once instead of an old one staying. If the host has not got it, the copy built
+//!    for that platform goes up over the same `ssh`
 //!    (`cat` into a temporary file, `chmod +x`, then a rename, so a half copy never runs). This needs
 //!    no `scp` on either side.
 //! 3. Dial: `ssh <host> <that path> --stdio`, whose stdin and stdout carry the frames.
@@ -63,9 +65,16 @@ impl Platform {
     }
 }
 
-/// Where the host keeps this version's copy, from its home folder.
-pub fn remote_binary(version: &str) -> String {
-    format!(".cache/lathe/remote/{version}/lathe-remote")
+/// Where the host keeps this build's copy, from its home folder: `hash` is the first twelve hex
+/// digits of the copy's SHA-256.
+pub fn remote_binary(version: &str, hash: &str) -> String {
+    format!(".cache/lathe/remote/{version}-{hash}/lathe-remote")
+}
+
+/// The first twelve hex digits of `bytes`' SHA-256.
+pub fn short_hash(bytes: &[u8]) -> String {
+    use sha2::Digest;
+    sha2::Sha256::digest(bytes).iter().take(6).map(|b| format!("{b:02x}")).collect()
 }
 
 /// The names `Host` lines give in an ssh config, leaving out patterns (`*`, `?`, `!`).
@@ -156,19 +165,19 @@ pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
 /// Makes sure the host has this version's lathe-remote, uploading it when not, and returns its path
 /// from the host's home.
 pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Result<String> {
-    let path = remote_binary(VERSION);
-    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| v.trim() == VERSION).unwrap_or(false);
-    if has {
-        return Ok(path);
-    }
     let local = local_binary(platform).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
             format!("no lathe-remote {VERSION} built for {} to put on {host}; set LATHE_REMOTE_DIR", platform.name()),
         )
     })?;
-    say(format!("Putting lathe-remote on {host}…"));
     let bytes = std::fs::read(&local)?;
+    let path = remote_binary(VERSION, &short_hash(&bytes));
+    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| v.trim() == VERSION).unwrap_or(false);
+    if has {
+        return Ok(path);
+    }
+    say(format!("Putting lathe-remote on {host}…"));
     let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
     run(host, &format!("mkdir -p {dir} && cat > {path}.part && chmod +x {path}.part && mv {path}.part {path}"), Some(&bytes))?;
     let version = run(host, &format!("{path} --version"), None)?;
