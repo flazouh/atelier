@@ -109,7 +109,7 @@ fn a_comment_goes_with_the_next_message_and_is_answered_by_its_turn(cx: &mut Tes
     let (pane, session, fake, _, cx) = reviewing(cx);
     // Row 2 of the merged text is "TWO", line 2 of the file now.
     cx.update(|_, cx| pane.update(cx, |p, cx| p.comment(2, "Why upper case?", cx)));
-    assert_eq!(cx.update(|_, cx| session.read(cx).comments.all().len()), 1);
+    assert_eq!(cx.update(|_, cx| session.read(cx).reviews.comments.all().len()), 1);
     fake.turns.lock().unwrap().push(vec![ended()]);
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("see my comment".into(), cx)));
     cx.run_until_parked();
@@ -119,7 +119,7 @@ fn a_comment_goes_with_the_next_message_and_is_answered_by_its_turn(cx: &mut Tes
     });
     let sent = sent.unwrap();
     assert!(matches!(&sent[..], [Attachment::LineComment { path, first_line: 2, body, .. }] if path == "a.txt" && body == "Why upper case?"), "{sent:?}");
-    let s = cx.update(|_, cx| (session.read(cx).comments.all().len(), session.read(cx).sent_comments.clone()));
+    let s = cx.update(|_, cx| (session.read(cx).reviews.comments.all().len(), session.read(cx).reviews.sent.clone()));
     assert_eq!(s.0, 0, "sent, so no longer waiting");
     assert!(s.1.iter().all(|(_, answered)| *answered), "the agent's turn after it ended");
 }
@@ -178,7 +178,7 @@ fn a_comment_typed_and_sent_with_its_key_is_kept_whole(cx: &mut TestAppContext) 
     cx.run_until_parked();
     cx.simulate_keystrokes("secondary-enter");
     cx.run_until_parked();
-    let bodies = cx.update(|_, cx| session.read(cx).comments.all().iter().map(|c| c.body.clone()).collect::<Vec<_>>());
+    let bodies = cx.update(|_, cx| session.read(cx).reviews.comments.all().iter().map(|c| c.body.clone()).collect::<Vec<_>>());
     assert_eq!(bodies, ["Why upper case?"]);
 }
 

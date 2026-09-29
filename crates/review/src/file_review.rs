@@ -55,17 +55,19 @@ impl FileReview {
         Self { path: path.into(), change, content: Content::Text(merged), before, after, exact, version }
     }
 
-    pub(crate) fn binary(path: impl Into<String>, change: Change) -> Self {
+    /// A file that is not text. Public so a store can rebuild a turn it kept.
+    pub fn binary(path: impl Into<String>, change: Change) -> Self {
         Self { path: path.into(), change, content: Content::Binary, before: None, after: None, exact: true, version: 0 }
     }
 
-    pub(crate) fn unknown(path: impl Into<String>, after: Option<String>) -> Self {
+    /// A file whose text before the turn is not known.
+    pub fn unknown(path: impl Into<String>, after: Option<String>) -> Self {
         let version = hash_of(after.as_deref());
         Self { path: path.into(), change: Change::Modified, content: Content::Unknown, before: None, after, exact: false, version }
     }
 
     /// A pure move: the same text under a new name.
-    pub(crate) fn renamed(mut self, from: String) -> Self {
+    pub fn renamed(mut self, from: String) -> Self {
         self.change = Change::Renamed { from };
         self
     }

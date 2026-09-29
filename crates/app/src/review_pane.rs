@@ -174,11 +174,11 @@ impl ReviewPane {
         let (editor, _edits) = Self::editor_for(files.get(current), window, cx);
         let _session = cx.subscribe_in(&session, window, |this, _, event: &SessionEvent, window, cx| {
             // A turn ended: the whole session holds it now.
-            if matches!(event, SessionEvent::Changed) && this.scope == Scope::Whole && this.turns != this.session.read(cx).review.turns().len() {
+            if matches!(event, SessionEvent::Changed) && this.scope == Scope::Whole && this.turns != this.session.read(cx).reviews.turns.turns().len() {
                 this.set_scope(Scope::Whole, window, cx);
             }
         });
-        let turns = session.read(cx).review.turns().len();
+        let turns = session.read(cx).reviews.turns.turns().len();
         let turn = match scope {
             Scope::Turn(turn) => turn,
             Scope::Whole => turns.saturating_sub(1),
@@ -263,7 +263,10 @@ impl ReviewPane {
     fn keep(&self, at: usize, cx: &mut Context<Self>) {
         let file = &self.files[at];
         let (key, kept) = ((self.scope, file.review.path.clone()), (file.merged.clone(), file.on_disk.clone()));
-        self.session.update(cx, |s, _| drop(s.decided.insert(key, kept)));
+        self.session.update(cx, |s, cx| {
+            s.reviews.decided.insert(key, kept);
+            s.save_review(cx);
+        });
     }
 
     /// Keeps files `at` with the session and writes the ones whose text is not on disk yet, off the UI
@@ -370,7 +373,7 @@ impl ReviewPane {
         let s = self.session.read(cx);
         self.files
             .iter()
-            .filter(|f| (f.merged.is_some() && f.hunks().is_empty()) || s.reviewed.is_reviewed(self.scope.key(), &f.review))
+            .filter(|f| (f.merged.is_some() && f.hunks().is_empty()) || s.reviews.is_reviewed(self.scope.key(), &f.review))
             .map(|f| f.review.path.clone().into())
             .collect()
     }
@@ -386,12 +389,10 @@ impl ReviewPane {
     fn toggle_mark(&mut self, cx: &mut Context<Self>) {
         let Some(file) = self.files.get(self.current) else { return };
         let (key, review) = (self.scope.key(), file.review.clone());
-        self.session.update(cx, |s, _| {
-            if s.reviewed.is_reviewed(key, &review) {
-                s.reviewed.unmark(key, &review.path);
-            } else {
-                s.reviewed.mark(key, &review);
-            }
+        self.session.update(cx, |s, cx| {
+            let on = !s.reviews.is_reviewed(key, &review);
+            s.reviews.set_reviewed(key, &review, on);
+            s.save_review(cx);
         });
         cx.notify();
     }
@@ -476,7 +477,7 @@ impl ReviewPane {
         self.scope = scope;
         self.files = read_files(self.session.read(cx), scope);
         self.changed = changed_of(&self.files);
-        self.turns = self.session.read(cx).review.turns().len();
+        self.turns = self.session.read(cx).reviews.turns.turns().len();
         self.current = path.and_then(|p| self.files.iter().position(|f| f.review.path == p)).unwrap_or(0);
         self.resolving.clear();
         self.composer = None;
@@ -516,7 +517,8 @@ impl ReviewPane {
         let Some(anchor) = file.merged.as_ref().and_then(|m| m.anchor(row..row + 1)) else { return };
         let (turn, path) = (self.turn, file.review.path.clone());
         self.session.update(cx, |s, cx| {
-            s.comments.add(turn, path, anchor, body);
+            s.reviews.comments.add(turn, path, anchor, body);
+            s.save_review(cx);
             cx.notify();
         });
     }
@@ -560,8 +562,8 @@ impl ReviewPane {
         let s = self.session.read(cx);
         let path = file.review.path.as_str();
         let mut blocks: Vec<RowBlock> = Vec::new();
-        let waiting = s.comments.for_file(path).map(|c| (c.clone(), None));
-        let sent = s.sent_comments.iter().filter(|(c, _)| c.path == path).map(|(c, answered)| (c.clone(), Some(*answered)));
+        let waiting = s.reviews.comments.for_file(path).map(|c| (c.clone(), None));
+        let sent = s.reviews.sent.iter().filter(|(c, _)| c.path == path).map(|(c, answered)| (c.clone(), Some(*answered)));
         for (comment, sent) in waiting.chain(sent).collect::<Vec<_>>() {
             let Some(row) = row_of(merged, comment.side, comment.last_line) else { continue };
             let time = match sent {
@@ -583,7 +585,8 @@ impl ReviewPane {
                             let (session, reply) = (session.clone(), this.clone());
                             thread
                                 .on_resolve(move |_, _, cx| session.update(cx, |s, cx| {
-                                    s.comments.remove(id);
+                                    s.reviews.comments.remove(id);
+                                    s.save_review(cx);
                                     cx.notify();
                                 }))
                                 .on_reply(move |_, window, cx| drop(reply.update(cx, |p, cx| p.open_composer(row, window, cx))))
@@ -640,14 +643,14 @@ fn changed_of(files: &[PaneFile]) -> Vec<ChangedFile> {
 /// The files of `scope`, with what the reader decided before where the session kept it.
 pub fn read_files(session: &AgentSession, scope: Scope) -> Vec<PaneFile> {
     let reviews = match scope {
-        Scope::Turn(turn) => session.review.turns().get(turn).map(|t| t.files().to_vec()).unwrap_or_default(),
-        Scope::Whole => session.review.whole(),
+        Scope::Turn(turn) => session.reviews.turns.turns().get(turn).map(|t| t.files().to_vec()).unwrap_or_default(),
+        Scope::Whole => session.reviews.turns.whole(),
     };
     reviews
         .into_iter()
         .map(|review| {
             let mut file = PaneFile::new(review);
-            if let Some((merged, on_disk)) = session.decided.get(&(scope, file.review.path.clone())) {
+            if let Some((merged, on_disk)) = session.reviews.decided.get(&(scope, file.review.path.clone())) {
                 (file.merged, file.on_disk) = (merged.clone(), on_disk.clone());
             }
             file
