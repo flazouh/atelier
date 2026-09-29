@@ -142,10 +142,16 @@ pub struct Prepared {
 }
 
 /// git for one project.
+/// Where an older lathe kept the cache and the checkouts.
+pub const LEGACY_DATA: &str = "~/.local/share/lathe/pr";
+
 pub struct PrGit {
     project: Arc<dyn Project>,
-    /// The folder for caches and checkouts as it was given: absolute, or starting with `~/` or `$HOME/`.
+    /// The folder for caches and checkouts as it was given: absolute, or starting with `~/` or `$HOME/`. Empty:
+    /// the `pr-view` folder of the project's data folder when the project has one, else [`LEGACY_DATA`].
     given: String,
+    /// Where an older lathe kept the cache and the checkouts, moved into the data folder on first use.
+    legacy: String,
     /// The same, absolute, once the host has been asked for its home. Asking starts a process, so it waits
     /// for the first use, which is on a background thread.
     data: std::sync::OnceLock<Result<String, GitError>>,
@@ -166,7 +172,13 @@ impl PrGit {
     /// `data` is the folder for caches and checkouts on the project's host: an absolute path, or one that
     /// starts with `~/` or `$HOME/`, which the host's own home replaces.
     pub fn new(project: Arc<dyn Project>, data: &str) -> Self {
-        Self { project, given: data.to_string(), data: std::sync::OnceLock::new(), remote: None, busy: std::sync::Mutex::new(()) }
+        Self { project, given: data.to_string(), legacy: LEGACY_DATA.to_string(), data: std::sync::OnceLock::new(), remote: None, busy: std::sync::Mutex::new(()) }
+    }
+
+    /// The folder an older lathe used, in place of [`LEGACY_DATA`]: for a test.
+    pub fn with_legacy(mut self, folder: impl Into<String>) -> Self {
+        self.legacy = folder.into();
+        self
     }
 
     /// Fetches from `url` in place of the project's remotes.
@@ -179,7 +191,14 @@ impl PrGit {
     pub fn data(&self) -> GitResult<String> {
         self.data
             .get_or_init(|| {
-                let given = self.given.as_str();
+                if self.given.is_empty()
+                    && let Some(base) = self.project.data_path()
+                {
+                    let target = format!("{}/pr-view", base.display());
+                    self.move_legacy(&target);
+                    return Ok(target);
+                }
+                let given = if self.given.is_empty() { self.legacy.as_str() } else { self.given.as_str() };
                 let data = match given.strip_prefix("~/").or_else(|| given.strip_prefix("$HOME/")) {
                     Some(rest) => {
                         let home = self.sh("printf %s \"$HOME\"", &[])?;
@@ -194,6 +213,15 @@ impl PrGit {
                 if data.starts_with('/') { Ok(data) } else { Err(GitError::Invalid(format!("the data folder {data}"))) }
             })
             .clone()
+    }
+
+    /// Moves the folder an older lathe used to `target`, when there is one and the target is not there yet. One
+    /// rename on the host, so the cache and the checkouts come whole. A failure leaves both as they are: the
+    /// next open makes a new cache.
+    fn move_legacy(&self, target: &str) {
+        let script = "old=\"$1\"; case \"$old\" in '~/'*) old=\"$HOME/${old#'~/'}\" ;; '$HOME/'*) old=\"$HOME/${old#'$HOME/'}\" ;; esac; \
+                      if [ -d \"$old\" ] && [ ! -e \"$2\" ]; then mkdir -p \"$(dirname \"$2\")\" && mv -- \"$old\" \"$2\"; fi";
+        let _ = self.sh(script, &[self.legacy.as_str(), target]);
     }
 
     /// Runs `command`, writes `input` to it, and reads it to the end. Kills it after `timeout`.

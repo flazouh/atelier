@@ -336,3 +336,37 @@ fn two_prepares_at_once_make_the_cache_once() {
         .collect();
     assert!(dirs.iter().all(|d| d.is_ok()), "{dirs:?}");
 }
+
+#[test]
+fn the_default_data_folder_is_the_pr_view_folder_of_the_projects_data_folder() {
+    let repo = Scenario::new(&[("a.txt", "a\n")]);
+    let project = repo.project();
+    let git = PrGit::new(project.clone(), "").with_legacy(repo.root().join("nothing-here").to_str().unwrap());
+    let data = git.data().unwrap();
+    assert_eq!(data, format!("{}/pr-view", project.data_path().unwrap().display()));
+}
+
+#[test]
+fn a_given_folder_is_still_the_one_used() {
+    let repo = Scenario::new(&[("a.txt", "a\n")]);
+    let git = PrGit::new(repo.project(), "/tmp/somewhere-else");
+    assert_eq!(git.data().unwrap(), "/tmp/somewhere-else");
+}
+
+#[test]
+fn what_an_older_lathe_left_moves_into_the_data_folder_once() {
+    let repo = Scenario::new(&[("a.txt", "a\n")]);
+    let old = repo.root().join("old-pr");
+    std::fs::create_dir_all(old.join("cache")).unwrap();
+    std::fs::write(old.join("cache/HEAD"), "ref").unwrap();
+    let git = PrGit::new(repo.project(), "").with_legacy(old.to_str().unwrap());
+    let data = git.data().unwrap();
+    assert_eq!(std::fs::read(std::path::Path::new(&data).join("cache/HEAD")).unwrap(), b"ref", "it came whole");
+    assert!(!old.exists(), "and is gone from where it was");
+    // A second view of the project finds the new folder there and leaves any second old folder alone.
+    std::fs::create_dir_all(&old).unwrap();
+    std::fs::write(old.join("later"), "x").unwrap();
+    let again = PrGit::new(repo.project(), "").with_legacy(old.to_str().unwrap());
+    assert_eq!(again.data().unwrap(), data);
+    assert!(old.join("later").exists(), "the folder that is already there is never overwritten");
+}

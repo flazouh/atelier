@@ -138,6 +138,12 @@ pub trait Project: Send + Sync {
     fn data_list(&self, prefix: &str) -> io::Result<Vec<DataEntry>> {
         Err(unsupported("data_list", prefix))
     }
+    /// The data folder itself, as its host names it, for a tool that needs a real path there (git, tar): a
+    /// bare repository is not a file to `data_write`. `None` when the project has no data folder, or its host
+    /// cannot say where it is. The folder may not exist yet.
+    fn data_path(&self) -> Option<PathBuf> {
+        None
+    }
 }
 
 /// What a project that keeps no data folder, or removes nothing, answers: a test's stand-in, say.

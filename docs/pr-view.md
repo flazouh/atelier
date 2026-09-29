@@ -26,7 +26,9 @@ and git's. This crate joins them.
 ## Where the bytes come from
 
 Never the reader's checkout. Each forge repository gets a bare cache, `git clone --bare --shared` from the
-project, in the data folder (`remote_data` on a remote project, so git runs where the code is). The cache
+project, in `<project data folder>/pr-view` (`Project::data_path`; git runs where the code is). A project that has
+no data path, a remote one for now, uses `remote_data` (default `~/.local/share/lathe/pr`). What an older lathe
+kept in that default folder is moved into the data folder, whole, the first time a pull request is opened. The cache
 fetches `refs/pull/N/head` into `refs/lathe/pr/N/head` and the base branch into `refs/lathe/base/<branch>`.
 The base of the diff is the merge base of the forge's `baseRefOid` and the head. Files come from
 `git diff`, blobs from one `git cat-file --batch`. Every call goes through `Project::spawn` with an

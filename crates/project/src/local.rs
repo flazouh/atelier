@@ -128,6 +128,9 @@ impl Project for LocalProject {
     fn data_list(&self, prefix: &str) -> io::Result<Vec<DataEntry>> {
         self.data()?.list(prefix)
     }
+    fn data_path(&self) -> Option<PathBuf> {
+        self.data.as_ref().map(|d| d.path().to_path_buf())
+    }
 
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
         let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();

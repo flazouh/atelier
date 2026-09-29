@@ -196,3 +196,16 @@ fn a_project_keeps_its_data_outside_the_repository_and_lists_it_newest_first() {
     let other = LocalProject::open(other.path()).unwrap().with_data_dir(data.path());
     assert_eq!(other.data_read("review/x.json").unwrap_err().kind(), io::ErrorKind::NotFound);
 }
+
+#[test]
+fn the_data_folders_path_is_where_data_write_puts_its_files() {
+    let (dir, data) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let p = LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    p.data_write("pr-view/x.txt", b"x").unwrap();
+    let path = p.data_path().expect("a local project has a data folder");
+    assert!(path.starts_with(data.path()), "{path:?}");
+    assert_eq!(std::fs::read(path.join("pr-view/x.txt")).unwrap(), b"x");
+    let other = tempfile::tempdir().unwrap();
+    let q = LocalProject::open(other.path()).unwrap().with_data_dir(data.path());
+    assert_ne!(q.data_path(), p.data_path(), "each project has its own");
+}

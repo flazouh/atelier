@@ -23,7 +23,9 @@ pub struct PrConfig {
     /// Every write button says so and does nothing. Set until a scratch repository is approved.
     pub read_only: bool,
     /// The folder on the project's host for the cache repositories and the head checkouts. Absolute, or
-    /// starting with `~/`.
+    /// starting with `~/`. Empty (the default): the `pr-view` folder of the project's data folder, where the
+    /// project has one, and `~/.local/share/lathe/pr` where it has not (an older lathe kept it there, and what
+    /// is there is moved on first use).
     pub remote_data: String,
     /// The folder on this machine for the reviewed-state database and the snapshots.
     pub local_data: PathBuf,
@@ -43,7 +45,7 @@ impl PrConfig {
         Self {
             me: me.into(),
             read_only: false,
-            remote_data: "~/.local/share/lathe/pr".into(),
+            remote_data: String::new(),
             local_data: local_data.into(),
             workers: None,
             refresh: Duration::from_secs(30),
