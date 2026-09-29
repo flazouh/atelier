@@ -53,6 +53,8 @@ pub enum SessionEvent {
     OpenFile(String),
     /// The reader picked another agent for this session before its first message, by its backend's name.
     ChooseAgent(String),
+    /// The reader pressed a pull request's chip in the agent's text.
+    OpenPull(beui::PrChipData),
     /// The reader named it: the name is kept across launches.
     Renamed,
 }
@@ -104,6 +106,8 @@ pub struct AgentSession {
     tracker: Arc<Mutex<Option<TurnTracker>>>,
     /// Turns the sink finished, waiting for the next drain.
     finished: Arc<Mutex<Vec<TurnReview>>>,
+    /// The pull requests a `#N` in the agent's text can name, from the project's list.
+    pub pr_chips: std::rc::Rc<Vec<beui::PrChipData>>,
     /// The session's review: its turns, decisions, marks and comments, kept in the data folder.
     pub reviews: ReviewState,
     /// Writes the review to the data folder a moment after it last changed.
@@ -198,6 +202,7 @@ impl AgentSession {
             rows: Vec::new(),
             tracker,
             finished,
+            pr_chips: std::rc::Rc::default(),
             reviews: ReviewState::default(),
             _saving: Task::ready(()),
             composer,

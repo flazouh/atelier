@@ -98,7 +98,15 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
             .into_any_element(),
         Item::Text { text, .. } => {
             let status = if working && last { AgentTextStatus::Streaming } else { AgentTextStatus::Complete };
-            AgentText::new(id("text"), SharedString::from(text.clone())).status(status).copy_text(text.clone()).into_any_element()
+            // A `#N` the project's pull requests hold is a chip; pressing it opens that pull request.
+            let chips = s.pr_chips.clone();
+            let opener = session.downgrade();
+            AgentText::new(id("text"), SharedString::from(text.clone()))
+                .status(status)
+                .copy_text(text.clone())
+                .pr_resolver(move |number| chips.iter().find(|c| c.number == number).cloned())
+                .on_open_pr(move |chip, _, cx| drop(opener.update(cx, |_, cx| cx.emit(SessionEvent::OpenPull(chip.clone())))))
+                .into_any_element()
         }
         Item::Thinking { block, took, .. } => {
             let phase = match took {

@@ -6,6 +6,7 @@
 
 use std::{io::Read, path::PathBuf, sync::Arc};
 
+use beui::PrChipData;
 use gpui_kit::{Entity, Subscription};
 use lathe_lsp::Workers;
 use lathe_pr_view::{hub::PrHub, services::{PrConfig, Services}};
@@ -15,7 +16,8 @@ pub struct Pulls {
     pub hub: Entity<PrHub>,
     /// In the right pane now; the hub keeps its state while hidden.
     pub shown: bool,
-    pub _events: Subscription,
+    /// The hub's events, the list's opens, and the list feeding the chips.
+    pub _events: [Subscription; 3],
 }
 
 /// The reader's GitHub login, from `gh` on the project's host; `None` when gh is missing or signed out.
@@ -34,3 +36,20 @@ pub fn open_services(project: Arc<dyn Project>, me: String, local_data: PathBuf,
     let config = PrConfig::new(me, local_data).read_only(true).workers(workers);
     Services::open(project, forge, config)
 }
+
+/// The pull requests a `#N` in an agent's text can name: those of the project's own repository
+/// (`owner/name`). While the repository is not known, those whose number no other repository holds, so
+/// a `#N` never opens whichever came first.
+pub fn chips_of(rows: impl IntoIterator<Item = PrChipData>, repo: Option<&str>) -> Vec<PrChipData> {
+    let rows: Vec<PrChipData> = rows.into_iter().collect();
+    match repo {
+        Some(repo) => rows.into_iter().filter(|chip| chip.repo.as_ref() == repo).collect(),
+        None => {
+            let held_once = |number: u64| rows.iter().filter(|c| c.number == number).count() == 1;
+            rows.iter().filter(|chip| held_once(chip.number)).cloned().collect()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests;
