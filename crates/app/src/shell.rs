@@ -83,6 +83,8 @@ pub struct Shell {
     panels: Entity<AgentPanels>,
     /// Names the reader gave sessions, by the agent's id.
     names: BTreeMap<String, String>,
+    /// With `LATHE_FRAMES=1`, times every frame.
+    meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -109,6 +111,7 @@ impl Shell {
             agents_sidebar,
             panels,
             names: saved.session_names.clone(),
+            meter: crate::frame_meter::enabled().then(Default::default),
             _subscriptions: Vec::new(),
         }
     }
@@ -700,7 +703,17 @@ impl Shell {
 }
 
 impl Render for Shell {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let root = self.root(window, cx);
+        match self.meter.clone() {
+            Some(meter) => crate::frame_meter::Timed { child: root, meter }.into_any_element(),
+            None => root,
+        }
+    }
+}
+
+impl Shell {
+    fn root(&mut self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
@@ -771,6 +784,7 @@ impl Render for Shell {
                 deferred(div().absolute().top(px(TITLE_BAR + 12.)).left_0().right_0().flex().justify_center().child(finder.clone()))
                     .with_priority(1)
             }))
+            .into_any_element()
     }
 }
 

@@ -61,10 +61,10 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     let key = s.key.clone();
     let id = |what: &str| gpui_kit::ElementId::Name(format!("{key}-{what}-{ix}").into());
     let body = match item {
-        Item::User { text } => div()
-            .flex()
-            .justify_end()
-            .child(MessageBubble::text(id("user"), text.clone()).variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End))
+        // The bubble aligns itself to the end of the row.
+        Item::User { text } => MessageBubble::text(id("user"), text.clone())
+            .variant(MessageBubbleVariant::Solid)
+            .align(MessageBubbleAlign::End)
             .into_any_element(),
         Item::Text { text, .. } => {
             let status = if working && last { AgentTextStatus::Streaming } else { AgentTextStatus::Complete };
@@ -166,9 +166,15 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
         list(s.list.clone(), move |ix, _, cx| item_row(&session, ix, cx)).size_full()
     };
     // Why it stopped: the reason, and the agent's own last words behind a fold.
-    let failure = match (&s.status, &s.problem) {
-        (SessionStatus::Failed(why), _) => Some(why.clone()),
-        (_, Some(problem)) => Some(problem.clone()),
+    // The whole reason: the row keeps the cut one.
+    // A turn that failed in a live session says so in the conversation; the box is for an agent
+    // that is gone, or never started.
+    let gone = !s.running() && !s.starting;
+    let failure = match (&s.problem, &s.status, &s.stderr) {
+        (Some(problem), _, _) => Some(problem.clone()),
+        (None, SessionStatus::Failed(_), _) if !gone => None,
+        (None, SessionStatus::Failed(_), Some(stderr)) => Some(crate::status::last_line(stderr).to_string().into()),
+        (None, SessionStatus::Failed(why), None) => Some(why.clone()),
         _ => None,
     };
     let details = s.stderr.clone();
