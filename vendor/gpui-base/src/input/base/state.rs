@@ -443,6 +443,9 @@ pub struct InputBaseState<M: InputModeKind> {
     pub(crate) scroll_handle: ScrollHandle,
     /// The deferred scroll offset to apply on next layout.
     pub(crate) deferred_scroll_offset: Option<Point<Pixels>>,
+    /// A text offset asked to be revealed before the text was ever laid out; the next paint
+    /// reveals it (lathe patch 17).
+    pub(crate) reveal_after_layout: Option<usize>,
     /// The size of the scrollable content.
     pub(crate) scroll_size: gpui::Size<Pixels>,
     pub(super) editor_scrollbar_snapshot: Cell<Option<EditorScrollbarSnapshot>>,
@@ -787,6 +790,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             editor_scrollbar_snapshot: Cell::new(None),
             editor_paddings: Edges::default(),
             deferred_scroll_offset: None,
+            reveal_after_layout: None,
             placeholder: SharedString::default(),
             mask_pattern: MaskPattern::default(),
             mask_pattern_set: false,
@@ -2550,12 +2554,12 @@ impl<M: InputModeKind> InputBaseState<M> {
         padding: ScrollPadding,
         cx: &mut Context<Self>,
     ) {
-        let Some(last_layout) = self.last_layout.as_ref() else {
+        let (Some(last_layout), Some(bounds)) = (self.last_layout.as_ref(), self.last_bounds.as_ref()) else {
+            // Nothing is laid out yet: the first paint reveals it (lathe patch 17).
+            self.reveal_after_layout = Some(offset);
             return;
         };
-        let Some(bounds) = self.last_bounds.as_ref() else {
-            return;
-        };
+        self.reveal_after_layout = None;
 
         let mut scroll_offset = self.scroll_handle.offset();
         let was_offset = scroll_offset;
