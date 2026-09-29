@@ -382,7 +382,7 @@ impl Gallery {
                     }))
                     .child(story.title())
             })))
-            .child(div().flex_none().pt(px(8.)).child(theme_picker(&theme)))
+            .child(div().flex_none().pt(px(8.)).debug_selector(|| "theme-picker".into()).child(theme_picker(&theme)))
     }
 
     fn story(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -1046,3 +1046,6 @@ fn main() {
         cx.activate(true);
     });
 }
+
+#[cfg(test)]
+mod tests;
