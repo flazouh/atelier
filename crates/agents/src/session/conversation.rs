@@ -149,6 +149,11 @@ impl Conversation {
                 }
             }
             Event::ToolStarted(call) => self.tool_started(call),
+            Event::ToolTarget { id, file } => {
+                if let Some(call) = self.call_mut(id) {
+                    call.call.file.get_or_insert_with(|| file.clone());
+                }
+            }
             Event::ToolInput { id, input, file } => {
                 if let Some(call) = self.call_mut(id) {
                     call.call.file = file.clone().or_else(|| call.call.file.take());

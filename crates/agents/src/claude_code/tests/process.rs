@@ -101,7 +101,7 @@ exit 3"#,
     );
     let (sink, rx) = channel();
     let session = ClaudeCode::with_program(program.to_string_lossy()).open(stand.project(), OpenRequest::default(), sink).unwrap();
-    session.send(Command::Send { text: "go".into() }).unwrap();
+    session.send(Command::send("go")).unwrap();
     let events = until(&rx, ended);
     assert!(events.iter().any(|e| matches!(e, Event::ToolFinished { output, .. } if output.is_error)));
     assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if matches!(&end.outcome, TurnOutcome::Failed(why) if why.contains("code 3")))));
@@ -121,7 +121,7 @@ while IFS= read -r line; do echo "$line" >> '{}'; done"#,
     let (sink, rx) = channel();
     let session = ClaudeCode::with_program(program.to_string_lossy()).open(stand.project(), OpenRequest::default(), sink).unwrap();
     until(&rx, |e| matches!(e, Event::Permission(_)));
-    session.send(Command::Send { text: "hello".into() }).unwrap();
+    session.send(Command::send("hello")).unwrap();
     session.send(Command::Answer { request: RequestId::new("r1"), choice: ChoiceId::new("allow") }).unwrap();
     session.send(Command::Interrupt).unwrap();
     let deadline = Instant::now() + WAIT;

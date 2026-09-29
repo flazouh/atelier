@@ -29,7 +29,7 @@ fn a_backend_with_no_process_runs_a_turn_through_the_trait() {
     })]]);
     let (sink, seen) = collect();
     let session = backend.open(project(), OpenRequest::default(), sink).unwrap();
-    session.send(Command::Send { text: "hi".into() }).unwrap();
+    session.send(Command::send("hi")).unwrap();
     drop(session);
     let events = seen.lock().unwrap().clone();
     assert!(matches!(events[0], Event::Started(_)));
@@ -58,7 +58,7 @@ fn a_send_after_the_script_ends_reports_a_closed_session() {
     let backend = FakeBackend::new(vec![]);
     let (sink, _) = collect();
     let session = backend.open(project(), OpenRequest::default(), sink).unwrap();
-    assert!(matches!(session.send(Command::Send { text: "hi".into() }), Err(SessionError::Closed)));
+    assert!(matches!(session.send(Command::send("hi")), Err(SessionError::Closed)));
 }
 
 #[test]
@@ -278,5 +278,33 @@ mod conversation {
             Event::ThinkingDone { block: BlockId(9), took: Duration::ZERO },
         ]);
         assert!(conversation.items().is_empty());
+    }
+}
+
+mod attachments {
+    use super::super::*;
+
+    #[test]
+    fn one_line_is_said_in_the_singular_and_a_range_in_the_plural() {
+        let one = Attachment::LineComment { path: "a".into(), first_line: 3, last_line: 3, quote: "x".into(), body: "b".into() };
+        assert_eq!(one.render(), "Review comment on a, line 3:\n> x\nb");
+    }
+
+    #[test]
+    fn a_message_with_no_attachment_is_its_text_alone() {
+        assert_eq!(message_text("hi", &[]), "hi");
+        assert_eq!(Command::send("hi"), Command::Send { text: "hi".into(), attachments: vec![] });
+    }
+
+    #[test]
+    fn a_session_receives_the_attachments_the_message_carried() {
+        let backend = fake::FakeBackend::new(vec![vec![]]);
+        let sink: EventSink = std::sync::Arc::new(|_| {});
+        let project: std::sync::Arc<dyn lathe_project::Project> =
+            std::sync::Arc::new(lathe_project::LocalProject::open(std::env::temp_dir()).unwrap());
+        let session = backend.open(project, OpenRequest::default(), sink).unwrap();
+        let file = Attachment::File { path: "a".into() };
+        session.send(Command::Send { text: "look".into(), attachments: vec![file.clone()] }).unwrap();
+        assert_eq!(backend.received(), vec![Command::Send { text: "look".into(), attachments: vec![file] }]);
     }
 }

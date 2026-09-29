@@ -16,7 +16,7 @@ pub use backend::{
 };
 pub use coalesce::EventQueue;
 pub use conversation::{Answer, Call, Conversation, Item, SubagentStatus};
-pub use command::{Command, PermissionMode};
+pub use command::{Attachment, Command, PermissionMode, message_text};
 pub use event::{
     BlockId, Choice, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started,
     Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolKind, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage,

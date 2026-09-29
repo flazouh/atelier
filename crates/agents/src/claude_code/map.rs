@@ -25,8 +25,9 @@ pub(super) const DENY: &str = "deny";
 enum Open {
     Text(BlockId),
     Thinking(BlockId, Instant),
-    /// A tool block whose call the mapper announces from the finished message, not the stream.
-    Tool,
+    /// A tool call announced at the start of its block. `json` is its input so far; `targeted` is
+    /// whether its file has been told.
+    Tool { id: ToolId, json: String, targeted: bool },
 }
 
 /// A question `claude` asked and lathe has not answered.
@@ -188,15 +189,27 @@ impl Mapper {
                     vec![Event::Thinking { block, delta: thinking }]
                 }
                 Block::ToolUse { id, name, .. } => {
-                    self.open.insert(index, Open::Tool);
-                    if tools::starts_subagent(&name) || tools::todo_tool(&name).is_some() {
+                    let deferred = tools::starts_subagent(&name) || tools::todo_tool(&name).is_some();
+                    // A deferred call never names a file the review needs, so its input is not followed.
+                    self.open.insert(index, Open::Tool { id: ToolId::new(&id), json: String::new(), targeted: deferred });
+                    if deferred {
                         return Vec::new();
                     }
                     self.announce(ToolId::new(id), name, Value::Null, parent)
                 }
                 Block::ToolResult { .. } | Block::Other => Vec::new(),
             },
-            StreamEvent::ContentBlockDelta { index, delta } => match (self.open.get(&index), delta) {
+            StreamEvent::ContentBlockDelta { index, delta } => match (self.open.get_mut(&index), delta) {
+                (Some(Open::Tool { id, json, targeted: targeted @ false }), Delta::InputJson { partial_json }) => {
+                    json.push_str(&partial_json);
+                    match tools::file_in_partial_input(json) {
+                        Some(file) => {
+                            *targeted = true;
+                            vec![Event::ToolTarget { id: id.clone(), file }]
+                        }
+                        None => Vec::new(),
+                    }
+                }
                 (Some(Open::Text(block)), Delta::Text { text }) if !text.is_empty() => {
                     vec![Event::Text { block: *block, delta: text }]
                 }

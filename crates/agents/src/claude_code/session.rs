@@ -85,9 +85,9 @@ fn write_lines(mut stdin: Box<dyn Write + Send>, queued: mpsc::Receiver<String>)
 impl Session for ClaudeSession {
     fn send(&self, command: Command) -> Result<(), SessionError> {
         let line = match command {
-            Command::Send { text } => {
+            Command::Send { text, attachments } => {
                 lock(&self.mapper).user_sent();
-                control::user_message(&text)
+                control::user_message(&text, &attachments)
             }
             Command::Answer { request, choice } => {
                 let answer = lock(&self.mapper).answer(&request, &choice);

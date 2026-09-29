@@ -194,6 +194,9 @@ pub enum Event {
     Thinking { block: BlockId, delta: String },
     ThinkingDone { block: BlockId, took: Duration },
     ToolStarted(ToolCall),
+    /// The file a call will touch, as soon as the stream names it: before the input is whole, and so
+    /// before the tool runs. A review takes the text of the file before its edit lands.
+    ToolTarget { id: ToolId, file: String },
     /// The whole input of a call announced before its input was known, and the file it names.
     ToolInput { id: ToolId, input: Value, file: Option<String> },
     ToolStatus { id: ToolId, status: ToolStatus },
