@@ -57,7 +57,7 @@ fn the_cli_still_asks_for_permissions_over_stdio() {
     let project: Arc<dyn Project> = Arc::new(LocalProject::open(dir.path()).unwrap());
     let request = OpenRequest { model: Some("haiku".into()), mode: Some(PermissionMode::Ask), ..OpenRequest::default() };
     let (session, rx) = open(&project, request);
-    session.send(Command::Send { text: "Create a file named asked.txt containing hi, with the Write tool.".into() }).unwrap();
+    session.send(Command::send("Create a file named asked.txt containing hi, with the Write tool.")).unwrap();
     let mut seen = Vec::new();
     until(&rx, &mut seen, |e| matches!(e, Event::Permission(_) | Event::TurnEnded(_)));
     assert!(
@@ -78,7 +78,7 @@ fn a_real_session_end_to_end() {
     let mut seen = Vec::new();
 
     // 1. A plain turn.
-    session.send(Command::Send { text: "Reply with the single word ok.".into() }).unwrap();
+    session.send(Command::send("Reply with the single word ok.")).unwrap();
     until(&rx, &mut seen, turn_ended);
     let Event::Started(started) = &seen[0] else { panic!("first event: {:?}", seen[0]) };
     let id: SessionId = started.session.clone();
@@ -88,7 +88,7 @@ fn a_real_session_end_to_end() {
 
     // 2. A write that asks first, answered by us.
     seen.clear();
-    session.send(Command::Send { text: "Create a file named made.txt containing hi, with the Write tool.".into() }).unwrap();
+    session.send(Command::send("Create a file named made.txt containing hi, with the Write tool.")).unwrap();
     until(&rx, &mut seen, |e| matches!(e, Event::Permission(_)));
     let Some(Event::Permission(request)) = seen.last().cloned() else { unreachable!() };
     assert_eq!(request.call.name, "Write");
@@ -102,7 +102,7 @@ fn a_real_session_end_to_end() {
 
     // 3. A write that we interrupt while it waits for an answer.
     seen.clear();
-    session.send(Command::Send { text: "Create a file named stop.txt containing hi, with the Write tool.".into() }).unwrap();
+    session.send(Command::send("Create a file named stop.txt containing hi, with the Write tool.")).unwrap();
     until(&rx, &mut seen, |e| matches!(e, Event::Permission(_)));
     session.send(Command::Interrupt).unwrap();
     until(&rx, &mut seen, turn_ended);
@@ -114,7 +114,7 @@ fn a_real_session_end_to_end() {
     drop(session);
     let (resumed, rx) = open(&project, OpenRequest { resume: Some(id.clone()), model: Some("haiku".into()), ..OpenRequest::default() });
     let mut seen = Vec::new();
-    resumed.send(Command::Send { text: "What single word did I first ask you to reply with? Answer with that word only.".into() }).unwrap();
+    resumed.send(Command::send("What single word did I first ask you to reply with? Answer with that word only.")).unwrap();
     until(&rx, &mut seen, turn_ended);
     assert!(seen.iter().any(|e| matches!(e, Event::Text { delta, .. } if delta.to_lowercase().contains("ok"))));
     println!("resume: the session remembers");
@@ -123,7 +123,7 @@ fn a_real_session_end_to_end() {
     seen.clear();
     resumed.send(Command::SetModel { model: "sonnet".into() }).unwrap();
     resumed.send(Command::SetPermissionMode { mode: PermissionMode::AcceptEdits }).unwrap();
-    resumed.send(Command::Send { text: "Reply with the single word ok.".into() }).unwrap();
+    resumed.send(Command::send("Reply with the single word ok.")).unwrap();
     until(&rx, &mut seen, turn_ended);
     assert!(seen.iter().any(|e| matches!(e, Event::Started(s) if s.model.as_deref().is_some_and(|m| m.contains("sonnet")))));
     println!("set model: the next turn runs on sonnet");

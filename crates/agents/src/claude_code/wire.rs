@@ -66,6 +66,11 @@ pub(super) enum Delta {
     Text {
         text: String,
     },
+    #[serde(rename = "input_json_delta")]
+    InputJson {
+        #[serde(default)]
+        partial_json: String,
+    },
     #[serde(rename = "thinking_delta")]
     Thinking {
         #[serde(default)]

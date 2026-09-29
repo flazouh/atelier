@@ -12,6 +12,7 @@ mod launch;
 mod mapping;
 mod process;
 mod store;
+mod targets;
 
 /// A captured run of `claude` 2.1.284 from `tests/fixtures/claude_code`.
 fn fixture(name: &str) -> String {

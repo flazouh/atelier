@@ -4,7 +4,7 @@ use std::{os::unix::fs::PermissionsExt, path::PathBuf, sync::Arc};
 
 use lathe_project::LocalProject;
 
-use super::{GhCli, parse_reply};
+use super::{GhCli, classify, parse_reply};
 use crate::github::transport::{Request, Transport, TransportError};
 
 fn stand_in(script: &str) -> (tempfile::TempDir, GhCli) {
@@ -76,22 +76,47 @@ fn a_get_sends_no_input_flag() {
     assert_eq!(std::fs::read_to_string(args).unwrap().trim(), "api --include --method GET repos/o/r");
 }
 
+fn stderr_of(name: &str) -> String {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/gh_stderr").join(name);
+    std::fs::read_to_string(path).unwrap()
+}
+
+/// `gh` 2.101's own words, captured: each file is what it wrote to stderr in that case.
 #[test]
-fn exit_four_with_no_reply_means_signed_out() {
-    let (_dir, cli) = stand_in("exit 4");
+fn ghs_real_messages_tell_signed_out_offline_and_the_rest_apart() {
+    assert_eq!(classify(Some(4), &stderr_of("signed_out.txt")), TransportError::NotSignedIn);
+    assert_eq!(classify(Some(1), &stderr_of("bad_token.txt")), TransportError::NotSignedIn);
+    assert_eq!(classify(Some(1), &stderr_of("refused.txt")), TransportError::Offline);
+    assert_eq!(classify(Some(1), &stderr_of("no_host.txt")), TransportError::Offline);
+    assert!(matches!(classify(Some(1), "gh: something new went wrong\n"), TransportError::Failed(text) if text.contains("something new")));
+    assert!(matches!(classify(None, ""), TransportError::Failed(text) if text.contains("no message")));
+}
+
+fn stand_in_saying(stderr: &str, code: i32) -> (tempfile::TempDir, GhCli) {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), stderr).unwrap();
+    let path = file.path().display().to_string();
+    let (dir, cli) = stand_in(&format!("cat '{path}' >&2\nexit {code}"));
+    std::mem::forget(file);
+    (dir, cli)
+}
+
+#[test]
+fn exit_four_and_a_sign_in_message_mean_signed_out() {
+    let (_dir, cli) = stand_in_saying(&stderr_of("signed_out.txt"), 4);
     assert_eq!(cli.send(&get("x")).err().unwrap(), TransportError::NotSignedIn);
 }
 
 #[test]
-fn exit_one_with_no_reply_means_the_connection_never_opened() {
-    let (_dir, cli) = stand_in("echo 'connection refused' >&2\nexit 1");
+fn a_refused_connection_means_offline_through_the_project() {
+    let (_dir, cli) = stand_in_saying(&stderr_of("refused.txt"), 1);
     assert_eq!(cli.send(&get("x")).err().unwrap(), TransportError::Offline);
 }
 
 #[test]
-fn any_other_exit_with_no_reply_is_a_failure_with_its_code() {
-    let (_dir, cli) = stand_in("exit 9");
-    assert!(matches!(cli.send(&get("x")).err().unwrap(), TransportError::Failed(text) if text.contains("9")));
+fn a_failure_of_another_kind_keeps_the_last_line_gh_wrote() {
+    let (_dir, cli) = stand_in_saying("warming up\ngh: the disk is full\n", 9);
+    assert!(matches!(cli.send(&get("x")).err().unwrap(), TransportError::Failed(text) if text.contains("the disk is full") && text.contains("9")));
 }
 
 #[test]

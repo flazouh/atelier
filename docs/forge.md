@@ -75,12 +75,13 @@ rate limit shows its reset.
 | What `gh` does | lathe says |
 | --- | --- |
 | Not installed on the host | `ToolMissing { tool: "gh" }` |
-| Exit 4 and no reply (signed out) | `NotSignedIn` |
-| A 401 (the token no longer works) | `NotSignedIn` |
-| Exit 1 and no reply (the connection never opened) | `Offline` |
+| A 401 (the token no longer works), or exit 4, or stderr with `gh auth login` or `Bad credentials` | `NotSignedIn` |
+| No reply and stderr with `connection refused`, `no such host`, `check your internet connection`, `i/o timeout`, `network is unreachable` or `tls handshake` | `Offline` |
+| No reply and any other stderr | `Unexpected`, with the last line `gh` wrote |
 
-`Project::spawn` drops stderr, so "exit 1 and no reply" is a guess: it also happens for a `gh` that fails
-before it connects for another reason. When the project keeps stderr, this can name the cause.
+`Project::spawn` keeps the last 64 KB of the process's stderr (`Control::stderr()`), and lathe reads `gh`'s
+own words from it. The cases are tests on stderr captured from `gh` 2.101 (`tests/fixtures/gh_stderr/`).
+The reading thread can lag a moment behind the exit, so an empty tail is asked for again for up to 200 ms.
 
 ### What is GraphQL and what is REST
 
@@ -168,6 +169,7 @@ list on a busy account.
 - The shelves are searches, not GitHub's own categories.
 - Conflicting files are not in GitHub's answer.
 - Only `github.com`. A GitHub Enterprise host needs `gh api --hostname` and a host in `RepoRef`.
-- `Project::spawn` drops stderr, so `Offline` is inferred.
+- `Control::stderr()` can be empty for a moment after the process exits (the reading thread lags), so
+  lathe asks again for up to 200 ms. Joining that thread in `Control::wait` would remove the wait.
 - Stacks: nothing here knows them. `file_courts` takes a function that says which pull requests stand on
   an unlanded one.

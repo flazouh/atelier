@@ -1,6 +1,6 @@
 use serde_json::{Value, json};
 
-use crate::{claude_code::control, session::PermissionMode};
+use crate::{claude_code::control, session::{Attachment, PermissionMode}};
 
 fn parse(line: &str) -> Value {
     assert!(!line.contains('\n'), "one line");
@@ -9,7 +9,7 @@ fn parse(line: &str) -> Value {
 
 #[test]
 fn a_user_message_is_a_user_line_with_the_text() {
-    let line = parse(&control::user_message("fix \"it\"\nnow"));
+    let line = parse(&control::user_message("fix \"it\"\nnow", &[]));
     assert_eq!(line, json!({"type": "user", "message": {"role": "user", "content": "fix \"it\"\nnow"}}));
 }
 
@@ -29,4 +29,21 @@ fn permission_modes_round_trip_through_claudes_names() {
     }
     assert_eq!(control::mode_from_name("manual"), Some(PermissionMode::Ask));
     assert_eq!(control::mode_from_name("dontAsk"), None);
+}
+
+#[test]
+fn a_message_carries_its_attachments_as_text_after_its_own() {
+    let comment = Attachment::LineComment {
+        path: "src/a.rs".into(),
+        first_line: 10,
+        last_line: 12,
+        removed: false,
+        quote: "let a = 1;\nlet b = 2;".into(),
+        body: "Why not a struct?".into(),
+    };
+    let line = parse(&control::user_message("Please look", &[comment, Attachment::File { path: "src/b.rs".into() }]));
+    assert_eq!(
+        line["message"]["content"],
+        "Please look\n\nReview comment on src/a.rs, lines 10-12:\n> let a = 1;\n> let b = 2;\nWhy not a struct?\n\nFile: src/b.rs"
+    );
 }

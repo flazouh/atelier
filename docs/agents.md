@@ -25,8 +25,16 @@ A session pushes **events** into a sink and takes **commands**. Both are plain d
 | `Warning` | A problem that does not end the session, such as a line that does not parse. |
 | `Ended` | The session is over: closed by lathe, the process exited, or it failed. Nothing follows. |
 
-Commands: `Send`, `Answer` (a request and one of its choices), `Interrupt`, `SetModel`,
-`SetPermissionMode`.
+Commands: `Send` (a text and its attachments), `Answer` (a request and one of its choices), `Interrupt`,
+`SetModel`, `SetPermissionMode`.
+
+An `Attachment` is a comment on lines of a file with the lines quoted, or a file. A backend that takes only
+text writes them out with `message_text`. `crates/review` makes the comments (`docs/review.md`).
+
+`ToolTarget { id, file }` names the file a call will touch as soon as the stream says so, before the call's
+input is whole and before the tool runs. Claude Code sends the input as `input_json_delta` chunks; the
+mapper reads the file out of the first top-level `file_path`, `notebook_path` or `path` key whose value has
+closed. A review takes the file's text before the edit lands from this event.
 
 A tool call names its tool as data. `ToolKind` (read, edit, write, search, shell, fetch, other) lets the
 UI pick a look without knowing the agent's names. A permission request carries its choices, each with a

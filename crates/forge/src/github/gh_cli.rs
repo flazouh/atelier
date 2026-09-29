@@ -56,12 +56,36 @@ impl Transport for GhCli {
         let text = String::from_utf8_lossy(&bytes);
         match parse_reply(&text) {
             Some(reply) => Ok(reply),
-            // Nothing came back. `gh` exits 4 when signed out; a failure with no reply at all is a
-            // connection that never opened.
-            None if code == Some(NEEDS_SIGN_IN) => Err(TransportError::NotSignedIn),
-            None if code == Some(1) => Err(TransportError::Offline),
-            None => Err(TransportError::Failed(format!("gh ended with {code:?} and no reply"))),
+            None => Err(classify(code, &stderr_after_exit(process.control.as_ref()))),
         }
+    }
+}
+
+/// What the process wrote to stderr. The reading thread may still be draining the pipe when the process
+/// has just ended, so an empty tail is asked for again a few times before it counts as empty.
+fn stderr_after_exit(control: &dyn lathe_project::Control) -> String {
+    for _ in 0..10 {
+        let text = control.stderr();
+        if !text.is_empty() {
+            return text;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    String::new()
+}
+
+/// Why `gh` produced no reply, from its exit code and what it wrote to stderr.
+pub(super) fn classify(code: Option<i32>, stderr: &str) -> TransportError {
+    const OFFLINE: [&str; 6] =
+        ["connection refused", "no such host", "check your internet connection", "i/o timeout", "network is unreachable", "tls handshake"];
+    let lower = stderr.to_ascii_lowercase();
+    if code == Some(NEEDS_SIGN_IN) || lower.contains("gh auth login") || lower.contains("bad credentials") {
+        TransportError::NotSignedIn
+    } else if OFFLINE.iter().any(|marker| lower.contains(marker)) {
+        TransportError::Offline
+    } else {
+        let said = stderr.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or("no message");
+        TransportError::Failed(format!("gh ended with {code:?}: {said}"))
     }
 }
 

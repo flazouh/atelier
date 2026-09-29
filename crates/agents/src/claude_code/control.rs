@@ -1,10 +1,11 @@
 //! The lines lathe writes to `claude`'s stdin. Each is one JSON object; the caller adds the line end.
 use serde_json::{Value, json};
 
-use crate::session::PermissionMode;
+use crate::session::{Attachment, PermissionMode, message_text};
 
-pub(super) fn user_message(text: &str) -> String {
-    json!({"type": "user", "message": {"role": "user", "content": text}}).to_string()
+pub(super) fn user_message(text: &str, attachments: &[Attachment]) -> String {
+    let content = message_text(text, attachments);
+    json!({"type": "user", "message": {"role": "user", "content": content}}).to_string()
 }
 
 pub(super) fn interrupt(request_id: &str) -> String {
