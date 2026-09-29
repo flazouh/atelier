@@ -63,6 +63,12 @@ Now, for every text size:
   which starts on the newest text when the running one ends. There is no debounce.
 - A combined layer (Markdown's inline text) that an edit moved is not offered for reuse to the next
   full pass: parsing again on its edited tree does not match a fresh parse.
+- The background parse updates the layers in place, as patch 1 does for one edit (`update_layers`).
+  The layers already moved with each edit, so it needs only where the edits wrote: `edit_tree` keeps
+  one span of new text for all edits since the layers were last whole (`moved_since_parse`), each
+  earlier span moved by the later edit and joined with its own. The region to query again is that
+  span and `changed_ranges` between the edited old tree and the new one. It falls back to a full
+  pass when the layers were not whole before the edits, or for patch 1's own reasons.
 
 The inline review's accept and reject, paste, undo and redo all reach the adapter as edits, so they
 take the same path. `apply_background_tree` and the sync-parse constants are gone.
@@ -70,4 +76,6 @@ take the same path. `apply_background_tree` and the sync-parse constants are gon
 Test: `tests/background_parse.rs`. A table of range moves; the old colours moved by an edit before
 any parse; for Rust, Markdown and HTML, after each of 60 seeded edits, a landed background parse
 equals a synchronous one; and 50 keystrokes during a parse make two parses, of which only the last is
-taken.
+taken. `coalesced_edits_update_the_layers_in_place_and_equal_a_fresh_parse` makes 80 parses of one to six
+random edits each for Rust, Markdown and HTML: each landed parse equals a fresh one, and at least
+three in four update the layers in place (80 of 80 in each language when written).
