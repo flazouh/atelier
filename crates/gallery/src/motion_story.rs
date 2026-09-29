@@ -1,7 +1,7 @@
 //! The "Motion" story: the components ported from beui.dev's `motion/` and `blocks/`, each in every state it
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
-use beui::{ActiveTheme, ColorSelector, Swatch};
+use beui::{ActiveTheme, Checkbox, ColorSelector, Swatch};
 use gpui_kit::{
     AnyElement, Context, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -35,11 +35,14 @@ pub struct MotionStory {
     /// Owned by the "every state" rows below.
     second: SharedString,
     third: SharedString,
+    terms: bool,
+    updates: bool,
+    all: bool,
 }
 
 impl MotionStory {
     pub fn new(_: &mut Window, _: &mut Context<Self>) -> Self {
-        Self { part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into() }
+        Self { part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false }
     }
 
     fn shows(&self, name: &str) -> bool {
@@ -113,6 +116,56 @@ impl Render for MotionStory {
                             .ok();
                         }
                     })),
+                ));
+            }
+        }
+        if self.shows("checkbox") {
+            let this = cx.entity().downgrade();
+            let flip = |field: fn(&mut MotionStory) -> &mut bool| {
+                let this = this.clone();
+                move |v: bool, _: &mut Window, cx: &mut gpui_kit::App| {
+                    this.update(cx, |s, cx| {
+                        *field(s) = v;
+                        cx.notify();
+                    })
+                    .ok();
+                }
+            };
+            let demo = div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(Checkbox::new("terms", self.terms).label("Accept terms and conditions").on_change(flip(|s| &mut s.terms)))
+                .child(Checkbox::new("updates", self.updates).label("Email me product updates").on_change(flip(|s| &mut s.updates)))
+                .child(Checkbox::new("partial", true).indeterminate(true).label("Select all (partial)").on_change(|_, _, _| {}))
+                .child(Checkbox::new("off", true).disabled(true).label("Disabled").on_change(|_, _, _| {}));
+            if alone {
+                parts.push(demo.into_any_element());
+            } else {
+                parts.push(section("Checkbox: the demo", &theme, demo));
+                parts.push(section(
+                    "Checkbox: every state",
+                    &theme,
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(12.))
+                        .child(Checkbox::new("s1", false).label("Unchecked").on_change(|_, _, _| {}))
+                        .child(Checkbox::new("s2", true).label("Checked").on_change(|_, _, _| {}))
+                        .child(Checkbox::new("s3", false).indeterminate(true).label("Partial").on_change(|_, _, _| {}))
+                        .child(Checkbox::new("s4", false).disabled(true).label("Unchecked, disabled").on_change(|_, _, _| {}))
+                        .child(Checkbox::new("s5", true).disabled(true).label("Checked, disabled").on_change(|_, _, _| {}))
+                        .child(Checkbox::new("s6", false).indeterminate(true).disabled(true).label("Partial, disabled").on_change(|_, _, _| {}))
+                        .child(Checkbox::new("s7", true).on_change({
+                            let this = this.clone();
+                            move |v, _, cx| {
+                                this.update(cx, |s, cx| {
+                                    s.all = v;
+                                    cx.notify();
+                                })
+                                .ok();
+                            }
+                        })),
                 ));
             }
         }
