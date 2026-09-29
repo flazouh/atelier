@@ -10,10 +10,8 @@ fn the_theme_picker_stays_in_a_short_window(cx: &mut TestAppContext) {
         beui::init(cx);
         beui::theme::set_theme(beui::themes::lathe(Appearance::Dark).clone(), cx);
     });
-    let (_gallery, cx) = cx.add_window_view(|window, cx| {
-        window.resize(size(px(1100.), px(860.)));
-        Gallery::new(window, cx)
-    });
+    let (_gallery, cx) = cx.add_window_view(Gallery::new);
+    cx.simulate_resize(size(px(1100.), px(860.)));
     cx.run_until_parked();
     let picker = cx.debug_bounds("theme-picker").expect("the picker is drawn");
     let window = cx.update(|window, _| window.viewport_size());
