@@ -1,10 +1,10 @@
-//! "Open over SSH…": a host from the user's `~/.ssh/config` (or one typed), a folder on it, and
-//! Connect. While it connects the form shows each step ("Reaching hp-agent…", "Putting lathe-remote
+//! "Open over SSH…": a host, typed or picked from the user's `~/.ssh/config` below the field, a
+//! folder on it, and Connect. Focus starts on the host; Tab goes to the folder; Enter in either
+//! connects, and Escape closes the form. While it connects the form shows each step ("Reaching hp-agent…", "Putting lathe-remote
 //! on hp-agent…"); a failure shows ssh's own words and leaves the form open to try again.
 
 use beui::{
     button::{Button, ButtonSize, ButtonVariant},
-    select::Select,
     spinner::Spinner,
     theme::{ActiveTheme, popover_shadow, radius},
     typography::TextSize,
@@ -33,7 +33,6 @@ pub enum Phase {
 
 pub struct SshForm {
     hosts: Vec<String>,
-    picked: Option<usize>,
     host: Entity<InputState>,
     path: Entity<InputState>,
     pub phase: Phase,
@@ -44,7 +43,7 @@ impl EventEmitter<SshFormEvent> for SshForm {}
 
 impl Focusable for SshForm {
     fn focus_handle(&self, cx: &gpui_kit::App) -> FocusHandle {
-        self.path.focus_handle(cx)
+        self.host.focus_handle(cx)
     }
 }
 
@@ -65,7 +64,18 @@ impl SshForm {
             }
         };
         let _enter = [cx.subscribe_in(&host, window, enter), cx.subscribe_in(&path, window, enter)];
-        Self { picked: (!hosts.is_empty()).then_some(0), hosts, host, path, phase: Phase::Idle, _enter }
+        Self { hosts, host, path, phase: Phase::Idle, _enter }
+    }
+
+    /// The config's hosts, once they have been read off the UI thread.
+    pub fn set_hosts(&mut self, hosts: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+        if self.hosts.is_empty() && self.host.read(cx).value().is_empty()
+            && let Some(first) = hosts.first()
+        {
+            self.host.update(cx, |h, cx| h.set_value(first.clone(), window, cx));
+        }
+        self.hosts = hosts;
+        cx.notify();
     }
 
     fn connect(&mut self, cx: &mut Context<Self>) {
@@ -98,17 +108,24 @@ impl Render for SshForm {
                 .child(div().rounded(radius::LG).bg(theme.card_strong).child(Input::new(input).appearance(false).px(px(10.)).text_size(TextSize::Sm.font_size())))
         };
         let this = cx.entity().downgrade();
-        let hosts = (!self.hosts.is_empty()).then(|| {
-            let (names, picked) = (self.hosts.clone(), self.picked);
-            let (host, pick) = (self.host.clone(), this.clone());
-            Select::new("ssh-hosts", names.clone()).selected(picked).compact(true).on_change(move |i, window, cx| {
-                host.update(cx, |h, cx| h.set_value(names[i].clone(), window, cx));
-                pick.update(cx, |f, cx| {
-                    f.picked = Some(i);
-                    cx.notify();
+        // The config's hosts, as chips under the field: a press puts the name in it.
+        let chips = self.hosts.iter().enumerate().map(|(i, name)| {
+            let (host, name) = (self.host.clone(), name.clone());
+            Button::new(("ssh-host", i)).label(name.clone()).variant(ButtonVariant::Ghost).on_click(move |_, window, cx| {
+                host.update(cx, |h, cx| {
+                    h.set_value(name.clone(), window, cx);
+                    h.focus(window, cx);
                 })
-                .ok();
             })
+        });
+        let hosts = (!self.hosts.is_empty()).then(|| {
+            div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap(px(2.))
+                .child(div().pr(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("From ~/.ssh/config"))
+                .children(chips)
         });
         let status = match &self.phase {
             Phase::Idle => None,
@@ -140,15 +157,9 @@ impl Render for SshForm {
             .rounded(radius::XL)
             .bg(theme.popover)
             .shadow(popover_shadow(&theme))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open over SSH"))
-                    .children(hosts),
-            )
+            .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open over SSH"))
             .child(field("Host", &self.host))
+            .children(hosts)
             .child(field("Folder on the host", &self.path))
             .children(status)
             .child(

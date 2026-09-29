@@ -211,7 +211,8 @@ impl Shared {
         }
         *lock(&self.down) = Some(why.clone());
         lock(&self.pending).clear();
-        for pipes in lock(&self.processes).values_mut() {
+        // The host's processes ended with it, and the next host numbers its own from the start.
+        for (_, mut pipes) in lock(&self.processes).drain() {
             pipes.end(None);
         }
         self.report(Link::Down(why));
@@ -383,7 +384,8 @@ impl Project for RemoteProject {
         let (reader, exit) = {
             let mut processes = lock(&self.shared.processes);
             let pipes = processes.entry(pid).or_default();
-            (pipes.reader.take().expect("a process is spawned once"), pipes.exit.clone())
+            let reader = pipes.reader.take().ok_or_else(|| io::Error::other(format!("process {pid} was handed out already")))?;
+            (reader, pipes.exit.clone())
         };
         let weak = Arc::downgrade(&self.shared);
         Ok(Process {
@@ -459,6 +461,15 @@ struct RemoteControl {
     shared: Weak<Shared>,
     pid: Pid,
     exit: Arc<(Mutex<Option<Option<i32>>>, Condvar)>,
+}
+
+impl Drop for RemoteControl {
+    /// Nobody can ask about the process any more: its pipes are forgotten.
+    fn drop(&mut self) {
+        if let Some(shared) = self.shared.upgrade() {
+            lock(&shared.processes).remove(&self.pid);
+        }
+    }
 }
 
 impl Control for RemoteControl {

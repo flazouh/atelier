@@ -254,3 +254,19 @@ The node count does not grow with the data: the list builds the rows in view, an
 columns in view and a margin. The whole-frame numbers on the Mac are for the lead to measure. The
 switching run counts the frames with a switch apart ("frame with a switch"); on the HP they took the same
 48 ms as the rest.
+
+## Remote projects
+
+`RemoteProject` over a real `ssh` from the HP to itself (`hp-agent`, loopback through sshd), the
+release lathe-remote, `/tmp/qa-lathe` (1,009 files). Load average 9 to 11. Three runs of 20
+samples each; the LAN number waits on a run from the Mac to the HP.
+
+    LATHE_REMOTE_DIR=… LATHE_TEST_SSH_HOST=hp-agent LATHE_TEST_SSH_ROOT=/tmp/qa-lathe \
+        cargo test --release -p lathe-remote --test over_ssh -- --ignored --nocapture remote_costs
+
+| Case | Target | Result | Passes |
+| --- | --- | --- | --- |
+| Connect, the copy already there (probe, check, dial, hello) | < 3 s | 420 to 476 ms | Yes |
+| Connect, uploading a new copy first | < 5 s | 966 ms | Yes |
+| File open: reading a 10,000-line file (212 KB) | < 150 ms on a LAN | 1.17 to 2.04 ms median, 1.39 to 3.12 ms p95 (loopback) | Yes, on loopback |
+| Listing 1,009 files | < 500 ms | 3.89 to 4.82 ms median, 4.86 to 6.36 ms p95 | Yes |
