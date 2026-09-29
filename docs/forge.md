@@ -81,7 +81,7 @@ rate limit shows its reset.
 
 `Project::spawn` keeps the last 64 KB of the process's stderr (`Control::stderr()`), and lathe reads `gh`'s
 own words from it. The cases are tests on stderr captured from `gh` 2.101 (`tests/fixtures/gh_stderr/`).
-The reading thread can lag a moment behind the exit, so an empty tail is asked for again for up to 200 ms.
+`Control::wait` returns with the stderr complete.
 
 ### What is GraphQL and what is REST
 
@@ -169,7 +169,5 @@ list on a busy account.
 - The shelves are searches, not GitHub's own categories.
 - Conflicting files are not in GitHub's answer.
 - Only `github.com`. A GitHub Enterprise host needs `gh api --hostname` and a host in `RepoRef`.
-- `Control::stderr()` can be empty for a moment after the process exits (the reading thread lags), so
-  lathe asks again for up to 200 ms. Joining that thread in `Control::wait` would remove the wait.
 - Stacks: nothing here knows them. `file_courts` takes a function that says which pull requests stand on
   an unlanded one.

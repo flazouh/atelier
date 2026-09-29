@@ -56,22 +56,9 @@ impl Transport for GhCli {
         let text = String::from_utf8_lossy(&bytes);
         match parse_reply(&text) {
             Some(reply) => Ok(reply),
-            None => Err(classify(code, &stderr_after_exit(process.control.as_ref()))),
+            None => Err(classify(code, &process.control.stderr())),
         }
     }
-}
-
-/// What the process wrote to stderr. The reading thread may still be draining the pipe when the process
-/// has just ended, so an empty tail is asked for again a few times before it counts as empty.
-fn stderr_after_exit(control: &dyn lathe_project::Control) -> String {
-    for _ in 0..10 {
-        let text = control.stderr();
-        if !text.is_empty() {
-            return text;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
-    String::new()
 }
 
 /// Why `gh` produced no reply, from its exit code and what it wrote to stderr.
