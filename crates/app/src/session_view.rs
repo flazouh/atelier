@@ -61,15 +61,10 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     let key = s.key.clone();
     let id = |what: &str| gpui_kit::ElementId::Name(format!("{key}-{what}-{ix}").into());
     let body = match item {
-        Item::User { text } => div()
-            .flex()
-            .justify_end()
-            // The bubble keeps its own width, up to most of the row, so a short message never wraps.
-            .child(
-                div().flex_none().max_w(gpui_kit::relative(0.85)).child(
-                    MessageBubble::text(id("user"), text.clone()).variant(MessageBubbleVariant::Solid).align(MessageBubbleAlign::End),
-                ),
-            )
+        // The bubble aligns itself to the end of the row.
+        Item::User { text } => MessageBubble::text(id("user"), text.clone())
+            .variant(MessageBubbleVariant::Solid)
+            .align(MessageBubbleAlign::End)
             .into_any_element(),
         Item::Text { text, .. } => {
             let status = if working && last { AgentTextStatus::Streaming } else { AgentTextStatus::Complete };
