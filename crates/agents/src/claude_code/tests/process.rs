@@ -2,7 +2,6 @@
 //! records what lathe writes to it. Only the process is fake; the project, the threads and the
 //! pipes are the real ones.
 use std::{
-    os::unix::fs::PermissionsExt,
     path::PathBuf,
     sync::{Arc, Mutex, mpsc},
     time::{Duration, Instant},
@@ -30,13 +29,12 @@ impl Stand {
 
     fn script(&self, body: &str) -> PathBuf {
         let path = self.dir.path().join("claude");
-        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::testing::write_script(&path, &format!("#!/bin/sh\n{body}\n"));
         path
     }
 
     fn project(&self) -> Arc<dyn lathe_project::Project> {
-        Arc::new(LocalProject::open(self.dir.path()).unwrap())
+        Arc::new(crate::testing::Locked(Arc::new(LocalProject::open(self.dir.path()).unwrap())))
     }
 }
 

@@ -13,3 +13,6 @@ pub mod session;
 pub mod subprocess;
 
 pub use assets::Assets;
+
+#[cfg(test)]
+mod testing;
