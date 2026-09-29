@@ -332,3 +332,6 @@ fn header(session: &Entity<AgentSession>, cx: &mut App) -> impl IntoElement {
         .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(s.status.words()))
         .children(stop)
 }
+
+#[cfg(test)]
+mod tests;
