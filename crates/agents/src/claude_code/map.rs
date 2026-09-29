@@ -47,6 +47,11 @@ pub struct Mapper {
     /// Calls whose result lathe swallows: todo edits and subagent starts.
     hidden: HashSet<ToolId>,
     subagents: HashSet<ToolId>,
+    /// Shell commands that run on after their call returned (`run_in_background`), until `claude` says
+    /// they ended. Each is a shell call that stays running, not a subagent.
+    background: HashSet<ToolId>,
+    /// The last turn ended aborted.
+    aborted: bool,
     todos: Vec<Todo>,
     /// `TaskCreate` calls waiting for the id the result gives the task.
     creating: HashMap<ToolId, String>,
@@ -122,7 +127,7 @@ impl Mapper {
             Some(line) => format!("{how}: {line}"),
             None => how,
         };
-        let mut events = self.fail_open_tools(&why);
+        let mut events = self.fail_open_tools(&why, false);
         events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
         let mut open: Vec<_> = self.subagents.drain().collect();
         open.sort();
@@ -134,6 +139,29 @@ impl Mapper {
         events
     }
 
+    /// The end of a transcript that is read as history. A record has no end for a subagent or a background
+    /// command that was still going when it stopped being written, and no live agent will ever send one, so
+    /// each of them ends here rather than show as running forever. If the last turn ended aborted they
+    /// end as interrupted; otherwise as finished, with a note that the record does not say how it went.
+    pub fn end_of_history(&mut self) -> Vec<Event> {
+        let (ok, note) = if self.aborted {
+            (false, "Interrupted before it finished.")
+        } else {
+            (true, "The record has no end for this; it is shown as finished.")
+        };
+        let mut open: Vec<_> = self.running.drain().collect();
+        open.sort();
+        let mut events: Vec<Event> = open
+            .into_iter()
+            .map(|id| Event::ToolFinished { id, output: ToolOutput { text: note.into(), is_error: !ok, truncated: false, full_at: None } })
+            .collect();
+        let mut subagents: Vec<_> = self.subagents.drain().collect();
+        subagents.sort();
+        events.extend(subagents.into_iter().map(|id| Event::SubagentEnded { id, ok, summary: Some(note.into()) }));
+        events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
+        self.background.clear();
+        events
+    }
     /// The event for a session lathe closed on purpose: it ends, and nothing else fails.
     pub fn closed(&mut self) -> Vec<Event> {
         if std::mem::replace(&mut self.ended, true) { Vec::new() } else { vec![Event::Ended(EndReason::Closed)] }
@@ -151,6 +179,12 @@ impl Mapper {
             },
             "task_started" => {
                 let Some(id) = system.tool_use_id.map(ToolId::new) else { return Vec::new() };
+                // Only an agent task is a subagent. A background shell (`local_bash`), and any other kind of
+                // task, is the call that started it, still running.
+                if !is_agent_task(system.task_type.as_deref()) {
+                    self.background.insert(id);
+                    return Vec::new();
+                }
                 if self.subagents.insert(id.clone()) {
                     self.hidden.insert(id.clone());
                     let subagent = Subagent {
@@ -169,6 +203,15 @@ impl Mapper {
             },
             "task_notification" => {
                 let Some(id) = system.tool_use_id.map(ToolId::new) else { return Vec::new() };
+                if self.background.remove(&id) {
+                    // The call returned long ago; now it ends, with what `claude` says of it.
+                    if !self.running.remove(&id) {
+                        return Vec::new();
+                    }
+                    let ok = system.status.as_deref() == Some("completed");
+                    let summary = system.summary.unwrap_or_else(|| if ok { "The command finished.".into() } else { "The command did not finish well.".into() });
+                    return vec![Event::ToolFinished { id, output: tool_output(&summary, !ok) }];
+                }
                 self.subagents.remove(&id);
                 vec![Event::SubagentEnded { id, ok: system.status.as_deref() == Some("completed"), summary: system.summary }]
             }
@@ -307,7 +350,8 @@ impl Mapper {
             TurnOutcome::Failed(why)
         };
         self.turn_open = false;
-        let mut events = self.fail_open_tools("the turn ended before the tool finished");
+        self.aborted = interrupted;
+        let mut events = self.fail_open_tools("the turn ended before the tool finished", true);
         events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
         if let Some(usage) = finish.usage {
             events.push(Event::Usage(Usage {
@@ -432,14 +476,26 @@ impl Mapper {
             self.todos.push(Todo { id: task.unwrap_or_default(), text: subject, status: TodoStatus::Pending });
             return vec![Event::Todos(self.todos.clone())];
         }
-        if self.hidden.remove(&id) || !self.running.remove(&id) {
+        if self.hidden.remove(&id) {
+            return Vec::new();
+        }
+        // A background command's result only says it started. The call stays running until it ends.
+        if self.background.contains(&id) && self.running.contains(&id) {
+            return Vec::new();
+        }
+        if !self.running.remove(&id) {
             return Vec::new();
         }
         vec![Event::ToolFinished { id, output: tool_output(&flatten(content), is_error) }]
     }
 
-    fn fail_open_tools(&mut self, why: &str) -> Vec<Event> {
-        let mut open: Vec<_> = self.running.drain().collect();
+    /// Ends the calls still running with an error. A background command outlives the turn that started it,
+    /// so `keep_background` leaves it running; a process that ended takes it down too.
+    fn fail_open_tools(&mut self, why: &str, keep_background: bool) -> Vec<Event> {
+        let mut open: Vec<_> = self.running.iter().filter(|id| !(keep_background && self.background.contains(*id))).cloned().collect();
+        for id in &open {
+            self.running.remove(id);
+        }
         open.sort();
         open.into_iter()
             .map(|id| Event::ToolFinished {
@@ -448,6 +504,11 @@ impl Mapper {
             })
             .collect()
     }
+}
+
+/// Whether a `task_started` names a subagent. A task with no type is an older `claude`'s subagent.
+fn is_agent_task(task_type: Option<&str>) -> bool {
+    task_type.is_none_or(|t| t.contains("agent"))
 }
 
 /// How many of the last lines of a process's stderr an end event carries.

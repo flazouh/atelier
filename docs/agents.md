@@ -132,7 +132,8 @@ again with the new model.
 | `user` with a `tool_result` | `ToolFinished`. |
 | `control_request` `can_use_tool` | `Permission` |
 | `control_cancel_request` | `PermissionCancelled` |
-| `system/task_started`, `task_progress`, `task_notification` | `SubagentStarted`, `SubagentProgress`, `SubagentEnded` |
+| `system/task_started`, `task_progress`, `task_notification` of `task_type` `local_agent` | `SubagentStarted`, `SubagentProgress`, `SubagentEnded` |
+| `system/task_started` and `task_notification` of `task_type` `local_bash` (a shell command run with `run_in_background`) | No event of their own: the shell call stays `Running` and `ToolFinished` comes at the notification |
 | `result` | `Usage`, then `TurnEnded` |
 | `system/status`, `thinking_tokens`, `hook_*`, `rate_limit_event`, `control_response`, anything new | Ignored. |
 
@@ -156,6 +157,17 @@ Things the captures showed, which the docs do not say:
   `assistant` and `user` lines with `parent_tool_use_id`. A subagent can run in the background: the
   `Agent` result then says it launched, and the turn can end before the subagent does. `task_notification`
   (with `status` and `summary`) ends it in both cases.
+- **A background shell command is a shell call that keeps running, not a subagent.** `claude` announces it with
+  `task_started` (`task_type` `local_bash`) after the call has returned "Command running in background".
+  lathe keeps the call `Running`, drops that first result, and ends it with `ToolFinished` when
+  `task_notification` comes, with the notification's summary (an error when the status is not `completed`).
+  A turn that ends does not end it; a process that exits does. Only a task of type `local_agent` (or one
+  with no type) is a subagent.
+- **History ends what the record left open.** A transcript has no end for a subagent or a call that was
+  still going when it stopped being written, and no live agent will send one. So `history` closes each one
+  at the end: `SubagentEnded` and `ToolFinished` as finished, with a note that the record has no end for it,
+  or as interrupted (`ok: false`, an error result) when the last turn ended aborted. A subagent whose
+  notification is in the record ends there, once.
 - **A resumed session does not replay its history** on stdout. lathe reads it from `claude`'s own record.
 
 ### Sessions

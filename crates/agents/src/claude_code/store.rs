@@ -102,5 +102,7 @@ pub(super) fn read_history(project: &dyn Project, session: &SessionId) -> Result
 pub fn history(transcript: &str) -> Vec<Event> {
     let mut mapper = Mapper::new();
     let now = Instant::now();
-    transcript.lines().flat_map(|line| mapper.line(line, now)).collect()
+    let mut events: Vec<Event> = transcript.lines().flat_map(|line| mapper.line(line, now)).collect();
+    events.extend(mapper.end_of_history());
+    events
 }

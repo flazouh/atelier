@@ -19,7 +19,7 @@ use serde_json::Value;
 
 use super::{
     OwnOptions,
-    context::{self, Budget},
+    context,
     message::{Block, Cancel, Delta, Message, Model, ModelError, ModelRequest, StopReason, ToolDef},
     permission::{self, Rules, Verdict},
     store::{self, Meta},
@@ -204,11 +204,11 @@ impl Runner {
             // The folder is made once; a failure to make it shows up as a failure to save.
             let _ = store::ensure_dir(self.project.as_ref());
         }
-        if let Err(why) = store::save(self.project.as_ref(), &self.meta, &self.messages) {
-            if !self.save_warned {
-                self.save_warned = true;
-                self.warn(format!("This session is not being saved: {why}"));
-            }
+        if let Err(why) = store::save(self.project.as_ref(), &self.meta, &self.messages)
+            && !self.save_warned
+        {
+            self.save_warned = true;
+            self.warn(format!("This session is not being saved: {why}"));
         }
     }
 
@@ -229,7 +229,7 @@ impl Runner {
             if compaction.shortened > 0 {
                 self.warn(format!("Shortened {} old tool results to fit the context.", compaction.shortened));
             }
-            let (reply, partial) = match self.call_model(&system, &defs) {
+            let (reply, _) = match self.call_model(&system, &defs) {
                 Ok(done) => done,
                 Err((ModelError::Cancelled, partial)) => {
                     if !partial.is_empty() {

@@ -1,7 +1,7 @@
 //! The agent's tools. Each is a function of the project and a JSON input, and touches the project only
 //! through the `Project` interface, so the same tool works on a folder here and on an SSH host.
 //! A tool never panics on bad input: it returns an error the model can read and fix.
-use std::{fmt::Write as _, path::Path};
+use std::fmt::Write as _;
 
 use lathe_project::{Project, host_path};
 use serde_json::{Value, json};
@@ -133,9 +133,6 @@ pub(crate) fn object(props: Value, required: &[&str]) -> Value {
     json!({"type": "object", "properties": props, "required": required})
 }
 
-pub(crate) fn name_of(path: &str) -> &str {
-    Path::new(path).file_name().and_then(|n| n.to_str()).unwrap_or(path)
-}
 
 /// The kind and the file of a call of `name`, for a history that shows calls without running a tool.
 pub fn describe(name: &str, input: &Value) -> (ToolKind, Option<String>) {

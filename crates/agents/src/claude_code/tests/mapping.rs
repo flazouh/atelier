@@ -385,3 +385,85 @@ fn a_signal_with_no_stderr_says_only_that() {
     let events = mapper.exited(None, "  \n");
     assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("the agent was stopped by a signal".into()))));
 }
+
+/// A shell command run in the background is the call that started it, still running: `claude` reports it
+/// with a `task_started` of type `local_bash`, and that is not a subagent. Captured with `claude` 2.1.284.
+#[test]
+fn a_background_shell_command_is_a_running_shell_call_not_a_subagent() {
+    let events = replay("background_bash");
+    assert!(!events.iter().any(|e| matches!(e, Event::SubagentStarted(_) | Event::SubagentEnded { .. })), "no subagent: {events:#?}");
+    let call = tool_named(&events, "Bash");
+    assert_eq!(call.kind, crate::session::ToolKind::Shell);
+    let position = |pred: &dyn Fn(&Event) -> bool| events.iter().position(pred).unwrap_or_else(|| panic!("missing event in {events:#?}"));
+    let started = position(&|e| matches!(e, Event::ToolStarted(c) if c.id == call.id));
+    let finished = position(&|e| matches!(e, Event::ToolFinished { id, .. } if *id == call.id));
+    // The result that only says "running in the background" is not the end of the call.
+    let waiting = events[started..finished].iter().filter(|e| matches!(e, Event::TurnEnded(_))).count();
+    assert_eq!(waiting, 1, "the first turn ended while the command still ran");
+    let Event::ToolFinished { output, .. } = &events[finished] else { unreachable!() };
+    assert!(!output.is_error);
+    assert!(output.text.contains("completed (exit code 0)"), "{}", output.text);
+    assert!(!output.text.contains("Command running in background"));
+    assert_eq!(events.iter().filter(|e| matches!(e, Event::ToolFinished { id, .. } if *id == call.id)).count(), 1, "it finishes once");
+}
+
+#[test]
+fn a_background_command_ends_as_failed_when_the_process_dies_first() {
+    let mut mapper = Mapper::new();
+    let now = Instant::now();
+    let lines = fixture("background_bash");
+    let up_to_start: Vec<&str> = lines.lines().take_while(|l| !l.contains("task_notification")).collect();
+    let mut events: Vec<Event> = up_to_start.iter().flat_map(|l| mapper.line(l, now)).collect();
+    events.extend(mapper.exited(Some(1), "boom"));
+    let call = tool_named(&events, "Bash");
+    assert!(events.iter().any(|e| matches!(e, Event::ToolFinished { id, output } if *id == call.id && output.is_error)), "{events:#?}");
+}
+
+fn ended_subagents(events: &[Event]) -> Vec<(String, bool, Option<String>)> {
+    events.iter().filter_map(|e| if let Event::SubagentEnded { id, ok, summary } = e { Some((id.as_str().to_string(), *ok, summary.clone())) } else { None }).collect()
+}
+
+fn subagent_transcript(extra: &[serde_json::Value]) -> String {
+    let mut lines = vec![
+        json!({"type": "user", "message": {"role": "user", "content": "look around"}}),
+        json!({"type": "assistant", "message": {"id": "m1", "content": [
+            {"type": "tool_use", "id": "task1", "name": "Task", "input": {"description": "Count", "prompt": "Count to 60", "subagent_type": "general-purpose"}},
+            {"type": "tool_use", "id": "sh1", "name": "Bash", "input": {"command": "sleep 60"}}]}}),
+    ];
+    lines.extend(extra.iter().cloned());
+    lines.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n")
+}
+
+/// A record has no end for a subagent or a call still going when the record stopped. In history they end.
+#[test]
+fn history_ends_every_subagent_and_call_the_record_left_open() {
+    let events = crate::claude_code::history(&subagent_transcript(&[]));
+    assert!(events.iter().any(|e| matches!(e, Event::SubagentStarted(s) if s.id.as_str() == "task1")), "{events:#?}");
+    let ended = ended_subagents(&events);
+    assert_eq!(ended.len(), 1, "{events:#?}");
+    assert_eq!(&ended[0].0, "task1");
+    assert!(ended[0].1, "a record that just stops is shown as finished");
+    assert!(ended[0].2.as_deref().unwrap().contains("no end"));
+    assert!(events.iter().any(|e| matches!(e, Event::ToolFinished { id, output } if id.as_str() == "sh1" && !output.is_error)), "the open shell call ends too");
+    let mut conversation = crate::session::Conversation::new();
+    events.iter().for_each(|e| conversation.apply(e));
+    assert!(!conversation.working(), "the resumed session shows nothing running");
+}
+
+#[test]
+fn history_of_an_aborted_turn_ends_open_work_as_interrupted() {
+    let aborted = json!({"type": "result", "subtype": "error_during_execution", "is_error": true, "terminal_reason": "aborted_tools"});
+    let events = crate::claude_code::history(&subagent_transcript(&[aborted]));
+    let ended = ended_subagents(&events);
+    assert_eq!(ended.len(), 1, "{events:#?}");
+    assert!(!ended[0].1, "an aborted turn leaves its subagent interrupted");
+    assert!(ended[0].2.as_deref().unwrap().contains("Interrupted"));
+}
+
+#[test]
+fn history_does_not_end_a_subagent_twice() {
+    let done = json!({"type": "system", "subtype": "task_notification", "tool_use_id": "task1", "status": "completed", "summary": "counted"});
+    let events = crate::claude_code::history(&subagent_transcript(&[done]));
+    assert_eq!(ended_subagents(&events).len(), 1, "{events:#?}");
+    assert_eq!(ended_subagents(&events)[0].2.as_deref(), Some("counted"));
+}

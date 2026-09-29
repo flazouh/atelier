@@ -33,6 +33,8 @@ pub(super) struct System {
     pub tool_use_id: Option<String>,
     pub description: Option<String>,
     pub subagent_type: Option<String>,
+    /// `local_agent` for a subagent, `local_bash` for a shell command run in the background.
+    pub task_type: Option<String>,
     pub status: Option<String>,
     pub summary: Option<String>,
 }

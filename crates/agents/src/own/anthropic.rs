@@ -186,10 +186,10 @@ impl Model for Anthropic {
                 parser.feed(&chunk[..n], &mut |e| events.push(e)).map_err(ModelError::Malformed)?;
             }
             for event in events {
-                if failure.is_none() {
-                    if let Err(e) = state.on_event(event.name.as_deref(), &event.data, sink) {
-                        failure = Some(e);
-                    }
+                if failure.is_none()
+                    && let Err(e) = state.on_event(event.name.as_deref(), &event.data, sink)
+                {
+                    failure = Some(e);
                 }
             }
             if let Some(e) = failure {
