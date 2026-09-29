@@ -12,3 +12,4 @@ lathe-lsp.workspace = true
 lsp-types = "0.97"
 futures-channel = "0.3"
 futures-util = "0.3"
+anyhow = "1"

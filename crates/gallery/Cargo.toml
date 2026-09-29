@@ -15,9 +15,6 @@ lathe-project.workspace = true
 lathe-settings.workspace = true
 ignore = "0.4.33"
 lsp-types = "0.97"
-anyhow = "1"
-futures-channel = "0.3"
-futures-util = "0.3"
 
 [dev-dependencies]
 gpui-kit = { workspace = true, features = ["test-support"] }
