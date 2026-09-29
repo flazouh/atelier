@@ -231,3 +231,26 @@ method as above; load average 4.4, 15 runs (7 for the disk case).
 
 The first run of the disk case took 250 ms: it read the last commit's text of each file git found with one
 `git show` a file. One `git cat-file --batch` for all of them brought it to 55 ms.
+
+## Sidebar and panels
+The gallery's "Sidebar" and "Panels" stories under a measuring run (`GALLERY_SCROLL=1`), release, on the
+HP. The HP draws in software, so a whole frame there is 48 ms whatever the code does; the numbers to read
+are our own layout, prepaint and paint, and the layout node count of the first frame. A whole-frame run on
+a Mac needs the window in front (see above).
+
+    GALLERY_STORY=Sidebar GALLERY_SCROLL=1 SIDEBAR_PROJECTS=50 SIDEBAR_SESSIONS=40 target/release/beui-gallery
+    GALLERY_STORY=Sidebar GALLERY_SCROLL=1 SIDEBAR_PROJECTS=50 SIDEBAR_SESSIONS=40 SIDEBAR_OPEN=1 ...
+    GALLERY_STORY=Panels GALLERY_SCROLL=1 PANELS=12 target/release/beui-gallery
+    GALLERY_STORY=Panels GALLERY_SCROLL=1 PANELS=12 GALLERY_SWITCH=1 ...
+
+| Case (300 frames, load average 9) | Target | Layout and prepaint, median | p95 | Paint, median | Layout nodes, first frame |
+| --- | --- | --- | --- | --- | --- |
+| Sidebar, 50 projects and 2,000 sessions, folded | frame under 8.3 ms | 1.10 ms | 2.11 ms | 0.36 ms | 105 |
+| The same with every fold open (every session a row) | frame under 8.3 ms | 1.11 ms | 1.87 ms | 0.31 ms | 105 |
+| Panels, 12 side by side, scrolled a frame at a time | frame under 8.3 ms | 0.66 ms | 1.52 ms | 0.64 ms | 208 |
+| The same, switching the layout every 30th frame | one frame | 0.56 ms | 0.88 ms | 0.47 ms | 208 |
+
+The node count does not grow with the data: the list builds the rows in view, and the strip builds the
+columns in view and a margin. The whole-frame numbers on the Mac are for the lead to measure. The
+switching run counts the frames with a switch apart ("frame with a switch"); on the HP they took the same
+48 ms as the rest.

@@ -110,4 +110,3 @@ impl Element for Timed {
         self.stages.borrow_mut().paint += start.elapsed();
     }
 }
-
