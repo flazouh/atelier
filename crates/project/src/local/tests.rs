@@ -125,6 +125,25 @@ fn a_spawned_process_talks_over_its_pipes() {
 }
 
 #[test]
+fn a_process_that_fails_leaves_its_stderr_and_only_the_tail_of_a_long_one() {
+    let (_dir, p) = project(&[]);
+    let mut failing = p.spawn(&Command::new("sh").args(["-c", "echo 'no such model' >&2; exit 3"])).unwrap();
+    assert_eq!(failing.control.wait().unwrap(), Some(3));
+    // The reader thread may still hold the last chunk for a moment after the exit.
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while failing.control.stderr().is_empty() && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(failing.control.stderr(), "no such model\n");
+    let tail = crate::Tail::default();
+    tail.push(&vec![b'a'; crate::STDERR_KEEP]);
+    tail.push(b"the end");
+    let text = tail.text();
+    assert_eq!(text.len(), crate::STDERR_KEEP);
+    assert!(text.ends_with("the end"));
+}
+
+#[test]
 fn git_runs_in_the_root_and_reports_a_folder_with_no_repository() {
     let (_dir, p) = project(&[("a.txt", "a")]);
     let status = p.git(&["status", "--porcelain"]).unwrap();

@@ -17,7 +17,7 @@ mod local;
 mod process;
 
 pub use local::LocalProject;
-pub use process::{Command, Control, Process};
+pub use process::{Command, Control, Process, STDERR_KEEP, Tail};
 
 /// One file or folder in the tree.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

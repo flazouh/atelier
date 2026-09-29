@@ -14,7 +14,7 @@ use ignore::{WalkBuilder, gitignore::Gitignore};
 use notify::{EventKind, RecursiveMode, Watcher};
 use regex::RegexBuilder;
 
-use crate::{Change, ChangeKind, ChangeSink, Command, Entry, GitOutput, Match, Process, Project, Query, Watch, host_path};
+use crate::{Change, ChangeKind, ChangeSink, Command, Entry, process::LocalChild, GitOutput, Match, Process, Project, Query, Watch, host_path};
 
 /// How long a watch gathers changes before it sends them, so a save that touches a file three times,
 /// or a checkout that touches a thousand, arrives as one batch.
@@ -181,11 +181,11 @@ impl Project for LocalProject {
             .envs(command.env.iter().map(|(k, v)| (k, v)))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()?;
         let stdin = child.stdin.take().expect("stdin is piped");
         let stdout = child.stdout.take().expect("stdout is piped");
-        Ok(Process { stdin: Box::new(stdin), stdout: Box::new(stdout), control: Box::new(child) })
+        Ok(Process { stdin: Box::new(stdin), stdout: Box::new(stdout), control: Box::new(LocalChild::new(child)) })
     }
 
     fn git(&self, args: &[&str]) -> io::Result<GitOutput> {
