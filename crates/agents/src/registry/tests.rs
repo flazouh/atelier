@@ -35,3 +35,10 @@ fn a_model_id_maps_to_its_lab() {
     assert!(model_mark("grok-4").is_none(), "xAI takes the monogram");
     assert!(model_mark("local-7b").is_none());
 }
+
+#[test]
+fn lathes_own_agent_is_offered_with_a_monogram() {
+    let own = agents().into_iter().find(|a| a.name == "lathe").expect("lathe's own agent is offered");
+    assert!(own.mark.is_none(), "it takes the monogram");
+    assert!(by_backend(own.backend.name()).is_some_and(|a| a.name == "lathe"));
+}

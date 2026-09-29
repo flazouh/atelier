@@ -16,6 +16,16 @@ const FRAMES: usize = 300;
 /// A frame must fit this: 120 Hz.
 const LIMIT: Duration = Duration::from_micros(8_333);
 
+thread_local! {
+    /// The last frame's layout and paint, for a timing that wants its own frame's cost.
+    static LAST: std::cell::Cell<Duration> = const { std::cell::Cell::new(Duration::ZERO) };
+}
+
+/// The last frame's layout and paint on the CPU; zero without `LATHE_FRAMES=1`.
+pub fn last_frame() -> Duration {
+    LAST.with(std::cell::Cell::get)
+}
+
 pub fn enabled() -> bool {
     std::env::var("LATHE_FRAMES").is_ok_and(|v| v == "1")
 }
@@ -31,6 +41,7 @@ pub struct Meter {
 
 impl Meter {
     fn frame_done(&mut self) {
+        LAST.with(|last| last.set(self.current));
         self.frames.push(std::mem::take(&mut self.current));
         self.layouts.push(std::mem::take(&mut self.layout));
         if self.frames.len() >= FRAMES {

@@ -96,8 +96,10 @@ pub struct Shell {
 /// The right pane's width a review opens at, room for its tree beside the file: less when the window
 /// has not got it, since the agent panel keeps its least width.
 const REVIEW_WIDTH: f32 = 860.;
-/// The agent panel's least width.
+/// The agent panel's least width, which a reader can drag it to.
 const AGENT_LEAST: f32 = 320.;
+/// What a review leaves the agent panel: a session panel at its default width, and its margins.
+const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::panel_layout::GAP + 4.;
 
 impl Shell {
     pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
@@ -368,13 +370,14 @@ impl Shell {
         }
     }
 
-    /// Gives the right pane the width a review wants, taken from the agent panel down to its least.
+    /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
+    /// still fits in it.
     fn widen_for_review(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let sizes = self.splits.read(cx).sizes().clone();
         let (Some(&right), Some(last)) = (sizes.last(), sizes.len().checked_sub(1)) else { return };
         let others = sizes[..last].iter().fold(px(0.), |a, b| a + *b);
         let sidebar = if self.sidebar { sizes[0] } else { px(0.) };
-        let room = right + others - sidebar - px(AGENT_LEAST);
+        let room = right + others - sidebar - px(AGENT_BESIDE_REVIEW);
         let want = px(REVIEW_WIDTH).min(room);
         if right < want {
             self.before_review.get_or_insert(right);

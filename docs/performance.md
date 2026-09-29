@@ -386,3 +386,32 @@ ms, the two blobs of one file 4 to 5 ms, and building the diff 0.01 ms. They add
 the target of 200 ms holds in the test; the story run, on a machine at load average 20 to 40, took up to
 four times as long for the same work. The window shows the saved read (header, checks, conversation, tree
 from the forge's file list) before git answers.
+
+## Review in the app
+
+A real turn of 200 files (claude ran `sed -i 1s/value/amount/ src/*.rs` over 199 small Rust files and
+one of 20,000 lines), then the review, in the release app under Xvfb at 1440×900. `LATHE_TIMINGS=1`
+prints each open and each whole-file decision: the pane's own work, how long after the press the frame
+that shows it began, and that frame's layout and paint (`LATHE_FRAMES=1`). The load average was 23 to 27
+from other builds on the HP.
+
+    LATHE_TIMINGS=1 LATHE_FRAMES=1 target/release/lathe ~/qa/big    # then Review, Escape, and ⌃⇧↵
+
+| Case | Target | Median | p95 or worst | Runs | Result |
+| --- | --- | --- | --- | --- | --- |
+| Open, first file 20,000 lines: press to the frame drawn | < 100 ms | 97.0 ms | 154.7 ms | 11 | Median at the target, p95 over |
+| The same: the pane's work | | 15.6 ms | 33.0 ms | 11 | |
+| The same: the first frame's layout and paint | | 61.9 ms | 112.4 ms | 11 | |
+| Open, first file 5 lines: press to the frame drawn | < 100 ms | 56 ms | 111 ms (the first open) | 8 | Passes but for the first |
+| Accept a whole file: the frame that shows it | one frame (8.3 ms) | 5.7 ms | 9.1 ms (worst 9.8) | 20 | 18 of 20 in a frame |
+| The same: the pane's work | | 0.9 ms | 5.1 ms | 20 | |
+
+- About 30 to 45 ms of each press-to-frame time is the wait before the frame begins, which a light
+  action (1 ms of work) shows too: the frame clock under Xvfb, and the load.
+- The open's cost is the 20,000-line editor: 15 ms to build its state, and about 50 ms in its first
+  layout. That is the editor's own, as it is for a tab; it is the next thing to measure on the Mac and
+  to cut.
+- Before gpui-component patch 3, each new editor compiled the Rust highlight queries (about 50 ms) on
+  the UI thread in its first frame: accepting a file, which opens the next one in a new editor, took a
+  30 to 65 ms frame (median 51 ms). With the queries compiled once per process, 5.7 ms. The first open of
+  a language in a process still pays it once (the 111 ms above).

@@ -15,7 +15,7 @@
 use std::{collections::HashSet, sync::Arc, time::{Duration, Instant}};
 
 use beui::{
-    ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineReview, LineComment, LineComposer, LineComposerEvent,
+    ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer, LineComposerEvent,
     ReviewBar, ReviewFileHeader, ReviewHandlers, ReviewProgress,
     file_tree::FileTree,
     inline_review,
@@ -41,7 +41,7 @@ use crate::{
 /// How long after the reader's last key the file is written.
 const WRITE_AFTER: Duration = Duration::from_millis(300);
 /// Below this width the tree hides, and `s`, `w` and the bar walk the files; review mode shows it.
-const TREE_FROM: f32 = 760.;
+const TREE_FROM: f32 = 680.;
 
 /// Which changes the review holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -84,7 +84,7 @@ impl PaneFile {
         Self { review, merged, on_disk, undo: Vec::new() }
     }
 
-    fn hunks(&self) -> &[beui::InlineHunk] {
+    fn hunks(&self) -> &[InlineHunk] {
         self.merged.as_ref().map_or(&[], |m| m.hunks())
     }
 
@@ -113,12 +113,15 @@ pub struct ReviewPane {
     /// How many turns the session had when the files were read.
     turns: usize,
     pub files: Vec<PaneFile>,
+    /// The files as the tree and the walk list them, made once when the files are read.
+    changed: Vec<ChangedFile>,
     pub current: usize,
     editor: Entity<EditorState>,
     focus: FocusHandle,
     pub review_mode: bool,
     resolving: Vec<beui::Resolve>,
-    composer: Option<(usize, Entity<LineComposer>, Subscription)>,
+    /// The comment being written: its file, the composer, and what the pane listens to on it.
+    composer: Option<(usize, Entity<LineComposer>, [Subscription; 2])>,
     width: f32,
     writing: Option<Task<()>>,
     _edits: Subscription,
@@ -134,6 +137,7 @@ impl ReviewPane {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let pressed = Instant::now();
         let files = read_files(session.read(cx), scope);
         let current = path.and_then(|p| files.iter().position(|f| f.review.path == p)).unwrap_or(0);
         let (editor, _edits) = Self::editor_for(files.get(current), window, cx);
@@ -148,12 +152,15 @@ impl ReviewPane {
             Scope::Turn(turn) => turn,
             Scope::Whole => turns.saturating_sub(1),
         };
+        // Typing not yet written when the pane goes is written as it goes.
+        cx.on_release(|pane: &mut Self, cx| pane.flush(cx)).detach();
         let mut pane = Self {
             session,
             project,
             scope,
             turn,
             turns,
+            changed: changed_of(&files),
             files,
             current,
             editor,
@@ -167,6 +174,7 @@ impl ReviewPane {
             _session,
         };
         pane.check_disk(pane.files.iter().map(|f| f.review.path.clone()).collect(), window, cx);
+        timing(window, format!("review of {} files opened", pane.files.len()), pressed, pressed.elapsed());
         pane
     }
 
@@ -181,6 +189,16 @@ impl ReviewPane {
             }
         });
         (editor, edits)
+    }
+
+    /// Puts the open file in a new editor. When the reader's keys were in the old one, they go to the
+    /// new one, or the next key would reach nothing.
+    fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let had_keys = self.editor.focus_handle(cx).is_focused(window);
+        (self.editor, self._edits) = Self::editor_for(self.files.get(self.current), window, cx);
+        if had_keys {
+            focus_once_painted(self.editor.focus_handle(cx), 3, window, cx);
+        }
     }
 
     /// The editor's text changed. The pane's own edits leave it equal to the file's merged text; an undo
@@ -201,7 +219,6 @@ impl ReviewPane {
             }
             None => merged.edited(&text),
         });
-        self.keep(at, cx);
         let this = cx.entity().downgrade();
         let timer = cx.background_executor().timer(WRITE_AFTER);
         self.writing = Some(cx.spawn(async move |_, cx| {
@@ -213,18 +230,22 @@ impl ReviewPane {
 
     /// Keeps file `at` as it stands with the session, so the review opens again as it was left.
     fn keep(&self, at: usize, cx: &mut Context<Self>) {
-        let (scope, file) = (self.scope, self.files[at].clone());
-        self.session.update(cx, |s, _| drop(s.decided.insert((scope, file.review.path.clone()), (file.merged, file.on_disk))));
+        let file = &self.files[at];
+        let (key, kept) = ((self.scope, file.review.path.clone()), (file.merged.clone(), file.on_disk.clone()));
+        self.session.update(cx, |s, _| drop(s.decided.insert(key, kept)));
     }
 
-    /// Writes files `at` with what the reader decided, off the UI thread.
+    /// Keeps files `at` with the session and writes the ones whose text is not on disk yet, off the UI
+    /// thread. An accept leaves the disk as it is, but its decision is kept all the same.
     fn write(&mut self, at: &[usize], cx: &mut Context<Self>) {
         let mut writes = Vec::new();
-        for &i in at {
-            let Some(text) = self.files.get(i).and_then(PaneFile::to_write) else { continue };
-            self.files[i].on_disk = Some(text.clone());
+        let count = self.files.len();
+        for &i in at.iter().filter(|i| **i < count) {
+            if let Some(text) = self.files[i].to_write() {
+                self.files[i].on_disk = Some(text.clone());
+                writes.push((self.files[i].review.path.clone(), text));
+            }
             self.keep(i, cx);
-            writes.push((self.files[i].review.path.clone(), text));
         }
         if writes.is_empty() {
             return;
@@ -239,6 +260,17 @@ impl ReviewPane {
             }
         })
         .detach();
+    }
+
+    /// Writes the open file when typing waits to be written, as the pane goes: the writes run on their
+    /// own, past the pane.
+    fn flush(&mut self, cx: &mut gpui_kit::App) {
+        if self.writing.take().is_none() {
+            return;
+        }
+        let Some(text) = self.files.get(self.current).and_then(PaneFile::to_write) else { return };
+        let (project, path) = (self.project.clone(), self.files[self.current].review.path.clone());
+        cx.background_spawn(async move { drop(project.write(&path, text.as_bytes())) }).detach();
     }
 
     /// Files of the project changed on disk: those under review are read again, and the ones the agent
@@ -298,13 +330,8 @@ impl ReviewPane {
         self.current = at;
         self.resolving.clear();
         self.composer = None;
-        (self.editor, self._edits) = Self::editor_for(self.files.get(at), window, cx);
+        self.load_editor(window, cx);
         cx.notify();
-    }
-
-    fn changed(&self) -> Vec<ChangedFile> {
-        let files: Vec<FileReview> = self.files.iter().map(|f| f.review.clone()).collect();
-        lathe_review::present::changed_files(&files)
     }
 
     /// A file is reviewed once no hunk is left in it, or once the reader marked it.
@@ -317,12 +344,12 @@ impl ReviewPane {
             .collect()
     }
 
-    fn progress(&self, cx: &gpui_kit::App) -> ReviewProgress {
+    fn progress(&self, reviewed: &HashSet<SharedString>) -> ReviewProgress {
         let (added, removed) = self.files.iter().fold((0, 0), |(a, r), f| {
             let (fa, fr) = f.review.counts();
             (a + fa, r + fr)
         });
-        ReviewProgress { files: self.files.len(), reviewed: self.reviewed(cx).len(), added, removed }
+        ReviewProgress { files: self.files.len(), reviewed: reviewed.len(), added, removed }
     }
 
     fn toggle_mark(&mut self, cx: &mut Context<Self>) {
@@ -339,25 +366,37 @@ impl ReviewPane {
     }
 
     fn step(&mut self, by: isize, window: &mut Window, cx: &mut Context<Self>) {
-        let order = FileTree::new(&self.changed()).file_order();
+        let order = FileTree::new(&self.changed).file_order();
         let current = self.files.get(self.current).map(|f| SharedString::from(f.review.path.clone()));
         if let Some(path) = step(&order, current.as_ref(), by) {
             self.open(&path, window, cx);
         }
     }
 
+    /// Applies `decisions` to file `at`: its `Merged`, its undo, and the editor when it is the open
+    /// one. The caller writes. False when there was nothing to decide.
+    fn decide(&mut self, at: usize, decisions: &[(InlineHunk, Decision)], window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(merged) = self.files.get(at).and_then(|f| f.merged.clone()) else { return false };
+        if decisions.is_empty() {
+            return false;
+        }
+        let decided = decisions.iter().fold(merged.clone(), |m, (h, d)| m.decide(&h.id, *d).unwrap_or(m));
+        let file = &mut self.files[at];
+        file.undo.push(merged);
+        file.merged = Some(decided);
+        if at == self.current {
+            inline_review::apply(&self.editor, decisions, window, cx);
+        }
+        true
+    }
+
     /// Decides hunk `id` of the open file, writes the file, and gives the rows that closed; `None` when
     /// the file has no such hunk.
     fn decide_hunk(&mut self, id: &str, decision: Decision, window: &mut Window, cx: &mut Context<Self>) -> Option<std::ops::Range<usize>> {
         let at = self.current;
-        let merged = self.files.get(at)?.merged.clone()?;
-        let hunk = merged.hunks().iter().find(|h| h.id == id).cloned()?;
+        let hunk = self.files.get(at)?.hunks().iter().find(|h| h.id == id).cloned()?;
         let closed = hunk.closing(decision);
-        let decided = merged.decide(id, decision)?;
-        let file = &mut self.files[at];
-        file.undo.push(merged);
-        file.merged = Some(decided);
-        inline_review::apply(&self.editor, &[(hunk, decision)], window, cx);
+        self.decide(at, &[(hunk, decision)], window, cx);
         self.write(&[at], cx);
         cx.notify();
         Some(closed)
@@ -365,16 +404,16 @@ impl ReviewPane {
 
     /// Decides every hunk of the open file at once, writes it, and moves to the next file.
     fn decide_file(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
+        let started = Instant::now();
+        self.decide_file_now(decision, window, cx);
+        timing(window, "review: a whole file decided".into(), started, started.elapsed());
+    }
+
+    fn decide_file_now(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
         let at = self.current;
-        let Some(merged) = self.files.get(at).and_then(|f| f.merged.clone()) else { return self.step(1, window, cx) };
-        let hunks = merged.hunks().to_vec();
-        if !hunks.is_empty() {
-            self.resolving.clear();
-            let decided = decide_all(&merged, decision);
-            let file = &mut self.files[at];
-            file.undo.push(merged);
-            file.merged = Some(decided);
-            inline_review::apply(&self.editor, &whole_file(&hunks, decision), window, cx);
+        self.resolving.clear();
+        let decisions = self.files.get(at).map(|f| whole_file(f.hunks(), decision)).unwrap_or_default();
+        if self.decide(at, &decisions, window, cx) {
             self.write(&[at], cx);
         }
         self.step(1, window, cx);
@@ -384,20 +423,13 @@ impl ReviewPane {
     /// Decides every hunk of every file, and writes them.
     fn decide_every_file(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
         self.resolving.clear();
-        let mut changed = Vec::new();
-        for (i, file) in self.files.iter_mut().enumerate() {
-            let Some(merged) = file.merged.clone() else { continue };
-            if merged.hunks().is_empty() {
-                continue;
-            }
-            if i == self.current {
-                inline_review::apply(&self.editor, &whole_file(merged.hunks(), decision), window, cx);
-            }
-            file.merged = Some(decide_all(&merged, decision));
-            file.undo.push(merged);
-            changed.push(i);
-        }
-        self.write(&changed, cx);
+        let decided: Vec<usize> = (0..self.files.len())
+            .filter(|&at| {
+                let decisions = whole_file(self.files[at].hunks(), decision);
+                self.decide(at, &decisions, window, cx)
+            })
+            .collect();
+        self.write(&decided, cx);
         cx.notify();
     }
 
@@ -412,11 +444,12 @@ impl ReviewPane {
         }
         self.scope = scope;
         self.files = read_files(self.session.read(cx), scope);
+        self.changed = changed_of(&self.files);
         self.turns = self.session.read(cx).review.turns().len();
         self.current = path.and_then(|p| self.files.iter().position(|f| f.review.path == p)).unwrap_or(0);
         self.resolving.clear();
         self.composer = None;
-        (self.editor, self._edits) = Self::editor_for(self.files.get(self.current), window, cx);
+        self.load_editor(window, cx);
         self.check_disk(self.files.iter().map(|f| f.review.path.clone()).collect(), window, cx);
         cx.notify();
     }
@@ -438,8 +471,11 @@ impl ReviewPane {
             this.composer = None;
             cx.notify();
         });
-        composer.focus_handle(cx).focus(window, cx);
-        self.composer = Some((self.current, composer, sub));
+        // The composer is drawn in a row block, which the editor draws only when it draws itself: each
+        // change of the composer draws the editor again, or what is typed would not show.
+        let redraw = cx.observe(&composer, |this, _, cx| this.editor.update(cx, |_, cx| cx.notify()));
+        focus_once_painted(composer.focus_handle(cx), 3, window, cx);
+        self.composer = Some((self.current, composer, [sub, redraw]));
         cx.notify();
     }
 
@@ -504,11 +540,12 @@ impl ReviewPane {
             };
             let entry = Comment::new("You", time, comment.body.clone());
             let (session, id) = (self.session.clone(), comment.id);
+            let element = gpui_kit::ElementId::NamedInteger("comment".into(), id);
             let this = cx.entity().downgrade();
             blocks.push(RowBlock {
                 row,
                 render: std::rc::Rc::new(move |_, _| {
-                    let thread = LineComment::new(("comment", id as usize), vec![entry.clone()]).resolved(sent == Some(true));
+                    let thread = LineComment::new(element.clone(), vec![entry.clone()]).resolved(sent == Some(true));
                     match sent {
                         // Waiting: Resolve takes it back before it goes; Reply adds another on its row.
                         None => {
@@ -536,9 +573,37 @@ impl ReviewPane {
     }
 }
 
-/// Every hunk of `merged` decided the same way.
-fn decide_all(merged: &Merged, decision: Decision) -> Merged {
-    merged.hunks().iter().fold(merged.clone(), |m, h| m.decide(&h.id, decision).unwrap_or(m))
+/// Focuses `handle` now and again at each of the next `frames` frames: a composer in a row block is
+/// painted only once the editor has laid it out, a frame or two later, and a frame that does not paint
+/// the focused handle drops the focus. It counts as focused until then, so the retry cannot ask.
+fn focus_once_painted(handle: FocusHandle, frames: usize, window: &mut Window, cx: &mut gpui_kit::App) {
+    handle.focus(window, cx);
+    if frames > 0 {
+        window.on_next_frame(move |window, cx| focus_once_painted(handle, frames - 1, window, cx));
+    }
+}
+
+/// With `LATHE_TIMINGS=1`, prints what an action cost: its own `work`, how long after `since` the frame
+/// that shows it began (the wait for the display), and that frame's layout and paint (with
+/// `LATHE_FRAMES=1`). A next-frame callback runs as a frame begins, before it is drawn, so the frame's
+/// cost is read at the start of the one after it.
+fn timing(window: &Window, what: String, since: Instant, work: Duration) {
+    if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
+        let ms = |d: Duration| d.as_secs_f64() * 1000.;
+        window.on_next_frame(move |window, _| {
+            let began = since.elapsed();
+            window.on_next_frame(move |_, _| {
+                let frame = crate::frame_meter::last_frame();
+                eprintln!("{what}: work {:.1} ms, its frame began after {:.1} ms and took {:.1} ms", ms(work), ms(began), ms(frame));
+            });
+        });
+    }
+}
+
+/// The list the tree and the walk take: each file's path, `+a -r` and change.
+fn changed_of(files: &[PaneFile]) -> Vec<ChangedFile> {
+    let reviews: Vec<FileReview> = files.iter().map(|f| f.review.clone()).collect();
+    lathe_review::present::changed_files(&reviews)
 }
 
 /// The files of `scope`, with what the reader decided before where the session kept it.
@@ -587,15 +652,15 @@ impl Render for ReviewPane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let handlers = self.handlers(cx);
-        let progress = self.progress(cx);
         let reviewed = self.reviewed(cx);
+        let progress = self.progress(&reviewed);
         let scope = match self.scope {
             Scope::Turn(_) => 0,
             Scope::Whole => 1,
         };
         let bar = ReviewBar::new("review-bar", progress, handlers.clone())
             .review_mode(self.review_mode)
-            .scopes(["This turn".into(), "Whole session".into()], scope);
+            .scopes([("This turn".into(), "Turn".into()), ("Whole session".into(), "Session".into())], scope);
 
         let Some(file) = self.files.get(self.current) else {
             let empty = div()
@@ -663,7 +728,7 @@ impl Render for ReviewPane {
         let show_tree = self.review_mode || self.width >= TREE_FROM;
         let tree = show_tree.then(|| {
             div().flex_none().w(px(220.)).h_full().bg(theme.card).rounded(radius::LG).p(px(6.)).child(
-                ChangedFileTree::new("review-tree", self.changed()).reviewed(reviewed).current(path).on_open(move |path, window, cx| open(path, window, cx)),
+                ChangedFileTree::new("review-tree", self.changed.clone()).reviewed(reviewed).current(path).on_open(move |path, window, cx| open(path, window, cx)),
             )
         });
         let this = cx.entity().downgrade();

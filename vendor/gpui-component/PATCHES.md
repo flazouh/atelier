@@ -79,3 +79,20 @@ equals a synchronous one; and 50 keystrokes during a parse make two parses, of w
 taken. `coalesced_edits_update_the_layers_in_place_and_equal_a_fresh_parse` makes 80 parses of one to six
 random edits each for Rust, Markdown and HTML: each landed parse equals a fresh one, and at least
 three in four update the layers in place (80 of 80 in each language when written).
+
+## 3. A language's queries compile once per process
+
+`SyntaxHighlighter::new` compiled the language's highlight, locals and injection queries each time:
+about 50 ms for Rust on the HP, on the UI thread, in the first frame of every editor that opened and
+after every `set_value`, which drops the editor's highlighter. A review that steps through files made
+a new editor for each, so each step's frame took 30 to 65 ms.
+
+`Compiled` holds what the queries give (the queries, the pattern indices, the capture indices), built
+the first time any highlighter of a language asks and kept for the process, by the language's name and
+a hash of its query sources, so a language registered again with new queries compiles them anew. The
+queries are only read after they are built, so every highlighter of the language shares them through
+an `Arc`, on any thread. The lock is held while a language compiles, so two threads that want it wait
+for one build. Each highlighter keeps its own parser.
+
+Test: `tests/shared_queries.rs`. A second Rust highlighter builds at least ten times faster than the
+first, which compiled the queries, and colours a text the same.

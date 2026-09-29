@@ -1,6 +1,7 @@
 #[cfg(test)]
 use crate::highlighter::HighlightTheme;
 use crate::highlighter::LanguageRegistry;
+use crate::highlighter::GrammarConfig;
 
 use anyhow::{Context, Result, anyhow};
 use gpui::{HighlightStyle, SharedString};
@@ -33,7 +34,7 @@ const INJECTION_PARSE_TIMEOUT: Duration = Duration::from_millis(20);
 #[allow(unused)]
 pub struct SyntaxHighlighter {
     language: SharedString,
-    query: Option<Query>,
+    query: Option<Arc<Query>>,
     /// The full injections query. This is used to build injection layers during parsing.
     injections_query: Option<Arc<Query>>,
 
@@ -1092,7 +1093,78 @@ impl SyntaxHighlighter {
         parser
             .set_language(&grammar)
             .context("parse set_language")?;
+        let compiled = Compiled::for_language(&config, &grammar)?;
+        Ok(Self {
+            language: config.name.clone(),
+            query: Some(compiled.query.clone()),
+            injections_query: compiled.injections_query.clone(),
+            locals_pattern_index: compiled.locals_pattern_index,
+            highlights_pattern_index: compiled.highlights_pattern_index,
+            non_local_variable_patterns: compiled.non_local_variable_patterns.clone(),
+            injection_content_capture_index: compiled.injection_content_capture_index,
+            injection_language_capture_index: compiled.injection_language_capture_index,
+            local_scope_capture_index: compiled.local_scope_capture_index,
+            local_def_capture_index: compiled.local_def_capture_index,
+            local_def_value_capture_index: compiled.local_def_value_capture_index,
+            local_ref_capture_index: compiled.local_ref_capture_index,
+            text: Rope::new(),
+            parser,
+            tree: None,
+            injection_layers: Vec::new(),
+            combined_ranges: Vec::new(),
+            injections_capped: false,
+            injections_edited: false,
+            injection_budget: Some(INJECTION_PARSE_TIMEOUT),
+            moved_since_parse: None,
+            injections_current: false,
+        })
+    }
+}
 
+/// lathe patch 3: a language's queries, compiled once for the whole process. Compiling Rust's takes
+/// about 50 ms, and every new highlighter needed them: each editor that opened, and each `set_value`,
+/// which drops the editor's highlighter. The queries never change after they are built, so every
+/// highlighter of the language shares them, on any thread.
+struct Compiled {
+    query: Arc<Query>,
+    injections_query: Option<Arc<Query>>,
+    locals_pattern_index: usize,
+    highlights_pattern_index: usize,
+    non_local_variable_patterns: Vec<bool>,
+    injection_content_capture_index: Option<u32>,
+    injection_language_capture_index: Option<u32>,
+    local_scope_capture_index: Option<u32>,
+    local_def_capture_index: Option<u32>,
+    local_def_value_capture_index: Option<u32>,
+    local_ref_capture_index: Option<u32>,
+}
+
+/// By the language's name and a hash of its query sources, so a language registered again with new
+/// queries compiles them anew.
+static COMPILED: std::sync::LazyLock<std::sync::Mutex<HashMap<(SharedString, u64), Arc<Compiled>>>> =
+    std::sync::LazyLock::new(Default::default);
+
+impl Compiled {
+    /// The queries of `lang`, compiled the first time any highlighter asks. The lock is held while
+    /// they compile, so two threads that want the same language wait for one build.
+    fn for_language(
+        config: &GrammarConfig,
+        grammar: &tree_sitter::Language,
+    ) -> Result<Arc<Self>> {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        (&config.injections, &config.locals, &config.highlights).hash(&mut hasher);
+        let key = (config.name.clone(), hasher.finish());
+        let mut compiled = COMPILED.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(found) = compiled.get(&key) {
+            return Ok(found.clone());
+        }
+        let built = Arc::new(Self::build(config, grammar)?);
+        compiled.insert(key, built.clone());
+        Ok(built)
+    }
+
+    fn build(config: &GrammarConfig, grammar: &tree_sitter::Language) -> Result<Self> {
         // Concatenate the query strings, keeping track of the start offset of each section.
         let mut query_source = String::new();
         query_source.push_str(&config.injections);
@@ -1103,7 +1175,7 @@ impl SyntaxHighlighter {
 
         // Construct a single query by concatenating the three query strings, but record the
         // range of pattern indices that belong to each individual string.
-        let mut query = Query::new(&grammar, &query_source).context("new query")?;
+        let mut query = Query::new(grammar, &query_source).context("new query")?;
 
         let mut locals_pattern_index = 0;
         let mut highlights_pattern_index = 0;
@@ -1120,7 +1192,7 @@ impl SyntaxHighlighter {
         }
 
         let injections_query = if !config.injections.is_empty() {
-            Query::new(&grammar, &config.injections).ok().map(Arc::new)
+            Query::new(grammar, &config.injections).ok().map(Arc::new)
         } else {
             None
         };
@@ -1170,13 +1242,9 @@ impl SyntaxHighlighter {
             }
         }
 
-        // let highlight_indices = vec![None; query.capture_names().len()];
-
         Ok(Self {
-            language: config.name.clone(),
-            query: Some(query),
+            query: Arc::new(query),
             injections_query,
-
             locals_pattern_index,
             highlights_pattern_index,
             non_local_variable_patterns,
@@ -1186,19 +1254,11 @@ impl SyntaxHighlighter {
             local_def_capture_index,
             local_def_value_capture_index,
             local_ref_capture_index,
-            text: Rope::new(),
-            parser,
-            tree: None,
-            injection_layers: Vec::new(),
-            combined_ranges: Vec::new(),
-            injections_capped: false,
-            injections_edited: false,
-            injection_budget: Some(INJECTION_PARSE_TIMEOUT),
-            moved_since_parse: None,
-            injections_current: false,
         })
     }
+}
 
+impl SyntaxHighlighter {
     pub fn is_empty(&self) -> bool {
         self.text.len() == 0
     }

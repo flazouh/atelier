@@ -277,3 +277,25 @@ fn a_file_put_back_is_no_longer_deleted(cx: &mut TestAppContext) {
     assert_eq!(deleted(&project, cx, "a.txt"), Deleted::No);
     assert_eq!(cx.update(|_, cx| project.read(cx).buffers["a.txt"].editor.read(cx).value().to_string()), "two\n", "and it reloads");
 }
+
+/// A new session takes another agent before its first message, in its place and under its key; one
+/// with a conversation keeps its agent.
+#[gpui_kit::test]
+fn a_new_session_takes_another_agent_until_its_first_message(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[]);
+    cx.update(|_, cx| project.update(cx, |p, _| p.agent = crate::fake_agent::fake_agent("first")));
+    let key = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, window, cx).read(cx).key.clone()));
+    cx.run_until_parked();
+    cx.update(|window, cx| project.update(cx, |p, cx| p.choose_agent(&key, crate::fake_agent::fake_agent("second"), window, cx)));
+    cx.run_until_parked();
+    let (count, name, same) = cx.update(|_, cx| {
+        let p = project.read(cx);
+        (p.sessions.len(), p.sessions[0].read(cx).agent.name, p.sessions[0].read(cx).key == key)
+    });
+    assert_eq!((count, name, same), (1, "second", true));
+    let session = cx.update(|_, cx| project.read(cx).sessions[0].clone());
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hello".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| project.update(cx, |p, cx| p.choose_agent(&key, crate::fake_agent::fake_agent("third"), window, cx)));
+    assert_eq!(cx.update(|_, cx| project.read(cx).sessions[0].read(cx).agent.name), "second", "it has a conversation now");
+}
