@@ -14,7 +14,7 @@ impl Render for Pane {
     }
 }
 
-fn open(cx: &mut TestAppContext, files: &[(&str, &str)]) -> (tempfile::TempDir, Entity<OpenProject>, &mut VisualTestContext) {
+fn open<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)]) -> (tempfile::TempDir, Entity<OpenProject>, &'a mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
