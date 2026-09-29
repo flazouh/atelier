@@ -66,6 +66,9 @@ pub struct SyntaxHighlighter {
     injections_edited: bool,
     /// How long one injection layer's parse may take; `None` for as long as it needs.
     injection_budget: Option<Duration>,
+    /// The new text that edits since the last whole set of layers wrote, while the layers moved
+    /// with each one (`edit_tree`); `None` when the layers were not whole to begin with.
+    moved_since_parse: Option<Range<usize>>,
     /// Whether `injection_layers` match `text`, so the next edit can update them in place.
     /// False after a parse that skipped them (a timeout, `edit_tree`) or a pass that dropped
     /// combined ranges at a cap.
@@ -74,6 +77,7 @@ pub struct SyntaxHighlighter {
 
 /// A parsed injection layer.
 /// Stores the parsed tree and the ranges it covers.
+#[derive(Clone)]
 pub(crate) struct InjectionLayer {
     pub(crate) language_name: SharedString,
     highlight_query: Arc<Query>,
@@ -88,6 +92,241 @@ pub(crate) struct InjectionLayer {
     /// Moved by an edit since it was parsed: its tree shows where the old colours went, but a
     /// combined layer's tree parsed again on it would not match a fresh parse, so it is not reused.
     followed: bool,
+}
+
+/// Updates injection `layers` for a change in place: keeps each layer the change did not touch,
+/// moved to its new offsets, and queries and parses again only where `old_tree` (already edited)
+/// and `new_tree` differ or the text changed. The result equals a full
+/// [`SyntaxHighlighter::compute_injection_layers`]; `None` when only a full pass can be exact.
+#[allow(clippy::too_many_arguments)]
+fn update_layers(
+    data: &InjectionParseData,
+    layers: &[InjectionLayer],
+    old_combined: &[(SharedString, Vec<tree_sitter::Range>)],
+    capped_before: bool,
+    moved: &Moved,
+    old_tree: &Tree,
+    new_tree: &Tree,
+    text: &Rope,
+) -> Option<InjectionLayers> {
+        let text_len = text.len();
+        // Where the tree or the text changed, in new offsets, a byte wider on each side so an
+        // empty range (a deletion) still meets the nodes around it.
+        let mut region: Vec<Range<usize>> = old_tree
+            .changed_ranges(new_tree)
+            .map(|r| r.start_byte..r.end_byte)
+            .chain([moved.span()])
+            .map(|r| r.start.saturating_sub(1)..(r.end + 1).min(text_len))
+            .collect();
+        region.sort_by_key(|r| r.start);
+        let mut merged: Vec<Range<usize>> = Vec::with_capacity(region.len());
+        for range in region {
+            match merged.last_mut() {
+                Some(last) if range.start <= last.end => last.end = last.end.max(range.end),
+                _ => merged.push(range),
+            }
+        }
+        let region = merged;
+        let touches = |r: &Range<usize>| region.iter().any(|g| r.start <= g.end && g.start <= r.end);
+
+        let mut highlight_queries: HashMap<SharedString, Arc<Query>> = layers
+            .iter()
+            .map(|layer| (layer.language_name.clone(), layer.highlight_query.clone()))
+            .collect();
+        let mut resolved_languages = HashMap::new();
+        // A layer that only touches the region is dropped, and the query needs a node to
+        // overlap its range, so it runs a byte wider still and finds that layer again.
+        let mut found = Vec::new();
+        for range in &region {
+            found.extend(find_injections(
+                data,
+                new_tree,
+                text,
+                Some(range.start.saturating_sub(1)..(range.end + 1).min(text_len)),
+                &mut highlight_queries,
+                &mut resolved_languages,
+            ));
+        }
+
+        // Single layers the edit did not touch, moved. Combined ones are parsed again below.
+        let mut kept = Vec::new();
+        let mut timed_out = false;
+        for layer in layers {
+            if layer.combined {
+                continue;
+            } else if let Some(moved) = moved
+                .layer(layer)
+                .filter(|l| !touches(&l.byte_range) && !touches(&l.match_range))
+            {
+                kept.push(moved);
+            }
+        }
+
+        // Single injections found in the region: new, or replacing a kept layer they overlap.
+        let mut singles: Vec<FoundInjection> = Vec::new();
+        let mut combined_found: HashMap<SharedString, Vec<tree_sitter::Range>> = HashMap::new();
+        for injection in found {
+            if injection.combined {
+                let ranges = combined_found.entry(injection.language_name).or_default();
+                for range in injection.ranges {
+                    if !ranges.contains(&range) {
+                        ranges.push(range);
+                    }
+                }
+                continue;
+            }
+            if !injection_ranges_within_limits(&injection.ranges)
+                || singles.iter().any(|s| {
+                    s.language_name == injection.language_name && s.ranges == injection.ranges
+                })
+            {
+                continue;
+            }
+            if kept.iter().any(|k| {
+                k.language_name == injection.language_name && k.ranges == injection.ranges
+            }) {
+                continue;
+            }
+            if let Some(envelope) = bounding_byte_range(&injection.ranges) {
+                kept.retain(|k| !(k.byte_range.start <= envelope.end && envelope.start <= k.byte_range.end));
+            }
+            singles.push(injection);
+        }
+        singles.sort_by_key(|s| s.ranges[0].start_byte);
+
+        // A full pass keeps the first layers in text order up to the cap.
+        let total = kept.len() + singles.len();
+        if capped_before && total < MAX_NON_COMBINED_INJECTION_PARSES {
+            // Layers past the old cap would come back, and they were never parsed.
+            return None;
+        }
+        let capped = capped_before || total > MAX_NON_COMBINED_INJECTION_PARSES;
+        let (mut k, mut n) = (0, 0);
+        while k + n < MAX_NON_COMBINED_INJECTION_PARSES && (k < kept.len() || n < singles.len()) {
+            let kept_first = match (kept.get(k), singles.get(n)) {
+                (Some(a), Some(b)) => a.byte_range.start <= b.ranges[0].start_byte,
+                (Some(_), None) => true,
+                _ => false,
+            };
+            if kept_first {
+                k += 1;
+            } else {
+                n += 1;
+            }
+        }
+        kept.truncate(k);
+        singles.truncate(n);
+
+        // Combined layers: their ranges, moved and updated, then parsed afresh. Parsing on the
+        // old tree edited does not match a fresh parse once the included ranges change.
+        let mut languages: Vec<SharedString> = old_combined
+            .iter()
+            .map(|(language, _)| language.clone())
+            .chain(combined_found.keys().cloned())
+            .collect();
+        languages.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
+        languages.dedup();
+        let mut combined_layers = Vec::new();
+        let mut combined_ranges = Vec::new();
+        for language_name in languages {
+            let mut ranges: Vec<tree_sitter::Range> = old_combined
+                .iter()
+                .filter(|(language, _)| *language == language_name)
+                .flat_map(|(_, ranges)| ranges.iter())
+                .filter_map(|range| moved.range(range))
+                .filter(|range| !touches(&(range.start_byte..range.end_byte)))
+                .collect();
+            for range in combined_found.remove(&language_name).unwrap_or_default() {
+                if !ranges.contains(&range) {
+                    ranges.push(range);
+                }
+            }
+            if !injection_ranges_within_limits(&ranges) {
+                return None;
+            }
+            if ranges.is_empty() {
+                continue;
+            }
+            sort_ranges(&mut ranges);
+            let normalized = normalize_combined_injection_ranges(&language_name, ranges.clone());
+            if normalized.last() != ranges.last() {
+                return None;
+            }
+            combined_ranges.push((language_name.clone(), ranges));
+            let Some(highlight_query) = highlight_queries.get(&language_name).cloned() else {
+                continue;
+            };
+            if let Some(layer) = SyntaxHighlighter::parse_injection_layer(
+                &language_name,
+                highlight_query,
+                normalized,
+                None,
+                text,
+                true,
+                data.budget,
+                &mut timed_out,
+            ) {
+                combined_layers.push(layer);
+            }
+        }
+
+        for injection in singles {
+            if let Some(layer) = SyntaxHighlighter::parse_injection_layer(
+                &injection.language_name,
+                injection.highlight_query,
+                injection.ranges,
+                None,
+                text,
+                false,
+                data.budget,
+                &mut timed_out,
+            ) {
+                kept.push(InjectionLayer {
+                    match_range: injection.match_range,
+                    ..layer
+                });
+            }
+        }
+        kept.extend(combined_layers);
+        sort_layers(&mut kept);
+        // A layer that ran out of time is missing, so the next edit builds them all again.
+        Some(InjectionLayers { layers: kept, combined_ranges, capped, complete: !timed_out })
+}
+
+
+
+/// How the injection layers stand against the new text: moved here by one edit, or already moved
+/// with each edit as it came (by [`SyntaxHighlighter::edit_tree`]), which touched `span` of the new
+/// text in all.
+enum Moved {
+    By(InputEdit),
+    Already(Range<usize>),
+}
+
+impl Moved {
+    /// The new text the change wrote, where the layers may be stale.
+    fn span(&self) -> Range<usize> {
+        match self {
+            Moved::By(edit) => edit.start_byte..edit.new_end_byte,
+            Moved::Already(span) => span.clone(),
+        }
+    }
+
+    /// `layer` in the new text's offsets; `None` when the edit touches it.
+    fn layer(&self, layer: &InjectionLayer) -> Option<InjectionLayer> {
+        match self {
+            Moved::By(edit) => layer.edited(edit),
+            Moved::Already(_) => Some(layer.clone()),
+        }
+    }
+
+    /// A combined layer's raw range in the new text's offsets; `None` when the edit touches it.
+    fn range(&self, range: &tree_sitter::Range) -> Option<tree_sitter::Range> {
+        match self {
+            Moved::By(edit) => shift_range(range, edit),
+            Moved::Already(_) => Some(*range),
+        }
+    }
 }
 
 /// One parse at a time for an editor. A request while one runs waits as a single queued parse,
@@ -126,6 +365,17 @@ pub struct BackgroundParse {
     old_tree: Option<Tree>,
     text: Rope,
     injections: Option<InjectionParseData>,
+    /// The layers as the edits moved them, for the in-place update; `None` when it cannot apply.
+    moved: Option<MovedLayers>,
+}
+
+/// Whole layers, moved with the edits since, and the span of new text those edits wrote.
+struct MovedLayers {
+    data: InjectionParseData,
+    layers: Vec<InjectionLayer>,
+    combined_ranges: Vec<(SharedString, Vec<tree_sitter::Range>)>,
+    capped: bool,
+    span: Range<usize>,
 }
 
 /// A finished background parse, for [`SyntaxHighlighter::apply_parsed`].
@@ -133,11 +383,18 @@ pub struct ParsedTree {
     tree: Tree,
     text: Rope,
     injections: InjectionLayers,
+    in_place: bool,
 }
 
 impl ParsedTree {
     pub fn tree(&self) -> &Tree {
         &self.tree
+    }
+
+    /// Whether its injection layers were updated in place, not rebuilt: for tests and timings.
+    #[doc(hidden)]
+    pub fn injections_in_place(&self) -> bool {
+        self.in_place
     }
 }
 
@@ -160,11 +417,26 @@ impl BackgroundParse {
             self.old_tree.as_ref(),
             None,
         )?;
-        let injections = match self.injections {
-            Some(data) => SyntaxHighlighter::compute_injection_layers(data, &tree, text),
-            None => InjectionLayers::default(),
+        // In place when the layers were whole and moved with the edits; a full pass otherwise.
+        let in_place = match (self.moved, self.old_tree.as_ref()) {
+            (Some(m), Some(old_tree)) => update_layers(
+                &m.data,
+                &m.layers,
+                &m.combined_ranges,
+                m.capped,
+                &Moved::Already(m.span),
+                old_tree,
+                &tree,
+                text,
+            ),
+            _ => None,
         };
-        Some(ParsedTree { tree, text: self.text, injections })
+        let (injections, in_place) = match (in_place, self.injections) {
+            (Some(layers), _) => (layers, true),
+            (None, Some(data)) => (SyntaxHighlighter::compute_injection_layers(data, &tree, text), false),
+            (None, None) => (InjectionLayers::default(), false),
+        };
+        Some(ParsedTree { tree, text: self.text, injections, in_place })
     }
 }
 
@@ -203,6 +475,18 @@ pub fn follow_range(range: &Range<usize>, edit: &InputEdit) -> Range<usize> {
     start..follow_offset(range.end, edit, false).max(start)
 }
 
+/// A tree-sitter range after `edit`, as [`follow_range`] moves byte ranges.
+fn follow_ts_range(range: &tree_sitter::Range, edit: &InputEdit) -> tree_sitter::Range {
+    let start_byte = follow_offset(range.start_byte, edit, true);
+    let end_byte = follow_offset(range.end_byte, edit, false).max(start_byte);
+    tree_sitter::Range {
+        start_point: follow_point(range.start_point, range.start_byte, edit, true),
+        end_point: follow_point(range.end_point, range.end_byte, edit, false),
+        start_byte,
+        end_byte,
+    }
+}
+
 impl InjectionLayer {
     /// Moves this layer with `edit` without parsing: its tree is edited and its ranges follow.
     fn follow(&mut self, edit: &InputEdit) {
@@ -210,14 +494,7 @@ impl InjectionLayer {
             self.tree.edit(edit);
         }
         for range in &mut self.ranges {
-            let start_byte = follow_offset(range.start_byte, edit, true);
-            let end_byte = follow_offset(range.end_byte, edit, false).max(start_byte);
-            *range = tree_sitter::Range {
-                start_point: follow_point(range.start_point, range.start_byte, edit, true),
-                end_point: follow_point(range.end_point, range.end_byte, edit, false),
-                start_byte,
-                end_byte,
-            };
+            *range = follow_ts_range(range, edit);
         }
         if let Some(bytes) = bounding_byte_range(&self.ranges) {
             self.byte_range = bytes;
@@ -788,6 +1065,7 @@ impl SyntaxHighlighter {
             injections_capped: false,
             injections_edited: false,
             injection_budget: Some(INJECTION_PARSE_TIMEOUT),
+            moved_since_parse: None,
             injections_current: false,
         }
     }
@@ -916,6 +1194,7 @@ impl SyntaxHighlighter {
             injections_capped: false,
             injections_edited: false,
             injection_budget: Some(INJECTION_PARSE_TIMEOUT),
+            moved_since_parse: None,
             injections_current: false,
         })
     }
@@ -940,6 +1219,24 @@ impl SyntaxHighlighter {
             for layer in &mut self.injection_layers {
                 layer.follow(&edit);
             }
+            for (_, ranges) in &mut self.combined_ranges {
+                for range in ranges.iter_mut() {
+                    *range = follow_ts_range(range, &edit);
+                }
+            }
+            // One span of new text for all the edits since the layers were whole: the earlier ones
+            // moved by this one, then this one's.
+            let wrote = edit.start_byte..edit.new_end_byte;
+            self.moved_since_parse = match self.moved_since_parse.take() {
+                Some(span) => {
+                    let span = follow_range(&span, &edit);
+                    Some(span.start.min(wrote.start)..span.end.max(wrote.end))
+                }
+                None if self.injections_current => Some(wrote),
+                None => None,
+            };
+        } else {
+            self.moved_since_parse = None;
         }
         self.text = text.clone();
         self.injections_current = false;
@@ -958,11 +1255,19 @@ impl SyntaxHighlighter {
     /// injections. `None` for a language with no grammar.
     pub fn background_parse(&self) -> Option<BackgroundParse> {
         self.parser.language()?;
+        let moved = self.moved_since_parse.clone().zip(self.injection_query_data()).map(|(span, data)| MovedLayers {
+            data,
+            layers: self.injection_layers.clone(),
+            combined_ranges: self.combined_ranges.clone(),
+            capped: self.injections_capped,
+            span,
+        });
         Some(BackgroundParse {
             language: self.language.clone(),
             old_tree: self.tree.clone(),
             text: self.text.clone(),
             injections: self.injection_parse_data(),
+            moved,
         })
     }
 
@@ -1258,211 +1563,32 @@ impl SyntaxHighlighter {
         }
     }
 
-    /// Update the injection layers for `edit` in place: keep each layer the edit did not
-    /// touch, moved to its new offsets, and query and parse again only where `old_tree`
-    /// (already edited) and `new_tree` differ or the text changed. The result equals a
-    /// full [`Self::compute_injection_layers`]. Returns `false`, changing nothing, when only
-    /// a full pass can be exact.
+    /// Update the injection layers for `edit` in place (see [`update_layers`]). Returns `false`,
+    /// changing nothing, when only a full pass can be exact.
     fn edit_injection_layers(&mut self, edit: &InputEdit, old_tree: &Tree, new_tree: &Tree) -> bool {
-        let Some(query) = self.injections_query.clone() else {
+        let Some(data) = self.injection_query_data() else {
             return false;
         };
-        let text_len = self.text.len();
-        // Where the tree or the text changed, in new offsets, a byte wider on each side so an
-        // empty range (a deletion) still meets the nodes around it.
-        let mut region: Vec<Range<usize>> = old_tree
-            .changed_ranges(new_tree)
-            .map(|r| r.start_byte..r.end_byte)
-            .chain([edit.start_byte..edit.new_end_byte])
-            .map(|r| r.start.saturating_sub(1)..(r.end + 1).min(text_len))
-            .collect();
-        region.sort_by_key(|r| r.start);
-        let mut merged: Vec<Range<usize>> = Vec::with_capacity(region.len());
-        for range in region {
-            match merged.last_mut() {
-                Some(last) if range.start <= last.end => last.end = last.end.max(range.end),
-                _ => merged.push(range),
+        let moved = Moved::By(*edit);
+        let updated = update_layers(&data, &self.injection_layers, &self.combined_ranges, self.injections_capped, &moved, old_tree, new_tree, &self.text);
+        match updated {
+            Some(layers) => {
+                self.set_injection_layers(layers);
+                true
             }
+            None => false,
         }
-        let region = merged;
-        let touches = |r: &Range<usize>| region.iter().any(|g| r.start <= g.end && g.start <= r.end);
+    }
 
-        let data = InjectionParseData {
+    /// The injections query and its settings, with no old layers.
+    fn injection_query_data(&self) -> Option<InjectionParseData> {
+        Some(InjectionParseData {
             budget: self.injection_budget,
-            query,
+            query: self.injections_query.clone()?,
             content_capture_index: self.injection_content_capture_index,
             language_capture_index: self.injection_language_capture_index,
             old_layers: Vec::new(),
-        };
-        let mut highlight_queries: HashMap<SharedString, Arc<Query>> = self
-            .injection_layers
-            .iter()
-            .map(|layer| (layer.language_name.clone(), layer.highlight_query.clone()))
-            .collect();
-        let mut resolved_languages = HashMap::new();
-        // A layer that only touches the region is dropped, and the query needs a node to
-        // overlap its range, so it runs a byte wider still and finds that layer again.
-        let mut found = Vec::new();
-        for range in &region {
-            found.extend(find_injections(
-                &data,
-                new_tree,
-                &self.text,
-                Some(range.start.saturating_sub(1)..(range.end + 1).min(text_len)),
-                &mut highlight_queries,
-                &mut resolved_languages,
-            ));
-        }
-
-        // Single layers the edit did not touch, moved. Combined ones are parsed again below.
-        let mut kept = Vec::new();
-        let mut timed_out = false;
-        for layer in &self.injection_layers {
-            if layer.combined {
-                continue;
-            } else if let Some(moved) = layer
-                .edited(edit)
-                .filter(|l| !touches(&l.byte_range) && !touches(&l.match_range))
-            {
-                kept.push(moved);
-            }
-        }
-
-        // Single injections found in the region: new, or replacing a kept layer they overlap.
-        let mut singles: Vec<FoundInjection> = Vec::new();
-        let mut combined_found: HashMap<SharedString, Vec<tree_sitter::Range>> = HashMap::new();
-        for injection in found {
-            if injection.combined {
-                let ranges = combined_found.entry(injection.language_name).or_default();
-                for range in injection.ranges {
-                    if !ranges.contains(&range) {
-                        ranges.push(range);
-                    }
-                }
-                continue;
-            }
-            if !injection_ranges_within_limits(&injection.ranges)
-                || singles.iter().any(|s| {
-                    s.language_name == injection.language_name && s.ranges == injection.ranges
-                })
-            {
-                continue;
-            }
-            if kept.iter().any(|k| {
-                k.language_name == injection.language_name && k.ranges == injection.ranges
-            }) {
-                continue;
-            }
-            if let Some(envelope) = bounding_byte_range(&injection.ranges) {
-                kept.retain(|k| !(k.byte_range.start <= envelope.end && envelope.start <= k.byte_range.end));
-            }
-            singles.push(injection);
-        }
-        singles.sort_by_key(|s| s.ranges[0].start_byte);
-
-        // A full pass keeps the first layers in text order up to the cap.
-        let total = kept.len() + singles.len();
-        if self.injections_capped && total < MAX_NON_COMBINED_INJECTION_PARSES {
-            // Layers past the old cap would come back, and they were never parsed.
-            return false;
-        }
-        let capped = self.injections_capped || total > MAX_NON_COMBINED_INJECTION_PARSES;
-        let (mut k, mut n) = (0, 0);
-        while k + n < MAX_NON_COMBINED_INJECTION_PARSES && (k < kept.len() || n < singles.len()) {
-            let kept_first = match (kept.get(k), singles.get(n)) {
-                (Some(a), Some(b)) => a.byte_range.start <= b.ranges[0].start_byte,
-                (Some(_), None) => true,
-                _ => false,
-            };
-            if kept_first {
-                k += 1;
-            } else {
-                n += 1;
-            }
-        }
-        kept.truncate(k);
-        singles.truncate(n);
-
-        // Combined layers: their ranges, moved and updated, then parsed afresh. Parsing on the
-        // old tree edited does not match a fresh parse once the included ranges change.
-        let mut languages: Vec<SharedString> = self
-            .combined_ranges
-            .iter()
-            .map(|(language, _)| language.clone())
-            .chain(combined_found.keys().cloned())
-            .collect();
-        languages.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
-        languages.dedup();
-        let mut combined_layers = Vec::new();
-        let mut combined_ranges = Vec::new();
-        for language_name in languages {
-            let mut ranges: Vec<tree_sitter::Range> = self
-                .combined_ranges
-                .iter()
-                .filter(|(language, _)| *language == language_name)
-                .flat_map(|(_, ranges)| ranges.iter())
-                .filter_map(|range| shift_range(range, edit))
-                .filter(|range| !touches(&(range.start_byte..range.end_byte)))
-                .collect();
-            for range in combined_found.remove(&language_name).unwrap_or_default() {
-                if !ranges.contains(&range) {
-                    ranges.push(range);
-                }
-            }
-            if !injection_ranges_within_limits(&ranges) {
-                return false;
-            }
-            if ranges.is_empty() {
-                continue;
-            }
-            sort_ranges(&mut ranges);
-            let normalized = normalize_combined_injection_ranges(&language_name, ranges.clone());
-            if normalized.last() != ranges.last() {
-                return false;
-            }
-            combined_ranges.push((language_name.clone(), ranges));
-            let Some(highlight_query) = highlight_queries.get(&language_name).cloned() else {
-                continue;
-            };
-            if let Some(layer) = Self::parse_injection_layer(
-                &language_name,
-                highlight_query,
-                normalized,
-                None,
-                &self.text,
-                true,
-                data.budget,
-                &mut timed_out,
-            ) {
-                combined_layers.push(layer);
-            }
-        }
-
-        for injection in singles {
-            if let Some(layer) = Self::parse_injection_layer(
-                &injection.language_name,
-                injection.highlight_query,
-                injection.ranges,
-                None,
-                &self.text,
-                false,
-                data.budget,
-                &mut timed_out,
-            ) {
-                kept.push(InjectionLayer {
-                    match_range: injection.match_range,
-                    ..layer
-                });
-            }
-        }
-        kept.extend(combined_layers);
-        sort_layers(&mut kept);
-        self.injection_layers = kept;
-        self.combined_ranges = combined_ranges;
-        self.injections_capped = capped;
-        // A layer that ran out of time is missing, so the next edit builds them all again.
-        self.injections_current = !timed_out;
-        true
+        })
     }
 
     /// Parse one injection layer over the given included ranges.
@@ -1525,6 +1651,7 @@ impl SyntaxHighlighter {
     }
 
     fn set_injection_layers(&mut self, injections: InjectionLayers) {
+        self.moved_since_parse = None;
         self.injection_layers = injections.layers;
         self.combined_ranges = injections.combined_ranges;
         self.injections_capped = injections.capped;
