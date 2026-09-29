@@ -278,7 +278,8 @@ Limits:
 ## QA, M3
 
 A real Claude Code session (claude 2.1.284) on the HP, in `~/qa/m3`, a git repository of three files.
-The shots and the recording are in `~/shots/m3/` on the HP, from the release build of `2678e25`.
+The shots and the recordings are in `~/shots/m3/` on the HP: the run from the release build of
+`5e148cb`, and `final-17-keys-after-switch.png` and `final-keys.mp4` from `2678e25`, with the keys fix.
 
 | What | Seen |
 | --- | --- |
