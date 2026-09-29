@@ -3832,6 +3832,7 @@ dependencies = [
 name = "lathe-project"
 version = "0.1.0"
 dependencies = [
+ "dirs 6.0.0",
  "ignore",
  "notify",
  "regex",
