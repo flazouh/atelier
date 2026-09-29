@@ -359,7 +359,8 @@ impl Gallery {
                     .font_weight(FontWeight::SEMIBOLD)
                     .child("beui for lathe"),
             )
-            .children(Story::ALL.into_iter().map(|story| {
+            // The list scrolls, so the theme picker at the foot stays in view in a short window.
+            .child(div().id("stories").flex().flex_col().gap(px(2.)).flex_1().min_h_0().overflow_y_scroll().children(Story::ALL.into_iter().map(|story| {
                 let selected = story == self.story;
                 let hover = theme.muted_hover();
                 div()
@@ -380,9 +381,8 @@ impl Gallery {
                         cx.notify();
                     }))
                     .child(story.title())
-            }))
-            .child(div().flex_1())
-            .child(theme_picker(&theme))
+            })))
+            .child(div().flex_none().pt(px(8.)).child(theme_picker(&theme)))
     }
 
     fn story(&self, cx: &mut Context<Self>) -> AnyElement {
