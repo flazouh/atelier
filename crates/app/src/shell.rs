@@ -12,6 +12,7 @@ use beui::{
     file_icon::FileIcon,
     finder::{Filter, Finder, FinderEvent, FinderItem},
     keys::{self, Command, Press},
+    popover::{Hang, Popover},
     theme::{ActiveTheme, radius},
     typography::{FONT_FAMILY, TextSize},
 };
@@ -20,7 +21,7 @@ use gpui_kit::{
     PathPromptOptions, Pixels, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea, actions,
     base::{ResizableState, ResizeHandleRenderer, h_resizable, resizable_panel},
-    deferred, div, prelude::FluentBuilder, px,
+    div, prelude::FluentBuilder, px,
 };
 use lathe_project::LocalProject;
 use lathe_settings::Location;
@@ -310,11 +311,7 @@ impl Shell {
         .detach();
         let events = cx.subscribe_in(&form, window, |this, _, event: &SshFormEvent, window, cx| match event {
             SshFormEvent::Connect { host, path } => this.open_remote(host.clone(), path.clone(), window, cx),
-            SshFormEvent::Cancel => {
-                this.ssh = None;
-                this.focus.focus(window, cx);
-                cx.notify();
-            }
+            SshFormEvent::Cancel => this.close_ssh(window, cx),
         });
         form.read(cx).focus_handle(cx).focus(window, cx);
         self.ssh = Some((form, events));
@@ -536,6 +533,14 @@ impl Shell {
         });
         finder.read(cx).focus_handle(cx).focus(window, cx);
         self.finder = Some((finder, paths, events));
+        cx.notify();
+    }
+
+    /// Closes "Open over SSH…", and gives focus back here.
+    fn close_ssh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ssh.take().is_some() {
+            self.focus.focus(window, cx);
+        }
         cx.notify();
     }
 
@@ -840,13 +845,27 @@ impl Shell {
             .children(banner)
             .child(div().flex().flex_1().min_h_0().child(body))
             .child(self.status_line(cx))
+            // Both on the shared Popover: a press outside only closes, as do Escape and Tab.
             .children(self.ssh.as_ref().map(|(form, _)| {
-                deferred(div().absolute().top(px(TITLE_BAR + 60.)).left_0().right_0().flex().justify_center().child(form.clone()))
-                    .with_priority(1)
+                let this = cx.entity().downgrade();
+                let focus = form.read(cx).focus_handle(cx);
+                Popover::new("open-over-ssh")
+                    .open(true)
+                    .hang(Hang::Centre(TITLE_BAR + 60.))
+                    .panel_focus(&focus)
+                    .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_ssh(window, cx))))
+                    .child(form.clone())
             }))
             .children(self.finder.as_ref().map(|(finder, _, _)| {
-                deferred(div().absolute().top(px(TITLE_BAR + 12.)).left_0().right_0().flex().justify_center().child(finder.clone()))
-                    .with_priority(1)
+                let this = cx.entity().downgrade();
+                let focus = gpui_kit::Focusable::focus_handle(finder, cx);
+                Popover::new("go-to-file")
+                    .open(true)
+                    .hang(Hang::Centre(TITLE_BAR + 12.))
+                    .height(360.)
+                    .panel_focus(&focus)
+                    .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_finder(true, window, cx))))
+                    .child(finder.clone())
             }))
             .into_any_element()
     }
