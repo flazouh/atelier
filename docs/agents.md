@@ -175,7 +175,7 @@ lathe reads it through a process the project spawns (`sh`), never from disk dire
 - **`claude` is not on the host:** `open` returns `SessionError::Missing { program }`.
 - **The process exits mid-turn:** the reader hits the end of stdout, waits for the exit code, and the mapper
   finishes what is open: each running call fails, each waiting question is cancelled, each subagent ends,
-  then `TurnEnded(Failed("the agent exited with code N"))` and `Ended(Exited(code))`. `Ended` comes once.
+  then `TurnEnded(Failed("the agent exited with code N: <its last stderr line>"))` and `Ended(Exited { code, stderr })`, where `stderr` is the last 20 lines the process wrote. `Ended` comes once.
 - **A line does not parse:** a `Warning`. The stream goes on.
 - **lathe closes the session:** dropping it closes stdin, kills the process and sends `Ended(Closed)` at
   once. The process can have children that keep its pipes open, so lathe does not wait for the end of

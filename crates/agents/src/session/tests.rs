@@ -265,9 +265,9 @@ mod conversation {
     fn an_end_stops_the_work_and_keeps_the_reason() {
         let mut conversation = Conversation::new();
         conversation.user_sent("hi");
-        conversation.apply(&Event::Ended(EndReason::Exited(Some(1))));
+        conversation.apply(&Event::Ended(EndReason::Exited { code: Some(1), stderr: "boom".into() }));
         assert!(!conversation.working());
-        assert_eq!(conversation.ended(), Some(&EndReason::Exited(Some(1))));
+        assert_eq!(conversation.ended(), Some(&EndReason::Exited { code: Some(1), stderr: "boom".into() }));
     }
 
     #[test]

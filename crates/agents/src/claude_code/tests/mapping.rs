@@ -255,19 +255,19 @@ fn a_crash_mid_turn_fails_the_open_tool_and_the_turn_then_ends_the_session() {
     mapper.user_sent();
     let start = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t9","name":"Bash","input":{}}}}"#;
     assert!(matches!(mapper.line(start, Instant::now()).as_slice(), [Event::ToolStarted(_)]));
-    let events = mapper.exited(Some(3));
+    let events = mapper.exited(Some(3), "");
     let [Event::ToolFinished { id, output }, Event::TurnEnded(end), Event::Ended(reason)] = events.as_slice() else {
         panic!("{events:#?}")
     };
     assert_eq!(id.as_str(), "t9");
     assert!(output.is_error && output.text.contains("code 3"));
     assert!(matches!(&end.outcome, TurnOutcome::Failed(why) if why.contains("code 3")));
-    assert_eq!(*reason, EndReason::Exited(Some(3)));
+    assert_eq!(*reason, EndReason::Exited { code: Some(3), stderr: String::new() });
 }
 
 #[test]
 fn a_crash_with_no_turn_open_only_ends_the_session() {
-    assert_eq!(Mapper::new().exited(None), [Event::Ended(EndReason::Exited(None))]);
+    assert_eq!(Mapper::new().exited(None, ""), [Event::Ended(EndReason::Exited { code: None, stderr: String::new() })]);
 }
 
 #[test]
@@ -280,9 +280,9 @@ fn a_session_lathe_closed_ends_closed_and_fails_nothing() {
 #[test]
 fn a_session_ends_once() {
     let mut mapper = Mapper::new();
-    assert_eq!(mapper.exited(Some(0)).len(), 1);
+    assert_eq!(mapper.exited(Some(0), "").len(), 1);
     assert!(mapper.closed().is_empty());
-    assert!(mapper.exited(None).is_empty());
+    assert!(mapper.exited(None, "").is_empty());
 }
 
 #[test]
@@ -290,7 +290,7 @@ fn a_permission_question_left_open_by_a_crash_is_cancelled() {
     let mut mapper = Mapper::new();
     let ask = r#"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{}}}"#;
     mapper.line(ask, Instant::now());
-    let events = mapper.exited(Some(1));
+    let events = mapper.exited(Some(1), "");
     assert!(events.contains(&Event::PermissionCancelled(RequestId::new("r1"))));
 }
 
@@ -353,4 +353,35 @@ fn the_foreground_subagent_run_folds_with_its_call_inside_the_subagent() {
     });
     assert_eq!(inside, Some(vec!["Read".to_string()]));
     assert!(conversation.items().iter().all(|item| !matches!(item, Item::Tool(c) if c.call.name == "Read")));
+}
+
+#[test]
+fn an_early_exit_carries_the_last_lines_of_stderr_and_puts_the_last_one_in_the_failure() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent();
+    let stderr = "starting\nwarming up\nError: no such model\n\n";
+    let events = mapper.exited(Some(3), stderr);
+    let Some(Event::TurnEnded(end)) = events.iter().find(|e| matches!(e, Event::TurnEnded(_))) else { panic!("{events:#?}") };
+    assert_eq!(end.outcome, TurnOutcome::Failed("the agent exited with code 3: Error: no such model".into()));
+    assert_eq!(
+        events.last(),
+        Some(&Event::Ended(EndReason::Exited { code: Some(3), stderr: "starting\nwarming up\nError: no such model".into() }))
+    );
+}
+
+#[test]
+fn only_the_last_twenty_lines_of_a_long_stderr_are_kept() {
+    let stderr: String = (1..=50).map(|i| format!("line {i}\n")).collect();
+    let events = Mapper::new().exited(Some(1), &stderr);
+    let Some(Event::Ended(EndReason::Exited { stderr: kept, .. })) = events.last() else { panic!() };
+    let lines: Vec<&str> = kept.lines().collect();
+    assert_eq!((lines.len(), lines[0], lines[19]), (20, "line 31", "line 50"));
+}
+
+#[test]
+fn a_signal_with_no_stderr_says_only_that() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent();
+    let events = mapper.exited(None, "  \n");
+    assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("the agent was stopped by a signal".into()))));
 }

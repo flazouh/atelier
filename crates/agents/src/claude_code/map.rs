@@ -108,13 +108,19 @@ impl Mapper {
     /// The events for a process that ended: `code` is its exit code, `None` when a signal ended it. A
     /// turn or a tool still open fails, so the UI never waits for an agent that is gone. A session ends
     /// once: a second call to `exited` or `closed` gives nothing.
-    pub fn exited(&mut self, code: Option<i32>) -> Vec<Event> {
+    pub fn exited(&mut self, code: Option<i32>, stderr: &str) -> Vec<Event> {
         if std::mem::replace(&mut self.ended, true) {
             return Vec::new();
         }
-        let why = match code {
+        let tail = stderr_tail(stderr);
+        let last = tail.lines().rev().find(|line| !line.trim().is_empty()).map(str::trim);
+        let how = match code {
             Some(code) => format!("the agent exited with code {code}"),
             None => "the agent was stopped by a signal".to_string(),
+        };
+        let why = match last {
+            Some(line) => format!("{how}: {line}"),
+            None => how,
         };
         let mut events = self.fail_open_tools(&why);
         events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
@@ -124,7 +130,7 @@ impl Mapper {
         if std::mem::take(&mut self.turn_open) {
             events.push(Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed(why), summary: None }));
         }
-        events.push(Event::Ended(EndReason::Exited(code)));
+        events.push(Event::Ended(EndReason::Exited { code, stderr: tail }));
         events
     }
 
@@ -442,6 +448,15 @@ impl Mapper {
             })
             .collect()
     }
+}
+
+/// How many of the last lines of a process's stderr an end event carries.
+const STDERR_LINES: usize = 20;
+
+/// The last [`STDERR_LINES`] lines of `stderr`, trailing blank lines dropped.
+fn stderr_tail(stderr: &str) -> String {
+    let lines: Vec<&str> = stderr.trim_end().lines().collect();
+    lines[lines.len().saturating_sub(STDERR_LINES)..].join("\n")
 }
 
 fn todo_status(status: Option<&str>) -> TodoStatus {
