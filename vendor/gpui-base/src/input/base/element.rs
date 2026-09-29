@@ -2771,6 +2771,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             state.scroll_size = prepaint.scroll_size;
             state.update_scroll_offset(Some(prepaint.cursor_scroll_offset), cx);
             state.deferred_scroll_offset = None;
+            state.layout_stale = false;
             // A caret set before this first layout is revealed now that there is one (lathe patch
             // 17); the next frame paints it.
             if let Some(offset) = state.reveal_after_layout.take() {

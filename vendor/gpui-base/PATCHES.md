@@ -172,7 +172,9 @@ It borrows the highlighter the editor already keeps; nothing else changes.
 
 ## 17. A caret set before the first layout is revealed
 
-`scroll_to` needs the last layout, so a caret moved in a buffer that has never been painted, such
-as a file just opened at a definition, moved without scrolling and the view stayed at the top. The
-state now keeps that offset (`reveal_after_layout`), and the first paint reveals it.
+`scroll_to` reads the last layout. Right after `set_value` that layout is of the old text, so a
+caret moved into the new text (a file just opened at a definition) was clamped to the old text's
+height, and the view stayed at the top. `set_value` now marks the layout stale; `scroll_to` keeps
+the offset (`reveal_after_layout`) while the layout is stale or missing, and the next paint reveals
+it.
 Test: `test_a_caret_set_before_the_first_layout_is_revealed`.
