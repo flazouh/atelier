@@ -15,7 +15,7 @@ use gpui_kit::{
     div, prelude::FluentBuilder, px,
 };
 
-use crate::open_project::OpenProject;
+use crate::open_project::{Deleted, OpenProject};
 
 pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
     let theme = cx.theme().clone();
@@ -91,29 +91,39 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
             .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("Pick one in the tree on the left."))
             .into_any_element(),
         Some((path, buffer)) => {
-            let banner = buffer.changed_on_disk.then(|| {
+            let banner = if buffer.deleted == Deleted::Asking {
+                let (close, keep) = (project.clone(), project.clone());
+                let (close_path, keep_path) = (path.to_string(), path.to_string());
+                Some(banner(
+                    IconName::Close,
+                    theme.danger,
+                    "This file was deleted on disk.",
+                    Button::new("close-deleted").label("Close").variant(ButtonVariant::Secondary).on_click(move |_, _, cx| {
+                        close.update(cx, |p, cx| p.close(&close_path, cx))
+                    }),
+                    Button::new("keep-deleted").label("Keep").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                        keep.update(cx, |p, cx| p.keep_deleted(&keep_path, cx))
+                    }),
+                    &theme,
+                ))
+            } else if buffer.changed_on_disk {
                 let (reload, keep) = (project.clone(), project.clone());
                 let (reload_path, keep_path) = (path.to_string(), path.to_string());
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(8.))
-                    .mx(px(8.))
-                    .mb(px(6.))
-                    .px(px(12.))
-                    .py(px(6.))
-                    .rounded(radius::LG)
-                    .bg(theme.card_strong)
-                    .text_size(TextSize::Xs.font_size())
-                    .child(Icon::new(IconName::Refresh).size(px(14.)).color(theme.warning))
-                    .child(div().flex_1().child("This file changed on disk. Your edits are not saved."))
-                    .child(Button::new("reload").label("Reload").variant(ButtonVariant::Secondary).on_click(move |_, window, cx| {
+                Some(banner(
+                    IconName::Refresh,
+                    theme.warning,
+                    "This file changed on disk. Your edits are not saved.",
+                    Button::new("reload").label("Reload").variant(ButtonVariant::Secondary).on_click(move |_, window, cx| {
                         reload.update(cx, |p, cx| p.reload(reload_path.clone(), window, cx))
-                    }))
-                    .child(Button::new("keep-mine").label("Keep mine").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                    }),
+                    Button::new("keep-mine").label("Keep mine").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
                         keep.update(cx, |p, cx| p.keep_mine(&keep_path, cx))
-                    }))
-            });
+                    }),
+                    &theme,
+                ))
+            } else {
+                None
+            };
             div()
                 .flex()
                 .flex_col()
@@ -130,4 +140,23 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         .size_full()
         .child(div().id("tabs").flex().flex_none().gap(px(2.)).px(px(6.)).pb(px(6.)).overflow_x_scroll().children(tabs))
         .child(body)
+}
+
+/// A line above the text about the file on disk, with its two answers.
+fn banner(icon: IconName, tone: gpui_kit::Hsla, words: &'static str, first: Button, second: Button, theme: &beui::Theme) -> impl IntoElement {
+    div()
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .mx(px(8.))
+        .mb(px(6.))
+        .px(px(12.))
+        .py(px(6.))
+        .rounded(radius::LG)
+        .bg(theme.card_strong)
+        .text_size(TextSize::Xs.font_size())
+        .child(Icon::new(icon).size(px(14.)).color(tone))
+        .child(div().flex_1().child(words))
+        .child(first)
+        .child(second)
 }

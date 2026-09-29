@@ -155,9 +155,9 @@ impl Shell {
         .detach();
     }
 
-    fn save(&mut self, _: &Save, _: &mut Window, cx: &mut Context<Self>) {
+    fn save(&mut self, _: &Save, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(p) = self.active().cloned() {
-            p.update(cx, |p, cx| p.save(cx));
+            p.update(cx, |p, cx| p.save_asking(window, cx));
         }
     }
 

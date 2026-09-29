@@ -3,7 +3,9 @@
 //! through [`Project`]; this entity only holds what came back, so switching projects is instant.
 //!
 //! A file that changes on disk reloads when its tab is clean. When the tab holds unsaved edits, the
-//! tab keeps them and says the file changed, with Reload and Keep mine.
+//! tab keeps them and says the file changed, with Reload and Keep mine. A file deleted on disk says
+//! so, with Close and Keep; a kept one holds its text as unsaved, and a save asks before it creates
+//! the file again.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -46,6 +48,16 @@ pub enum Listing {
     Failed(SharedString),
 }
 
+/// Whether a tab's file is still on disk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Deleted {
+    No,
+    /// Deleted on disk; the tab asks: Close or Keep.
+    Asking,
+    /// The reader kept the text; a save asks before it creates the file again.
+    Kept,
+}
+
 /// One open file.
 pub struct Buffer {
     pub editor: Entity<EditorState>,
@@ -55,6 +67,7 @@ pub struct Buffer {
     pub dirty: bool,
     /// The file changed on disk while this tab held unsaved edits.
     pub changed_on_disk: bool,
+    pub deleted: Deleted,
     _edits: Subscription,
 }
 
@@ -173,10 +186,16 @@ impl OpenProject {
             self.relist(cx);
         }
         for change in batch {
+            let Some(buffer) = self.buffers.get_mut(&change.path) else { continue };
             if change.kind == ChangeKind::Removed {
+                if buffer.deleted == Deleted::No {
+                    buffer.deleted = Deleted::Asking;
+                    cx.notify();
+                }
                 continue;
             }
-            let Some(buffer) = self.buffers.get(&change.path) else { continue };
+            // Back on disk, as after a checkout: a change like any other.
+            buffer.deleted = Deleted::No;
             if buffer.dirty {
                 self.check_disk(change.path, cx);
             } else {
@@ -226,6 +245,15 @@ impl OpenProject {
                 cx.notify();
             });
         }).detach();
+    }
+
+    /// Keeps a deleted file's tab: its text stays, unsaved, until a save creates the file again.
+    pub fn keep_deleted(&mut self, path: &str, cx: &mut Context<Self>) {
+        if let Some(buffer) = self.buffers.get_mut(path) {
+            buffer.deleted = Deleted::Kept;
+            buffer.dirty = true;
+            cx.notify();
+        }
     }
 
     /// Keeps the tab's edits over the file's new text; the next save writes them.
@@ -324,8 +352,30 @@ impl OpenProject {
                 cx.notify();
             }
         });
-        self.buffers.insert(path.clone(), Buffer { editor, session, saved: text, dirty: false, changed_on_disk: false, _edits });
+        self.buffers.insert(path.clone(), Buffer { editor, session, saved: text, dirty: false, changed_on_disk: false, deleted: Deleted::No, _edits });
         self.tabs.open(&path);
+    }
+
+    /// Writes the tab showing; for a file deleted on disk, asks first whether to create it again.
+    pub fn save_asking(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(path) = self.tabs.active().map(str::to_string) else { return };
+        if self.buffers.get(&path).is_none_or(|b| b.deleted == Deleted::No) {
+            return self.save_path(path, false, cx);
+        }
+        let name = path.rsplit('/').next().unwrap_or(&path).to_string();
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            &format!("Create {name} again?"),
+            Some("It was deleted on disk. Saving writes it back."),
+            &["Create", "Cancel"],
+            cx,
+        );
+        cx.spawn(async move |this, cx| {
+            if answer.await == Ok(0) {
+                _ = this.update(cx, |this, cx| this.save_path(path, false, cx));
+            }
+        })
+        .detach();
     }
 
     /// Writes the tab showing.
@@ -353,6 +403,7 @@ impl OpenProject {
                             buffer.dirty = buffer.editor.read(cx).value().as_ref() != text;
                             buffer.saved = text;
                             buffer.changed_on_disk = false;
+                            buffer.deleted = Deleted::No;
                         }
                         cx.emit(ProjectEvent::Said(format!("Saved {path}").into()));
                         if then_close {
