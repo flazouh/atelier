@@ -67,6 +67,17 @@ impl SshForm {
         Self { hosts, host, path, phase: Phase::Idle, _enter }
     }
 
+    /// The config's hosts, once they have been read off the UI thread.
+    pub fn set_hosts(&mut self, hosts: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+        if self.hosts.is_empty() && self.host.read(cx).value().is_empty()
+            && let Some(first) = hosts.first()
+        {
+            self.host.update(cx, |h, cx| h.set_value(first.clone(), window, cx));
+        }
+        self.hosts = hosts;
+        cx.notify();
+    }
+
     fn connect(&mut self, cx: &mut Context<Self>) {
         if matches!(self.phase, Phase::Connecting(_)) {
             return;

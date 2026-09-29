@@ -110,6 +110,8 @@ fn a_process_on_the_host_talks_over_its_pipes() {
     sleeper.control.kill().unwrap();
     sleeper.control.wait().unwrap();
     assert!(remote.spawn(&Command::new("lathe-no-such-program")).is_err());
+    drop((cat.control, failing.control, sleeper.control));
+    assert!(lock(&remote.shared.processes).is_empty(), "a process is forgotten once its control is gone");
 }
 
 #[test]

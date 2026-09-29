@@ -109,7 +109,15 @@ impl Shell {
     }
 
     fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
-        let form = cx.new(|cx| SshForm::new(lathe_remote::ssh::known_hosts(), window, cx));
+        let form = cx.new(|cx| SshForm::new(Vec::new(), window, cx));
+        // ~/.ssh/config is read off the UI thread; the form fills its hosts in when it has them.
+        let reading = cx.background_spawn(async { lathe_remote::ssh::known_hosts() });
+        let filling = form.downgrade();
+        cx.spawn_in(window, async move |_, cx| {
+            let hosts = reading.await;
+            _ = filling.update_in(cx, |f, window, cx| f.set_hosts(hosts, window, cx));
+        })
+        .detach();
         let events = cx.subscribe_in(&form, window, |this, _, event: &SshFormEvent, window, cx| match event {
             SshFormEvent::Connect { host, path } => this.open_remote(host.clone(), path.clone(), window, cx),
             SshFormEvent::Cancel => {

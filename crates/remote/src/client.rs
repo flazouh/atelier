@@ -463,6 +463,15 @@ struct RemoteControl {
     exit: Arc<(Mutex<Option<Option<i32>>>, Condvar)>,
 }
 
+impl Drop for RemoteControl {
+    /// Nobody can ask about the process any more: its pipes are forgotten.
+    fn drop(&mut self) {
+        if let Some(shared) = self.shared.upgrade() {
+            lock(&shared.processes).remove(&self.pid);
+        }
+    }
+}
+
 impl Control for RemoteControl {
     fn kill(&mut self) -> io::Result<()> {
         let shared = self.shared.upgrade().ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "the project closed"))?;
