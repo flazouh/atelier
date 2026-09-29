@@ -18,6 +18,7 @@ lathe-forge = { path = "crates/forge" }
 lathe-lsp = { path = "crates/lsp" }
 lathe-project = { path = "crates/project" }
 lathe-remote = { path = "crates/remote" }
+lathe-review = { path = "crates/review" }
 lathe-settings = { path = "crates/settings" }
 lathe-tracker = { path = "crates/tracker" }
 

@@ -12,6 +12,7 @@ use beui::{
     SubagentStrip, Thinking, ThinkingPhase, Todo as TodoRow, TodoList, TodoStatus as RowStatus, ToolApproval,
     ToolApprovalStatus, ToolCall as ToolRow, ToolStatus as RowToolStatus,
     button::{Button, ButtonVariant},
+    changed_files::ChangedFiles,
     icon::{Icon, IconName},
     session_status::SessionStatus,
     theme::{ActiveTheme, radius},
@@ -23,7 +24,10 @@ use gpui_kit::{
 };
 use lathe_agents::session::{Answer, Call, ChoiceKind, Item, SubagentStatus, TodoStatus, ToolStatus};
 
-use crate::agent_session::AgentSession;
+use crate::{
+    agent_session::{AgentSession, SessionEvent},
+    list_diff::Row,
+};
 
 fn row_status(status: ToolStatus) -> RowToolStatus {
     match status {
@@ -49,7 +53,32 @@ fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call) -> ToolRow {
     row
 }
 
-/// One row of the conversation.
+/// One row of the list: a conversation item, or a turn's changed files.
+fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
+    match session.read(cx).shown.get(ix).copied() {
+        Some(Row::Item(item)) => item_row(session, item, cx),
+        Some(Row::Changes { turn }) => changes_row(session, turn, cx),
+        None => div().into_any_element(),
+    }
+}
+
+/// The files turn `turn` changed, with its `+a −r`: Review opens the review at a file, and a file's
+/// name opens it in the editor.
+fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElement {
+    let s = session.read(cx);
+    let Some(files) = s.review.turns().get(turn).map(|t| lathe_review::present::changed_files(t.files())) else {
+        return div().into_any_element();
+    };
+    let (review, open) = (session.clone(), session.clone());
+    let card = ChangedFiles::new(gpui_kit::ElementId::Name(format!("{}-changes-{turn}", s.key).into()), files)
+        .on_review(move |path, _, cx| {
+            review.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: Some(turn), path: Some(path.to_string()) }))
+        })
+        .on_open_file(move |path, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenFile(path.to_string()))));
+    div().px(px(16.)).pb(px(14.)).child(card).into_any_element()
+}
+
+/// One item of the conversation.
 fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     let s = session.read(cx);
     let theme = cx.theme().clone();
@@ -163,7 +192,7 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
     let empty = s.conversation.items().is_empty();
     let rows = {
         let session = session.clone();
-        list(s.list.clone(), move |ix, _, cx| item_row(&session, ix, cx)).size_full()
+        list(s.list.clone(), move |ix, _, cx| row(&session, ix, cx)).size_full()
     };
     // Why it stopped: the reason, and the agent's own last words behind a fold.
     // The whole reason: the row keeps the cut one.

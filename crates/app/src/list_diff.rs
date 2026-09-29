@@ -37,6 +37,37 @@ pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
     }
 }
 
+/// One row of a session's list: an item of the conversation, or the files a finished turn changed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Row {
+    Item(usize),
+    Changes { turn: usize },
+}
+
+/// The rows for `items` conversation items, with each turn's changed files after the item it ended at:
+/// `marks` holds `(items before the card, turn)`, in order.
+pub fn rows(items: usize, marks: &[(usize, usize)]) -> Vec<Row> {
+    let mut out = Vec::with_capacity(items + marks.len());
+    let mut marks = marks.iter().peekable();
+    for ix in 0..=items {
+        while let Some(&&(at, turn)) = marks.peek()
+            && at <= ix
+        {
+            out.push(Row::Changes { turn });
+            marks.next();
+        }
+        if ix < items {
+            out.push(Row::Item(ix));
+        }
+    }
+    out
+}
+
+/// A turn's card draws the same files once the turn is kept: its turn is its fingerprint.
+pub fn changes_fingerprint(turn: usize) -> (u8, usize, usize) {
+    (7, turn, 0)
+}
+
 /// The replacements that turn a list of `before` rows into `after`: `(old range, new count)`, in order
 /// from the end, so each applies without moving the next.
 pub fn changes(before: &[(u8, usize, usize)], after: &[(u8, usize, usize)]) -> Vec<(Range<usize>, usize)> {

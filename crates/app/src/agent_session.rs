@@ -5,6 +5,11 @@
 //! when it goes from empty to not; the entity then drains everything waiting, folds it, and asks for
 //! one repaint, so a fast stream costs a repaint a frame. Only the rows whose content changed are
 //! measured again (`list_diff`), so the list keeps its scroll while text streams.
+//!
+//! Each turn is tracked for review (`lathe-review`): the turn's `begin` (a git snapshot) runs on a
+//! background task before the message goes to the agent; every event then passes the tracker on the
+//! agent's own thread, as it arrives, so a file is read before the tool that names it writes it; and the
+//! turn's end `finish`es it there too. The panel shows the turn's changed files after its last row.
 
 use std::{sync::Arc, time::SystemTime};
 
@@ -23,8 +28,10 @@ use lathe_agents::{
     },
 };
 use lathe_project::Project;
+use lathe_review::{Comments, Merged, Reviewed, SessionReview, TurnReview, TurnTracker};
+use std::sync::Mutex;
 
-use crate::{list_diff, status};
+use crate::{list_diff, review_pane::Scope, status};
 
 /// How far past the view the list lays out rows.
 const OVERDRAW: f32 = 160.;
@@ -33,6 +40,10 @@ const OVERDRAW: f32 = 160.;
 pub enum SessionEvent {
     /// Its title, status or id changed: the sidebar and the tabs draw it again.
     Changed,
+    /// The reader asked to review a turn (`None` for the whole session) at a file.
+    Review { turn: Option<usize>, path: Option<String> },
+    /// The reader asked to open a file in the editor.
+    OpenFile(String),
     /// The reader named it: the name is kept across launches.
     Renamed,
 }
@@ -70,9 +81,29 @@ pub struct AgentSession {
     /// Starting, or reading its history: the panel shows it.
     pub starting: bool,
     /// A message written while the agent was not running: it goes once the session resumes.
-    waiting_send: Option<String>,
+    waiting_send: Option<Command>,
     pub list: ListState,
+    /// What each row of the list draws, and its fingerprint.
+    pub shown: Vec<list_diff::Row>,
     rows: Vec<(u8, usize, usize)>,
+    /// The turn being recorded, shared with the sink on the agent's thread.
+    tracker: Arc<Mutex<Option<TurnTracker>>>,
+    /// Turns the sink finished, waiting for the next drain.
+    finished: Arc<Mutex<Vec<TurnReview>>>,
+    /// Every finished turn of the session.
+    pub review: SessionReview,
+    /// Which files the reader has read, per turn.
+    pub reviewed: Reviewed,
+    /// The review comments that go with the next message.
+    pub comments: Comments,
+    /// Comments sent with a message, and whether the agent's turn after it has ended: then they show
+    /// resolved.
+    pub sent_comments: Vec<(lathe_review::ReviewComment, bool)>,
+    /// After how many conversation items each finished turn's changed files show, and which turn.
+    pub turn_marks: Vec<(usize, usize)>,
+    /// Each reviewed file as the review left it, by scope and path: its hunks after the reader's
+    /// decisions and edits, and the text the review last wrote or read on disk.
+    pub decided: HashMap<(Scope, String), (Option<Merged>, Option<String>)>,
     pub composer: Entity<PromptInput>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
@@ -96,6 +127,8 @@ impl AgentSession {
     ) -> Self {
         let (wake, mut woken) = mpsc::unbounded::<()>();
         let queue = EventQueue::new(move || drop(wake.unbounded_send(())));
+        let tracker: Arc<Mutex<Option<TurnTracker>>> = Arc::default();
+        let finished: Arc<Mutex<Vec<TurnReview>>> = Arc::default();
         let _pump = cx.spawn_in(window, async move |this, cx| {
             while woken.next().await.is_some() {
                 if this.update(cx, |s, cx| s.drain(cx)).is_err() {
@@ -155,7 +188,16 @@ impl AgentSession {
             // The list lays out this much past the view each frame: enough that a fast scroll never
             // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
             list: ListState::new(0, ListAlignment::Bottom, px(OVERDRAW)),
+            shown: Vec::new(),
             rows: Vec::new(),
+            tracker,
+            finished,
+            review: SessionReview::new(),
+            reviewed: Reviewed::new(),
+            comments: Comments::new(),
+            sent_comments: Vec::new(),
+            turn_marks: Vec::new(),
+            decided: HashMap::new(),
             composer,
             renaming: None,
             _renaming: None,
@@ -171,7 +213,7 @@ impl AgentSession {
     /// Opens the agent's session off the UI thread: its history first when it resumes and the panel
     /// has not got it (`read_history`), then the agent.
     fn open(&mut self, resume: Option<SessionId>, read_history: bool, cx: &mut Context<Self>) {
-        let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.queue.sink());
+        let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink());
         let request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode };
         let opening = cx.background_spawn(async move {
             let history = match &resume {
@@ -190,8 +232,8 @@ impl AgentSession {
                 match opened {
                     Ok(session) => {
                         s.session = Some(session);
-                        if let Some(text) = s.waiting_send.take() {
-                            s.command(Command::send(text), cx);
+                        if let Some(command) = s.waiting_send.take() {
+                            s.start_turn(command, cx);
                         }
                     }
                     Err(error) => {
@@ -207,12 +249,33 @@ impl AgentSession {
         });
     }
 
+    /// The sink the agent gets: each event passes the turn's tracker first, on the agent's thread, then
+    /// goes to the queue. The turn's end finishes the tracker there, before its event reaches the UI.
+    fn tracking_sink(&self) -> lathe_agents::session::EventSink {
+        let (queue, tracker, finished, project) = (self.queue.sink(), self.tracker.clone(), self.finished.clone(), self.project.clone());
+        Arc::new(move |event: Event| {
+            {
+                let mut tracker = tracker.lock().unwrap_or_else(|p| p.into_inner());
+                if let Some(t) = tracker.as_mut() {
+                    t.observe(project.as_ref(), &event);
+                }
+                if matches!(event, Event::TurnEnded(_) | Event::Ended(_))
+                    && let Some(t) = tracker.take()
+                {
+                    finished.lock().unwrap_or_else(|p| p.into_inner()).push(t.finish(project.as_ref()));
+                }
+            }
+            queue(event);
+        })
+    }
+
     /// Folds every event waiting: one frame's worth.
     fn drain(&mut self, cx: &mut Context<Self>) {
         let events = self.queue.drain();
         if events.is_empty() {
             return;
         }
+        let turns = std::mem::take(&mut *self.finished.lock().unwrap_or_else(|p| p.into_inner()));
         let before = self.status.clone();
         for event in &events {
             if let Event::Thinking { block, .. } = event {
@@ -238,6 +301,17 @@ impl AgentSession {
                 _ => {}
             }
         }
+        for turn in turns {
+            let at = self.review.push(turn);
+            // A turn that changed nothing shows no card.
+            if !self.review.turns()[at].files().is_empty() {
+                self.turn_marks.push((self.conversation.items().len(), at));
+            }
+            // The comments that went with this turn's message are answered now.
+            for (_, answered) in &mut self.sent_comments {
+                *answered = true;
+            }
+        }
         self.active_at = now();
         self.refresh_rows();
         let working = self.conversation.working();
@@ -250,11 +324,20 @@ impl AgentSession {
 
     /// Tells the list which rows to measure again.
     fn refresh_rows(&mut self) {
-        let after: Vec<_> = self.conversation.items().iter().map(list_diff::fingerprint).collect();
+        let items = self.conversation.items();
+        let shown = list_diff::rows(items.len(), &self.turn_marks);
+        let after: Vec<_> = shown
+            .iter()
+            .map(|row| match *row {
+                list_diff::Row::Item(ix) => list_diff::fingerprint(&items[ix]),
+                list_diff::Row::Changes { turn } => list_diff::changes_fingerprint(turn),
+            })
+            .collect();
         for (range, count) in list_diff::changes(&self.rows, &after) {
             self.list.splice(range, count);
         }
         self.rows = after;
+        self.shown = shown;
     }
 
     fn command(&mut self, command: Command, cx: &mut Context<Self>) {
@@ -283,24 +366,46 @@ impl AgentSession {
         self.stderr = None;
         self.refresh_rows();
         self.list.scroll_to_end();
+        // The review comments go with the message, and show resolved once the agent's turn ends.
+        self.sent_comments.extend(self.comments.all().iter().cloned().map(|c| (c, false)));
+        let command = Command::Send { text, attachments: self.comments.take_attachments() };
         match (&self.session, &self.id) {
             // The agent stopped (a crash, Stop): the session resumes, and the message goes then.
             (None, Some(id)) if !self.starting => {
-                self.waiting_send = Some(text);
+                self.waiting_send = Some(command);
                 self.starting = true;
                 let id = id.clone();
                 self.open(Some(id), false, cx);
             }
-            (None, _) if self.starting => self.waiting_send = Some(text),
+            (None, _) if self.starting => self.waiting_send = Some(command),
             // It never started (its program was missing, say): it tries again, and the message goes then.
             (None, None) => {
-                self.waiting_send = Some(text);
+                self.waiting_send = Some(command);
                 self.starting = true;
                 self.open(None, false, cx);
             }
-            _ => self.command(Command::send(text), cx),
+            _ => self.start_turn(command, cx),
         }
         cx.emit(SessionEvent::Changed);
+    }
+
+    /// Sends a message that starts a turn: the turn's tracker begins first, off the UI thread, so it
+    /// knows the files as they were before the agent reads the message. A message sent while a turn
+    /// runs joins that turn.
+    fn start_turn(&mut self, command: Command, cx: &mut Context<Self>) {
+        if self.tracker.lock().unwrap_or_else(|p| p.into_inner()).is_some() {
+            return self.command(command, cx);
+        }
+        let project = self.project.clone();
+        let beginning = cx.background_spawn(async move { TurnTracker::begin(project.as_ref()) });
+        cx.spawn(async move |this, cx| {
+            let tracker = beginning.await;
+            _ = this.update(cx, |s, cx| {
+                *s.tracker.lock().unwrap_or_else(|p| p.into_inner()) = Some(tracker);
+                s.command(command, cx);
+            });
+        })
+        .detach();
     }
 
     pub fn interrupt(&mut self, cx: &mut Context<Self>) {

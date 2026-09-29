@@ -1,56 +1,8 @@
-use std::sync::{Arc, Mutex};
-
-use gpui_kit::{AppContext, Entity, TestAppContext, VisualTestContext};
-use lathe_agents::session::{
-    Backend, Capabilities, Choice, ChoiceId, EventSink, PermissionRequest, RequestId, Session, Started, ToolCall, ToolId,
-    ToolKind, ToolStatus, TurnEnd, TurnOutcome,
-};
+use gpui_kit::TestAppContext;
+use lathe_agents::session::{Choice, ChoiceId, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
 
 use super::*;
-
-/// A backend in the test's thread: each message plays the next scripted turn into the sink, and every
-/// command is kept. `fail_first` makes the first open fail as a missing program does.
-struct Fake {
-    turns: Mutex<Vec<Vec<Event>>>,
-    received: Arc<Mutex<Vec<Command>>>,
-    fail_first: Mutex<bool>,
-}
-
-struct FakeSession {
-    backend: Arc<Fake>,
-    sink: EventSink,
-}
-
-impl Session for FakeSession {
-    fn send(&self, command: Command) -> Result<(), SessionError> {
-        let turn = matches!(command, Command::Send { .. });
-        self.backend.received.lock().unwrap().push(command);
-        if turn {
-            let next = { let mut t = self.backend.turns.lock().unwrap(); if t.is_empty() { Vec::new() } else { t.remove(0) } };
-            next.into_iter().for_each(|e| (self.sink)(e));
-        }
-        Ok(())
-    }
-}
-
-struct FakeBackend(Arc<Fake>);
-
-impl Backend for FakeBackend {
-    fn name(&self) -> &str {
-        "fake"
-    }
-    fn capabilities(&self) -> Capabilities {
-        Capabilities::default()
-    }
-    fn open(&self, _: Arc<dyn Project>, request: OpenRequest, sink: EventSink) -> Result<Box<dyn Session>, SessionError> {
-        if std::mem::take(&mut *self.0.fail_first.lock().unwrap()) {
-            return Err(SessionError::Missing { program: "fake".into() });
-        }
-        let id = request.resume.unwrap_or_else(|| SessionId::new("fake-1"));
-        sink(Event::Started(Started { session: id, model: None, mode: None }));
-        Ok(Box::new(FakeSession { backend: self.0.clone(), sink }))
-    }
-}
+use crate::fake_agent::{ended, git_project, start, start_in};
 
 fn ask() -> PermissionRequest {
     PermissionRequest {
@@ -70,42 +22,6 @@ fn ask() -> PermissionRequest {
             Choice { id: ChoiceId::new("always"), label: "Always".into(), kind: ChoiceKind::AllowAlways },
             Choice { id: ChoiceId::new("no"), label: "Deny".into(), kind: ChoiceKind::Deny },
         ],
-    }
-}
-
-fn ended() -> Event {
-    Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Completed, summary: None })
-}
-
-fn start(cx: &mut TestAppContext, turns: Vec<Vec<Event>>, fail_first: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
-    cx.update(|cx| {
-        gpui_kit::init(cx);
-        beui::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
-    });
-    let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(fail_first) });
-    let dir = tempfile::tempdir().unwrap().keep();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
-    let mut agent = lathe_agents::registry::agents().remove(0);
-    agent.backend = Arc::new(FakeBackend(fake.clone()));
-    let mut made = None;
-    let (_root, cx) = cx.add_window_view(|window, cx| {
-        let session = cx.new(|cx| AgentSession::start("k".into(), agent, project, None, window, cx));
-        made = Some(session.clone());
-        Root { _session: session }
-    });
-    cx.run_until_parked();
-    (made.unwrap(), fake, cx)
-}
-
-/// Keeps the session alive in the window.
-struct Root {
-    _session: Entity<AgentSession>,
-}
-
-impl gpui_kit::Render for Root {
-    fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
-        gpui_kit::div()
     }
 }
 
@@ -207,4 +123,27 @@ fn a_long_session_scrolls_under_a_frame(cx: &mut TestAppContext) {
         "{items} items: folded in {:.1} ms, first draw {:.2} ms; scroll frames median {:.2} ms, p95 {:.2} ms, worst {:.2} ms, over 8 ms: {}",
         ms(folded), ms(first), ms(frames[100]), ms(frames[190]), ms(frames[199]), frames.iter().filter(|f| **f > Duration::from_millis(8)).count()
     );
+}
+
+/// A turn that edits one file and makes another, one of them through a shell command no tool names,
+/// ends with its changed files, and their card follows the turn's last row.
+#[gpui_kit::test]
+fn a_turn_ends_with_its_changed_files_after_its_rows(cx: &mut TestAppContext) {
+    let dir = git_project(&[("a.txt", "one\n"), ("b.txt", "keep\n")]);
+    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![Event::Text { block: lathe_agents::session::BlockId(1), delta: "done".into() }, ended()]], false);
+    let root = dir.clone();
+    fake.work.lock().unwrap().push(Box::new(move || {
+        std::fs::write(root.join("a.txt"), "one\ntwo\n").unwrap();
+        std::fs::write(root.join("c.txt"), "new\n").unwrap();
+    }));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
+    cx.run_until_parked();
+    let (turns, shown, counts) = cx.update(|_, cx| {
+        let s = session.read(cx);
+        let files = s.review.turns().first().map(|t| t.files().iter().map(|f| (f.path.clone(), f.counts())).collect::<Vec<_>>());
+        (s.review.turns().len(), s.shown.clone(), files)
+    });
+    assert_eq!(turns, 1);
+    assert_eq!(counts.unwrap(), [("a.txt".to_string(), (1, 0)), ("c.txt".to_string(), (1, 0))], "b.txt did not change");
+    assert_eq!(shown.last(), Some(&list_diff::Row::Changes { turn: 0 }), "the card comes after the turn's rows");
 }
