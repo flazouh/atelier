@@ -78,7 +78,7 @@ impl TasksStory {
             TaskBoardEvent::Changed { ids, change } => this.changed(ids, change, Source::Board, cx),
         }));
         subscriptions.push(cx.subscribe_in(&view, window, |this: &mut Self, _, event: &TaskViewEvent, window, cx| match event {
-            TaskViewEvent::Changed { id, change } => this.changed(&[id.clone()], change, Source::View, cx),
+            TaskViewEvent::Changed { id, change } => this.changed(std::slice::from_ref(id), change, Source::View, cx),
             TaskViewEvent::OpenTask(id) => this.show(id.clone(), window, cx),
             TaskViewEvent::DescriptionSaved { id, text } => {
                 if let Some(task) = this.tasks.iter_mut().find(|t| t.id == *id) {

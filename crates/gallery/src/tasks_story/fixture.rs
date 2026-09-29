@@ -41,8 +41,8 @@ pub fn people(claude: &AgentLook, other: &AgentLook) -> Vec<Assignee> {
         Assignee::Person { name: "Sam".into() },
         Assignee::Person { name: "Mina".into() },
         Assignee::Person { name: "Ravi".into() },
-        Assignee::Agent { name: "Claude".into(), look: claude.clone() },
-        Assignee::Agent { name: "Codex".into(), look: other.clone() },
+        Assignee::agent("Claude", claude.clone()),
+        Assignee::agent("Codex", other.clone()),
     ]
 }
 
@@ -105,7 +105,7 @@ pub fn tasks(count: usize, claude: &AgentLook, other: &AgentLook) -> Vec<TaskDat
                 TaskStatus::InReview => PrState::Open,
                 _ => PrState::Draft,
             };
-            task.prs.push(pr(number, state, &task.title.to_string()));
+            task.prs.push(pr(number, state, task.title.as_ref()));
             task.activity.push(Activity::PrOpened { number, at: task.updated_at - 600 });
         }
         if status == TaskStatus::InProgress && rng.next(2) == 0 {
@@ -132,7 +132,7 @@ fn feature(task: &mut TaskData, claude: &AgentLook) {
     task.title = "Add the task list and the task board".into();
     task.status = TaskStatus::InProgress;
     task.priority = Priority::High;
-    task.assignee = Some(Assignee::Agent { name: "Claude".into(), look: claude.clone() });
+    task.assignee = Some(Assignee::agent("Claude", claude.clone()));
     task.labels = vec![Label::new("ui", 1), Label::new("agents", 5)];
     task.description = "## Goal\n\nShow the work as **tasks**, the way Linear does.\n\n- a list grouped by status\n- a board with drag between columns\n- a page for one task\n\nSee `docs/tasks.md` for the keys.".into();
     task.sessions = vec![SessionLink { id: "s0".into(), title: "Build the task parts".into(), status: SessionStatus::Working, look: claude.clone() }];

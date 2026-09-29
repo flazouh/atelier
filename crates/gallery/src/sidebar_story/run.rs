@@ -22,6 +22,8 @@ pub struct Run {
     nodes: Vec<Duration>,
     /// Frames in which the story marked a switch, apart from the rest.
     switched: Vec<Duration>,
+    /// Layout and prepaint of those same frames.
+    switched_layout: Vec<Duration>,
     mark_switch: bool,
 }
 
@@ -35,6 +37,7 @@ impl Run {
             paint: Vec::new(),
             nodes: Vec::new(),
             switched: Vec::new(),
+            switched_layout: Vec::new(),
             mark_switch: false,
         }
     }
@@ -45,13 +48,14 @@ impl Run {
         let now = Instant::now();
         if let Some(last) = self.last.replace(now) {
             let took = now - last;
+            let stages = std::mem::take(&mut *self.stages.borrow_mut());
             if std::mem::take(&mut self.mark_switch) {
                 self.switched.push(took);
+                self.switched_layout.push(stages.layout);
             } else {
                 self.frames.push(took);
+                self.layout.push(stages.layout);
             }
-            let stages = std::mem::take(&mut *self.stages.borrow_mut());
-            self.layout.push(stages.layout);
             self.paint.push(stages.paint);
             self.nodes.push(Duration::from_nanos(stages.nodes as u64));
         }
@@ -60,6 +64,7 @@ impl Run {
             report("frame", &mut self.frames);
             if !self.switched.is_empty() {
                 report("frame with a switch", &mut self.switched);
+                report("layout with a switch", &mut self.switched_layout);
             }
             report("layout and prepaint", &mut self.layout);
             report("paint", &mut self.paint);
