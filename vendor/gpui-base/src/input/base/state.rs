@@ -443,6 +443,11 @@ pub struct InputBaseState<M: InputModeKind> {
     pub(crate) scroll_handle: ScrollHandle,
     /// The deferred scroll offset to apply on next layout.
     pub(crate) deferred_scroll_offset: Option<Point<Pixels>>,
+    /// A text offset asked to be revealed while no layout described the text; the next paint
+    /// reveals it (lathe patch 17).
+    pub(crate) reveal_after_layout: Option<usize>,
+    /// The last layout is of a text `set_value` has since replaced whole (lathe patch 17).
+    pub(crate) layout_stale: bool,
     /// The size of the scrollable content.
     pub(crate) scroll_size: gpui::Size<Pixels>,
     pub(super) editor_scrollbar_snapshot: Cell<Option<EditorScrollbarSnapshot>>,
@@ -787,6 +792,8 @@ impl<M: InputModeKind> InputBaseState<M> {
             editor_scrollbar_snapshot: Cell::new(None),
             editor_paddings: Edges::default(),
             deferred_scroll_offset: None,
+            reveal_after_layout: None,
+            layout_stale: false,
             placeholder: SharedString::default(),
             mask_pattern: MaskPattern::default(),
             mask_pattern_set: false,
@@ -995,6 +1002,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.reset_selection();
         self.reset_lsp_state();
         self.reset_scroll_to_start();
+        self.layout_stale = true;
 
         self.undo_manager.clear();
         cx.notify();
@@ -2550,12 +2558,19 @@ impl<M: InputModeKind> InputBaseState<M> {
         padding: ScrollPadding,
         cx: &mut Context<Self>,
     ) {
-        let Some(last_layout) = self.last_layout.as_ref() else {
+        let laid_out = (self.last_layout.as_ref(), self.last_bounds.as_ref());
+        let (Some(last_layout), Some(bounds)) = laid_out else {
+            // Nothing is laid out yet: the first paint reveals it (lathe patch 17).
+            self.reveal_after_layout = Some(offset);
             return;
         };
-        let Some(bounds) = self.last_bounds.as_ref() else {
+        if self.layout_stale {
+            // The layout is of the text before `set_value`: its sizes would clamp the scroll to the
+            // old text's height (lathe patch 17).
+            self.reveal_after_layout = Some(offset);
             return;
-        };
+        }
+        self.reveal_after_layout = None;
 
         let mut scroll_offset = self.scroll_handle.offset();
         let was_offset = scroll_offset;
@@ -5025,6 +5040,26 @@ mod tests {
                 assert_eq!(state.value(), "!changed");
             });
         });
+    }
+
+    /// lathe patch 17: a caret set before the text has ever been laid out (a file just opened at a
+    /// definition) is revealed by the first layout, instead of the view staying at the top.
+    #[gpui::test]
+    fn test_a_caret_set_before_the_first_layout_is_revealed(cx: &mut TestAppContext) {
+        let input_view = InputView::new(cx);
+        let mut cx = VisualTestContext::from_window(input_view.window_handle.into(), cx);
+        let input = input_view.input;
+        cx.update(|window, cx| {
+            input.update(cx, |state, cx| {
+                let text: String = (0..400).map(|i| format!("line {i}\n")).collect();
+                state.set_value(text, window, cx);
+                state.set_cursor_position(Position::new(300, 0), window, cx);
+            });
+        });
+        cx.run_until_parked();
+        let (line, scrolled) = cx.update(|_, cx| input.read_with(cx, |s, _| (s.cursor_position().line, s.scroll_offset().y)));
+        assert_eq!(line, 300);
+        assert!(scrolled < px(-2000.), "the first layout revealed the caret: {scrolled:?}");
     }
 
     /// Regression test: `scroll_to` at end-of-buffer must produce a deferred

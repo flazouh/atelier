@@ -169,3 +169,12 @@ Test: `test_the_offset_under_the_pointer`.
 as the editor paints them, so a test can compare them with a fresh parse after an edit that took
 the background path. lathe's `crates/beui/src/code_editor/tests.rs` (module `background`) does.
 It borrows the highlighter the editor already keeps; nothing else changes.
+
+## 17. A caret set before the first layout is revealed
+
+`scroll_to` reads the last layout. Right after `set_value` that layout is of the old text, so a
+caret moved into the new text (a file just opened at a definition) was clamped to the old text's
+height, and the view stayed at the top. `set_value` now marks the layout stale; `scroll_to` keeps
+the offset (`reveal_after_layout`) while the layout is stale or missing, and the next paint reveals
+it.
+Test: `test_a_caret_set_before_the_first_layout_is_revealed`.

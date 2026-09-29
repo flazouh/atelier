@@ -2771,6 +2771,16 @@ impl<M: InputModeKind> Element for TextElement<M> {
             state.scroll_size = prepaint.scroll_size;
             state.update_scroll_offset(Some(prepaint.cursor_scroll_offset), cx);
             state.deferred_scroll_offset = None;
+            state.layout_stale = false;
+            // A caret set before this layout is revealed now that the layout is of its text (lathe
+            // patch 17). The target goes straight to the scroll handle: a deferred one would wait for
+            // a frame nothing has asked for yet.
+            if let Some(offset) = state.reveal_after_layout.take() {
+                state.scroll_to(offset, None, cx);
+                let target = state.deferred_scroll_offset.take();
+                state.update_scroll_offset(target, cx);
+                window.refresh();
+            }
 
             // Layout consumers need changed geometry, not another notification
             // for every paint of an unchanged input.

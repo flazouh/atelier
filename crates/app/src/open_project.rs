@@ -239,22 +239,12 @@ impl OpenProject {
     fn place_caret(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(buffer) = self.buffers.get(path) else { return };
         let position = self.caret_at.remove(path);
-        let editor = buffer.editor.clone();
-        editor.update(cx, |state, cx| {
+        buffer.editor.update(cx, |state, cx| {
             if let Some(position) = position {
                 state.set_cursor_position(position, window, cx);
             }
             state.focus(window, cx);
         });
-        // The editor scrolls to its caret from its last layout, which a new buffer has only after its
-        // first frame; so the caret is set again once that frame has laid it out.
-        if let Some(position) = position {
-            cx.spawn_in(window, async move |_, cx| {
-                cx.background_executor().timer(Duration::from_millis(1)).await;
-                _ = editor.update_in(cx, |state, window, cx| state.set_cursor_position(position, window, cx));
-            })
-            .detach();
-        }
     }
 
     /// Shows `path` in a tab, reading it first when it has none.
