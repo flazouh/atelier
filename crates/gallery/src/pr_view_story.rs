@@ -7,11 +7,13 @@
 //! `PRV_VIEW=list` opens the list first; the default opens the pull request. `PRV_LSP=1` starts the language
 //! servers on the head's checkout (rust-analyzer, downloaded once unless `LATHE_OFFLINE` is set).
 //! `PRV_BIG=1` opens a large pull request (`PRV_FILES`, `PRV_COMMENTS`); `GALLERY_SCROLL=1` measures frames on it.
+//! `PRV_REAL=owner/name#number` reads a real pull request through `gh`, read only (`PRV_ME` names the reader).
 use beui::ActiveTheme;
 use gpui_kit::{AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window, div};
 use lathe_pr_view::{
-    fixture::{big::Big, relay::Relay},
+    fixture::{big::Big, real::Real, relay::Relay},
     hub::{PrEvent, PrHub},
+    services::PrConfig,
 };
 
 use crate::sidebar_story::run::Run;
@@ -21,6 +23,7 @@ use crate::sidebar_story::run::Run;
 enum Keep {
     _Relay(Relay),
     _Big(Big),
+    _Real,
 }
 
 pub struct PrViewStory {
@@ -36,7 +39,14 @@ impl PrViewStory {
         let measuring = std::env::var("GALLERY_SCROLL").is_ok_and(|v| v == "1");
         let local = std::env::temp_dir().join("lathe-gallery-pr-view");
         let number = |name: &str, or: usize| std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(or);
-        let (hub, keep, reference) = if measuring || std::env::var("PRV_BIG").is_ok() {
+        let (hub, keep, reference) = if let Ok(spec) = std::env::var("PRV_REAL") {
+            // A real pull request, read only: PRV_REAL=owner/name#number.
+            let real = Real::open(&spec, &std::env::temp_dir().join("lathe-pr-view-qa")).expect("the pull request opens");
+            let me = std::env::var("PRV_ME").unwrap_or_else(|_| "alex".into());
+            let config = PrConfig::new(me, &local).read_only(true);
+            let hub = cx.new(|cx| PrHub::new(real.project.clone(), real.forge.clone(), config, cx).expect("the caches open"));
+            (hub, Keep::_Real, real.reference)
+        } else if measuring || std::env::var("PRV_BIG").is_ok() {
             // PRV_FILES changed files and PRV_COMMENTS comments (five to a thread).
             let big = Big::build(number("PRV_FILES", 300), number("PRV_COMMENTS", 5000) / 5, 5);
             let config = big.config(&local).refresh(std::time::Duration::from_secs(600), std::time::Duration::from_secs(600));

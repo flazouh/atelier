@@ -155,6 +155,8 @@ pub struct PullView {
     pub(crate) rail_scroll: ScrollHandle,
     /// How many threads and remarks the rail lists: a page, and more when the reader asks.
     pub(crate) page: (usize, usize),
+    /// The description is shown whole, not clipped.
+    pub(crate) body_open: bool,
     /// Long threads the reader opened up in the diff.
     unfolded: HashSet<ThreadId>,
     pub timeline: Vec<(&'static str, std::time::Duration)>,
@@ -251,6 +253,7 @@ impl PullView {
             sync_failed: false,
             rail_scroll: ScrollHandle::new(),
             page: (crate::layout::PAGE, crate::layout::PAGE),
+            body_open: false,
             unfolded: HashSet::new(),
             timeline: Vec::new(),
             opened: std::time::Instant::now(),

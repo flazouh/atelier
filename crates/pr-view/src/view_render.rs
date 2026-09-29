@@ -21,6 +21,9 @@ use crate::{
     view::PullView,
 };
 
+/// The description shows this tall until the reader asks for all of it.
+const BODY_CLIP: f32 = 160.;
+
 /// The line under the diff.
 const STATUS_HEIGHT: f32 = 26.;
 
@@ -83,7 +86,22 @@ impl PullView {
                     .child(Button::new("pr-base").label(base_words).variant(ButtonVariant::Secondary).size(ButtonSize::Sm).on_click(move |e, w, cx| pick(e, w, cx))),
             )
             .when_some(note, |d, note| d.child(div().text_size(TextSize::Xs.font_size()).text_color(if error { theme.danger } else { muted }).child(SharedString::from(note))))
-            .when(!pull.body.trim().is_empty(), |d| d.child(div().pt(px(4.)).child(AgentText::new("pr-body", body))))
+            .when(!pull.body.trim().is_empty(), |d| {
+                let open = self.body_open;
+                let toggle = cx.listener(|view, _, _, cx| {
+                    view.body_open = !view.body_open;
+                    cx.notify();
+                });
+                d.child(
+                    div()
+                        .pt(px(4.))
+                        .flex()
+                        .flex_col()
+                        .gap(px(4.))
+                        .child(div().when(!open, |d| d.max_h(px(BODY_CLIP)).overflow_hidden()).child(AgentText::new("pr-body", body)))
+                        .child(Button::new("pr-body-more").label(if open { "Show less" } else { "Show the whole description" }).variant(ButtonVariant::Ghost).size(ButtonSize::Sm).on_click(move |e, w, cx| toggle(e, w, cx))),
+                )
+            })
             .into_any_element()
     }
 

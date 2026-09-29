@@ -601,6 +601,7 @@ dependencies = [
  "lathe-agents",
  "lathe-editor",
  "lathe-lsp",
+ "lathe-pr-view",
  "lathe-project",
  "lathe-settings",
  "lsp-types",
@@ -3826,6 +3827,26 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "lathe-pr-view"
+version = "0.1.0"
+dependencies = [
+ "beui",
+ "futures-channel",
+ "futures-util",
+ "gpui-kit",
+ "lathe-editor",
+ "lathe-forge",
+ "lathe-lsp",
+ "lathe-project",
+ "lathe-review",
+ "lsp-types",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

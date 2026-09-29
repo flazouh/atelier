@@ -60,3 +60,14 @@ fn what_the_reader_said_comes_from_the_opinions() {
     assert_eq!(stated_verdict(&pull, "nobody"), None);
     pull.state = PullState::Merged;
 }
+
+#[test]
+fn a_line_of_the_list_says_the_words_and_not_the_markup() {
+    use crate::present::{first_words, without_html};
+    assert_eq!(without_html("<div><sup>Updated 8:43 PM</sup></div>\nDone"), "Updated 8:43 PM\nDone");
+    assert_eq!(without_html("<!-- marker\nover lines -->Real words"), "Real words");
+    assert_eq!(without_html("a < b and c > d"), "a < b and c > d", "a bare < is not a tag");
+    assert_eq!(without_html("open <!-- never closed"), "open ");
+    assert_eq!(first_words("<div><sup>Updated 8:43 PM</sup></div>").as_ref(), "Updated 8:43 PM");
+    assert_eq!(first_words("<!-- hidden -->\n\nSecond line").as_ref(), "Second line");
+}

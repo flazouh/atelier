@@ -20,7 +20,7 @@ use lathe_forge::{Change, Pull, PullRef, RepoRef};
 use lathe_project::{Command, Project};
 
 /// How long a fetch may take before it is given up.
-const FETCH_TIMEOUT: Duration = Duration::from_secs(180);
+const FETCH_TIMEOUT: Duration = Duration::from_secs(900);
 const QUICK: Duration = Duration::from_secs(60);
 /// A file bigger than this is listed but not diffed.
 pub const MAX_TEXT: u64 = 4 * 1024 * 1024;

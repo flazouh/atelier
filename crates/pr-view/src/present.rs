@@ -49,9 +49,39 @@ pub fn comment(comment: &Comment, now: u64) -> UiComment {
 /// A comment's first words for a line of the list: the first line with something in it, cut at 90
 /// characters.
 pub fn first_words(body: &str) -> SharedString {
-    let line = body.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+    let plain = without_html(body);
+    let line = plain.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
     let cut: String = line.chars().take(90).collect();
     if line.chars().count() > 90 { format!("{cut}…").into() } else { cut.into() }
+}
+
+/// The text of a comment with its HTML comments and tags taken out: bots write `<div><sup>Updated…</sup></div>`
+/// and `<!-- marker -->`, and a line of the list should say the words, not the markup. A `<` that does not
+/// start a tag (`a < b`) stays.
+pub fn without_html(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('<') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at..];
+        if let Some(inner) = after.strip_prefix("<!--") {
+            match inner.find("-->") {
+                Some(end) => rest = &inner[end + 3..],
+                None => return out,
+            }
+            continue;
+        }
+        let starts_tag = after[1..].chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '/');
+        match (starts_tag, after.find('>')) {
+            (true, Some(end)) => rest = &after[end + 1..],
+            _ => {
+                out.push('<');
+                rest = &after[1..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 pub fn thread_summary(thread: &Thread, now: u64) -> ThreadSummary {

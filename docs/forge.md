@@ -141,6 +141,10 @@ list on a busy account.
 - Merge queue: a repository that has one takes `merge` into the queue (`enqueuePullRequest`), whatever
   `when_ready` says. `delete_branch` applies to a merge that lands now, in the same repository; a branch
   in a fork is never deleted.
+- `Pull.base_sha` is GitHub's `baseRefOid`: the tip of the base branch the pull request was last compared
+  with. The pull request view takes the merge base of it and the head as the start of the diff
+  (`docs/pr-view.md`). Every type in `model/` is `Serialize` and `Deserialize`, for the view's snapshots.
+- `time::ago` and `time::parse` turn the forge's timestamps into words and seconds.
 
 ## Tests
 
