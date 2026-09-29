@@ -17,6 +17,8 @@ pub fn after(now: &SessionStatus, event: &Event, seen: bool) -> SessionStatus {
             TurnOutcome::Completed | TurnOutcome::Interrupted => SessionStatus::Finished,
         },
         Event::Ended(EndReason::Failed(why)) => SessionStatus::Failed(short_reason(why)),
+        // Stopped by the reader: nothing runs any more, and nothing waits.
+        Event::Ended(EndReason::Closed) if matches!(now, SessionStatus::Working | SessionStatus::NeedsYou(_)) => SessionStatus::Idle,
         Event::Ended(EndReason::Exited { code, stderr }) if !matches!(now, SessionStatus::Failed(_)) => match code {
             Some(0) if matches!(now, SessionStatus::Idle | SessionStatus::Finished) => now.clone(),
             // The row says the agent's own last words when it left any.

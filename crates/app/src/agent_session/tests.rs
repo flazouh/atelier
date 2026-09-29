@@ -157,8 +157,9 @@ fn a_stream_folds_into_one_row(cx: &mut TestAppContext) {
 }
 
 /// What a long session costs: 2,000 messages (the reader's and the agent's, and a tool call every
-/// tenth) folded and drawn in the panel, then scrolled a frame at a time. Target: every frame under
-/// 8 ms. Layout and prepaint on the CPU; the harness paints no pixels.
+/// tenth) folded and drawn in the panel, then scrolled a frame at a time. The harness shapes no text
+/// (GPUI's `NoopTextSystem`) and paints no pixels, so this is the fold's and the list's own cost; the
+/// real frame is the app's, under `LATHE_FRAMES=1` (docs/performance.md, "Agent sessions in the app").
 ///     cargo test --release -p lathe-app -- --ignored --nocapture a_long_session_scrolls
 #[gpui_kit::test]
 #[ignore]
