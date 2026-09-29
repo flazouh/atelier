@@ -141,3 +141,26 @@ fn the_whole_session_holds_every_turn_and_marks_keep_per_scope(cx: &mut TestAppC
     cx.update(|window, cx| pane.update(cx, |p, cx| p.switch_scope(window, cx)));
     assert_eq!(cx.update(|_, cx| pane.read(cx).progress(cx).reviewed), 0, "the mark was on the whole session, not on the turn");
 }
+
+/// Shows the pane as the window's root, so it is laid out and painted.
+struct Shown(Entity<ReviewPane>);
+
+impl gpui_kit::Render for Shown {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().size_full().child(self.0.clone())
+    }
+}
+
+/// The gutter's + opens a composer that takes the keys at once: it is painted in a row block, so it can
+/// only take focus once it has been painted.
+#[gpui_kit::test]
+fn a_new_comment_takes_the_keys_at_once(cx: &mut TestAppContext) {
+    let (pane, _, _, _, cx) = reviewing(cx);
+    let shown = pane.clone();
+    cx.update(|window, cx| _ = window.replace_root(cx, |_, _| Shown(shown)));
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.open_composer(2, window, cx)));
+    cx.run_until_parked();
+    let focused = cx.update(|window, cx| pane.read(cx).composer.as_ref().is_some_and(|(_, c, _)| c.focus_handle(cx).is_focused(window)));
+    assert!(focused, "the composer has the keys");
+}

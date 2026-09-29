@@ -41,7 +41,7 @@ use crate::{
 /// How long after the reader's last key the file is written.
 const WRITE_AFTER: Duration = Duration::from_millis(300);
 /// Below this width the tree hides, and `s`, `w` and the bar walk the files; review mode shows it.
-const TREE_FROM: f32 = 760.;
+const TREE_FROM: f32 = 680.;
 
 /// Which changes the review holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -438,7 +438,7 @@ impl ReviewPane {
             this.composer = None;
             cx.notify();
         });
-        composer.focus_handle(cx).focus(window, cx);
+        focus_once_painted(composer.focus_handle(cx), 3, window, cx);
         self.composer = Some((self.current, composer, sub));
         cx.notify();
     }
@@ -533,6 +533,19 @@ impl ReviewPane {
             blocks.push(RowBlock { row, render: std::rc::Rc::new(move |_, _| composer.clone().into_any_element()) });
         }
         blocks
+    }
+}
+
+/// Focuses `handle` now and again on each of the next `frames` frames until it holds: a composer in a
+/// row block is painted only once the editor has laid it out, and a handle not yet painted loses the
+/// focus the press gave it.
+fn focus_once_painted(handle: FocusHandle, frames: usize, window: &mut Window, cx: &mut gpui_kit::App) {
+    if handle.is_focused(window) {
+        return;
+    }
+    handle.focus(window, cx);
+    if frames > 0 {
+        window.on_next_frame(move |window, cx| focus_once_painted(handle, frames - 1, window, cx));
     }
 }
 
