@@ -610,6 +610,50 @@ fn buttons() -> impl IntoElement {
                 .child(Button::new("i-more").icon(IconName::MoreHoriz).size(ButtonSize::Icon).variant(ButtonVariant::Ghost)),
         ))
         .child(section("Disabled", row().child(Button::new("disabled").label("Send").disabled(true))))
+        .child(section(
+            "Button groups: two and three parts, primary and secondary, one part disabled",
+            div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(
+                    row()
+                        .child(
+                            beui::ButtonGroup::new("group-two")
+                                .child(Button::new("g2-merge").label("Squash and merge"))
+                                .child(Button::new("g2-more").icon(IconName::ChevronDown)),
+                        )
+                        .child(
+                            beui::ButtonGroup::new("group-three")
+                                .child(Button::new("g3-prev").icon(IconName::ArrowUp))
+                                .child(Button::new("g3-mark").label("Seen"))
+                                .child(Button::new("g3-next").icon(IconName::ArrowDown)),
+                        ),
+                )
+                .child(
+                    row()
+                        .child(
+                            beui::ButtonGroup::new("group-two-secondary")
+                                .variant(ButtonVariant::Secondary)
+                                .child(Button::new("g2s-open").label("Open"))
+                                .child(Button::new("g2s-more").icon(IconName::ChevronDown)),
+                        )
+                        .child(
+                            beui::ButtonGroup::new("group-three-secondary")
+                                .variant(ButtonVariant::Secondary)
+                                .child(Button::new("g3s-left").label("Left"))
+                                .child(Button::new("g3s-center").label("Center"))
+                                .child(Button::new("g3s-right").label("Right")),
+                        ),
+                )
+                .child(
+                    row().child(
+                        beui::ButtonGroup::new("group-disabled")
+                            .child(Button::new("gd-merge").label("Squash and merge").disabled(true).tooltip("2 checks still running"))
+                            .child(Button::new("gd-more").icon(IconName::ChevronDown)),
+                    ),
+                ),
+        ))
 }
 
 fn badges() -> impl IntoElement {
