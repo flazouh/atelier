@@ -3765,6 +3765,8 @@ dependencies = [
  "beui",
  "gpui-kit",
  "lathe-project",
+ "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_json",
  "tempfile",
