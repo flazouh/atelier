@@ -1,8 +1,11 @@
 //! What git says about the working tree, at the start of a turn and at its end. A shell command changes
 //! files no tool call names; comparing the two states finds them.
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+};
 
-use lathe_project::Project;
+use lathe_project::{Command, Project};
 
 /// How many paths one `git hash-object` is given.
 const HASH_BATCH: usize = 200;
@@ -35,11 +38,56 @@ pub(crate) fn snapshot(project: &dyn Project) -> Option<State> {
     Some(State { entries, blobs })
 }
 
-/// The text of `path` in the last commit, or `None` when the file is not in it (or is not text).
-pub(crate) fn head_text(project: &dyn Project, path: &str) -> Option<String> {
-    // `./` makes the path relative to the project, not to the repository.
-    let spec = format!("HEAD:./{path}");
-    project.git(&["show", &spec]).ok().filter(|o| o.ok()).map(|o| o.stdout)
+/// How many paths one `git cat-file --batch` is given. The names go in before any answer is read, so
+/// they must fit in the pipe.
+const HEAD_BATCH: usize = 500;
+
+/// The bytes of each path in the last commit, or `None` for a path that is not in it. One git process
+/// for a batch of paths, since a turn can change hundreds of files. Paths are relative to the project.
+pub(crate) fn head_files(project: &dyn Project, paths: &[&str]) -> HashMap<String, Option<Vec<u8>>> {
+    let mut found = HashMap::with_capacity(paths.len());
+    for batch in paths.chunks(HEAD_BATCH) {
+        // A name with a line end cannot be asked for on a line of its own.
+        let (asked, odd): (Vec<&str>, Vec<&str>) = batch.iter().copied().partition(|p| !p.contains('\n'));
+        found.extend(odd.into_iter().map(|p| (p.to_string(), None)));
+        let Some(answers) = cat_file(project, &asked) else {
+            found.extend(asked.into_iter().map(|p| (p.to_string(), None)));
+            continue;
+        };
+        found.extend(asked.into_iter().zip(answers).map(|(path, bytes)| (path.to_string(), bytes)));
+    }
+    found
+}
+
+/// `git cat-file --batch` for `HEAD:./path` of each path: one answer per path, in order. The answers
+/// read `<id> blob <size>` and the bytes, or `<name> missing`.
+fn cat_file(project: &dyn Project, paths: &[&str]) -> Option<Vec<Option<Vec<u8>>>> {
+    let mut process = project.spawn(&Command::new("git").args(["cat-file", "--batch"])).ok()?;
+    for path in paths {
+        writeln!(process.stdin, "HEAD:./{path}").ok()?;
+    }
+    drop(process.stdin);
+    let mut out = Vec::new();
+    process.stdout.read_to_end(&mut out).ok()?;
+    let _ = process.control.wait();
+    let mut answers = Vec::with_capacity(paths.len());
+    let mut at = 0;
+    for _ in paths {
+        let end = at + out[at..].iter().position(|b| *b == b'\n')?;
+        let header = std::str::from_utf8(&out[at..end]).ok()?;
+        at = end + 1;
+        if header.ends_with(" missing") {
+            answers.push(None);
+            continue;
+        }
+        let mut parts = header.split(' ');
+        let (_id, kind, size) = (parts.next()?, parts.next()?, parts.next()?.parse::<usize>().ok()?);
+        let body = out.get(at..at + size)?;
+        // A name that is a folder answers with a tree, which is not a file's text.
+        answers.push((kind == "blob").then(|| body.to_vec()));
+        at += size + 1;
+    }
+    Some(answers)
 }
 
 /// Reads `git status --porcelain=v2 -z`. Entries outside `prefix` (the project's folder inside the

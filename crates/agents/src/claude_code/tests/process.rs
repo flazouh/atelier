@@ -13,7 +13,7 @@ use lathe_project::LocalProject;
 use crate::{
     claude_code::ClaudeCode,
     session::{
-        Backend, Command, EndReason, Event, EventSink, OpenRequest, RequestId, ChoiceId, SessionError, TurnOutcome,
+        Attachment, Backend, Command, EndReason, Event, EventSink, OpenRequest, RequestId, ChoiceId, SessionError, TurnOutcome,
     },
 };
 
@@ -153,4 +153,29 @@ fn dropping_the_session_stops_the_process_and_ends_closed() {
     let events = until(&rx, ended);
     assert_eq!(events.last(), Some(&Event::Ended(EndReason::Closed)));
     assert!(dropped.elapsed() < Duration::from_secs(5), "the process must not run its sleep out");
+}
+
+#[test]
+fn a_message_with_attachments_reaches_the_process_as_one_text() {
+    let stand = Stand::new();
+    let log = stand.dir.path().join("log");
+    let program = stand.script(&format!(
+        "echo '{{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"s1\"}}'\nwhile IFS= read -r line; do printf '%s\\n' \"$line\" >> '{}'; done",
+        log.display()
+    ));
+    let (sink, rx) = channel();
+    let session = ClaudeCode::with_program(program.to_string_lossy()).open(stand.project(), OpenRequest::default(), sink).unwrap();
+    until(&rx, |e| matches!(e, Event::Started(_)));
+    let comment = Attachment::LineComment { path: "src/a.rs".into(), first_line: 3, last_line: 3, removed: false, quote: "let x = 1;".into(), body: "why?".into() };
+    session.send(Command::Send { text: "look at this".into(), attachments: vec![comment] }).unwrap();
+    let deadline = Instant::now() + WAIT;
+    let written = loop {
+        let text = std::fs::read_to_string(&log).unwrap_or_default();
+        if !text.is_empty() || Instant::now() > deadline {
+            break text;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let line: serde_json::Value = serde_json::from_str(written.lines().next().unwrap()).unwrap();
+    assert_eq!(line["message"]["content"], "look at this\n\nReview comment on src/a.rs, line 3:\n> let x = 1;\nwhy?");
 }

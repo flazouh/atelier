@@ -212,3 +212,22 @@ from alex-31's builds running at the same time.
   only the rows on screen lay out.
 - The first frame waits for no disk work: the settings file is read before the event loop, and the
   project lists after the window shows.
+
+## Review
+What runs when a turn ends and when the reader works on it. All of it runs off the UI thread. Machine and
+method as above; load average 4.4, 15 runs (7 for the disk case).
+
+    cargo test -p lathe-review --release --test perf -- --ignored --nocapture --test-threads=1
+
+| Case | Target | Median | p95 | Result |
+| --- | --- | --- | --- | --- |
+| A turn of 200 files, one of 20,000 lines: all hunks, from texts in memory | < 100 ms | 20.2 ms | 23.4 ms | Passes |
+| The same, through `TurnTracker::finish` on real files with git (status, hashes, reads, hunks) | < 100 ms | 55.5 ms | max 57.2 ms | Passes |
+| One edit in a 20,000-line file, diffed | < 5 ms | 1.7 ms | 2.0 ms | Passes |
+| The agent edits again with the review open: `rebased_on` | < 5 ms | 2.5 ms | 2.7 ms | Passes |
+| One decision on the merged text of that file | (none) | 0.66 ms | 0.84 ms | |
+| One keystroke moving the hunks (`track_edit`) | (none) | 0.70 ms | 0.80 ms | |
+| A 20,000-line file with 500 hunks | < 50 ms | 26.3 ms | 28.2 ms | Passes |
+
+The first run of the disk case took 250 ms: it read the last commit's text of each file git found with one
+`git show` a file. One `git cat-file --batch` for all of them brought it to 55 ms.

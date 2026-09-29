@@ -3,7 +3,7 @@ use std::{fs, path::Path, process::Command, sync::Arc};
 
 use lathe_project::LocalProject;
 
-use super::{head_text, parse_status, snapshot};
+use super::{head_files, parse_status, snapshot};
 
 fn git(dir: &Path, args: &[&str]) {
     let out = Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
@@ -120,11 +120,42 @@ fn many_changed_files_are_hashed_in_batches() {
 }
 
 #[test]
-fn the_text_of_a_file_in_the_last_commit_is_found_from_the_projects_folder() {
+fn the_bytes_of_files_in_the_last_commit_come_from_one_process_and_missing_ones_are_none() {
     let (dir, project) = repo();
     fs::write(dir.path().join("a.txt"), "changed\n").unwrap();
-    assert_eq!(head_text(project.as_ref(), "a.txt").as_deref(), Some("a\n"));
-    assert_eq!(head_text(project.as_ref(), "nope.txt"), None);
+    fs::write(dir.path().join("sub/bin.dat"), [0u8, 1, 2, 255]).unwrap();
+    git(dir.path(), &["add", "sub/bin.dat"]);
+    git(dir.path(), &["commit", "-q", "-m", "bin"]);
+    let heads = head_files(project.as_ref(), &["a.txt", "nope.txt", "sub/b.txt", "sub", "sub/bin.dat", "odd\nname"]);
+    assert_eq!(heads["a.txt"].as_deref(), Some(&b"a\n"[..]));
+    assert_eq!(heads["nope.txt"], None);
+    assert_eq!(heads["sub/b.txt"].as_deref(), Some(&b"b\n"[..]));
+    assert_eq!(heads["sub"], None, "a folder is not a file");
+    assert_eq!(heads["sub/bin.dat"].as_deref(), Some(&[0u8, 1, 2, 255][..]));
+    assert_eq!(heads["odd\nname"], None);
     let inner = LocalProject::open(dir.path().join("sub")).unwrap();
-    assert_eq!(head_text(&inner, "b.txt").as_deref(), Some("b\n"));
+    assert_eq!(head_files(&inner, &["b.txt"])["b.txt"].as_deref(), Some(&b"b\n"[..]));
+}
+
+#[test]
+fn many_files_are_asked_for_in_batches_and_come_back_each_to_its_path() {
+    let (dir, project) = repo();
+    for i in 0..1200 {
+        fs::write(dir.path().join(format!("f{i}.txt")), format!("content {i}\n")).unwrap();
+    }
+    git(dir.path(), &["add", "-A"]);
+    git(dir.path(), &["commit", "-q", "-m", "many"]);
+    let names: Vec<String> = (0..1200).map(|i| format!("f{i}.txt")).collect();
+    let paths: Vec<&str> = names.iter().map(String::as_str).collect();
+    let heads = head_files(project.as_ref(), &paths);
+    assert_eq!(heads.len(), 1200);
+    assert_eq!(heads["f0.txt"].as_deref(), Some(&b"content 0\n"[..]));
+    assert_eq!(heads["f1199.txt"].as_deref(), Some(&b"content 1199\n"[..]));
+}
+
+#[test]
+fn a_folder_that_is_not_a_repository_has_no_head_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = LocalProject::open(dir.path()).unwrap();
+    assert_eq!(head_files(&project, &["a.txt"])["a.txt"], None);
 }

@@ -110,9 +110,12 @@ impl TurnTracker {
             paths.extend(end.entries.keys().filter(|path| changed_since(start, end, path)).cloned());
             undone.extend(start.entries.keys().filter(|path| !end.entries.contains_key(*path)).cloned());
         }
+        // The last commit's text of every file no tool named, in one git process.
+        let from_git: Vec<&str> = paths.iter().filter(|p| !self.baselines.contains_key(*p)).map(String::as_str).collect();
+        let heads = git_state::head_files(project, &from_git);
         let files: Vec<FileReview> = paths
             .iter()
-            .filter_map(|path| self.review_of(project, path))
+            .filter_map(|path| self.review_of(project, path, &heads))
             .chain(undone.iter().filter(|path| !self.baselines.contains_key(*path)).filter_map(|path| match read(project, path)? {
                 Now::Text(text) => Some(FileReview::unknown(path, Some(text))),
                 Now::Absent => Some(FileReview::unknown(path, None)),
@@ -122,11 +125,11 @@ impl TurnTracker {
         TurnReview::new(pair_renames(files))
     }
 
-    fn review_of(&self, project: &dyn Project, path: &str) -> Option<FileReview> {
+    fn review_of(&self, project: &dyn Project, path: &str, heads: &Heads) -> Option<FileReview> {
         let now = read(project, path)?;
         let (baseline, exact) = match self.baselines.get(path) {
             Some(baseline) => (Some(baseline.clone()), true),
-            None => self.baseline_from_git(project, path),
+            None => self.baseline_from_git(path, heads),
         };
         let Some(baseline) = baseline else {
             return Some(FileReview::unknown(path, if let Now::Text(text) = now { Some(text) } else { None }));
@@ -148,22 +151,27 @@ impl TurnTracker {
 
     /// The text before the turn of a file no tool named, from git. Exact when the file was clean when
     /// the turn started, since then it held the last commit's text. `None` when nothing is known.
-    fn baseline_from_git(&self, project: &dyn Project, path: &str) -> (Option<Baseline>, bool) {
+    fn baseline_from_git(&self, path: &str, heads: &Heads) -> (Option<Baseline>, bool) {
         let Some(start) = &self.start else { return (None, false) };
+        let head = heads.get(path).and_then(|bytes| bytes.as_deref());
+        let as_baseline = |bytes: &[u8]| match std::str::from_utf8(bytes) {
+            Ok(text) if !text.contains('\0') => Baseline::Text(text.to_string()),
+            _ => Baseline::Binary(0),
+        };
         match start.entries.get(path) {
-            None => match git_state::head_text(project, path) {
-                Some(text) if text.contains('\0') => (Some(Baseline::Binary(0)), true),
-                Some(text) => (Some(Baseline::Text(text)), true),
-                None => (Some(Baseline::Absent), true),
-            },
+            None => (Some(head.map_or(Baseline::Absent, as_baseline)), true),
             Some(entry) if entry.untracked => (None, false),
-            Some(_) => match git_state::head_text(project, path) {
-                Some(text) if !text.contains('\0') => (Some(Baseline::Text(text)), false),
+            // Dirty when the turn started: the last commit's text stands in for the user's.
+            Some(_) => match head.map(as_baseline) {
+                Some(Baseline::Text(text)) => (Some(Baseline::Text(text)), false),
                 _ => (None, false),
             },
         }
     }
 }
+
+/// The last commit's bytes of each file, by path.
+type Heads = HashMap<String, Option<Vec<u8>>>;
 
 /// Whether the working tree holds something different at `path` than when the turn started.
 fn changed_since(start: &State, end: &State, path: &str) -> bool {
