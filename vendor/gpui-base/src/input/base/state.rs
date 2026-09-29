@@ -5027,6 +5027,26 @@ mod tests {
         });
     }
 
+    /// lathe patch 17: a caret set before the text has ever been laid out (a file just opened at a
+    /// definition) is revealed by the first layout, instead of the view staying at the top.
+    #[gpui::test]
+    fn test_a_caret_set_before_the_first_layout_is_revealed(cx: &mut TestAppContext) {
+        let input_view = InputView::new(cx);
+        let mut cx = VisualTestContext::from_window(input_view.window_handle.into(), cx);
+        let input = input_view.input;
+        cx.update(|window, cx| {
+            input.update(cx, |state, cx| {
+                let text: String = (0..400).map(|i| format!("line {i}\n")).collect();
+                state.set_value(text, window, cx);
+                state.set_cursor_position(Position::new(300, 0), window, cx);
+            });
+        });
+        cx.run_until_parked();
+        let (line, scrolled) = cx.update(|_, cx| input.read_with(cx, |s, _| (s.cursor_position().line, s.scroll_offset().y)));
+        assert_eq!(line, 300);
+        assert!(scrolled < px(-2000.), "the first layout revealed the caret: {scrolled:?}");
+    }
+
     /// Regression test: `scroll_to` at end-of-buffer must produce a deferred
     /// scroll target within the safe scroll range, so the painted frame
     /// matches what `update_scroll_offset` persists (no jitter). A small
