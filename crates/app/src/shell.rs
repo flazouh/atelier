@@ -348,7 +348,11 @@ impl Shell {
                 Git::Branch(b) => b.clone(),
             });
             if let (Listing::Ready(tree), Some(took)) = (&p.listing, p.listed_in) {
-                parts.push(format!("{} files, listed in {} ms", tree.files(), took.as_millis()).into());
+                let files = match tree.files() {
+                    1 => "1 file".to_string(),
+                    n => format!("{n} files"),
+                };
+                parts.push(format!("{files}, listed in {} ms", took.as_millis()).into());
             }
             if let Some((_, buffer)) = p.active_buffer() {
                 parts.extend(buffer.session.read(cx).status());
@@ -372,17 +376,19 @@ impl Shell {
 impl Render for Shell {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
             None => self.start_screen(cx).into_any_element(),
             Some(project) => h_resizable("shell-splits")
                 .with_handle_appearance(borderless_handle(&theme))
-                .child(resizable_panel().visible(self.sidebar).size(px(260.)).size_range(px(180.)..px(480.)).child(self.sidebar(cx)))
-                .child(resizable_panel().size(px(440.)).size_range(px(320.)..px(2000.)).child(self.agent_panel(cx)))
+                .child(resizable_panel().visible(self.sidebar).size(px(260.)).size_range(px(180.)..px(480.)).flex_none().child(self.sidebar(cx)))
+                .child(resizable_panel().size_range(px(320.)..px(4000.)).child(self.agent_panel(cx)))
                 .child(
                     resizable_panel()
                         .visible(self.right)
                         .size(px(560.))
                         .size_range(px(320.)..px(2400.))
+                        .flex_none()
                         .child(div().size_full().pr(px(8.)).pb(px(2.)).child(
                             div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(&project, cx)),
                         )),
