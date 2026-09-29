@@ -10,6 +10,7 @@ use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions,
 mod agent_session;
 mod agents_view;
 mod editor_pane;
+mod frame_meter;
 mod list_diff;
 mod open_project;
 mod session_view;
