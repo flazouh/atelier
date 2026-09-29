@@ -14,7 +14,7 @@
 use std::{
     path::PathBuf,
     rc::Rc,
-    sync::{Arc, Mutex, OnceLock},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -26,13 +26,13 @@ use gpui_kit::{
     base::input::{self, DefinitionProvider, HoverProvider, InputEvent, Rope, RopeExt},
     component::input::EditorState,
 };
-use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Store, Symbol, Target, Workers, canonical, client::uri_to_path};
+use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Symbol, Target, Workers, canonical, client::uri_to_path};
 use lsp_types::{Diagnostic, Hover, LocationLink, Position, ShowDocumentParams, Uri};
 
 /// How long one question may take. Servers answer in milliseconds once they have indexed.
-const ASK: Duration = Duration::from_secs(20);
+pub const ASK: Duration = Duration::from_secs(20);
 /// How long a server may take to start and shake hands.
-const READY: Duration = Duration::from_secs(60);
+pub const READY: Duration = Duration::from_secs(60);
 /// How long typing must pause before the buffer is checked again. docs/code-editor.md sets 150ms.
 const RECHECK_AFTER: Duration = Duration::from_millis(150);
 /// The key a Zed user holds to follow a symbol.
@@ -41,17 +41,6 @@ const SECONDARY: &str = if cfg!(target_os = "macos") { "⌘" } else { "ctrl" };
 /// The newest answer to a Cmd-hover, Cmd-click or F12, kept so a click can tell one place to jump to
 /// from several to list. The provider writes it off the main thread.
 type LastNavigation = Arc<Mutex<Option<Navigation>>>;
-
-/// Every server the gallery runs: one per (server, project), shared by all its tabs. A server the
-/// user has not installed is downloaded into lathe's folder, unless `LATHE_OFFLINE` is set.
-fn workers() -> &'static Workers {
-    static WORKERS: OnceLock<Workers> = OnceLock::new();
-    // The gallery's files sit in fixture folders all over the disk, so its project is the disk.
-    WORKERS.get_or_init(|| {
-        let disk = Arc::new(lathe_project::LocalProject::open("/").expect("the disk opens"));
-        Workers::new(disk, Store::from_env(), READY, ASK)
-    })
-}
 
 /// A jump out of this file: the file, and the place in it, in that file's own rows.
 #[derive(Clone, Debug)]
@@ -132,14 +121,16 @@ pub struct EditorSession {
 }
 
 impl EditorSession {
-    /// Starts the server for `path`, whose text `editor` holds, and attaches it once it is ready.
-    pub fn new(editor: Entity<EditorState>, path: PathBuf, cx: &mut Context<Self>) -> Self {
-        Self::for_review(editor, path, RowMap::default(), None, cx)
+    /// Starts the server for `path`, whose text `editor` holds, from the project's `workers`, and
+    /// attaches it once it is ready.
+    pub fn new(workers: Arc<Workers>, editor: Entity<EditorState>, path: PathBuf, cx: &mut Context<Self>) -> Self {
+        Self::for_review(workers, editor, path, RowMap::default(), None, cx)
     }
 
     /// The same for a buffer that shows `rows` over the file, as a pull request's diff does, with
     /// jumps into other files handed to `elsewhere`.
     pub fn for_review(
+        workers: Arc<Workers>,
         editor: Entity<EditorState>,
         path: PathBuf,
         rows: RowMap,
@@ -148,7 +139,7 @@ impl EditorSession {
     ) -> Self {
         let path = canonical(&path);
         let rows = Rows { path: path.clone(), map: Arc::new(rows) };
-        let mut starting = start(path.clone());
+        let mut starting = start(workers, path.clone());
         let _start = cx.spawn(async move |this, cx| {
             loop {
                 let started = match starting.next().await {
@@ -405,11 +396,11 @@ pub fn go_to_definition(editor: &Entity<EditorState>, window: &mut Window, cx: &
 /// Finds or starts the server for `path` on a thread, so the window opens at once. Anything that
 /// stops it, such as a language lathe has no server for or one that is not installed, comes back as
 /// the sentence the status line shows.
-fn start(path: PathBuf) -> mpsc::UnboundedReceiver<Starting> {
+fn start(workers: Arc<Workers>, path: PathBuf) -> mpsc::UnboundedReceiver<Starting> {
     let (tx, rx) = mpsc::unbounded();
     std::thread::spawn(move || {
         let report = |line| drop(tx.unbounded_send(Starting::Downloading(line)));
-        let started = workers().for_file(&path, &report).map_err(|e| e.to_string());
+        let started = workers.for_file(&path, &report).map_err(|e| e.to_string());
         drop(tx.unbounded_send(Starting::Done(started)));
     });
     rx

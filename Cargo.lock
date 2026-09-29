@@ -586,13 +586,11 @@ dependencies = [
 name = "beui-gallery"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "beui",
- "futures-channel",
- "futures-util",
  "gpui-kit",
  "ignore",
  "lathe-agents",
+ "lathe-editor",
  "lathe-lsp",
  "lathe-project",
  "lathe-settings",
@@ -3673,6 +3671,34 @@ version = "0.1.0"
 dependencies = [
  "beui",
  "gpui-kit",
+]
+
+[[package]]
+name = "lathe-app"
+version = "0.1.0"
+dependencies = [
+ "beui",
+ "futures-channel",
+ "futures-util",
+ "gpui-kit",
+ "lathe-agents",
+ "lathe-editor",
+ "lathe-lsp",
+ "lathe-project",
+ "lathe-settings",
+]
+
+[[package]]
+name = "lathe-editor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "beui",
+ "futures-channel",
+ "futures-util",
+ "gpui-kit",
+ "lathe-lsp",
+ "lsp-types",
 ]
 
 [[package]]

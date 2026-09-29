@@ -10,7 +10,9 @@ use gpui_kit::{
     StatefulInteractiveElement, Styled, Window, component::input::EditorState, div, prelude::FluentBuilder, px,
 };
 
-use crate::{Gallery, editor_lsp::{self, EditorSession, file_name}};
+use lathe_editor::{EditorSession, file_name, go_to_definition};
+
+use crate::{Gallery, workers::workers};
 
 /// One tab: a file in a project of its own.
 struct Fixture {
@@ -108,7 +110,7 @@ impl EditorTabs {
             return;
         }
         let (state, path) = (tab.state.clone(), tab.path.clone());
-        let session = cx.new(|cx| EditorSession::new(state, path, cx));
+        let session = cx.new(|cx| EditorSession::new(workers(), state, path, cx));
         cx.observe(&session, |_, _, cx| cx.notify()).detach();
         tab.session = Some(session);
     }
@@ -136,7 +138,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
 
     let go = {
         let state = state.clone();
-        move |_: &_, window: &mut Window, cx: &mut App| editor_lsp::go_to_definition(&state, window, cx)
+        move |_: &_, window: &mut Window, cx: &mut App| go_to_definition(&state, window, cx)
     };
     let check = {
         let session = session.clone();
