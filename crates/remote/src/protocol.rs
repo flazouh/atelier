@@ -12,8 +12,8 @@ use lathe_project::{Change, Command, DataEntry, Entry, GitOutput, Match, Query};
 use serde::{Deserialize, Serialize};
 
 /// The protocol's version: both ends must agree, or the hello fails.
-/// 2: `Remove` and the data folder's calls.
-pub const VERSION: u32 = 2;
+/// 2: `Remove` and the data folder's calls. 3: `DataPath`.
+pub const VERSION: u32 = 3;
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -45,6 +45,8 @@ pub enum Call {
     DataRead { path: String },
     DataWrite { path: String, bytes: Vec<u8> },
     DataList { prefix: String },
+    /// Where the project's data folder is on the host: [`Reply::Text`], or `NotFound` when it has none.
+    DataPath,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

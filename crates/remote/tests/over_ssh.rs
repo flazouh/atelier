@@ -20,6 +20,9 @@ fn a_folder_over_ssh_lists_and_reads() {
     project.data_write("over-ssh/check.txt", b"kept").unwrap();
     assert_eq!(project.data_read("over-ssh/check.txt").unwrap(), b"kept");
     assert!(project.data_list("over-ssh").unwrap().iter().any(|e| e.path == "over-ssh/check.txt"));
+    // Protocol 3: the data folder's path on the host, where the check landed.
+    let folder = project.data_path().expect("the host names its data folder");
+    assert!(folder.join("over-ssh/check.txt").exists(), "{}", folder.display());
 }
 
 #[test]

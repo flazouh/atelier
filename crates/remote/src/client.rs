@@ -279,6 +279,9 @@ pub struct RemoteProject {
     shared: Arc<Shared>,
     /// The folder on the host, as the host resolved it.
     root: PathBuf,
+    /// The data folder on the host, once the host has said: it never moves, so it is asked once. A call
+    /// that failed (the link was down) is asked again next time.
+    data_path: Mutex<Option<Option<PathBuf>>>,
 }
 
 impl RemoteProject {
@@ -301,7 +304,7 @@ impl RemoteProject {
         });
         attach(&shared, connection);
         let root = shared.hello()?;
-        Ok(Self { shared, root: PathBuf::from(root) })
+        Ok(Self { shared, root: PathBuf::from(root), data_path: Mutex::default() })
     }
 
     fn call(&self, call: Call) -> io::Result<Reply> {
@@ -374,6 +377,20 @@ impl Project for RemoteProject {
             Reply::DataEntries(entries) => Ok(entries),
             other => Err(unexpected(other)),
         }
+    }
+
+    fn data_path(&self) -> Option<PathBuf> {
+        if let Some(known) = lock(&self.data_path).clone() {
+            return known;
+        }
+        let answer = match self.call(Call::DataPath) {
+            Ok(Reply::Text(path)) => Some(PathBuf::from(path)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            // The link is down, or an old host: not an answer to keep.
+            _ => return None,
+        };
+        *lock(&self.data_path) = Some(answer.clone());
+        answer
     }
 
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {

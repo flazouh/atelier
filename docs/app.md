@@ -119,7 +119,8 @@ servers all go through the same calls. The servers run on the host, started thro
 - The app sends `Request { id, call }`; the host answers `Response { id, result }` and on its own
   sends `Event`s: a watch's `Changes`, a process's `Output`, its `Exited`. The first call is
   `Hello { version, root }`; a version the host does not speak fails the hello. Version 2 added
-  `Remove` and the data folder's calls; the deploy path holds the binary's hash, so a new app puts its
+  `Remove` and the data folder's calls, version 3 `DataPath` (the folder's path on the host, asked once and
+  kept); the deploy path holds the binary's hash, so a new app puts its
   own `lathe-remote` on the host.
 - The host runs each request on a thread of its own, so a slow search never holds up a read. A
   process's stdin is fed in order by a thread of its own. Its stderr's last 64 KB is kept.

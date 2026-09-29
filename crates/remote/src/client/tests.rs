@@ -217,3 +217,15 @@ fn a_remote_project_removes_files_and_keeps_its_data_on_the_host() {
     assert!(std::fs::read_dir(data.path().join("projects")).unwrap().next().is_some(), "the data is on the host, under its data folder");
     assert!(!dir.path().join("review").exists());
 }
+
+/// A remote project names its data folder on the host, as the host's own project does, and asks once.
+#[test]
+fn a_remote_project_names_its_data_folder_on_the_host() {
+    let dir = folder(&[("a.txt", "a")]);
+    let data = tempfile::tempdir().unwrap();
+    let (_host, dial) = host_with_data(Some(data.path().to_path_buf()));
+    let remote = connect(&dir, dial);
+    let local = lathe_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    assert_eq!(remote.data_path(), local.data_path());
+    assert!(remote.data_path().is_some_and(|p| p.starts_with(data.path())));
+}
