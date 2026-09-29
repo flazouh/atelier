@@ -135,6 +135,7 @@ impl ReviewPane {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let pressed = Instant::now();
         let files = read_files(session.read(cx), scope);
         let current = path.and_then(|p| files.iter().position(|f| f.review.path == p)).unwrap_or(0);
         let (editor, _edits) = Self::editor_for(files.get(current), window, cx);
@@ -168,6 +169,7 @@ impl ReviewPane {
             _session,
         };
         pane.check_disk(pane.files.iter().map(|f| f.review.path.clone()).collect(), window, cx);
+        timing(window, format!("review of {} files: first frame", pane.files.len()), pressed);
         pane
     }
 
@@ -369,6 +371,7 @@ impl ReviewPane {
 
     /// Decides every hunk of the open file at once, writes it, and moves to the next file.
     fn decide_file(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
+        timing(window, "review: a whole file decided, to its frame".into(), Instant::now());
         let at = self.current;
         let Some(merged) = self.files.get(at).and_then(|f| f.merged.clone()) else { return self.step(1, window, cx) };
         let hunks = merged.hunks().to_vec();
@@ -550,6 +553,13 @@ fn focus_once_painted(handle: FocusHandle, frames: usize, window: &mut Window, c
     handle.focus(window, cx);
     if frames > 0 {
         window.on_next_frame(move |window, cx| focus_once_painted(handle, frames - 1, window, cx));
+    }
+}
+
+/// With `LATHE_TIMINGS=1`, prints how long after `since` the next frame was drawn.
+fn timing(window: &Window, what: String, since: Instant) {
+    if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
+        window.on_next_frame(move |_, _| eprintln!("{what} after {:.1} ms", since.elapsed().as_secs_f64() * 1000.));
     }
 }
 
