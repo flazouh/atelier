@@ -286,6 +286,12 @@ impl AgentSession {
                 self.open(Some(id), false, cx);
             }
             (None, _) if self.starting => self.waiting_send = Some(text),
+            // It never started (its program was missing, say): it tries again, and the message goes then.
+            (None, None) => {
+                self.waiting_send = Some(text);
+                self.starting = true;
+                self.open(None, false, cx);
+            }
             _ => self.command(Command::send(text), cx),
         }
         cx.emit(SessionEvent::Changed);
