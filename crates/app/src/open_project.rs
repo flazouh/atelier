@@ -215,7 +215,7 @@ impl OpenProject {
                     return;
                 }
                 SessionEvent::Review { turn, path } => {
-                    return cx.emit(ProjectEvent::Review { session, turn: *turn, path: path.clone() });
+                    return cx.emit(ProjectEvent::Review { session: session.clone(), turn: *turn, path: path.clone() });
                 }
                 SessionEvent::OpenFile(path) => return cx.emit(ProjectEvent::Open(path.clone())),
                 SessionEvent::Renamed => {
