@@ -10,13 +10,17 @@
 //!
 //! Every call that blocks runs off the UI thread. `docs/pr-view.md` says how the parts fit.
 pub mod base;
+pub mod checks;
 pub mod data;
 pub mod diff;
 pub mod fixture;
 pub mod git;
 pub mod load;
+pub mod place;
+pub mod present;
 pub mod snapshot;
 pub mod state;
+pub mod sync;
 
 pub use data::{Part, PartKind, PullData};
 

@@ -296,7 +296,7 @@ fn the_parsers_read_git_output() {
     assert_eq!(commits.len(), 2);
     assert_eq!((commits[0].author.as_str(), commits[0].at, commits[0].title.as_str()), ("Ada Lovelace", 1_700_000_000, "Fix the thing"));
     let raw = b":100644 100644 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 M\0a.rs\0:000000 100644 0000000000000000000000000000000000000000 3333333333333333333333333333333333333333 A\0b c.rs\0:100644 100644 4444444444444444444444444444444444444444 4444444444444444444444444444444444444444 R100\0old.rs\0new.rs\0";
-    let stat = b"3\t1\ta.rs\0-\t-\tb c.rs\00\t0\t\0old.rs\0new.rs\0";
+    let stat = b"3\t1\ta.rs\0-\t-\tb c.rs\0\x30\t0\t\0old.rs\0new.rs\0";
     let files = parse_files(raw, stat);
     assert_eq!(files.len(), 3);
     assert_eq!((files[0].additions, files[0].deletions, files[0].change), (3, 1, Change::Modified));

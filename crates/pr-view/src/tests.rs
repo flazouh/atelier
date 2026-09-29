@@ -1,7 +1,11 @@
 mod base;
+mod checks;
 mod diff;
 mod git;
 mod load;
+mod place;
+mod present;
 mod repo;
 mod snapshot;
 mod state;
+mod sync;

@@ -1,7 +1,7 @@
 //! Times from the forge, as seconds since the Unix epoch. Forges send RFC 3339 in UTC.
 
 /// `2026-09-29T15:14:16Z` as epoch seconds. Anything else is `None`.
-pub(crate) fn parse(text: &str) -> Option<u64> {
+pub fn parse(text: &str) -> Option<u64> {
     let text = text.strip_suffix('Z')?;
     let (date, time) = text.split_once('T')?;
     let mut d = date.split('-').map(|part| part.parse::<i64>().ok());
@@ -22,7 +22,7 @@ pub(crate) fn parse(text: &str) -> Option<u64> {
 }
 
 /// "2h ago", "3d ago": how long before `now`, in one unit.
-pub(crate) fn ago(now: u64, then: u64) -> String {
+pub fn ago(now: u64, then: u64) -> String {
     let seconds = now.saturating_sub(then);
     let (n, unit) = match seconds {
         0..=59 => return "just now".into(),
