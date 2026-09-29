@@ -79,19 +79,21 @@ fn span(wait: Duration) -> String {
 }
 
 /// A process on the host, as the client sees it.
-#[derive(Default)]
 struct Pipes {
     output: Option<mpsc::Sender<Vec<u8>>>,
     reader: Option<mpsc::Receiver<Vec<u8>>>,
     exit: Arc<(Mutex<Option<Option<i32>>>, Condvar)>,
 }
 
-impl Pipes {
-    fn new() -> Self {
+impl Default for Pipes {
+    /// A new process's pipes: its stdout's channel open, its exit not known.
+    fn default() -> Self {
         let (tx, rx) = mpsc::channel();
         Self { output: Some(tx), reader: Some(rx), exit: Arc::default() }
     }
+}
 
+impl Pipes {
     /// The process is gone: its stdout ends, and waiting on it returns `code`.
     fn end(&mut self, code: Option<i32>) {
         self.output = None;
@@ -191,12 +193,12 @@ impl Shared {
             }
             Frame::Event(Event::Output { pid, bytes }) => {
                 let mut processes = lock(&self.processes);
-                let pipes = processes.entry(pid).or_insert_with(Pipes::new);
+                let pipes = processes.entry(pid).or_default();
                 if let Some(tx) = &pipes.output {
                     let _ = tx.send(bytes);
                 }
             }
-            Frame::Event(Event::Exited { pid, code }) => lock(&self.processes).entry(pid).or_insert_with(Pipes::new).end(code),
+            Frame::Event(Event::Exited { pid, code }) => lock(&self.processes).entry(pid).or_default().end(code),
             Frame::Request { .. } => {}
         }
     }
@@ -380,7 +382,7 @@ impl Project for RemoteProject {
         // Output may have arrived before the answer did: it waits in the same pipes.
         let (reader, exit) = {
             let mut processes = lock(&self.shared.processes);
-            let pipes = processes.entry(pid).or_insert_with(Pipes::new);
+            let pipes = processes.entry(pid).or_default();
             (pipes.reader.take().expect("a process is spawned once"), pipes.exit.clone())
         };
         let weak = Arc::downgrade(&self.shared);
