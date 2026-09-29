@@ -86,6 +86,8 @@ pub enum ProjectEvent {
     Review { session: Entity<AgentSession>, turn: Option<usize>, path: Option<String> },
     /// The reader asked to open a file, by its path in the project.
     Open(String),
+    /// The review closed: the editor is back.
+    ReviewClosed,
 }
 
 impl EventEmitter<ProjectEvent> for OpenProject {}
@@ -289,6 +291,7 @@ impl OpenProject {
         let sub = cx.subscribe(&pane, |this, _, event: &PaneEvent, cx| match event {
             PaneEvent::Close => {
                 this.review = None;
+                cx.emit(ProjectEvent::ReviewClosed);
                 cx.notify();
             }
             PaneEvent::Said(line) => cx.emit(ProjectEvent::Said(line.clone())),
