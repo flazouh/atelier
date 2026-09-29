@@ -588,7 +588,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "beui",
- "dirs 6.0.0",
  "futures-channel",
  "futures-util",
  "gpui-kit",
@@ -596,9 +595,8 @@ dependencies = [
  "lathe-agents",
  "lathe-lsp",
  "lathe-project",
+ "lathe-settings",
  "lsp-types",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -3697,6 +3695,15 @@ dependencies = [
  "regex",
  "serde",
  "tempfile",
+]
+
+[[package]]
+name = "lathe-settings"
+version = "0.1.0"
+dependencies = [
+ "dirs 6.0.0",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
