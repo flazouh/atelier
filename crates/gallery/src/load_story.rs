@@ -1,6 +1,6 @@
 //! The "Highlight load" story: a 10k-line Rust file in the editor and a 5k-row diff on the left, 20
 //! code blocks on the right, all highlighted. With `GALLERY_SCROLL=1` it scrolls the editor, the diff
-//! and the blocks each frame, logs what each frame took, what highlighting took inside it, and the
+//! and the blocks each frame, logs what each frame took, how many layout nodes it built, what highlighting took inside it, and the
 //! diff's layout and paint apart, prints the medians after 300 frames, and quits.
 //! `LOAD_DIFF_ROWS` sets the diff's size. It backs the frame numbers in `docs/code-editor.md` ("Performance").
 
@@ -60,6 +60,8 @@ pub struct LoadStory {
     diff_times: Rc<RefCell<Stages>>,
     diff_layout: Vec<Duration>,
     diff_paint: Vec<Duration>,
+    frame_times: Rc<RefCell<Stages>>,
+    nodes: Vec<Duration>,
     scroll: bool,
     last: Option<Instant>,
     frames: Vec<Duration>,
@@ -77,6 +79,8 @@ impl LoadStory {
             diff_times: Rc::default(),
             diff_layout: Vec::new(),
             diff_paint: Vec::new(),
+            frame_times: Rc::default(),
+            nodes: Vec::new(),
             scroll: std::env::var("GALLERY_SCROLL").is_ok_and(|v| v == "1"),
             last: None,
             frames: Vec::new(),
@@ -100,12 +104,15 @@ impl LoadStory {
             let stages = std::mem::take(&mut *self.diff_times.borrow_mut());
             self.diff_layout.push(stages.layout);
             self.diff_paint.push(stages.paint);
+            let frame = std::mem::take(&mut *self.frame_times.borrow_mut());
+            self.nodes.push(Duration::from_nanos(frame.nodes as u64));
         }
         if self.frames.len() == FRAMES {
             report("frame", &mut self.frames);
             report("highlight in frame", &mut self.highlighting);
             report("diff layout", &mut self.diff_layout);
             report("diff paint", &mut self.diff_paint);
+            report_count("layout nodes", &mut self.nodes);
             cx.quit();
             return;
         }
@@ -131,11 +138,26 @@ fn report(name: &str, samples: &mut [Duration]) {
     );
 }
 
+/// Prints the median and the largest of a count that `Duration::from_nanos` carries.
+fn report_count(name: &str, samples: &mut [Duration]) {
+    samples.sort();
+    let count = |d: Duration| d.as_nanos();
+    println!("{name:<20} median {:>8}     max {:>8}", count(samples[samples.len() / 2]), count(*samples.last().unwrap()));
+}
 /// Time spent laying out and painting one element in a frame.
 #[derive(Default)]
 struct Stages {
     layout: Duration,
     paint: Duration,
+    /// The highest layout node index seen: taffy hands out indices from zero each frame, so this is
+    /// the frame's node count when the timed element wraps the whole tree.
+    nodes: usize,
+}
+/// A layout id's node index, read from its debug form (`LayoutId(NodeId(n))`), for gpui keeps it private.
+fn node_index(id: LayoutId) -> usize {
+    let text = format!("{id:?}");
+    let digits: String = text.chars().skip_while(|c| !c.is_ascii_digit()).take_while(char::is_ascii_digit).collect();
+    digits.parse::<u64>().map_or(0, |n| (n & 0xffff_ffff) as usize)
 }
 
 /// Wraps an element and adds what its layout (request_layout, which builds a component, and
@@ -169,7 +191,9 @@ impl Element for Timed {
     fn request_layout(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, ()) {
         let start = Instant::now();
         let id = self.child.request_layout(window, cx);
-        self.stages.borrow_mut().layout += start.elapsed();
+        let mut stages = self.stages.borrow_mut();
+        stages.layout += start.elapsed();
+        stages.nodes = stages.nodes.max(node_index(id));
         (id, ())
     }
 
@@ -196,7 +220,7 @@ impl Render for LoadStory {
             .collapse_on_complete(false)
             .max_height(560.)
             .scroll_handle(self.diff_scroll.clone());
-        div()
+        let root = div()
             .size_full()
             .flex()
             .gap(px(12.))
@@ -227,6 +251,7 @@ impl Render for LoadStory {
                             CodeBlock::new(("load-block", i), code.clone()).language("rust").title(format!("block_{i}.rs")),
                         )
                     })),
-            )
+            );
+        Timed { child: root.into_any_element(), stages: self.frame_times.clone() }
     }
 }
