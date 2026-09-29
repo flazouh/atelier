@@ -15,10 +15,10 @@ use futures_channel::mpsc;
 use futures_util::StreamExt;
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, SharedString, Subscription, Task, Window,
-    base::input::InputEvent,
+    base::input::{InputEvent, Position},
     component::input::EditorState,
 };
-use lathe_editor::{ASK, EditorSession, READY};
+use lathe_editor::{ASK, EditorSession, Elsewhere, Jump, READY};
 use lathe_lsp::{Store, Workers};
 use lathe_project::{Change, ChangeKind, Project, Watch};
 use lathe_settings::Location;
@@ -78,6 +78,8 @@ pub struct OpenProject {
     pub buffers: HashMap<String, Buffer>,
     /// Files being read for a tab, so a second click does not read them twice.
     opening: HashSet<String>,
+    /// Where the caret goes in a file still being read, after a jump to it.
+    caret_at: HashMap<String, Position>,
     _watch: Option<Watch>,
     _tasks: Vec<Task<()>>,
     listing_task: Task<()>,
@@ -97,6 +99,7 @@ impl OpenProject {
             tabs: Tabs::default(),
             buffers: HashMap::new(),
             opening: HashSet::new(),
+            caret_at: HashMap::new(),
             _watch: None,
             _tasks: Vec::new(),
             listing_task: Task::ready(()),
@@ -219,11 +222,37 @@ impl OpenProject {
         cx.notify();
     }
 
+    /// A definition in another file: its tab opens with the caret there. One outside the project,
+    /// such as the toolchain's own sources, is named, not opened.
+    fn jump(&mut self, jump: Jump, window: &mut Window, cx: &mut Context<Self>) {
+        let relative = jump.path.strip_prefix(self.project.root()).ok().and_then(|p| p.to_str()).map(|p| p.replace('\\', "/"));
+        let Some(relative) = relative else {
+            let name = jump.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            cx.emit(ProjectEvent::Said(format!("Defined in {name} on line {}, outside this project", jump.position.line + 1).into()));
+            return;
+        };
+        self.caret_at.insert(relative.clone(), jump.position);
+        self.open_file(&relative, window, cx);
+    }
+
+    /// Puts the caret where a jump asked, once the file's tab has its buffer, and gives it focus.
+    fn place_caret(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(buffer) = self.buffers.get(path) else { return };
+        let position = self.caret_at.remove(path);
+        buffer.editor.update(cx, |state, cx| {
+            if let Some(position) = position {
+                state.set_cursor_position(position, window, cx);
+            }
+            state.focus(window, cx);
+        });
+    }
+
     /// Shows `path` in a tab, reading it first when it has none.
     pub fn open_file(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.open_folders.extend(ancestors(path));
         if self.buffers.contains_key(path) {
             self.tabs.open(path);
+            self.place_caret(path, window, cx);
             cx.notify();
             return;
         }
@@ -241,7 +270,10 @@ impl OpenProject {
             _ = this.update_in(cx, |this, window, cx| {
                 this.opening.remove(&path);
                 match read {
-                    Ok(bytes) => this.add_buffer(path, String::from_utf8_lossy(&bytes).into_owned(), window, cx),
+                    Ok(bytes) => {
+                        this.add_buffer(path.clone(), String::from_utf8_lossy(&bytes).into_owned(), window, cx);
+                        this.place_caret(&path, window, cx);
+                    }
                     Err(error) => cx.emit(ProjectEvent::Said(format!("Could not open {path}: {error}").into())),
                 }
                 cx.notify();
@@ -253,7 +285,12 @@ impl OpenProject {
         let editor = beui::CodeEditor::state(&path, text.clone(), window, cx);
         let host = self.project.root().join(&path);
         let workers = self.workers.clone();
-        let session = cx.new(|cx| EditorSession::new(workers, editor.clone(), host, cx));
+        let this = cx.entity().downgrade();
+        let elsewhere: Elsewhere = std::rc::Rc::new(move |jump, window, cx| {
+            this.update(cx, |p, cx| p.jump(jump, window, cx)).ok();
+        });
+        let session =
+            cx.new(|cx| EditorSession::for_review(workers, editor.clone(), host, beui::RowMap::default(), Some(elsewhere), cx));
         let key = path.clone();
         let _edits = cx.subscribe(&editor, move |this, editor, event: &InputEvent, cx| {
             if !matches!(event, InputEvent::Change) {
