@@ -56,6 +56,11 @@ impl ProjectTree {
         self.entries.iter().filter(|e| !e.dir).count()
     }
 
+    /// Every file's path, in path order, for Go to file.
+    pub fn file_paths(&self) -> Vec<String> {
+        self.entries.iter().filter(|e| !e.dir).map(|e| e.path.clone()).collect()
+    }
+
     /// The rows that show with the folders in `open` open.
     pub fn rows(&self, open: &HashSet<String>) -> Vec<Row> {
         let mut rows = Vec::new();
