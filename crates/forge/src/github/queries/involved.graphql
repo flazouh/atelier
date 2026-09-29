@@ -1,0 +1,38 @@
+query Involved($search: String!, $after: String) {
+  search(query: $search, type: ISSUE, first: 50, after: $after) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      ... on PullRequest {
+        id
+        number
+        title
+        state
+        isDraft
+        merged
+        url
+        updatedAt
+        createdAt
+        repository { nameWithOwner }
+        author { login }
+        reviewDecision
+        additions
+        deletions
+        comments { totalCount }
+        viewerLatestReview { state }
+        commits(last: 1) {
+          nodes {
+            commit {
+              statusCheckRollup {
+                state
+                contexts(first: 1) {
+                  checkRunCountsByState { state count }
+                  statusContextCountsByState { state count }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

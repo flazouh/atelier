@@ -1,0 +1,10 @@
+query Files($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      files(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { path additions deletions changeType }
+      }
+    }
+  }
+}
