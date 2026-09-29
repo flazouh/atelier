@@ -20,6 +20,7 @@ mod agent_parts;
 mod editor_lsp;
 mod editor_story;
 mod load_story;
+mod merge_story;
 mod pr_fixture;
 mod pr_story;
 mod settings;
@@ -45,6 +46,7 @@ enum Story {
     Review,
     PullRequest,
     PullRequests,
+    Merge,
     Colors,
     Typography,
     Icons,
@@ -63,7 +65,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 25] = [
+    const ALL: [Story; 26] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -74,6 +76,7 @@ impl Story {
         Story::Review,
         Story::PullRequest,
         Story::PullRequests,
+        Story::Merge,
         Story::Colors,
         Story::Typography,
         Story::Icons,
@@ -103,6 +106,7 @@ impl Story {
             Story::Review => "Review",
             Story::PullRequest => "Pull request",
             Story::PullRequests => "Pull requests",
+            Story::Merge => "Merge",
             Story::Colors => "Colors",
             Story::Typography => "Typography",
             Story::Icons => "Icons",
@@ -170,6 +174,8 @@ struct Gallery {
     review: Entity<review_story::ReviewStory>,
     /// The Pull request story: its rail, its bar and its diff.
     pull_request: Entity<pr_story::PrStory>,
+    /// The Merge story, which keeps the reader's last method.
+    merge: Entity<merge_story::MergeStory>,
     /// Built the first time it shows: it holds a 10k-line file.
     load: Option<Entity<load_story::LoadStory>>,
     prompt: Entity<PromptInput>,
@@ -258,6 +264,7 @@ impl Gallery {
         let editors = editor_story::EditorTabs::new(window, cx);
         let review = cx.new(|cx| review_story::ReviewStory::new(window, cx));
         let pull_request = cx.new(|cx| pr_story::PrStory::new(window, cx));
+        let merge = cx.new(|cx| merge_story::MergeStory::new(window, cx));
         let mut gallery =
             Self {
             story,
@@ -271,6 +278,7 @@ impl Gallery {
             editors,
             review,
             pull_request,
+            merge,
             load: None,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
@@ -401,6 +409,7 @@ impl Gallery {
             Story::PullRequest => pr_story::element(&self.pull_request),
             Story::Load => self.load.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequests => pr_story::pull_requests().into_any_element(),
+            Story::Merge => self.merge.clone().into_any_element(),
             Story::Colors => colors(cx).into_any_element(),
             Story::Typography => typography().into_any_element(),
             Story::Icons => icons(cx).into_any_element(),

@@ -115,8 +115,14 @@ fn conversation() -> (Vec<ThreadSummary>, Vec<RemarkSummary>) {
     )
 }
 
+const COMMITS: [&str; 6] =
+    ["Detach the byte stream before a second write", "Test an abort between chunks", "Hold the sink until flush", "Name the fields", "Drop the extra render", "Keep the status flag"];
+
+/// The pull request's description, which fills the squash commit's message.
+const PR_BODY: &str = "A client that aborted between two chunks left the relay writing into a closed sink. The stream now detaches on abort, and a second write does nothing.";
+
 fn commits() -> Vec<CommitData> {
-    ["Detach the byte stream before a second write", "Test an abort between chunks", "Hold the sink until flush", "Name the fields", "Drop the extra render", "Keep the status flag"]
+    COMMITS
         .iter()
         .enumerate()
         .map(|(i, title)| CommitData {
@@ -177,6 +183,7 @@ pub struct PrStory {
     unsent: usize,
     composer: Entity<CommentComposer>,
     verdict: Entity<VerdictBox>,
+    merge: Entity<beui::MergeBox>,
     _subscriptions: Vec<Subscription>,
     _session: Option<Subscription>,
 }
@@ -193,7 +200,18 @@ impl PrStory {
             c
         });
         let verdict = cx.new(|cx| VerdictBox::new("f4a97b1c9e2d4f0a", false, window, cx));
+        let merge = cx.new(|cx| {
+            let facts = crate::merge_story::states().remove(0).1;
+            let choice = beui::merge::first_choice(&facts, None);
+            beui::MergeBox::new(facts, choice, COMMITS[0], PR_BODY, window, cx)
+        });
         let subs = vec![
+            cx.subscribe_in(&merge, window, |_, merge, event: &beui::MergeBoxEvent, _, cx| {
+                println!("merge: {event:?}");
+                if let beui::MergeBoxEvent::Act { action: beui::merge::Action::Merge(_), choice, .. } = event {
+                    merge.update(cx, |b, cx| b.merged(choice.delete_branch, cx));
+                }
+            }),
             cx.subscribe(&composer, |_, _, event: &CommentComposerEvent, _| println!("comment: {event:?}")),
             cx.subscribe_in(&verdict, window, |_, verdict, event: &VerdictEvent, window, cx| {
                 println!("verdict: {event:?}");
@@ -236,6 +254,7 @@ impl PrStory {
             unsent: 2,
             composer,
             verdict,
+            merge,
             _subscriptions: subs,
             _session: None,
         };
@@ -683,6 +702,7 @@ impl Render for PrStory {
             .child(ChecksPanel::new("pr-checks", checks()))
             .child(div().flex().flex_col().flex_none().rounded(radius::LG).bg(theme.card).child(ConversationList::new("pr-conversation", threads, remarks)).child(self.composer.clone()))
             .child(self.verdict.clone())
+            .child(self.merge.clone())
             .child(CommitsSummary::new("pr-commits", commits()));
 
         let open = cx.listener(|this, path: &SharedString, window, cx| this.open(path, window, cx));
