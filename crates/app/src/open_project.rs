@@ -81,7 +81,8 @@ pub struct OpenProject {
     /// Where the caret goes in a file still being read, after a jump to it.
     caret_at: HashMap<String, Position>,
     _watch: Option<Watch>,
-    _tasks: Vec<Task<()>>,
+    /// Hands the watch's batches to this entity, as long as it lives.
+    watching: Task<()>,
     listing_task: Task<()>,
 }
 
@@ -101,7 +102,7 @@ impl OpenProject {
             opening: HashSet::new(),
             caret_at: HashMap::new(),
             _watch: None,
-            _tasks: Vec::new(),
+            watching: Task::ready(()),
             listing_task: Task::ready(()),
         };
         this.relist(cx);
@@ -138,7 +139,7 @@ impl OpenProject {
     fn read_git(&mut self, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let asked = cx.background_spawn(async move { project.git(&["rev-parse", "--abbrev-ref", "HEAD"]) });
-        self._tasks.push(cx.spawn(async move |this, cx| {
+        cx.spawn(async move |this, cx| {
             let git = match asked.await {
                 Ok(out) if out.ok() => Git::Branch(out.stdout.trim().to_string().into()),
                 _ => Git::None,
@@ -147,7 +148,7 @@ impl OpenProject {
                 this.git = git;
                 cx.notify();
             });
-        }));
+        }).detach();
     }
 
     fn watch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -159,11 +160,11 @@ impl OpenProject {
                 return;
             }
         }
-        self._tasks.push(cx.spawn_in(window, async move |this, cx| {
+        self.watching = cx.spawn_in(window, async move |this, cx| {
             while let Some(batch) = rx.next().await {
                 _ = this.update_in(cx, |this, window, cx| this.changed(batch, window, cx));
             }
-        }));
+        });
     }
 
     /// A batch from the watch: new or removed paths list the tree again; an open file reloads.
@@ -175,14 +176,34 @@ impl OpenProject {
             if change.kind == ChangeKind::Removed {
                 continue;
             }
-            let Some(buffer) = self.buffers.get_mut(&change.path) else { continue };
+            let Some(buffer) = self.buffers.get(&change.path) else { continue };
             if buffer.dirty {
-                buffer.changed_on_disk = true;
-                cx.notify();
+                self.check_disk(change.path, cx);
             } else {
                 self.reload(change.path, window, cx);
             }
         }
+    }
+
+    /// A dirty tab's file changed: it says so only when the file holds something other than what the
+    /// tab last saved, so the watch reporting lathe's own write is no news.
+    fn check_disk(&mut self, path: String, cx: &mut Context<Self>) {
+        let project = self.project.clone();
+        let read = {
+            let path = path.clone();
+            cx.background_spawn(async move { project.read(&path).map(|b| String::from_utf8_lossy(&b).into_owned()) })
+        };
+        cx.spawn(async move |this, cx| {
+            let Ok(text) = read.await else { return };
+            _ = this.update(cx, |this, cx| {
+                let Some(buffer) = this.buffers.get_mut(&path) else { return };
+                if buffer.dirty && text != buffer.saved {
+                    buffer.changed_on_disk = true;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     /// Reads `path` again and puts its text in its tab, when it differs.
@@ -192,7 +213,7 @@ impl OpenProject {
             let path = path.clone();
             cx.background_spawn(async move { project.read(&path).map(|b| String::from_utf8_lossy(&b).into_owned()) })
         };
-        self._tasks.push(cx.spawn_in(window, async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             let Ok(text) = read.await else { return };
             _ = this.update_in(cx, |this, window, cx| {
                 let Some(buffer) = this.buffers.get_mut(&path) else { return };
@@ -204,7 +225,7 @@ impl OpenProject {
                 buffer.saved = text;
                 cx.notify();
             });
-        }));
+        }).detach();
     }
 
     /// Keeps the tab's edits over the file's new text; the next save writes them.
@@ -265,7 +286,7 @@ impl OpenProject {
             cx.background_spawn(async move { project.read(&path) })
         };
         let path = path.to_string();
-        self._tasks.push(cx.spawn_in(window, async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             let read = read.await;
             _ = this.update_in(cx, |this, window, cx| {
                 this.opening.remove(&path);
@@ -278,7 +299,7 @@ impl OpenProject {
                 }
                 cx.notify();
             });
-        }));
+        }).detach();
     }
 
     fn add_buffer(&mut self, path: String, text: String, window: &mut Window, cx: &mut Context<Self>) {
@@ -323,7 +344,7 @@ impl OpenProject {
             let (path, text) = (path.clone(), text.clone());
             cx.background_spawn(async move { project.write(&path, text.as_bytes()) })
         };
-        self._tasks.push(cx.spawn(async move |this, cx| {
+        cx.spawn(async move |this, cx| {
             let written = written.await;
             _ = this.update(cx, |this, cx| {
                 match written {
@@ -342,7 +363,7 @@ impl OpenProject {
                 }
                 cx.notify();
             });
-        }));
+        }).detach();
     }
 
     /// How many tabs hold unsaved edits.

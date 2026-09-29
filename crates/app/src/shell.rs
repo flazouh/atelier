@@ -2,24 +2,25 @@
 //! active project's sessions and its file tree), the agent panel in the middle, the editor on the
 //! right, and the status line at the foot. With no project open, the start screen fills the window.
 //!
-//! Keys: ⌘O opens a folder, ⌘S saves, ⌘W closes the tab, and GitQuiet's ⌘B and ⌘⇧B hide and show
-//! the left and the right pane.
+//! Keys: ⌘O opens a folder, ⌘S saves, ⌘W closes the tab, and from GitQuiet's table, `t` goes to a
+//! file (while nothing is being typed) and ⌘B and ⌘⇧B hide and show the left and the right pane.
 
 use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 use beui::{
     button::{Button, ButtonSize, ButtonVariant},
     file_icon::FileIcon,
-    keys,
+    finder::{Filter, Finder, FinderEvent, FinderItem},
+    keys::{self, Command, Press},
     theme::{ActiveTheme, radius},
     typography::{FONT_FAMILY, TextSize},
 };
 use gpui_kit::{
-    App, AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement, KeyBinding, ParentElement,
+    App, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, KeyDownEvent, ParentElement,
     PathPromptOptions, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea, actions,
     base::{ResizeHandleRenderer, h_resizable, resizable_panel},
-    div, prelude::FluentBuilder, px,
+    deferred, div, prelude::FluentBuilder, px,
 };
 use lathe_project::LocalProject;
 use lathe_settings::Location;
@@ -56,6 +57,8 @@ pub struct Shell {
     recent: Vec<Location>,
     /// The last thing a project or the shell said, for the status line.
     said: Option<SharedString>,
+    /// Go to file, while it is open: the finder and the paths its rows stand for.
+    finder: Option<(Entity<Finder>, Vec<String>, Subscription)>,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -69,6 +72,7 @@ impl Shell {
             right: true,
             recent,
             said: None,
+            finder: None,
             focus: cx.focus_handle(),
             _subscriptions: Vec::new(),
         }
@@ -170,6 +174,52 @@ impl Shell {
     /// Tabs with unsaved edits, across every project in the window.
     pub fn unsaved(&self, cx: &App) -> usize {
         self.projects.iter().map(|p| p.read(cx).unsaved()).sum()
+    }
+
+    /// A key from GitQuiet's table. ⌘B and ⌘⇧B arrive as actions instead, so they work from the
+    /// editor too; here, Go to file, and only while nothing is being typed.
+    fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let press = Press::from_keystroke(&event.keystroke);
+        if press.secondary || keys::typing(window) {
+            return;
+        }
+        if keys::read_now(&press, cx) == Some(Command::GoToFile) {
+            cx.stop_propagation();
+            self.go_to_file(window, cx);
+        }
+    }
+
+    fn go_to_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.active().cloned() else { return };
+        let Listing::Ready(tree) = &project.read(cx).listing else { return };
+        let paths = tree.file_paths();
+        let items = paths.iter().map(|p| FinderItem::new(p.clone(), "").icon(p.clone())).collect();
+        let finder = cx.new(|cx| {
+            let mut finder = Finder::new("Go to file", "Part of a path", Filter::Here, window, cx).command(Command::GoToFile);
+            finder.set_items(items, cx);
+            finder
+        });
+        let events = cx.subscribe_in(&finder, window, move |this, _, event: &FinderEvent, window, cx| match event {
+            FinderEvent::Query(_) => {}
+            FinderEvent::Pick(i) => {
+                if let Some(path) = this.finder.as_ref().and_then(|(_, paths, _)| paths.get(*i).cloned()) {
+                    project.update(cx, |p, cx| p.open_file(&path, window, cx));
+                }
+                this.close_finder(false, window, cx);
+            }
+            FinderEvent::Dismiss => this.close_finder(true, window, cx),
+        });
+        finder.read(cx).focus_handle(cx).focus(window, cx);
+        self.finder = Some((finder, paths, events));
+        cx.notify();
+    }
+
+    /// Closes Go to file. A pick hands focus to the file's editor; a dismissal gives it back here.
+    fn close_finder(&mut self, refocus: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.finder.take().is_some() && refocus {
+            self.focus.focus(window, cx);
+        }
+        cx.notify();
     }
 
     fn toggle_sidebar(&mut self, _: &ToggleSidebar, _: &mut Window, cx: &mut Context<Self>) {
@@ -409,15 +459,21 @@ impl Render for Shell {
             .on_action(cx.listener(Self::close_tab))
             .on_action(cx.listener(Self::toggle_sidebar))
             .on_action(cx.listener(Self::toggle_right))
+            .on_key_down(cx.listener(Self::key_down))
             .flex()
             .flex_col()
             .size_full()
             .bg(theme.background)
             .text_color(theme.foreground)
             .font_family(FONT_FAMILY)
+            .relative()
             .child(self.title_bar(cx))
             .child(div().flex().flex_1().min_h_0().child(body))
             .child(self.status_line(cx))
+            .children(self.finder.as_ref().map(|(finder, _, _)| {
+                deferred(div().absolute().top(px(TITLE_BAR + 12.)).left_0().right_0().flex().justify_center().child(finder.clone()))
+                    .with_priority(1)
+            }))
     }
 }
 
