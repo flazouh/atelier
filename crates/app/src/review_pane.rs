@@ -254,9 +254,22 @@ impl ReviewPane {
 
     /// The review with the project's language servers on each file it shows.
     pub fn with_language(mut self, language: SessionFor, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        self.language = Some(language);
-        self.load_editor(window, cx);
+        self.attach_language(language, window, cx);
         self
+    }
+
+    /// Starts the language server's session on the editor the pane already made.
+    fn attach_language(&mut self, language: SessionFor, _: &mut Window, cx: &mut Context<Self>) {
+        self.language = Some(language);
+        self.start_lsp(cx);
+    }
+
+    /// The open file's server session, on its editor, when the review has servers and the file has text.
+    fn start_lsp(&mut self, cx: &mut Context<Self>) {
+        self.lsp = match (&self.language, self.files.get(self.current)) {
+            (Some(language), Some(file)) if file.merged.is_some() => Some(language(&file.review.path, self.editor.clone(), RowMap::new(file.hunks()), cx)),
+            _ => None,
+        };
     }
 
     /// The server's words for the status line, when the open file has one.
@@ -277,10 +290,7 @@ impl ReviewPane {
     fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let had_keys = self.editor.focus_handle(cx).is_focused(window);
         (self.editor, self._edits) = Self::editor_for(self.files.get(self.current), window, cx);
-        self.lsp = match (&self.language, self.files.get(self.current)) {
-            (Some(language), Some(file)) if file.merged.is_some() => Some(language(&file.review.path, self.editor.clone(), RowMap::new(file.hunks()), cx)),
-            _ => None,
-        };
+        self.start_lsp(cx);
         if had_keys {
             focus_once_painted(self.editor.focus_handle(cx), 3, window, cx);
         }
