@@ -14,7 +14,24 @@ use ignore::{WalkBuilder, gitignore::Gitignore};
 use notify::{EventKind, RecursiveMode, Watcher};
 use regex::RegexBuilder;
 
-use crate::{Change, ChangeKind, ChangeSink, Command, Entry, process::LocalChild, GitOutput, Match, Process, Project, Query, Watch, host_path};
+use crate::{
+    Change, ChangeKind, ChangeSink, Command, DataEntry, Entry, GitOutput, Match, Process, Project, Query, Watch,
+    data::DataFolder, host_path, process::LocalChild,
+};
+
+/// Writes `target` whole, through a temporary file beside it, so a reader never sees half of it. The
+/// file keeps its permissions, so saving a script keeps it runnable.
+pub(crate) fn write_whole(target: &Path, bytes: &[u8]) -> io::Result<()> {
+    let name = target.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let temporary = target.with_file_name(format!(".{name}.lathe-save"));
+    fs::write(&temporary, bytes)?;
+    if let Ok(meta) = fs::metadata(target) {
+        fs::set_permissions(&temporary, meta.permissions())?;
+    }
+    fs::rename(&temporary, target).inspect_err(|_| {
+        let _ = fs::remove_file(&temporary);
+    })
+}
 
 /// How long a watch gathers changes before it sends them, so a save that touches a file three times,
 /// or a checkout that touches a thousand, arrives as one batch.
@@ -25,6 +42,7 @@ const SEARCH_MAX_BYTES: u64 = 4 << 20;
 
 pub struct LocalProject {
     root: PathBuf,
+    data: Option<DataFolder>,
 }
 
 impl LocalProject {
@@ -34,7 +52,18 @@ impl LocalProject {
         if !root.is_dir() {
             return Err(io::Error::new(io::ErrorKind::NotADirectory, format!("{} is not a folder", root.display())));
         }
-        Ok(Self { root })
+        let data = DataFolder::for_root(&root, None);
+        Ok(Self { root, data })
+    }
+
+    /// The same project with its data folder under `dir`, as a test wants.
+    pub fn with_data_dir(mut self, dir: &Path) -> Self {
+        self.data = DataFolder::for_root(&self.root, Some(dir));
+        self
+    }
+
+    fn data(&self) -> io::Result<&DataFolder> {
+        self.data.as_ref().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "this machine has no data folder"))
     }
 
     fn walker(&self) -> WalkBuilder {
@@ -81,17 +110,23 @@ impl Project for LocalProject {
     }
 
     fn write(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
-        let target = host_path(&self.root, path)?;
-        let name = target.file_name().and_then(|n| n.to_str()).unwrap_or("file");
-        let temporary = target.with_file_name(format!(".{name}.lathe-save"));
-        fs::write(&temporary, bytes)?;
-        // Keep the file's permissions, so saving a script keeps it runnable.
-        if let Ok(meta) = fs::metadata(&target) {
-            fs::set_permissions(&temporary, meta.permissions())?;
-        }
-        fs::rename(&temporary, &target).inspect_err(|_| {
-            let _ = fs::remove_file(&temporary);
-        })
+        write_whole(&host_path(&self.root, path)?, bytes)
+    }
+
+    fn remove(&self, path: &str) -> io::Result<()> {
+        fs::remove_file(host_path(&self.root, path)?)
+    }
+
+    fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
+        self.data()?.read(path)
+    }
+
+    fn data_write(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
+        self.data()?.write(path, bytes)
+    }
+
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<DataEntry>> {
+        self.data()?.list(prefix)
     }
 
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {

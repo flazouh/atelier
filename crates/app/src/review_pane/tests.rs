@@ -255,3 +255,20 @@ fn typing_just_before_the_review_closes_reaches_the_disk(cx: &mut TestAppContext
     cx.run_until_parked();
     assert!(read(&dir, "a.txt").contains("TWO!"), "{}", read(&dir, "a.txt"));
 }
+
+/// Rejecting a file the agent made removes it, instead of leaving it empty.
+#[gpui_kit::test]
+fn a_rejected_new_file_is_removed(cx: &mut TestAppContext) {
+    let dir = git_project(&[("a.txt", BEFORE)]);
+    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![ended()]], false);
+    let root = dir.clone();
+    fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("new.txt"), "made\n").unwrap()));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("make a file".into(), cx)));
+    cx.run_until_parked();
+    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project, Scope::Turn(0), Some("new.txt"), window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_file(Decision::Reject, window, cx)));
+    cx.run_until_parked();
+    assert!(!dir.join("new.txt").exists(), "the file the agent made is gone");
+}

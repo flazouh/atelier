@@ -8,11 +8,12 @@
 
 use std::io::{self, Read, Write};
 
-use lathe_project::{Change, Command, Entry, GitOutput, Match, Query};
+use lathe_project::{Change, Command, DataEntry, Entry, GitOutput, Match, Query};
 use serde::{Deserialize, Serialize};
 
 /// The protocol's version: both ends must agree, or the hello fails.
-pub const VERSION: u32 = 1;
+/// 2: `Remove` and the data folder's calls.
+pub const VERSION: u32 = 2;
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -39,6 +40,11 @@ pub enum Call {
     /// The last of a process's stderr.
     Stderr { pid: Pid },
     Git { args: Vec<String> },
+    Remove { path: String },
+    /// The project's data folder, on the host.
+    DataRead { path: String },
+    DataWrite { path: String, bytes: Vec<u8> },
+    DataList { prefix: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -52,6 +58,7 @@ pub enum Reply {
     Spawned { pid: Pid },
     Text(String),
     Git(GitOutput),
+    DataEntries(Vec<DataEntry>),
 }
 
 /// Why a call failed on the host: an `io::ErrorKind` by name, and the message.
