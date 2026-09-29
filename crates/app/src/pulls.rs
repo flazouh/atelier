@@ -38,9 +38,17 @@ pub fn open_services(project: Arc<dyn Project>, me: String, local_data: PathBuf,
 }
 
 /// The pull requests a `#N` in an agent's text can name: those of the project's own repository
-/// (`owner/name`), or every one the list holds when the project's repository is not known.
+/// (`owner/name`). While the repository is not known, those whose number no other repository holds, so
+/// a `#N` never opens whichever came first.
 pub fn chips_of(rows: impl IntoIterator<Item = PrChipData>, repo: Option<&str>) -> Vec<PrChipData> {
-    rows.into_iter().filter(|chip| repo.is_none_or(|repo| chip.repo.as_ref() == repo)).collect()
+    let rows: Vec<PrChipData> = rows.into_iter().collect();
+    match repo {
+        Some(repo) => rows.into_iter().filter(|chip| chip.repo.as_ref() == repo).collect(),
+        None => {
+            let held_once = |number: u64| rows.iter().filter(|c| c.number == number).count() == 1;
+            rows.iter().filter(|chip| held_once(chip.number)).cloned().collect()
+        }
+    }
 }
 
 #[cfg(test)]

@@ -334,7 +334,7 @@ alex-31's pull request view (`crates/pr-view`, `docs/pr-view.md`) is mounted per
   A row of the list opens its pull request; the view's back link returns to the list.
 - **From an agent's text.** A `#N` in an agent's answer is a PR chip when the list holds a pull request
   of the project's own repository with that number (the origin remote, `RepoRef::from_remote`); a press
-  opens it. Chips appear once the reader has opened the list in this launch.
+  opens it. Until the remote is read, a number two repositories hold is no chip. Chips appear once the reader has opened the list in this launch.
 - **To the editor.** The view's "Open in editor" opens the file in the project's editor at its line.
 - **Read-only.** `PrConfig::read_only(true)`: nothing is sent to GitHub until Alex approves a scratch
   repository. The status line says so.
@@ -344,6 +344,9 @@ alex-31's pull request view (`crates/pr-view`, `docs/pr-view.md`) is mounted per
 QA on the HP (`~/shots/m3/pulls-*.png`, `chips-*.png`, `chips.mp4`): the list of 47 pull requests, one
 opened from the list with typescript-go ready, a `#3` chip in Claude's answer in a clone of flazouh/wt
 opening that draft with gopls ready, and its file opened in the editor.
+
+A chip names only a pull request the list holds (the reader's involved ones). The roadmap's lookup of any
+`#N` by repository and number, batched in one GraphQL request, is not built.
 
 Not built: the PR card in a session (no agent event names a pull request yet), a session linked to a pull
 request (`PrEvent::OpenSession`), and chips before the list has been opened.

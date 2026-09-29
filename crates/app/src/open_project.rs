@@ -125,7 +125,9 @@ pub struct OpenProject {
     pub pulls: Option<Pulls>,
     /// The project's own repository on its forge (`owner/name`), from the origin remote.
     repo: Option<String>,
-    /// What a `#N` in an agent's text can name, handed to each session.
+    /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
+    /// them, handed to each session.
+    list_rows: Vec<beui::PrChipData>,
     pr_chips: std::rc::Rc<Vec<beui::PrChipData>>,
     opening_pulls: Task<()>,
     /// How many files differ from the last commit, from `git status`: the status line shows it.
@@ -169,6 +171,7 @@ impl OpenProject {
             review: None,
             pulls: None,
             repo: None,
+            list_rows: Vec::new(),
             pr_chips: std::rc::Rc::default(),
             opening_pulls: Task::ready(()),
             dirty: None,
@@ -302,7 +305,7 @@ impl OpenProject {
         let remote = cx.background_spawn(async move { project.git(&["remote", "get-url", "origin"]) });
         cx.spawn(async move |this, cx| {
             let repo = remote.await.ok().filter(|out| out.ok()).and_then(|out| lathe_forge::RepoRef::from_remote(out.stdout.trim())).map(|r| r.slug());
-            _ = this.update(cx, |this, _| this.repo = repo);
+            _ = this.update(cx, |this, cx| this.set_repo(repo, cx));
         })
         .detach();
         let project = self.project.clone();
@@ -363,6 +366,35 @@ impl OpenProject {
         });
     }
 
+    /// The pull requests the list holds now.
+    pub fn set_list_rows(&mut self, rows: Vec<beui::PrChipData>, cx: &mut Context<Self>) {
+        self.list_rows = rows;
+        self.refresh_chips(cx);
+    }
+
+    /// The project's own repository, once the origin remote is read.
+    pub fn set_repo(&mut self, repo: Option<String>, cx: &mut Context<Self>) {
+        self.repo = repo;
+        self.refresh_chips(cx);
+    }
+
+    /// The chips from the list and the repository. The list notifies on a hover or a tick, so the
+    /// sessions hear only of chips that changed.
+    fn refresh_chips(&mut self, cx: &mut Context<Self>) {
+        let chips = pulls::chips_of(self.list_rows.iter().cloned(), self.repo.as_deref());
+        if *self.pr_chips == chips {
+            return;
+        }
+        self.pr_chips = std::rc::Rc::new(chips);
+        for session in &self.sessions {
+            let chips = self.pr_chips.clone();
+            session.update(cx, |s, cx| {
+                s.pr_chips = chips;
+                cx.notify();
+            });
+        }
+    }
+
     /// Opens the pull request a chip names, in the pull request pane.
     fn open_pull(&mut self, chip: &beui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
         let Some(pulls) = &mut self.pulls else { return };
@@ -396,15 +428,8 @@ impl OpenProject {
         });
         // What the list holds is what an agent's `#N` can name.
         let _chips = cx.observe(&list, |this, list, cx| {
-            let rows = list.read(cx).model().rows(lathe_pr_view::services::now()).into_iter().map(|row| row.pr);
-            this.pr_chips = std::rc::Rc::new(pulls::chips_of(rows, this.repo.as_deref()));
-            for session in &this.sessions {
-                let chips = this.pr_chips.clone();
-                session.update(cx, |s, cx| {
-                    s.pr_chips = chips;
-                    cx.notify();
-                });
-            }
+            let rows = list.read(cx).model().rows(lathe_pr_view::services::now()).into_iter().map(|row| row.pr).collect();
+            this.set_list_rows(rows, cx);
         });
         self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens, _chips] });
         cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));

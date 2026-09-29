@@ -299,3 +299,29 @@ fn a_new_session_takes_another_agent_until_its_first_message(cx: &mut TestAppCon
     cx.update(|window, cx| project.update(cx, |p, cx| p.choose_agent(&key, crate::fake_agent::fake_agent("third"), window, cx)));
     assert_eq!(cx.update(|_, cx| project.read(cx).sessions[0].read(cx).agent.name), "second", "it has a conversation now");
 }
+
+fn chip(repo: &str, number: u64) -> beui::PrChipData {
+    beui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: beui::pr::PrState::Open, url: "u".into() }
+}
+
+/// The chips follow the project's repository when it lands after the list, and a list change that
+/// leaves them the same tells no session.
+#[gpui_kit::test]
+fn the_chips_follow_the_repository_and_stay_quiet_when_the_list_does(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[]);
+    cx.update(|_, cx| project.update(cx, |p, _| p.agent = crate::fake_agent::fake_agent("fake")));
+    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, window, cx)));
+    cx.run_until_parked();
+    let told = std::rc::Rc::new(std::cell::Cell::new(0));
+    let count = told.clone();
+    let _watch = cx.update(|_, cx| cx.observe(&session, move |_, _| count.set(count.get() + 1)));
+    let rows = vec![chip("a/one", 3), chip("b/two", 4)];
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_list_rows(rows.clone(), cx)));
+    let numbers = |cx: &mut VisualTestContext| cx.update(|_, cx| session.read(cx).pr_chips.iter().map(|c| c.number).collect::<Vec<_>>());
+    assert_eq!(numbers(cx), [3, 4], "no repository yet");
+    let before = told.get();
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_list_rows(rows.clone(), cx)));
+    assert_eq!(told.get(), before, "the same chips tell no session");
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some("b/two".into()), cx)));
+    assert_eq!(numbers(cx), [4], "the repository landed: only its own");
+}
