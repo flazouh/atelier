@@ -171,8 +171,9 @@ pub struct TurnEnd {
 pub enum EndReason {
     /// lathe closed the session.
     Closed,
-    /// The agent's process ended. `None` means a signal ended it.
-    Exited(Option<i32>),
+    /// The agent's process ended. `code` is `None` when a signal ended it; `stderr` is the last lines it
+    /// wrote, which say why when it stopped early.
+    Exited { code: Option<i32>, stderr: String },
     Failed(String),
 }
 

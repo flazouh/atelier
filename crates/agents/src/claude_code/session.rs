@@ -52,7 +52,9 @@ impl ClaudeSession {
             if closing_in.load(Ordering::SeqCst) {
                 return;
             }
-            let events = lock(&mapper_in).exited(code);
+            // `wait` returns with the stderr complete, so the tail says why the process stopped.
+            let stderr = lock(&control_in).stderr();
+            let events = lock(&mapper_in).exited(code, &stderr);
             events.into_iter().for_each(|event| sink_in(event));
         });
 

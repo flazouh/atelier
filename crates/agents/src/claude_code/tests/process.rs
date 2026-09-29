@@ -87,7 +87,7 @@ fn a_played_back_run_becomes_events_and_ends_with_the_exit_code() {
     let events = until(&rx, ended);
     assert!(matches!(events[0], Event::Started(_)));
     assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Completed)));
-    assert_eq!(events.last(), Some(&Event::Ended(EndReason::Exited(Some(0)))));
+    assert_eq!(events.last(), Some(&Event::Ended(EndReason::Exited { code: Some(0), stderr: String::new() })));
 }
 
 #[test]
@@ -105,7 +105,7 @@ exit 3"#,
     let events = until(&rx, ended);
     assert!(events.iter().any(|e| matches!(e, Event::ToolFinished { output, .. } if output.is_error)));
     assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if matches!(&end.outcome, TurnOutcome::Failed(why) if why.contains("code 3")))));
-    assert_eq!(events.last(), Some(&Event::Ended(EndReason::Exited(Some(3)))));
+    assert_eq!(events.last(), Some(&Event::Ended(EndReason::Exited { code: Some(3), stderr: String::new() })));
 }
 
 #[test]
@@ -178,4 +178,17 @@ fn a_message_with_attachments_reaches_the_process_as_one_text() {
     };
     let line: serde_json::Value = serde_json::from_str(written.lines().next().unwrap()).unwrap();
     assert_eq!(line["message"]["content"], "look at this\n\nReview comment on src/a.rs, line 3:\n> let x = 1;\nwhy?");
+}
+
+#[test]
+fn a_process_that_says_why_on_stderr_and_exits_gives_that_text_in_its_end_events() {
+    let stand = Stand::new();
+    let program = stand.script("read first\necho 'no such model' >&2\nexit 3");
+    let (sink, rx) = channel();
+    let session = ClaudeCode::with_program(program.to_string_lossy()).open(stand.project(), OpenRequest::default(), sink).unwrap();
+    session.send(Command::send("go")).unwrap();
+    let events = until(&rx, ended);
+    assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end)
+        if matches!(&end.outcome, TurnOutcome::Failed(why) if why == "the agent exited with code 3: no such model"))));
+    assert_eq!(events.last(), Some(&Event::Ended(EndReason::Exited { code: Some(3), stderr: "no such model".into() })));
 }
