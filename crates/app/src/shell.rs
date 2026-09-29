@@ -26,12 +26,13 @@ use lathe_project::LocalProject;
 use lathe_settings::Location;
 
 use crate::{
+    ssh_form::{Phase, SshForm, SshFormEvent},
     editor_pane::editor_pane,
     open_project::{Git, Listing, OpenProject, ProjectEvent},
     tree_view::tree_view,
 };
 
-actions!(lathe, [OpenFolder, Save, CloseTab, ToggleSidebar, ToggleRight]);
+actions!(lathe, [OpenFolder, OpenRemote, Save, CloseTab, ToggleSidebar, ToggleRight]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -40,6 +41,8 @@ const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else { 12. };
 pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-o", OpenFolder, None),
+        KeyBinding::new("secondary-shift-o", OpenRemote, None),
+        KeyBinding::new("secondary-shift-O", OpenRemote, None),
         KeyBinding::new("secondary-s", Save, None),
         KeyBinding::new("secondary-w", CloseTab, None),
         KeyBinding::new("secondary-b", ToggleSidebar, None),
@@ -59,6 +62,8 @@ pub struct Shell {
     said: Option<SharedString>,
     /// Go to file, while it is open: the finder and the paths its rows stand for.
     finder: Option<(Entity<Finder>, Vec<String>, Subscription)>,
+    /// "Open over SSH…", while it is open.
+    ssh: Option<(Entity<SshForm>, Subscription)>,
     focus: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -73,6 +78,7 @@ impl Shell {
             recent,
             said: None,
             finder: None,
+            ssh: None,
             focus: cx.focus_handle(),
             _subscriptions: Vec::new(),
         }
@@ -100,6 +106,70 @@ impl Shell {
             });
         })
         .detach();
+    }
+
+    fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
+        let form = cx.new(|cx| SshForm::new(lathe_remote::ssh::known_hosts(), window, cx));
+        let events = cx.subscribe_in(&form, window, |this, _, event: &SshFormEvent, window, cx| match event {
+            SshFormEvent::Connect { host, path } => this.open_remote(host.clone(), path.clone(), window, cx),
+            SshFormEvent::Cancel => {
+                this.ssh = None;
+                this.focus.focus(window, cx);
+                cx.notify();
+            }
+        });
+        form.read(cx).focus_handle(cx).focus(window, cx);
+        self.ssh = Some((form, events));
+        cx.notify();
+    }
+
+    /// Opens `path` on `host` over ssh: the host is probed and given lathe-remote if need be, all on
+    /// a background thread, and the form, when open, shows each step and any failure.
+    pub fn open_remote(&mut self, host: String, path: String, window: &mut Window, cx: &mut Context<Self>) {
+        let (tx, mut steps) = futures_channel::mpsc::unbounded::<String>();
+        let connecting = {
+            let (host, path) = (host.clone(), path.clone());
+            cx.background_spawn(async move { lathe_remote::ssh::connect(&host, &path, &|line| drop(tx.unbounded_send(line))) })
+        };
+        cx.spawn_in(window, async move |this, cx| {
+            use futures_util::StreamExt;
+            let mut connecting = std::pin::pin!(connecting);
+            let connected = loop {
+                let step = std::pin::pin!(steps.next());
+                match futures_util::future::select(step, connecting.as_mut()).await {
+                    futures_util::future::Either::Left((Some(line), _)) => {
+                        _ = this.update(cx, |this, cx| this.form_phase(Phase::Connecting(line.into()), cx));
+                    }
+                    futures_util::future::Either::Left((None, _)) => break connecting.await,
+                    futures_util::future::Either::Right((connected, _)) => break connected,
+                }
+            };
+            _ = this.update_in(cx, |this, window, cx| match connected {
+                Ok(project) => {
+                    this.ssh = None;
+                    let location = Location::Ssh { host, path: PathBuf::from(path) };
+                    this.add(location, Arc::new(project), window, cx);
+                }
+                Err(error) => {
+                    let why = error.to_string();
+                    if this.ssh.is_some() {
+                        this.form_phase(Phase::Failed(why.into()), cx);
+                    } else {
+                        this.say(format!("Could not open {path} on {host}: {why}"), cx);
+                    }
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn form_phase(&mut self, phase: Phase, cx: &mut Context<Self>) {
+        if let Some((form, _)) = &self.ssh {
+            form.update(cx, |f, cx| {
+                f.phase = phase;
+                cx.notify();
+            });
+        }
     }
 
     fn add(&mut self, location: Location, project: Arc<dyn lathe_project::Project>, window: &mut Window, cx: &mut Context<Self>) {
@@ -276,7 +346,7 @@ impl Shell {
                 .hover(|s| s.bg(theme.muted_hover()))
                 .on_click(cx.listener(move |this, _, window, cx| match &open {
                     Location::Local { path } => this.open_local(path.clone(), window, cx),
-                    Location::Ssh { .. } => this.say("Remote projects open from “Open over SSH…”.".into(), cx),
+                    Location::Ssh { host, path } => this.open_remote(host.clone(), path.display().to_string(), window, cx),
                 }))
                 .child(FileIcon::folder(&location.name(), false).size(px(16.)))
                 .child(
@@ -302,14 +372,25 @@ impl Shell {
                     .w(px(420.))
                     .child(div().text_size(TextSize::Lg.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open a project"))
                     .child(
-                        div().flex().gap(px(8.)).child(
-                            Button::new("open-folder")
-                                .label("Open Folder…")
-                                .size(ButtonSize::Md)
-                                .variant(ButtonVariant::Primary)
-                                .cap(keys::cap("⌘o"))
-                                .on_click(cx.listener(|this, _, window, cx| this.open_folder(&OpenFolder, window, cx))),
-                        ),
+                        div()
+                            .flex()
+                            .gap(px(8.))
+                            .child(
+                                Button::new("open-folder")
+                                    .label("Open Folder…")
+                                    .size(ButtonSize::Md)
+                                    .variant(ButtonVariant::Primary)
+                                    .cap(keys::cap("⌘o"))
+                                    .on_click(cx.listener(|this, _, window, cx| this.open_folder(&OpenFolder, window, cx))),
+                            )
+                            .child(
+                                Button::new("open-remote")
+                                    .label("Open over SSH…")
+                                    .size(ButtonSize::Md)
+                                    .variant(ButtonVariant::Secondary)
+                                    .cap(keys::cap("⌘⇧o"))
+                                    .on_click(cx.listener(|this, _, window, cx| this.open_ssh_form(&OpenRemote, window, cx))),
+                            ),
                     )
                     .child(
                         div()
@@ -450,11 +531,31 @@ impl Render for Shell {
                 )
                 .into_any_element(),
         };
+        let link_down = self.active().and_then(|p| match &p.read(cx).link {
+            lathe_project::Link::Down(why) => Some((p.read(cx).location.place(), why.clone())),
+            lathe_project::Link::Up => None,
+        });
+        let banner = link_down.map(|(place, why)| {
+            div()
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .mx(px(8.))
+                .mb(px(6.))
+                .px(px(12.))
+                .py(px(6.))
+                .rounded(radius::LG)
+                .bg(theme.card_strong)
+                .text_size(TextSize::Xs.font_size())
+                .child(beui::spinner::Spinner::new("reconnecting").size(px(12.)).color(theme.warning))
+                .child(format!("Lost {place} ({why}). Reconnecting; your unsaved edits are kept here."))
+        });
         div()
             .id("shell")
             .key_context("Shell")
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::open_folder))
+            .on_action(cx.listener(Self::open_ssh_form))
             .on_action(cx.listener(Self::save))
             .on_action(cx.listener(Self::close_tab))
             .on_action(cx.listener(Self::toggle_sidebar))
@@ -468,8 +569,13 @@ impl Render for Shell {
             .font_family(FONT_FAMILY)
             .relative()
             .child(self.title_bar(cx))
+            .children(banner)
             .child(div().flex().flex_1().min_h_0().child(body))
             .child(self.status_line(cx))
+            .children(self.ssh.as_ref().map(|(form, _)| {
+                deferred(div().absolute().top(px(TITLE_BAR + 60.)).left_0().right_0().flex().justify_center().child(form.clone()))
+                    .with_priority(1)
+            }))
             .children(self.finder.as_ref().map(|(finder, _, _)| {
                 deferred(div().absolute().top(px(TITLE_BAR + 12.)).left_0().right_0().flex().justify_center().child(finder.clone()))
                     .with_priority(1)

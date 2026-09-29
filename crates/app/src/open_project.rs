@@ -22,7 +22,7 @@ use gpui_kit::{
 };
 use lathe_editor::{ASK, EditorSession, Elsewhere, Jump, READY};
 use lathe_lsp::{Store, Workers};
-use lathe_project::{Change, ChangeKind, Project, Watch};
+use lathe_project::{Change, ChangeKind, Link, Project, Watch};
 use lathe_settings::Location;
 
 use crate::{
@@ -87,6 +87,8 @@ pub struct OpenProject {
     pub listed_in: Option<Duration>,
     pub open_folders: HashSet<String>,
     pub git: Git,
+    /// Whether the project's host can be reached; always up for a folder on this machine.
+    pub link: Link,
     pub tabs: Tabs,
     pub buffers: HashMap<String, Buffer>,
     /// Files being read for a tab, so a second click does not read them twice.
@@ -96,12 +98,19 @@ pub struct OpenProject {
     _watch: Option<Watch>,
     /// Hands the watch's batches to this entity, as long as it lives.
     watching: Task<()>,
+    /// Hands the link's ups and downs to this entity.
+    linking: Task<()>,
     listing_task: Task<()>,
 }
 
 impl OpenProject {
     pub fn new(location: Location, project: Arc<dyn Project>, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let workers = Arc::new(Workers::new(project.clone(), Store::from_env(), READY, ASK));
+        // A remote project's servers run on its host, found by the host's PATH, at the project's root.
+        let workers = match project.host() {
+            Some(_) => Workers::new(project.clone(), Store::on_host(), READY, ASK).at_project_root(),
+            None => Workers::new(project.clone(), Store::from_env(), READY, ASK),
+        };
+        let workers = Arc::new(workers);
         let mut this = Self {
             location,
             project,
@@ -110,17 +119,20 @@ impl OpenProject {
             listed_in: None,
             open_folders: HashSet::new(),
             git: Git::Unknown,
+            link: Link::Up,
             tabs: Tabs::default(),
             buffers: HashMap::new(),
             opening: HashSet::new(),
             caret_at: HashMap::new(),
             _watch: None,
             watching: Task::ready(()),
+            linking: Task::ready(()),
             listing_task: Task::ready(()),
         };
         this.relist(cx);
         this.read_git(cx);
         this.watch(window, cx);
+        this.follow_link(window, cx);
         this
     }
 
@@ -178,6 +190,42 @@ impl OpenProject {
                 _ = this.update_in(cx, |this, window, cx| this.changed(batch, window, cx));
             }
         });
+    }
+
+    fn follow_link(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (tx, mut rx) = mpsc::unbounded::<Link>();
+        self.project.on_link(Box::new(move |link| drop(tx.unbounded_send(link))));
+        self.linking = cx.spawn_in(window, async move |this, cx| {
+            while let Some(link) = rx.next().await {
+                _ = this.update(cx, |this, cx| this.linked(link, cx));
+            }
+        });
+    }
+
+    /// The host dropped or came back. Back, the tree and the branch are read again, since they may
+    /// have changed meanwhile, and each open file's language server starts again, since the host's
+    /// ended with the connection. The tabs' text never left this machine.
+    fn linked(&mut self, link: Link, cx: &mut Context<Self>) {
+        let back = link == Link::Up && self.link != Link::Up;
+        self.link = link;
+        if back {
+            self.relist(cx);
+            self.read_git(cx);
+            let open: Vec<(String, Entity<EditorState>)> = self.buffers.iter().map(|(p, b)| (p.clone(), b.editor.clone())).collect();
+            for (path, editor) in open {
+                let session = self.session_for(&path, editor, cx);
+                if let Some(buffer) = self.buffers.get_mut(&path) {
+                    buffer.session = session;
+                }
+            }
+            cx.emit(ProjectEvent::Said("Reconnected".into()));
+        }
+        cx.notify();
+    }
+
+    /// Files being read for a tab, for the tab bar to show them as pending.
+    pub fn opening(&self) -> impl Iterator<Item = &String> {
+        self.opening.iter()
     }
 
     /// A batch from the watch: new or removed paths list the tree again; an open file reloads.
@@ -330,16 +378,20 @@ impl OpenProject {
         }).detach();
     }
 
-    fn add_buffer(&mut self, path: String, text: String, window: &mut Window, cx: &mut Context<Self>) {
-        let editor = beui::CodeEditor::state(&path, text.clone(), window, cx);
-        let host = self.project.root().join(&path);
+    /// The language server session for `path`'s editor, with jumps to other files opening them here.
+    fn session_for(&self, path: &str, editor: Entity<EditorState>, cx: &mut Context<Self>) -> Entity<EditorSession> {
+        let host = self.project.root().join(path);
         let workers = self.workers.clone();
         let this = cx.entity().downgrade();
         let elsewhere: Elsewhere = std::rc::Rc::new(move |jump, window, cx| {
             this.update(cx, |p, cx| p.jump(jump, window, cx)).ok();
         });
-        let session =
-            cx.new(|cx| EditorSession::for_review(workers, editor.clone(), host, beui::RowMap::default(), Some(elsewhere), cx));
+        cx.new(|cx| EditorSession::for_review(workers, editor, host, beui::RowMap::default(), Some(elsewhere), cx))
+    }
+
+    fn add_buffer(&mut self, path: String, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        let editor = beui::CodeEditor::state(&path, text.clone(), window, cx);
+        let session = self.session_for(&path, editor.clone(), cx);
         let key = path.clone();
         let _edits = cx.subscribe(&editor, move |this, editor, event: &InputEvent, cx| {
             if !matches!(event, InputEvent::Change) {

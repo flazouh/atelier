@@ -9,6 +9,7 @@ use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions,
 mod editor_pane;
 mod open_project;
 mod shell;
+mod ssh_form;
 mod tabs;
 mod tree;
 mod tree_view;

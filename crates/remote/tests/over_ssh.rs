@@ -1,7 +1,7 @@
 //! The whole path over a real `ssh`: probe, deploy, dial, and a project that answers. It needs a
-//! host that takes the user's key and a lathe-remote built for it:
-//!     cargo build -p lathe-remote && LATHE_TEST_SSH_HOST=hp-agent \
-//!         cargo test -p lathe-remote --test over_ssh -- --ignored --nocapture
+//! host that takes the user's key, and a lathe-remote built for it in `$LATHE_REMOTE_DIR/<platform>/`:
+//!     cargo build -p lathe-remote && mkdir -p /tmp/remote/linux-x86_64 && cp target/debug/lathe-remote /tmp/remote/linux-x86_64/
+//!     LATHE_REMOTE_DIR=/tmp/remote LATHE_TEST_SSH_HOST=hp-agent cargo test -p lathe-remote --test over_ssh -- --ignored --nocapture
 
 use lathe_project::Project;
 

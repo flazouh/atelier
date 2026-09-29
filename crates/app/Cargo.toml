@@ -16,6 +16,7 @@ lathe-agents.workspace = true
 lathe-editor.workspace = true
 lathe-lsp.workspace = true
 lathe-project.workspace = true
+lathe-remote.workspace = true
 lathe-settings.workspace = true
 futures-channel = "0.3"
 futures-util = "0.3"
