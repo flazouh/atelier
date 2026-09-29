@@ -37,6 +37,7 @@ fn a_message_carries_its_attachments_as_text_after_its_own() {
         path: "src/a.rs".into(),
         first_line: 10,
         last_line: 12,
+        removed: false,
         quote: "let a = 1;\nlet b = 2;".into(),
         body: "Why not a struct?".into(),
     };

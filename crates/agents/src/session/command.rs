@@ -20,8 +20,9 @@ pub enum PermissionMode {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Attachment {
     /// A comment on lines of a file, with the lines quoted so the agent reads what was meant even if the
-    /// file has moved on.
-    LineComment { path: String, first_line: u32, last_line: u32, quote: String, body: String },
+    /// file has moved on. `removed` says the lines are ones the agent removed, counted in the file as it
+    /// was before the turn.
+    LineComment { path: String, first_line: u32, last_line: u32, removed: bool, quote: String, body: String },
     /// A file the message is about.
     File { path: String },
 }
@@ -30,10 +31,11 @@ impl Attachment {
     /// The attachment as text, for a backend that carries only text.
     pub fn render(&self) -> String {
         match self {
-            Self::LineComment { path, first_line, last_line, quote, body } => {
+            Self::LineComment { path, first_line, last_line, removed, quote, body } => {
                 let lines = if first_line == last_line { format!("line {first_line}") } else { format!("lines {first_line}-{last_line}") };
                 let quoted: String = quote.lines().map(|line| format!("> {line}\n")).collect();
-                format!("Review comment on {path}, {lines}:\n{quoted}{body}")
+                let which = if *removed { " (lines the agent removed, numbered as they were before)" } else { "" };
+                format!("Review comment on {path}, {lines}{which}:\n{quoted}{body}")
             }
             Self::File { path } => format!("File: {path}"),
         }

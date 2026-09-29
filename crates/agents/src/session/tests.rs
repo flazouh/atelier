@@ -286,7 +286,7 @@ mod attachments {
 
     #[test]
     fn one_line_is_said_in_the_singular_and_a_range_in_the_plural() {
-        let one = Attachment::LineComment { path: "a".into(), first_line: 3, last_line: 3, quote: "x".into(), body: "b".into() };
+        let one = Attachment::LineComment { path: "a".into(), first_line: 3, last_line: 3, removed: false, quote: "x".into(), body: "b".into() };
         assert_eq!(one.render(), "Review comment on a, line 3:\n> x\nb");
     }
 
