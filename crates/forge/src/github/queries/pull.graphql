@@ -23,6 +23,7 @@ query Pull($owner: String!, $name: String!, $number: Int!) {
       updatedAt
       author { login }
       baseRefName
+      baseRefOid
       headRefName
       headRefOid
       mergeable

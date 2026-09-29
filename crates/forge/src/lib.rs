@@ -8,7 +8,7 @@ pub mod github;
 mod lookup;
 mod model;
 pub mod present;
-mod time;
+pub mod time;
 
 pub use court::{Court, Filed, Weighing, court_of, file as file_courts};
 pub use error::{ForgeError, ForgeResult};

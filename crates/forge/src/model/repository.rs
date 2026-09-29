@@ -1,7 +1,7 @@
 //! A repository on a forge, and the remote URL that names it.
 use super::merge::MergeSettings;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RepoRef {
     pub host: String,
     pub owner: String,
@@ -41,7 +41,7 @@ impl RepoRef {
 }
 
 /// A repository with what the reader may do in it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Repository {
     /// The forge's own id, which writes need.
     pub id: String,

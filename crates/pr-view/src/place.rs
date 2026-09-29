@@ -1,0 +1,55 @@
+//! Where the threads of a pull request sit in one file's diff. A thread on the new side hangs under the
+//! row that holds its line in the head; one on the old side under the row that holds its line in the base.
+//! A thread on the whole file, or one whose code has changed since (outdated: it has no line now), has no
+//! row, and the view lists them above the code instead.
+use lathe_forge::{Side, Thread};
+
+use crate::diff::FileView;
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Placement {
+    /// `(row, index into the threads)`, in row order; several threads may share a row.
+    pub rows: Vec<(usize, usize)>,
+    /// On the whole file.
+    pub file_level: Vec<usize>,
+    /// Their code changed since; no line to hang on.
+    pub outdated: Vec<usize>,
+}
+
+impl Placement {
+    pub fn total(&self) -> usize {
+        self.rows.len() + self.file_level.len() + self.outdated.len()
+    }
+}
+
+pub fn place(threads: &[Thread], view: &FileView) -> Placement {
+    let mut placement = Placement::default();
+    let Some(shown) = view.shown() else {
+        // A file with no rows still has its threads: they list above.
+        for (i, t) in threads.iter().enumerate().filter(|(_, t)| belongs(t, view)) {
+            if t.file_level { placement.file_level.push(i) } else { placement.outdated.push(i) }
+        }
+        return placement;
+    };
+    for (i, thread) in threads.iter().enumerate().filter(|(_, t)| belongs(t, view)) {
+        if thread.file_level {
+            placement.file_level.push(i);
+            continue;
+        }
+        let row = match (thread.outdated, thread.line, thread.side) {
+            (false, Some(line), Side::Right) => shown.lines.head_row(line),
+            (false, Some(line), Side::Left) => shown.lines.base_row(line),
+            _ => None,
+        };
+        match row {
+            Some(row) => placement.rows.push((row, i)),
+            None => placement.outdated.push(i),
+        }
+    }
+    placement.rows.sort();
+    placement
+}
+
+fn belongs(thread: &Thread, view: &FileView) -> bool {
+    thread.path == view.path || view.old_path.as_deref() == Some(thread.path.as_str())
+}

@@ -352,6 +352,40 @@ from alex-31's builds.
 - Folding the 2,000 events and the first draw: 0.9 ms and 0.8 ms in the unit bench
   (`cargo test --release -p lathe-app -- --ignored --nocapture a_long_session`), which shapes no text.
 - A stream costs one repaint a frame: the queue wakes the session once per batch.
+## The pull request view
+The gallery's "Pull request view" story on a large pull request: 300 changed files, 5,000 comments (1,000
+threads of five, spread over the files), real git and an in-memory forge, release, on the HP. The HP draws
+in software (about 80 ms a frame whatever the code does), so the numbers to read are our own layout,
+prepaint and paint. The run opens the pull request, waits for the first diff, then draws 300 frames: the
+rail scrolls every frame and every tenth frame goes to the next file.
+    GALLERY_STORY="Pull request view" GALLERY_SCROLL=1 PRV_FILES=300 PRV_COMMENTS=5000 target/release/beui-gallery
+| Case (300 frames) | Target | Layout and prepaint, median | p95 | Paint, median | Layout nodes, most |
+| --- | --- | --- | --- | --- | --- |
+| 300 files, 5,000 comments | layout under 8 ms | 3.9 ms | 8.5 to 9.0 ms | 1.6 ms | 220 |
+| The frames that go to the next file | | 5.1 to 5.4 ms | 10.8 to 18.9 ms | | |
+The load average was 6 to 20 during these runs. The "Tasks" story ran in the same session as a control
+(5,000 tasks scrolled): layout median 3.5 ms, p95 8.8 ms, 20 of 298 frames over 8.33 ms; the pull request
+view had 15 to 20 of 270. So the view is as heavy as the board and the list, and the frames over budget
+come from load, as `docs/performance.md` says of them above. Not measured on the Mac.
+Before this, the rail listed every thread as a row and drew the same run at 40 ms of layout and 11,296
+nodes. Now it lists 20 threads and 20 remarks and counts all of them ("Show more" adds 20), a thread of
+more than three comments shows its first and its last in the diff, and the model builds only the page
+(0.04 ms for 5,000 comments; it took 3 to 5 ms when it built all). What is left is mostly the comments in
+the diff: with the threads and the rail both off, layout is 0.9 ms; the rail costs about 2 ms and the
+threads under the rows about 2 ms when every file has three.
+Open to first paint from the local cache, in the view's own timeline (`PullView::timeline`, printed at
+the end of the run) and in the ignored test `cargo test --release -p lathe-pr-view perf -- --ignored
+--nocapture`, which makes the same pull request on disk:
+| Step, from the view being made | Test (release, HP) | Story run |
+| --- | --- | --- |
+| The saved read of 5,000 comments is on screen | 6 ms | 75 to 220 ms under load |
+| git has answered (cache, 300 files, commits, base) | 107 ms | 270 to 690 ms under load |
+| The first diff is read | 155 ms | 270 to 890 ms under load |
+git alone, one call at a time, median: prepare 14 to 37 ms, the 300-file list 11 to 19 ms, the commits 4 to 5
+ms, the two blobs of one file 4 to 5 ms, and building the diff 0.01 ms. They add up to 35 to 65 ms and
+the target of 200 ms holds in the test; the story run, on a machine at load average 20 to 40, took up to
+four times as long for the same work. The window shows the saved read (header, checks, conversation, tree
+from the forge's file list) before git answers.
 
 ## Review in the app
 

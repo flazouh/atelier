@@ -4,17 +4,17 @@ use super::{
     repository::RepoRef,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct PullRef {
     pub repo: RepoRef,
     pub number: u64,
 }
 
 /// The forge's own id for a pull request, which writes need.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct PullId(pub String);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PullState {
     Open,
     Draft,
@@ -23,7 +23,7 @@ pub enum PullState {
 }
 
 /// What the forge says about merging the pull request now.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MergeState {
     Clean,
     /// A check that is not required fails.
@@ -39,7 +39,7 @@ pub enum MergeState {
 }
 
 /// What the required review says.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ReviewDecision {
     /// No rule asks for a review.
     NotRequired,
@@ -49,20 +49,20 @@ pub enum ReviewDecision {
 }
 
 /// One reviewer's standing opinion.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Opinion {
     pub reviewer: String,
     pub verdict: super::conversation::Verdict,
 }
 
 /// Someone or some team asked to review.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Reviewer {
     Person(String),
     Team(String),
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CheckCounts {
     pub passed: u32,
     pub failed: u32,
@@ -85,14 +85,14 @@ impl CheckCounts {
 }
 
 /// From worst to best: one failure outweighs any number of passes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum CheckState {
     Failing,
     Running,
     Passing,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Pull {
     pub id: PullId,
     pub reference: PullRef,
@@ -102,6 +102,9 @@ pub struct Pull {
     pub url: String,
     pub author: String,
     pub base: String,
+    /// The commit of the base branch the pull request stands on: for a merged one, the base before the
+    /// merge. Empty when the forge did not say. The changes are those since the merge base of this and the head.
+    pub base_sha: String,
     pub head: String,
     /// The commit the head branch stands on now.
     pub head_sha: String,
@@ -127,7 +130,7 @@ pub struct Pull {
 }
 
 /// What a list and a chip need to know about a pull request.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PullBrief {
     pub reference: PullRef,
     pub title: String,
@@ -136,7 +139,7 @@ pub struct PullBrief {
 }
 
 /// One row of a reader's working set.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PullSummary {
     pub brief: PullBrief,
     pub author: String,
@@ -151,7 +154,7 @@ pub struct PullSummary {
 }
 
 /// Which of the reader's lists a pull request came from. Each is a question the forge answers.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum Shelf {
     NeedsAction,
     TeamReviewRequested,
@@ -174,14 +177,14 @@ impl Shelf {
 
 /// An involved pull request and the shelf that holds it. One the reader is only assigned to or
 /// mentioned in is on none.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Involved {
     pub summary: PullSummary,
     pub shelf: Option<Shelf>,
 }
 
 /// A changed file, as a list shows it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Change {
     Added,
     Modified,
@@ -190,7 +193,7 @@ pub enum Change {
     Copied,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ChangedFile {
     pub path: String,
     pub additions: u32,
@@ -198,7 +201,7 @@ pub struct ChangedFile {
     pub change: Change,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NewPull {
     pub title: String,
     pub body: String,
@@ -208,7 +211,7 @@ pub struct NewPull {
 }
 
 /// What to change on a pull request. A field left `None` stays.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PullUpdate {
     pub title: Option<String>,
     pub body: Option<String>,

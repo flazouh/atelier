@@ -1,6 +1,6 @@
 //! Merging: the repository's rules, what the reader may do, and the request and its outcome.
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MergeMethod {
     Merge,
     Squash,
@@ -8,7 +8,7 @@ pub enum MergeMethod {
 }
 
 /// The reader's right to merge.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Rights {
     Merge,
     /// An administrator, who may merge past the rules that failed.
@@ -17,7 +17,7 @@ pub enum Rights {
 }
 
 /// How a repository lets pull requests land.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct MergeSettings {
     pub methods: Vec<MergeMethod>,
     pub default_method: MergeMethod,
@@ -39,12 +39,12 @@ impl Default for MergeSettings {
 }
 
 /// A pull request's place in a merge queue. The first in line is 1.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct QueuePlace {
     pub position: Option<u32>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct MergeRequest {
     pub method: MergeMethod,
     /// The commit's title and message; the forge's own when `None`.
@@ -57,7 +57,7 @@ pub struct MergeRequest {
     pub delete_branch: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MergeOutcome {
     Merged,
     /// Set to merge itself when ready.
