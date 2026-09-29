@@ -20,6 +20,7 @@ mod agent_parts;
 mod editor_story;
 mod workers;
 mod load_story;
+mod replay_story;
 mod merge_story;
 mod pr_fixture;
 mod pr_story;
@@ -61,10 +62,11 @@ enum Story {
     Select,
     Prompt,
     Load,
+    AgentReplay,
 }
 
 impl Story {
-    const ALL: [Story; 26] = [
+    const ALL: [Story; 27] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -91,6 +93,7 @@ impl Story {
         Story::Select,
         Story::Prompt,
         Story::Load,
+        Story::AgentReplay,
     ];
 
     fn title(self) -> &'static str {
@@ -121,6 +124,7 @@ impl Story {
             Story::Select => "Select",
             Story::Prompt => "Prompt input",
             Story::Load => "Highlight load",
+            Story::AgentReplay => "Agent replay",
         }
     }
 }
@@ -177,6 +181,7 @@ struct Gallery {
     merge: Entity<merge_story::MergeStory>,
     /// Built the first time it shows: it holds a 10k-line file.
     load: Option<Entity<load_story::LoadStory>>,
+    agent_replay: Option<Entity<replay_story::ReplayStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -279,6 +284,7 @@ impl Gallery {
             pull_request,
             merge,
             load: None,
+            agent_replay: None,
             prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
             gallery.editors.open(cx);
@@ -297,6 +303,9 @@ impl Gallery {
     fn open_load(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.story == Story::Load && self.load.is_none() {
             self.load = Some(cx.new(|cx| load_story::LoadStory::new(window, cx)));
+        }
+        if self.story == Story::AgentReplay && self.agent_replay.is_none() {
+            self.agent_replay = Some(cx.new(|cx| replay_story::ReplayStory::new(window, cx)));
         }
     }
 
@@ -407,6 +416,7 @@ impl Gallery {
             Story::Review => review_story::element(&self.review),
             Story::PullRequest => pr_story::element(&self.pull_request),
             Story::Load => self.load.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequests => pr_story::pull_requests().into_any_element(),
             Story::Merge => self.merge.clone().into_any_element(),
             Story::Colors => colors(cx).into_any_element(),
