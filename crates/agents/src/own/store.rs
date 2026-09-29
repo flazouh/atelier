@@ -58,6 +58,31 @@ pub fn ensure_dir(project: &dyn Project) -> Result<(), String> {
     }
 }
 
+/// Keeps `.lathe/` out of the repository's `git status`: adds it to the repository's own
+/// `.git/info/exclude`, which is local and never committed. Does nothing when the project is not a git
+/// repository, or the line is there. `true` when it added the line.
+///
+/// Short term. The right place for the record is a data folder outside the repository (see
+/// `docs/agents.md`, "Where the record lives").
+pub fn exclude_from_git(project: &dyn Project) -> Result<bool, String> {
+    let found = project.git(&["rev-parse", "--git-path", "info/exclude"]).map_err(|e| e.to_string())?;
+    let path = found.stdout.trim();
+    if !found.ok() || path.is_empty() {
+        return Ok(false);
+    }
+    // The path is the host's, relative to the project folder or absolute (a worktree shares its main
+    // repository's file), so the shell that writes it runs on the host.
+    let script = "grep -qxF '.lathe/' \"$1\" 2>/dev/null && exit 3; mkdir -p \"$(dirname \"$1\")\" && { [ ! -s \"$1\" ] || [ -z \"$(tail -c1 \"$1\")\" ] || printf '\\n' >> \"$1\"; } && printf '.lathe/\\n' >> \"$1\"";
+    let command = Command::new("sh").args(["-c", script, "sh", path]);
+    let mut process = project.spawn(&command).map_err(|e| e.to_string())?;
+    drop(std::mem::replace(&mut process.stdin, Box::new(std::io::sink())));
+    match process.control.wait() {
+        Ok(Some(0)) => Ok(true),
+        Ok(Some(3)) => Ok(false),
+        _ => Err(process.control.stderr().trim().to_string()),
+    }
+}
+
 /// Writes the whole record. The messages first, then the meta, so a listed session always has its messages.
 pub fn save(project: &dyn Project, meta: &Meta, messages: &[Message]) -> Result<(), String> {
     let mut lines = String::new();

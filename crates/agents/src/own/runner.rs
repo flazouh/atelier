@@ -116,6 +116,7 @@ pub(super) fn open(
         next_block: 0,
         closed: false,
         save_warned: false,
+        dir_made: false,
     };
     thread::Builder::new()
         .name("lathe-own-agent".into())
@@ -138,6 +139,8 @@ struct Runner {
     next_block: u64,
     closed: bool,
     save_warned: bool,
+    /// The record's folder has been made (once a session; making it starts a process).
+    dir_made: bool,
 }
 
 /// How a turn ended, before it is told to the UI.
@@ -200,9 +203,13 @@ impl Runner {
         }
         self.meta.updated = store::now();
         self.meta.model = self.model_id();
-        if !self.save_warned && self.meta.updated > 0 {
-            // The folder is made once; a failure to make it shows up as a failure to save.
-            let _ = store::ensure_dir(self.project.as_ref());
+        if !self.dir_made {
+            // A failure to make the folder shows up as a failure to save, and is tried again.
+            self.dir_made = store::ensure_dir(self.project.as_ref()).is_ok();
+            if self.dir_made {
+                // Not the user's to commit: keep the record out of `git status`.
+                let _ = store::exclude_from_git(self.project.as_ref());
+            }
         }
         if let Err(why) = store::save(self.project.as_ref(), &self.meta, &self.messages)
             && !self.save_warned

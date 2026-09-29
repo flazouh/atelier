@@ -235,7 +235,8 @@ variant, and every backend and the UI keep working because the UI ignores what i
 ## Our own agent
 
 lathe's own agent runs in process. There is no child and no wire format. It is a `Backend` like the
-others, and it is the case the trait was shaped for. It is not built. This is the design.
+others, and it is the case the trait was shaped for. It is built (`crates/agents/src/own`); this is the design,
+and "What is built" below says where the build differs.
 
 ```
 Session::send ──> loop thread ──> model client ──> API (Anthropic, OpenAI-compatible, OpenRouter)
@@ -285,6 +286,91 @@ events, and resume loads the conversation back into the loop.
 returns the same errors. `open` starts the loop thread and returns at once. The fake backend in the tests
 already works this way: no process, events made in the caller's or its own thread.
 
+### What is built
+The module is `lathe_agents::own`. `OwnAgent` is the `Backend` (name `lathe`).
+| File | What it does |
+| --- | --- |
+| `message.rs` | The conversation as blocks (`Text`, `Thinking` with its signature, `Redacted`, `ToolUse`, `ToolResult`), the `Model` trait, `Cancel`, `Secret`, `ModelError`. |
+| `http.rs` | A small HTTP/1.1 client (plain and TLS through rustls). Every wait wakes ten times a second to look at the cancel flag, so an interrupt reaches a stalled model at once and closes the connection. No header of a request is ever in an error. |
+| `sse.rs` | Server-sent events from bytes cut anywhere. |
+| `anthropic.rs` | The Messages API, streaming. Tool use, adaptive thinking (a token budget for Haiku 4.5), and prompt caching. `models()` lists the account's models from `GET /v1/models`. |
+| `openai.rs` | Chat Completions, streaming, for OpenAI, OpenRouter and any server that copies it. Reasoning arrives as `reasoning_content` or `reasoning`. |
+| `tools.rs`, `tools/*` | `read`, `list`, `search`, `edit`, `write`, `shell`. |
+| `permission.rs` | The decision table. |
+| `context.rs` | The context budget. |
+| `store.rs` | The session record, `sessions`, `history`. |
+| `runner.rs` | The loop thread and the `Session` handle. |
+**Keys.** `OwnAgent::from_env()` reads `ANTHROPIC_API_KEY`, then `OPENROUTER_API_KEY`, then `OPENAI_API_KEY`. The
+constructors `anthropic(key)`, `openai(key)` and `openrouter(key)` take a `Secret` from the settings. With no key
+the agent still exists, and `open` says what to set. A `Secret` prints as `***`. The key is sent in one header, is
+never in an event, an error, a log, the record of a session or the repository, and a test checks each.
+**The request.** Three cache breakpoints (the last tool, the system prompt, the end of the conversation), adaptive
+thinking with `display: "summarized"` so the reasoning can be shown, no sampling settings, no forced `tool_choice`,
+no prefill, and `eager_input_streaming` on every tool, so the input of a call streams as it is made (a
+file to write shows up as it is written). The API does not validate such an input, so one that is cut off
+or is not JSON is marked malformed and the model is told. The system prompt holds nothing that changes from call to call, so the cache keeps it. Thinking blocks
+go back signed, as the API needs them in a turn that used a tool. A reply cut off by the token limit, or refused,
+keeps no tool call that has no result.
+**Retry.** A rate limit (429), a server failure (5xx, 529) and a dropped connection are tried again, up to
+`RetryPolicy::max_retries` times (three), after a wait that doubles from a second up to 30 s, or the
+`retry-after` the API gave. Only when nothing of the reply has been shown: a reply that broke halfway is a
+failed turn, not a repeat of text. A refused key, a bad request and a missing model are not retried.
+**Tools and events.** A call emits `ToolStarted` (kind, `Pending`) as the model names it, `ToolInput` and
+`ToolTarget` when its input is whole (before the tool runs), `ToolStatus` `Running`, and `ToolFinished`. `list`
+and `search` are kind `Search`. Paths are checked to be inside the project. `write` makes the folder. `edit` fails
+when the text is missing or appears more than once. `shell` runs `sh -c` with stderr joined to stdout, stops at
+`timeout_secs` (120, at most 600) or an interrupt, kills the command's whole process tree (through the project, so
+it works over SSH), and keeps 256 KiB of output. Results reach the model cut to 30,000 bytes and the UI cut to
+`ToolOutput::MAX_TEXT`.
+**Permissions.** `Ask`: reads run, changes and commands ask. `AcceptEdits` and `Auto`: reads and file changes run,
+commands ask (this agent has no judge of its own, so `Auto` is `AcceptEdits`). `Plan`: reads only; the rest is
+refused with words the model can act on. `Bypass`: all run. "Always allow" adds a rule for the tool for the rest of
+the session (`OwnOptions::allow` starts a session with rules the settings keep). A denied call is a tool error the
+model reads, and the turn goes on. An interrupt while a question waits cancels it.
+**Context.** Past `Budget::limit_tokens` (120,000, estimated at four bytes a token) the oldest tool results, and
+the big strings in old tool inputs (a file that was written), shrink to a note and their first 240 bytes, oldest
+first, until the conversation is under 80% of the limit. The newest eight messages stay whole. The shape of the
+conversation stays. A shortened message changes the cache from that point, so it happens only when the budget
+is passed, and it says so in a `Warning`.
+**Sessions.** The record is kept with the project, through `Project::write`: `.lathe/agent/sessions/<id>.jsonl`
+(one message a line) and `<id>.meta` (title, model, time). `sessions` lists them newest first, `history` maps them
+to events, and resume loads the messages back. An id is letters, digits and dashes, so it is never a path. A save
+that fails warns once and the session goes on. Both files are rewritten whole after each message.
+**Where the record lives.** Now inside the project, in `.lathe/`. That would show in the user's `git status`, so
+the first time a session writes there it adds `.lathe/` to the repository's own `.git/info/exclude` (local,
+never committed; found with `git rev-parse --git-path info/exclude`, so a linked worktree writes the shared
+file). It adds the line once, keeps what was in the file, and does nothing when the project is not a git
+repository. This is a short-term fix. The right place is a data folder outside the repository, on the
+project's host, like the task tracker's database. That needs a method on `Project` (`crates/project`):
+
+    /// A folder for lathe's own data about this project, on the project's host and outside the
+    /// repository, made when first asked for. The same project always gets the same folder. Paths in the
+    /// three calls below are relative to it; `..` and absolute paths are refused, as in `read` and `write`.
+    fn data_read(&self, path: &str) -> io::Result<Vec<u8>>;
+    fn data_write(&self, path: &str, bytes: &[u8]) -> io::Result<()>;
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<Entry>>;   // newest first, with the time
+
+A local project keeps it under the app's data folder (`<data>/projects/<hash of the root>/`); an SSH project
+under `~/.local/share/lathe/projects/<hash of the root>/` on the host, through the same connection. `list`
+would replace the `ls -t` this store runs now. The store then writes `agent/sessions/<id>.jsonl` there, and
+`exclude_from_git` goes away.
+**Interrupt.** `Command::Interrupt` sets a flag that the HTTP read, the retry wait, the permission wait and a
+running command all look at. What streamed before it stays in the conversation as text. A message sent while a
+turn runs waits and runs next.
+**Not built.** Subagents and a todo tool (`Capabilities` says so), a cost in dollars (`Usage::cost_usd` is
+`None`), a persistent "always allow" (the settings keep the list; `OwnOptions::allow` takes it), and tool
+calls run in parallel (they run one after another).
+**To add it to the registry** (`registry.rs` is the app's): one entry in `agents()`,
+`Agent { backend: Arc::new(OwnAgent::from_env()), name: "lathe", mark: None, look: claude::look(), lab: Lab::Anthropic }`.
+`mark: None` gives the monogram. The look is a stand-in until lathe has its own.
+**Tests.** `crates/agents/src/own/tests` play scripted streams from a local HTTP server: text, thinking, one tool,
+several tools, a tool error, permission asked, allowed, denied and always allowed, plan mode, an interrupt in
+a stream, at a question and in a command, a malformed and a truncated stream, a 429 that is retried, a server that
+keeps failing, a refused key, a cut-off reply, a refusal, resume, and a cancelled request. No default test calls a
+real API. `crates/agents/tests/own_live.rs` has two tests that do, ignored:
+`ANTHROPIC_API_KEY=... cargo test -p lathe-agents --test own_live -- --ignored --nocapture --test-threads=1`.
+They use Haiku 4.5 and cost a few cents. `crates/agents/tests/own_perf.rs` measures the numbers in
+`docs/performance.md`.
 ## Performance
 
 Targets and numbers are in `docs/performance.md` ("Agent sessions"). The measurements are
@@ -294,4 +380,4 @@ Targets and numbers are in `docs/performance.md` ("Agent sessions"). The measure
 
 - `Project::spawn` drops stderr, so a crash has no message. The interface needs a way to keep it.
 - `Backend::sessions` and `history` start `sh` on the host. A host with no POSIX shell has no list.
-- The ACP backend and our own agent are designs only.
+- The ACP backend is a design only.
