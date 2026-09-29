@@ -201,7 +201,8 @@ impl PrStory {
         });
         let verdict = cx.new(|cx| VerdictBox::new("f4a97b1c9e2d4f0a", false, window, cx));
         let merge = cx.new(|cx| {
-            let facts = crate::merge_story::states().remove(0).1;
+            // As the checks panel shows: linux-x64 is a required check, and it failed.
+            let facts = beui::merge::MergeFacts { checks_failing: 1, ..crate::merge_story::states().remove(0).1 };
             let choice = beui::merge::first_choice(&facts, None);
             beui::MergeBox::new(facts, choice, COMMITS[0], PR_BODY, window, cx)
         });
