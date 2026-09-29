@@ -1,6 +1,6 @@
 [package]
 name = "lathe-agents"
-description = "Each agent's look for beui: Claude's spark, colours, and wording."
+description = "Agents in lathe: their session model and backends, and each one's look for beui: Claude's spark, colours, and wording."
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
@@ -8,3 +8,9 @@ publish.workspace = true
 [dependencies]
 gpui-kit.workspace = true
 beui.workspace = true
+lathe-project.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

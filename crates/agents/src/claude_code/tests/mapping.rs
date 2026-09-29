@@ -1,0 +1,317 @@
+use std::time::{Duration, Instant};
+
+use serde_json::json;
+
+use super::{fixture, replay, replay_with};
+use crate::{
+    claude_code::Mapper,
+    session::{
+        ChoiceKind, EndReason, Event, RequestId, ToolId, ToolKind, ToolOutput, TodoStatus, TurnOutcome,
+    },
+};
+
+fn text_of(events: &[Event]) -> String {
+    events.iter().filter_map(|e| if let Event::Text { delta, .. } = e { Some(delta.as_str()) } else { None }).collect()
+}
+
+fn tool_named(events: &[Event], name: &str) -> crate::session::ToolCall {
+    events
+        .iter()
+        .find_map(|e| match e {
+            Event::ToolStarted(call) if call.name == name => Some(call.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("no {name} call"))
+}
+
+#[test]
+fn a_plain_turn_streams_its_text_once_and_ends_completed() {
+    let events = replay("plain");
+    let Event::Started(started) = &events[0] else { panic!("the first event is {:?}", events[0]) };
+    assert!(!started.session.as_str().is_empty());
+    assert_eq!(text_of(&events), "ok", "the finished message must not repeat the streamed text");
+    assert!(events.iter().all(|e| !matches!(e, Event::Warning(_))));
+    assert!(events.iter().any(|e| matches!(e, Event::Usage(u) if u.output_tokens > 0 && u.cost_usd.is_some())));
+    let Some(Event::TurnEnded(end)) = events.last() else { panic!("the last event is {:?}", events.last()) };
+    assert_eq!(end.outcome, TurnOutcome::Completed);
+    assert_eq!(end.summary.as_deref(), Some("ok"));
+}
+
+#[test]
+fn thinking_streams_from_its_start_and_ends_with_its_time() {
+    let events = replay("tool_read");
+    let block = events.iter().find_map(|e| if let Event::Thinking { block, .. } = e { Some(*block) } else { None });
+    let block = block.expect("the run thinks");
+    let took = events.iter().find_map(|e| match e {
+        Event::ThinkingDone { block: done, took } if *done == block => Some(*took),
+        _ => None,
+    });
+    assert!(took.is_some_and(|t| t > Duration::ZERO), "thinking has a time: {took:?}");
+}
+
+#[test]
+fn a_thinking_block_reports_the_time_between_its_start_and_its_stop() {
+    let mut mapper = Mapper::new();
+    let start = Instant::now();
+    let start_line = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}}"#;
+    let stop_line = r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#;
+    mapper.line(start_line, start);
+    let events = mapper.line(stop_line, start + Duration::from_millis(1500));
+    assert!(matches!(events.as_slice(), [Event::ThinkingDone { took, .. }] if *took == Duration::from_millis(1500)));
+}
+
+#[test]
+fn a_tool_call_starts_gets_its_input_and_finishes_with_its_output() {
+    let events = replay("tool_read");
+    let call = tool_named(&events, "Bash");
+    assert_eq!(call.kind, ToolKind::Shell);
+    let input = events.iter().find_map(|e| match e {
+        Event::ToolInput { id, input } if *id == call.id => Some(input.clone()),
+        _ => None,
+    });
+    assert!(input.expect("the whole input arrives")["command"].as_str().unwrap().contains("note.txt"));
+    let output = events.iter().find_map(|e| match e {
+        Event::ToolFinished { id, output } if *id == call.id => Some(output.clone()),
+        _ => None,
+    });
+    let output = output.expect("the call finishes");
+    assert!(output.text.contains("hello") && !output.is_error);
+}
+
+#[test]
+fn a_permission_request_names_the_tool_its_file_and_its_choices() {
+    let mut mapper = Mapper::new();
+    let events = replay_with(&mut mapper, &fixture("permission_allow"));
+    let request = events
+        .iter()
+        .find_map(|e| if let Event::Permission(request) = e { Some(request.clone()) } else { None })
+        .expect("a permission request");
+    assert_eq!(request.call.name, "Write");
+    assert_eq!(request.call.kind, ToolKind::Write);
+    assert_eq!(request.call.file.as_deref(), Some("/work/made.txt"));
+    assert_eq!(request.call.input["content"], "hi");
+    let kinds: Vec<_> = request.choices.iter().map(|c| c.kind).collect();
+    assert!(kinds.contains(&ChoiceKind::Allow) && kinds.contains(&ChoiceKind::Deny));
+}
+
+#[test]
+fn an_answer_is_written_once_and_only_for_a_request_that_waits() {
+    let mut mapper = Mapper::new();
+    let events = replay_with(&mut mapper, &fixture("permission_allow"));
+    let Some(Event::Permission(request)) = events.iter().find(|e| matches!(e, Event::Permission(_))) else {
+        panic!("no request")
+    };
+    let allow = request.choices.iter().find(|c| c.kind == ChoiceKind::Allow).unwrap().id.clone();
+    // The captured run finished its turn, which withdraws what nobody answered.
+    assert!(mapper.answer(&request.id, &allow).is_none());
+    assert!(events.iter().any(|e| matches!(e, Event::PermissionCancelled(id) if *id == request.id)));
+}
+
+#[test]
+fn allow_and_deny_answer_with_the_input_and_a_message() {
+    let mut mapper = Mapper::new();
+    let ask = r#"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"ls"},"tool_use_id":"t1"}}"#;
+    let events = mapper.line(ask, Instant::now());
+    let Event::Permission(request) = &events[0] else { panic!("no request") };
+    assert_eq!(request.call.id, ToolId::new("t1"));
+    let line = mapper.answer(&request.id, &request.choices[0].id).expect("the request waits");
+    let value: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(value["response"]["request_id"], "r1");
+    assert_eq!(value["response"]["response"]["behavior"], "allow");
+    assert_eq!(value["response"]["response"]["updatedInput"]["command"], "ls");
+
+    let events = mapper.line(&ask.replace("r1", "r2"), Instant::now());
+    let Event::Permission(request) = &events[0] else { panic!("no request") };
+    let deny = request.choices.iter().find(|c| c.kind == ChoiceKind::Deny).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&mapper.answer(&request.id, &deny.id).unwrap()).unwrap();
+    assert_eq!(value["response"]["response"]["behavior"], "deny");
+    assert!(value["response"]["response"]["message"].as_str().is_some_and(|m| !m.is_empty()));
+}
+
+#[test]
+fn always_allow_is_offered_only_with_rules_and_sends_them_back() {
+    let mut mapper = Mapper::new();
+    let rules = json!([{"type": "addRules", "rules": [{"toolName": "Bash"}], "behavior": "allow"}]);
+    let ask = json!({"type": "control_request", "request_id": "r1", "request": {
+        "subtype": "can_use_tool", "tool_name": "Bash", "input": {}, "permission_suggestions": rules}});
+    let events = mapper.line(&ask.to_string(), Instant::now());
+    let Event::Permission(request) = &events[0] else { panic!("no request") };
+    let always = request.choices.iter().find(|c| c.kind == ChoiceKind::AllowAlways).expect("always allow");
+    let value: serde_json::Value = serde_json::from_str(&mapper.answer(&request.id, &always.id).unwrap()).unwrap();
+    assert_eq!(value["response"]["response"]["updatedPermissions"], rules);
+}
+
+#[test]
+fn a_denied_tool_finishes_as_an_error_and_the_turn_still_completes() {
+    let events = replay("permission_deny");
+    let call = tool_named(&events, "Write");
+    let output = events.iter().find_map(|e| match e {
+        Event::ToolFinished { id, output } if *id == call.id => Some(output.clone()),
+        _ => None,
+    });
+    assert!(output.expect("the call finishes").is_error);
+    assert!(matches!(events.last(), Some(Event::TurnEnded(end)) if end.outcome == TurnOutcome::Completed));
+}
+
+#[test]
+fn an_interrupt_during_a_tool_fails_the_tool_and_ends_the_turn_interrupted() {
+    let events = replay("permission_interrupt");
+    let call = tool_named(&events, "Write");
+    let finished = events.iter().position(|e| matches!(e, Event::ToolFinished { id, output } if *id == call.id && output.is_error));
+    let ended = events.iter().position(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Interrupted));
+    assert!(finished.is_some() && ended.is_some(), "{events:#?}");
+    assert!(finished < ended, "the tool fails before the turn ends");
+    assert!(events.iter().all(|e| !matches!(e, Event::UserMessage { .. })), "the interrupt note is not a user message");
+}
+
+#[test]
+fn the_task_tools_build_the_todo_list() {
+    let events = replay("task_list");
+    let lists: Vec<_> = events.iter().filter_map(|e| if let Event::Todos(list) = e { Some(list.clone()) } else { None }).collect();
+    let last = lists.last().expect("todo lists");
+    let seen: Vec<_> = last.iter().map(|t| (t.text.as_str(), t.status)).collect();
+    assert_eq!(seen, [("one", TodoStatus::Done), ("two", TodoStatus::InProgress)]);
+    assert!(events.iter().all(|e| !matches!(e, Event::ToolStarted(c) if c.name.starts_with("Task"))));
+}
+
+#[test]
+fn todo_write_replaces_the_whole_list() {
+    let mut mapper = Mapper::new();
+    let call = json!({"type": "assistant", "message": {"id": "m", "content": [{"type": "tool_use", "id": "t", "name": "TodoWrite",
+        "input": {"todos": [{"content": "a", "status": "completed"}, {"content": "b", "status": "pending"}]}}]}});
+    let events = mapper.line(&call.to_string(), Instant::now());
+    let [Event::Todos(list)] = events.as_slice() else { panic!("{events:?}") };
+    assert_eq!((list[0].status, list[1].status), (TodoStatus::Done, TodoStatus::Pending));
+}
+
+#[test]
+fn a_foreground_subagent_starts_reports_progress_and_ends_with_its_calls_under_it() {
+    let events = replay("subagent_foreground");
+    let started = events.iter().find_map(|e| if let Event::SubagentStarted(s) = e { Some(s.clone()) } else { None }).expect("a subagent");
+    assert_eq!(started.kind.as_deref(), Some("general-purpose"));
+    assert!(started.task.contains("note.txt"));
+    assert!(events.iter().any(|e| matches!(e, Event::SubagentProgress { id, .. } if *id == started.id)));
+    let read = tool_named(&events, "Read");
+    assert_eq!(read.parent.as_ref(), Some(&started.id));
+    assert!(events.iter().any(|e| matches!(e, Event::SubagentEnded { id, ok: true, .. } if *id == started.id)));
+    assert!(events.iter().all(|e| !matches!(e, Event::ToolStarted(c) if c.name == "Agent")));
+    assert_eq!(events.iter().filter(|e| matches!(e, Event::SubagentStarted(_))).count(), 1);
+}
+
+#[test]
+fn a_background_subagent_is_told_once_and_the_turn_can_end_before_it() {
+    let events = replay("subagent_background");
+    assert_eq!(events.iter().filter(|e| matches!(e, Event::SubagentStarted(_))).count(), 1);
+    assert!(matches!(events.last(), Some(Event::TurnEnded(_))));
+}
+
+#[test]
+fn a_saved_output_passes_on_its_preview_and_its_path() {
+    let events = replay("long_output");
+    let output: ToolOutput = events
+        .iter()
+        .find_map(|e| if let Event::ToolFinished { output, .. } = e { Some(output.clone()) } else { None })
+        .expect("the call finishes");
+    assert!(output.truncated);
+    assert!(output.full_at.as_deref().is_some_and(|p| p.contains(".claude/projects/")));
+    assert!(output.text.starts_with("1\n2\n3") && !output.text.contains("persisted-output"));
+}
+
+#[test]
+fn a_ten_megabyte_result_keeps_a_head_and_says_it_was_cut() {
+    let mut mapper = Mapper::new();
+    let call = json!({"type": "assistant", "message": {"id": "m", "content": [{"type": "tool_use", "id": "t", "name": "Read", "input": {}}]}});
+    mapper.line(&call.to_string(), Instant::now());
+    let big = "é".repeat(5 * 1024 * 1024);
+    let result = json!({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t", "content": big}]}});
+    let events = mapper.line(&result.to_string(), Instant::now());
+    let [Event::ToolFinished { output, .. }] = events.as_slice() else { panic!("{}", events.len()) };
+    assert!(output.truncated && output.text.len() <= ToolOutput::MAX_TEXT);
+    assert!(output.text.chars().all(|c| c == 'é'), "the cut is on a character boundary");
+}
+
+#[test]
+fn a_line_that_is_not_json_or_is_cut_short_is_a_warning_and_the_stream_goes_on() {
+    let mut mapper = Mapper::new();
+    for bad in ["not json at all", "{", r#"{"type":"assistant","message":"#, r#"{"type":"assistant","message":5}"#] {
+        let events = mapper.line(bad, Instant::now());
+        assert!(matches!(events.as_slice(), [Event::Warning(_)]), "{bad}: {events:?}");
+    }
+    let after = mapper.line(r#"{"type":"system","subtype":"init","session_id":"s"}"#, Instant::now());
+    assert!(matches!(after.as_slice(), [Event::Started(_)]));
+}
+
+#[test]
+fn blank_lines_and_kinds_lathe_does_not_know_give_nothing() {
+    let mut mapper = Mapper::new();
+    for line in ["", "   ", r#"{"type":"rate_limit_event"}"#, r#"{"type":"something_new","x":1}"#, r#"{"type":"system","subtype":"status"}"#] {
+        assert!(mapper.line(line, Instant::now()).is_empty(), "{line}");
+    }
+}
+
+#[test]
+fn a_crash_mid_turn_fails_the_open_tool_and_the_turn_then_ends_the_session() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent();
+    let start = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t9","name":"Bash","input":{}}}}"#;
+    assert!(matches!(mapper.line(start, Instant::now()).as_slice(), [Event::ToolStarted(_)]));
+    let events = mapper.finish(Some(3), false);
+    let [Event::ToolFinished { id, output }, Event::TurnEnded(end), Event::Ended(reason)] = events.as_slice() else {
+        panic!("{events:#?}")
+    };
+    assert_eq!(id.as_str(), "t9");
+    assert!(output.is_error && output.text.contains("code 3"));
+    assert!(matches!(&end.outcome, TurnOutcome::Failed(why) if why.contains("code 3")));
+    assert_eq!(*reason, EndReason::Exited(Some(3)));
+}
+
+#[test]
+fn a_crash_with_no_turn_open_only_ends_the_session() {
+    assert_eq!(Mapper::new().finish(None, false), [Event::Ended(EndReason::Exited(None))]);
+}
+
+#[test]
+fn a_session_lathe_closed_ends_closed_and_fails_nothing() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent();
+    assert_eq!(mapper.finish(None, true), [Event::Ended(EndReason::Closed)]);
+}
+
+#[test]
+fn a_session_ends_once() {
+    let mut mapper = Mapper::new();
+    assert_eq!(mapper.finish(Some(0), false).len(), 1);
+    assert!(mapper.finish(None, true).is_empty());
+}
+
+#[test]
+fn a_permission_question_left_open_by_a_crash_is_cancelled() {
+    let mut mapper = Mapper::new();
+    let ask = r#"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{}}}"#;
+    mapper.line(ask, Instant::now());
+    let events = mapper.finish(Some(1), false);
+    assert!(events.contains(&Event::PermissionCancelled(RequestId::new("r1"))));
+}
+
+#[test]
+fn a_transcript_shows_history_with_no_streaming() {
+    let transcript = [
+        json!({"type": "summary", "summary": "x"}),
+        json!({"type": "user", "message": {"role": "user", "content": "fix the bug"}}),
+        json!({"type": "assistant", "message": {"id": "m1", "content": [
+            {"type": "text", "text": "Looking."}, {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "/a.rs"}}]}}),
+        json!({"type": "user", "toolUseResult": {"x": 1}, "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "fn main() {}"}]}}),
+        json!({"type": "user", "isMeta": true, "message": {"role": "user", "content": "a hidden note"}}),
+        json!({"type": "assistant", "isSidechain": true, "message": {"id": "m2", "content": [{"type": "text", "text": "subagent chatter"}]}}),
+        json!({"type": "assistant", "message": {"id": "m3", "content": [{"type": "text", "text": "Done."}]}}),
+    ]
+    .map(|line| line.to_string())
+    .join("\n");
+    let events = crate::claude_code::history(&transcript);
+    assert!(matches!(&events[0], Event::UserMessage { text } if text == "fix the bug"));
+    assert_eq!(text_of(&events), "Looking.Done.");
+    let call = tool_named(&events, "Read");
+    assert_eq!(call.file.as_deref(), Some("/a.rs"));
+    assert!(events.iter().any(|e| matches!(e, Event::ToolFinished { id, output } if *id == call.id && output.text == "fn main() {}")));
+    assert_eq!(events.len(), 5, "{events:#?}");
+}

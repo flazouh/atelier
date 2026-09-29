@@ -1,0 +1,484 @@
+//! `claude`'s lines to lathe's events. The mapper keeps what one session needs between lines: which
+//! blocks stream, which tools run, the todo list, the questions waiting for an answer. It reads no
+//! clock and touches no process: the caller passes the time with each line.
+use std::{
+    collections::{HashMap, HashSet},
+    time::{Duration, Instant},
+};
+
+use serde_json::Value;
+
+use super::{
+    control::{self, mode_from_name},
+    tools,
+    wire::{Block, CanUseTool, Content, ControlBody, ControlRequest, Delta, Finish, Line, Message, Stream, StreamEvent, System},
+};
+use crate::session::{
+    BlockId, Choice, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started,
+    Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage,
+};
+
+pub(super) const ALLOW: &str = "allow";
+pub(super) const ALLOW_ALWAYS: &str = "allow_always";
+pub(super) const DENY: &str = "deny";
+
+enum Open {
+    Text(BlockId),
+    Thinking(BlockId, Instant),
+    /// A tool block whose call the mapper announces from the finished message, not the stream.
+    Tool,
+}
+
+/// A question `claude` asked and lathe has not answered.
+struct Asked {
+    input: Value,
+    suggestions: Option<Value>,
+}
+
+#[derive(Default)]
+pub struct Mapper {
+    next_block: u64,
+    /// Messages that streamed: their finished copy repeats what the deltas already said.
+    streamed: HashSet<String>,
+    open: HashMap<u32, Open>,
+    /// Calls announced and not finished.
+    running: HashSet<ToolId>,
+    /// Calls whose result lathe swallows: todo edits and subagent starts.
+    hidden: HashSet<ToolId>,
+    subagents: HashSet<ToolId>,
+    todos: Vec<Todo>,
+    /// `TaskCreate` calls waiting for the id the result gives the task.
+    creating: HashMap<ToolId, String>,
+    asked: HashMap<RequestId, Asked>,
+    turn_open: bool,
+    ended: bool,
+}
+
+impl Mapper {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// lathe sent a user message: a turn is open until `claude` reports its result.
+    pub fn user_sent(&mut self) {
+        self.turn_open = true;
+    }
+
+    /// Reads one line of `claude`'s stdout. A line that is not JSON gives a warning; a line of a
+    /// kind lathe does not know gives nothing.
+    pub fn line(&mut self, line: &str, now: Instant) -> Vec<Event> {
+        let line = line.trim();
+        if line.is_empty() {
+            return Vec::new();
+        }
+        match serde_json::from_str::<Line>(line) {
+            Ok(parsed) => self.parsed(parsed, now),
+            Err(error) => vec![Event::Warning(format!("a line from the agent did not parse: {error}"))],
+        }
+    }
+
+    fn parsed(&mut self, line: Line, now: Instant) -> Vec<Event> {
+        match line {
+            Line::System(system) => self.system(system),
+            Line::StreamEvent(stream) => self.stream(stream, now),
+            Line::Assistant(message) => self.assistant(message),
+            Line::User(message) => self.user(message),
+            Line::Finished(finish) => self.finished(finish),
+            Line::ControlRequest(request) => self.control_request(request),
+            Line::ControlCancelRequest { request_id } => {
+                let id = RequestId::new(request_id);
+                if self.asked.remove(&id).is_some() { vec![Event::PermissionCancelled(id)] } else { Vec::new() }
+            }
+            Line::Ignored => Vec::new(),
+        }
+    }
+
+    /// The line to write for a permission answer, or `None` when the request is unknown or already
+    /// answered.
+    pub fn answer(&mut self, request: &RequestId, choice: &ChoiceId) -> Option<String> {
+        let asked = self.asked.remove(request)?;
+        Some(match choice.as_str() {
+            ALLOW => control::allow(request.as_str(), &asked.input, None),
+            ALLOW_ALWAYS => control::allow(request.as_str(), &asked.input, asked.suggestions.as_ref()),
+            _ => control::deny(request.as_str()),
+        })
+    }
+
+    /// The events for the end of the stream: `exited` is the process's exit code. A turn or a tool
+    /// still open fails, so the UI never waits for an agent that is gone. A second call gives nothing:
+    /// a session ends once.
+    pub fn finish(&mut self, exited: Option<i32>, closed_by_lathe: bool) -> Vec<Event> {
+        if std::mem::replace(&mut self.ended, true) {
+            return Vec::new();
+        }
+        let mut events = Vec::new();
+        if !closed_by_lathe {
+            let why = match exited {
+                Some(code) => format!("the agent exited with code {code}"),
+                None => "the agent was stopped by a signal".to_string(),
+            };
+            events.extend(self.fail_open_tools(&why));
+            events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
+            let mut open: Vec<_> = self.subagents.drain().collect();
+            open.sort();
+            events.extend(open.into_iter().map(|id| Event::SubagentEnded { id, ok: false, summary: Some(why.clone()) }));
+            if std::mem::take(&mut self.turn_open) {
+                events.push(Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed(why), summary: None }));
+            }
+        }
+        events.push(Event::Ended(if closed_by_lathe { EndReason::Closed } else { EndReason::Exited(exited) }));
+        events
+    }
+
+    fn system(&mut self, system: System) -> Vec<Event> {
+        match system.subtype.as_str() {
+            "init" => match system.session_id {
+                Some(id) => vec![Event::Started(Started {
+                    session: SessionId::new(id),
+                    model: system.model,
+                    mode: system.permission_mode.as_deref().and_then(mode_from_name),
+                })],
+                None => Vec::new(),
+            },
+            "task_started" => {
+                let Some(id) = system.tool_use_id.map(ToolId::new) else { return Vec::new() };
+                if self.subagents.insert(id.clone()) {
+                    self.hidden.insert(id.clone());
+                    let subagent = Subagent {
+                        id,
+                        task: system.description.unwrap_or_default(),
+                        kind: system.subagent_type,
+                        model: None,
+                    };
+                    return vec![Event::SubagentStarted(subagent)];
+                }
+                Vec::new()
+            }
+            "task_progress" => match (system.tool_use_id, system.description) {
+                (Some(id), Some(activity)) => vec![Event::SubagentProgress { id: ToolId::new(id), activity }],
+                _ => Vec::new(),
+            },
+            "task_notification" => {
+                let Some(id) = system.tool_use_id.map(ToolId::new) else { return Vec::new() };
+                self.subagents.remove(&id);
+                vec![Event::SubagentEnded { id, ok: system.status.as_deref() == Some("completed"), summary: system.summary }]
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    fn stream(&mut self, stream: Stream, now: Instant) -> Vec<Event> {
+        let parent = stream.parent_tool_use_id.map(ToolId::new);
+        match stream.event {
+            StreamEvent::MessageStart { message } => {
+                self.streamed.insert(message.id);
+                Vec::new()
+            }
+            StreamEvent::ContentBlockStart { index, content_block } => match content_block {
+                Block::Text { text } => {
+                    let block = self.new_block();
+                    self.open.insert(index, Open::Text(block));
+                    if text.is_empty() { Vec::new() } else { vec![Event::Text { block, delta: text }] }
+                }
+                Block::Thinking { thinking } => {
+                    let block = self.new_block();
+                    self.open.insert(index, Open::Thinking(block, now));
+                    vec![Event::Thinking { block, delta: thinking }]
+                }
+                Block::ToolUse { id, name, .. } => {
+                    self.open.insert(index, Open::Tool);
+                    if tools::starts_subagent(&name) || tools::edits_todos(&name) {
+                        return Vec::new();
+                    }
+                    self.announce(ToolId::new(id), name, Value::Null, parent)
+                }
+                Block::ToolResult { .. } | Block::Other => Vec::new(),
+            },
+            StreamEvent::ContentBlockDelta { index, delta } => match (self.open.get(&index), delta) {
+                (Some(Open::Text(block)), Delta::Text { text }) if !text.is_empty() => {
+                    vec![Event::Text { block: *block, delta: text }]
+                }
+                (Some(Open::Thinking(block, _)), Delta::Thinking { thinking }) if !thinking.is_empty() => {
+                    vec![Event::Thinking { block: *block, delta: thinking }]
+                }
+                _ => Vec::new(),
+            },
+            StreamEvent::ContentBlockStop { index } => match self.open.remove(&index) {
+                Some(Open::Thinking(block, since)) => {
+                    vec![Event::ThinkingDone { block, took: now.saturating_duration_since(since) }]
+                }
+                _ => Vec::new(),
+            },
+            StreamEvent::Other => Vec::new(),
+        }
+    }
+
+    /// A finished assistant message: what streamed is already told, what did not stream is told now,
+    /// and every tool call gets its whole input.
+    fn assistant(&mut self, message: Message) -> Vec<Event> {
+        if message.sidechain {
+            return Vec::new();
+        }
+        let parent = message.parent_tool_use_id.map(ToolId::new);
+        let streamed = message.message.id.as_ref().is_some_and(|id| self.streamed.contains(id));
+        let Content::Blocks(blocks) = message.message.content else { return Vec::new() };
+        let mut events = Vec::new();
+        for block in blocks {
+            match block {
+                Block::Text { text } if !streamed && !text.is_empty() => {
+                    let block = self.new_block();
+                    events.push(Event::Text { block, delta: text });
+                }
+                Block::Thinking { thinking } if !streamed && !thinking.is_empty() => {
+                    let block = self.new_block();
+                    events.push(Event::Thinking { block, delta: thinking });
+                    events.push(Event::ThinkingDone { block, took: Duration::ZERO });
+                }
+                Block::ToolUse { id, name, input } => {
+                    events.extend(self.tool_use(ToolId::new(id), name, input, parent.clone()));
+                }
+                _ => {}
+            }
+        }
+        events
+    }
+
+    fn user(&mut self, message: Message) -> Vec<Event> {
+        if message.sidechain || message.meta {
+            return Vec::new();
+        }
+        let mut result = message.tool_use_result;
+        match message.message.content {
+            Content::Text(text) => self.user_text(text, message.parent_tool_use_id.is_some()),
+            Content::Blocks(blocks) => {
+                let mut events = Vec::new();
+                for block in blocks {
+                    match block {
+                        Block::ToolResult { tool_use_id, content, is_error } => {
+                            events.extend(self.tool_result(ToolId::new(tool_use_id), &content, is_error, result.take()));
+                        }
+                        Block::Text { text } => events.extend(self.user_text(text, message.parent_tool_use_id.is_some())),
+                        _ => {}
+                    }
+                }
+                events
+            }
+        }
+    }
+
+    /// A user message that did not come from lathe: history. `claude` also writes a line for an
+    /// interrupt and for a subagent's prompt; neither is something the user said.
+    fn user_text(&mut self, text: String, from_subagent: bool) -> Vec<Event> {
+        if from_subagent || text.starts_with("[Request interrupted") || text.trim().is_empty() {
+            return Vec::new();
+        }
+        vec![Event::UserMessage { text }]
+    }
+
+    fn finished(&mut self, finish: Finish) -> Vec<Event> {
+        let interrupted = matches!(finish.terminal_reason.as_deref(), Some("aborted_tools" | "aborted_streaming"));
+        let outcome = if interrupted {
+            TurnOutcome::Interrupted
+        } else if finish.subtype == "success" && !finish.is_error {
+            TurnOutcome::Completed
+        } else {
+            let why = if finish.errors.is_empty() { finish.result.clone().unwrap_or(finish.subtype) } else { finish.errors.join("; ") };
+            TurnOutcome::Failed(why)
+        };
+        self.turn_open = false;
+        let mut events = self.fail_open_tools("the turn ended before the tool finished");
+        events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
+        if let Some(usage) = finish.usage {
+            events.push(Event::Usage(Usage {
+                input_tokens: usage.input_tokens,
+                output_tokens: usage.output_tokens,
+                cache_read_tokens: usage.cache_read_input_tokens,
+                cache_write_tokens: usage.cache_creation_input_tokens,
+                cost_usd: finish.total_cost_usd,
+            }));
+        }
+        events.push(Event::TurnEnded(TurnEnd { outcome, summary: finish.result.filter(|text| !text.is_empty()) }));
+        events
+    }
+
+    fn control_request(&mut self, request: ControlRequest) -> Vec<Event> {
+        let ControlBody::CanUseTool(ask) = request.request else { return Vec::new() };
+        let CanUseTool { tool_name, input, tool_use_id, description, permission_suggestions } = *ask;
+        let id = RequestId::new(request.request_id);
+        let has_rules = permission_suggestions.as_ref().is_some_and(|rules| rules.as_array().is_none_or(|a| !a.is_empty()));
+        let mut choices = vec![Choice { id: ChoiceId::new(ALLOW), label: "Allow".into(), kind: ChoiceKind::Allow }];
+        if has_rules {
+            choices.push(Choice { id: ChoiceId::new(ALLOW_ALWAYS), label: "Always allow".into(), kind: ChoiceKind::AllowAlways });
+        }
+        choices.push(Choice { id: ChoiceId::new(DENY), label: "Deny".into(), kind: ChoiceKind::Deny });
+        let call = ToolCall {
+            id: ToolId::new(tool_use_id.unwrap_or_else(|| id.as_str().to_string())),
+            kind: tools::kind(&tool_name),
+            file: tools::file(&input),
+            name: tool_name,
+            input: input.clone(),
+            parent: None,
+            status: ToolStatus::Pending,
+        };
+        self.asked.insert(id.clone(), Asked { input, suggestions: permission_suggestions.filter(|_| has_rules) });
+        vec![Event::Permission(PermissionRequest { id, call, reason: description.filter(|d| !d.is_empty()), choices })]
+    }
+
+    fn new_block(&mut self) -> BlockId {
+        self.next_block += 1;
+        BlockId(self.next_block)
+    }
+
+    fn announce(&mut self, id: ToolId, name: String, input: Value, parent: Option<ToolId>) -> Vec<Event> {
+        self.running.insert(id.clone());
+        vec![Event::ToolStarted(ToolCall {
+            id,
+            kind: tools::kind(&name),
+            file: tools::file(&input),
+            name,
+            input,
+            parent,
+            status: ToolStatus::Running,
+        })]
+    }
+
+    /// A tool call with its whole input, from a finished message.
+    fn tool_use(&mut self, id: ToolId, name: String, input: Value, parent: Option<ToolId>) -> Vec<Event> {
+        if tools::starts_subagent(&name) {
+            self.hidden.insert(id.clone());
+            if !self.subagents.insert(id.clone()) {
+                return Vec::new();
+            }
+            let text = |key: &str| input.get(key).and_then(Value::as_str).map(str::to_string);
+            let task = text("description").or_else(|| text("prompt")).unwrap_or_default();
+            return vec![Event::SubagentStarted(Subagent { id, task, kind: text("subagent_type"), model: text("model") })];
+        }
+        if tools::edits_todos(&name) {
+            self.hidden.insert(id.clone());
+            return self.edit_todos(id, &name, &input);
+        }
+        if self.running.contains(&id) {
+            return vec![Event::ToolInput { id, input }];
+        }
+        self.announce(id, name, input, parent)
+    }
+
+    fn edit_todos(&mut self, id: ToolId, name: &str, input: &Value) -> Vec<Event> {
+        let text = |value: &Value, key: &str| value.get(key).and_then(Value::as_str).map(str::to_string);
+        match name {
+            "TodoWrite" => {
+                let items = input.get("todos").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
+                self.todos = items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, item)| Todo {
+                        id: (i + 1).to_string(),
+                        text: text(item, "content").unwrap_or_default(),
+                        status: todo_status(text(item, "status").as_deref()),
+                    })
+                    .collect();
+                vec![Event::Todos(self.todos.clone())]
+            }
+            "TaskCreate" => {
+                self.creating.insert(id, text(input, "subject").unwrap_or_default());
+                Vec::new()
+            }
+            _ => {
+                let Some(task) = text(input, "taskId") else { return Vec::new() };
+                if text(input, "status").as_deref() == Some("deleted") {
+                    self.todos.retain(|todo| todo.id != task);
+                } else if let Some(todo) = self.todos.iter_mut().find(|todo| todo.id == task) {
+                    if let Some(status) = text(input, "status") {
+                        todo.status = todo_status(Some(&status));
+                    }
+                    if let Some(subject) = text(input, "subject") {
+                        todo.text = subject;
+                    }
+                }
+                vec![Event::Todos(self.todos.clone())]
+            }
+        }
+    }
+
+    fn tool_result(&mut self, id: ToolId, content: &Value, is_error: bool, detail: Option<Value>) -> Vec<Event> {
+        if let Some(subject) = self.creating.remove(&id) {
+            self.hidden.remove(&id);
+            let task = detail.as_ref().and_then(|d| d.get("task")?.get("id")?.as_str().map(str::to_string));
+            let task = task.or_else(|| task_number(&flatten(content)));
+            if is_error || task.is_none() {
+                return Vec::new();
+            }
+            self.todos.push(Todo { id: task.unwrap_or_default(), text: subject, status: TodoStatus::Pending });
+            return vec![Event::Todos(self.todos.clone())];
+        }
+        if self.hidden.remove(&id) || !self.running.remove(&id) {
+            return Vec::new();
+        }
+        vec![Event::ToolFinished { id, output: tool_output(&flatten(content), is_error) }]
+    }
+
+    fn fail_open_tools(&mut self, why: &str) -> Vec<Event> {
+        let mut open: Vec<_> = self.running.drain().collect();
+        open.sort();
+        open.into_iter()
+            .map(|id| Event::ToolFinished {
+                id,
+                output: ToolOutput { text: why.to_string(), is_error: true, truncated: false, full_at: None },
+            })
+            .collect()
+    }
+}
+
+fn todo_status(status: Option<&str>) -> TodoStatus {
+    match status {
+        Some("in_progress") => TodoStatus::InProgress,
+        Some("completed") => TodoStatus::Done,
+        _ => TodoStatus::Pending,
+    }
+}
+
+/// `Task #3 created successfully` gives `3`.
+fn task_number(text: &str) -> Option<String> {
+    let digits: String = text.split("#").nth(1)?.chars().take_while(char::is_ascii_digit).collect();
+    (!digits.is_empty()).then_some(digits)
+}
+
+/// A tool result's text: a string, or the text blocks of a list.
+fn flatten(content: &Value) -> String {
+    match content {
+        Value::String(text) => text.clone(),
+        Value::Array(blocks) => blocks
+            .iter()
+            .filter_map(|block| block.get("text")?.as_str())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
+}
+
+/// `claude` keeps an output it finds too large in a file and puts a preview and the path in the
+/// result. lathe passes both on. An output that is large and not kept is cut to its head.
+fn tool_output(text: &str, is_error: bool) -> ToolOutput {
+    const OPEN: &str = "<persisted-output>";
+    const SAVED: &str = "Full output saved to: ";
+    const PREVIEW: &str = "Preview";
+    if let Some(body) = text.strip_prefix(OPEN) {
+        let full_at = body.split_once(SAVED).and_then(|(_, rest)| rest.lines().next()).map(str::to_string);
+        let preview = body
+            .split_once(PREVIEW)
+            .and_then(|(_, rest)| rest.split_once('\n'))
+            .map_or("", |(_, preview)| preview.trim_end().trim_end_matches("</persisted-output>").trim_end_matches("...").trim_end());
+        return ToolOutput { text: head(preview).0, is_error, truncated: true, full_at };
+    }
+    let (text, truncated) = head(text);
+    ToolOutput { text, is_error, truncated, full_at: None }
+}
+
+/// At most [`ToolOutput::MAX_TEXT`] bytes of `text`, cut on a character boundary.
+fn head(text: &str) -> (String, bool) {
+    if text.len() <= ToolOutput::MAX_TEXT {
+        return (text.to_string(), false);
+    }
+    let cut = (0..=ToolOutput::MAX_TEXT).rev().find(|i| text.is_char_boundary(*i)).unwrap_or(0);
+    (text[..cut].to_string(), true)
+}
