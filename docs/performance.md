@@ -387,6 +387,15 @@ the target of 200 ms holds in the test; the story run, on a machine at load aver
 four times as long for the same work. The window shows the saved read (header, checks, conversation, tree
 from the forge's file list) before git answers.
 
+The Mac row is alex-9c's run (M4 Pro, release, `PRV_BIG=1`, 300 files, 5,000 comments, window in front, git's cache cold):
+| Case (300 frames) | Layout and prepaint, median | p95 | max | Paint, median | Layout nodes, most |
+| --- | --- | --- | --- | --- | --- |
+| 300 files, 5,000 comments, Mac | 0.98 ms | 1.14 ms | 2.77 ms, 0 of 270 over budget | 0.32 ms | 220 |
+The frames that switch file took 1.40 ms in layout. Opening on the Mac: first frame with data 109 ms, git
+answered 419 ms, first file read 442 ms. That was the first open, so the cache was being made. On the HP the
+same pull request in the release test took 364 ms to the first file the first time (cache made from the
+project, the pull request and its base fetched) and 155 ms the second time, with git answering at 107 ms:
+the cold open costs about the cache, and 419 ms on the Mac is that, not a slow warm path.
 ## Review in the app
 
 A real turn of 200 files (claude ran `sed -i 1s/value/amount/ src/*.rs` over 199 small Rust files and
