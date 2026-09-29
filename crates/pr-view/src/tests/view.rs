@@ -305,3 +305,67 @@ fn the_rail_lists_a_page_of_threads_and_shows_more_when_asked(cx: &mut TestAppCo
         assert_eq!(v.model.conversation_page(sample::NOW, v.page.0, v.page.1).hidden_threads, 45 - 2 * crate::layout::PAGE);
     });
 }
+
+#[gpui_kit::test]
+fn the_other_merge_box_presses_each_reach_the_forge_with_their_own_call(cx: &mut TestAppContext) {
+    use beui::merge::{Action, Choice, MergeMethod, UpdateWay};
+    setup(cx);
+    let h = harness();
+    let (view, cx) = open(&h, cx);
+    settle(&view, cx, |v| v.current_view().is_some());
+    let choice = Choice { method: MergeMethod::Merge, auto: false, delete_branch: false };
+    let press = |action: Action, view: &Entity<PullView>, cx: &mut VisualTestContext| {
+        view.update_in(cx, |v, window, cx| v.merge_pull(action, choice, String::new(), String::new(), window, cx));
+    };
+    press(Action::UpdateBranch(UpdateWay::Rebase), &view, cx);
+    write_seen(&h, cx, &view, 1);
+    press(Action::CancelMergeWhenReady, &view, cx);
+    write_seen(&h, cx, &view, 2);
+    press(Action::RemoveFromQueue, &view, cx);
+    write_seen(&h, cx, &view, 3);
+    press(Action::DeleteBranch, &view, cx);
+    write_seen(&h, cx, &view, 4);
+    press(Action::Revert, &view, cx);
+    write_seen(&h, cx, &view, 5);
+    press(Action::ReadyForReview, &view, cx);
+    write_seen(&h, cx, &view, 6);
+    let writes = h.forge.writes();
+    assert_eq!(writes[0], Write::UpdateBranch { reference: h.reference.clone(), method: lathe_forge::UpdateMethod::Rebase, expected_head: h.head.clone() });
+    assert_eq!(writes[1], Write::CancelAutoMerge(h.reference.clone()));
+    assert_eq!(writes[2], Write::Dequeue(h.reference.clone()));
+    assert_eq!(writes[3], Write::DeleteBranch(h.reference.clone()));
+    assert_eq!(writes[4], Write::Revert(h.reference.clone()));
+    assert!(matches!(&writes[5], Write::Update { update, .. } if update.ready == Some(true)));
+    settle(&view, cx, |v| v.notice.is_some());
+}
+
+#[gpui_kit::test]
+fn an_update_of_a_branch_that_moved_is_refused_and_says_so(cx: &mut TestAppContext) {
+    use beui::merge::{Action, Choice, MergeMethod, UpdateWay};
+    setup(cx);
+    let h = harness();
+    let (view, cx) = open(&h, cx);
+    settle(&view, cx, |v| v.current_view().is_some());
+    h.forge.edit(&h.reference, |d| d.pull.as_mut().unwrap().head_sha = "e".repeat(40));
+    let choice = Choice { method: MergeMethod::Merge, auto: false, delete_branch: false };
+    view.update_in(cx, |v, window, cx| v.merge_pull(Action::UpdateBranch(UpdateWay::Merge), choice, String::new(), String::new(), window, cx));
+    write_seen(&h, cx, &view, 1);
+    settle(&view, cx, |v| v.notice.as_deref().is_some_and(|n| n.contains("modified")));
+}
+
+#[gpui_kit::test]
+fn a_read_only_view_sends_none_of_the_merge_box_presses(cx: &mut TestAppContext) {
+    use beui::merge::{Action, Choice, MergeMethod};
+    setup(cx);
+    let h = harness_with(|c| c.read_only(true));
+    let (view, cx) = open(&h, cx);
+    settle(&view, cx, |v| v.current_view().is_some());
+    let choice = Choice { method: MergeMethod::Merge, auto: false, delete_branch: false };
+    for action in [Action::ReadyForReview, Action::DeleteBranch, Action::Revert, Action::RemoveFromQueue, Action::CancelMergeWhenReady] {
+        view.update_in(cx, |v, window, cx| v.merge_pull(action, choice, String::new(), String::new(), window, cx));
+    }
+    cx.run_until_parked();
+    std::thread::sleep(Duration::from_millis(50));
+    cx.run_until_parked();
+    assert!(h.forge.writes().is_empty(), "{:?}", h.forge.writes());
+}

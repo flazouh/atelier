@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use super::{GitHub, decode, queries, read, wire::Root};
 use crate::{
     Comment, ForgeError, ForgeResult, HeldComment, MergeMethod, MergeOutcome, MergeRequest, NewLine, NewPull,
-    PullRef, PullUpdate, RepoRef, Reviewer, Side, ThreadId, Verdict,
+    PullRef, PullUpdate, RepoRef, Reviewer, Side, ThreadId, UpdateMethod, Verdict,
 };
 
 const CREATE_PULL: &str = "mutation CreatePull($input: CreatePullRequestInput!) {
@@ -23,6 +23,14 @@ const AUTO_MERGE: &str = "mutation AutoMerge($input: EnablePullRequestAutoMergeI
   enablePullRequestAutoMerge(input: $input) { pullRequest { id } } }";
 const ENQUEUE: &str = "mutation Enqueue($input: EnqueuePullRequestInput!) {
   enqueuePullRequest(input: $input) { mergeQueueEntry { id } } }";
+const UPDATE_BRANCH: &str = "mutation UpdateBranch($input: UpdatePullRequestBranchInput!) {
+  updatePullRequestBranch(input: $input) { pullRequest { id } } }";
+const DISABLE_AUTO_MERGE: &str = "mutation DisableAutoMerge($input: DisablePullRequestAutoMergeInput!) {
+  disablePullRequestAutoMerge(input: $input) { pullRequest { id } } }";
+const DEQUEUE: &str = "mutation Dequeue($input: DequeuePullRequestInput!) {
+  dequeuePullRequest(input: $input) { mergeQueueEntry { id } } }";
+const REVERT: &str = "mutation Revert($input: RevertPullRequestInput!) {
+  revertPullRequest(input: $input) { revertPullRequest { number repository { nameWithOwner } } } }";
 const COMMENT_FIELDS: &str = "id body createdAt author { login __typename } state";
 const ADD_COMMENT: &str = "mutation AddComment($input: AddCommentInput!) {
   addComment(input: $input) { commentEdge { node { id body createdAt author { login __typename } } } } }";
@@ -158,6 +166,46 @@ impl GitHub {
             self.client.rest("DELETE", &path, None)?;
         }
         Ok(MergeOutcome::Merged)
+    }
+
+    pub(super) fn write_update_branch(&self, reference: &PullRef, method: UpdateMethod, expected_head: &str) -> ForgeResult<()> {
+        let id = self.target(reference)?.id;
+        let way = match method {
+            UpdateMethod::Merge => "MERGE",
+            UpdateMethod::Rebase => "REBASE",
+        };
+        self.mutate(UPDATE_BRANCH, json!({"pullRequestId": id, "expectedHeadOid": expected_head, "updateMethod": way})).map(drop)
+    }
+
+    pub(super) fn write_cancel_auto_merge(&self, reference: &PullRef) -> ForgeResult<()> {
+        let id = self.target(reference)?.id;
+        self.mutate(DISABLE_AUTO_MERGE, json!({"pullRequestId": id})).map(drop)
+    }
+
+    pub(super) fn write_dequeue(&self, reference: &PullRef) -> ForgeResult<()> {
+        let id = self.target(reference)?.id;
+        self.mutate(DEQUEUE, json!({"id": id})).map(drop)
+    }
+
+    pub(super) fn write_delete_branch(&self, reference: &PullRef) -> ForgeResult<()> {
+        let target = self.target(reference)?;
+        if !target.same_repo {
+            return Err(ForgeError::Rejected("The branch lives in a fork; only its owner can delete it.".into()));
+        }
+        let path = format!("repos/{}/git/refs/heads/{}", reference.repo.slug(), target.head);
+        self.client.rest("DELETE", &path, None).map(drop)
+    }
+
+    pub(super) fn write_revert(&self, reference: &PullRef) -> ForgeResult<PullRef> {
+        let id = self.target(reference)?.id;
+        let data = self.mutate(REVERT, json!({"pullRequestId": id}))?;
+        let made = &data["revertPullRequest"]["revertPullRequest"];
+        let number = made["number"].as_u64();
+        let repo = made["repository"]["nameWithOwner"].as_str().map(read::repo_ref);
+        match (number, repo) {
+            (Some(number), Some(repo)) => Ok(PullRef { repo: repo?, number }),
+            _ => Err(ForgeError::Unexpected("the revert has no pull request number".into())),
+        }
     }
 
     pub(super) fn write_request_review(&self, reference: &PullRef, reviewers: &[Reviewer]) -> ForgeResult<()> {

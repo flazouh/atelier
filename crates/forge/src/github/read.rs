@@ -280,6 +280,7 @@ pub(super) fn check(repo: &RepoRef, node: &ContextNode) -> Check {
         };
     }
     let run = node.check_suite.as_ref().and_then(|suite| suite.workflow_run.as_ref());
+    let suite = node.check_suite.as_ref().and_then(|suite| suite.conclusion.as_deref()).and_then(conclusion);
     Check {
         name: node.name.clone().unwrap_or_default(),
         status: status(node.status.as_deref().unwrap_or("QUEUED")),
@@ -295,6 +296,7 @@ pub(super) fn check(repo: &RepoRef, node: &ContextNode) -> Check {
             workflow: run.workflow.as_ref().map(|w| w.name.clone()).unwrap_or_default(),
             number: run.run_number,
             event: run.event.clone(),
+            suite,
         }),
     }
 }

@@ -26,9 +26,17 @@ pub fn state_of(status: CheckStatus, conclusion: Option<Conclusion>) -> UiState 
     }
 }
 
+/// The check's state, with a failure the workflow allowed (the job failed, the run around it succeeded) told
+/// apart: it is Tolerated, and never why the pull request is red.
+pub fn tolerated_or(check: &Check) -> UiState {
+    let state = state_of(check.status, check.conclusion);
+    let run_ok = check.run.as_ref().and_then(|r| r.suite).is_some_and(|c| matches!(c, Conclusion::Success | Conclusion::Neutral));
+    if state == UiState::Failed && run_ok { UiState::Tolerated } else { state }
+}
+
 /// A failing check whose job can be read, and so whose Fault can be shown.
 pub fn wants_log(check: &Check) -> Option<&JobRef> {
-    let failing = state_of(check.status, check.conclusion) == UiState::Failed;
+    let failing = matches!(tolerated_or(check), UiState::Failed | UiState::Tolerated);
     check.job.as_ref().filter(|_| failing)
 }
 
@@ -47,7 +55,7 @@ pub fn check_runs(checks: &[Check], jobs: &HashMap<u64, JobLog>) -> Vec<CheckRun
     checks
         .iter()
         .map(|check| {
-            let state = state_of(check.status, check.conclusion);
+            let state = tolerated_or(check);
             let read = check.job.as_ref().and_then(|j| jobs.get(&j.id));
             let summary = check.run.as_ref().map(|run| run.workflow.clone()).unwrap_or_default();
             CheckRun { name: check.name.clone().into(), summary: summary.into(), state, steps: read.map(|j| steps(&j.job, &j.log)).unwrap_or_default() }

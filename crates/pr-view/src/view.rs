@@ -1010,23 +1010,32 @@ impl PullView {
         self.write_and_report("Sending your comments…", cx, |forge, reference| forge.submit_review(reference, Verdict::Comment, "").map(|()| "Sent.".to_string()));
     }
 
+    /// A press in the merge box: a merge, or one of the other calls the box offers.
     pub(crate) fn merge_pull(&mut self, action: beui::merge::Action, choice: beui::merge::Choice, title: String, message: String, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::actions::{Ask, ask};
         let Some(head) = self.model.pull().map(|p| p.head_sha.clone()) else { return };
-        let request = match crate::actions::merge_request(action, choice, &title, &message, &head) {
-            Ok(request) => request,
-            Err(words) => {
-                self.notice = Some(words);
-                cx.notify();
-                return;
-            }
+        let asked = ask(action, choice, &title, &message, &head);
+        let (words, delete) = match &asked {
+            Ask::Merge(request) => ("Merging…", request.delete_branch),
+            Ask::Ready => ("Marking it ready…", false),
+            Ask::UpdateBranch { .. } => ("Updating the branch…", false),
+            Ask::CancelAutoMerge => ("Turning off merge when ready…", false),
+            Ask::Dequeue => ("Leaving the queue…", false),
+            Ask::DeleteBranch => ("Deleting the branch…", false),
+            Ask::Revert => ("Opening the revert…", false),
         };
-        let delete = request.delete_branch;
-        let Some(task) = self.write("Merging…", cx, move |forge, reference| {
-            forge.merge(reference, &request).map(|outcome| match outcome {
+        let Some(task) = self.write(words, cx, move |forge, reference| match asked {
+            Ask::Merge(request) => forge.merge(reference, &request).map(|outcome| match outcome {
                 MergeOutcome::Merged => "Merged.".to_string(),
                 MergeOutcome::WillMergeWhenReady => "It will merge when it is ready.".to_string(),
                 MergeOutcome::Queued => "Added to the merge queue.".to_string(),
-            })
+            }),
+            Ask::Ready => forge.update_pull(reference, &lathe_forge::PullUpdate { ready: Some(true), ..Default::default() }).map(|()| "Ready for review.".to_string()),
+            Ask::UpdateBranch { method, expected_head } => forge.update_branch(reference, method, &expected_head).map(|()| "The branch is up to date.".to_string()),
+            Ask::CancelAutoMerge => forge.cancel_auto_merge(reference).map(|()| "Merge when ready is off.".to_string()),
+            Ask::Dequeue => forge.dequeue(reference).map(|()| "Out of the merge queue.".to_string()),
+            Ask::DeleteBranch => forge.delete_branch(reference).map(|()| "Branch deleted.".to_string()),
+            Ask::Revert => forge.revert(reference).map(|made| format!("Opened #{} to revert it.", made.number)),
         }) else {
             return;
         };

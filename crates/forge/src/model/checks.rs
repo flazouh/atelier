@@ -29,6 +29,9 @@ pub struct RunInfo {
     pub workflow: String,
     pub number: u64,
     pub event: String,
+    /// How the run's check suite ended. A job that failed in a suite that succeeded was allowed to fail.
+    #[serde(default)]
+    pub suite: Option<Conclusion>,
 }
 
 /// Which job's steps and log to fetch.
