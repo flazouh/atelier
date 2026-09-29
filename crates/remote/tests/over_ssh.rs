@@ -22,5 +22,5 @@ fn a_host_that_does_not_exist_says_so() {
     let error = lathe_remote::ssh::connect("lathe-no-such-host.invalid", "/", &|_| {}).err().expect("no host");
     eprintln!("{error}");
     assert!(error.to_string().contains("lathe-no-such-host.invalid"), "{error}");
-    assert_eq!(error.to_string().matches("lathe-no-such-host.invalid").count(), 2, "ssh's own words, not a second prefix: {error}");
+    assert_eq!(error.to_string().matches("lathe-no-such-host.invalid").count(), 1, "ssh's own words, not a second prefix: {error}");
 }
