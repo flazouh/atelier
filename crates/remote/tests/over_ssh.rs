@@ -24,3 +24,43 @@ fn a_host_that_does_not_exist_says_so() {
     assert!(error.to_string().contains("lathe-no-such-host.invalid"), "{error}");
     assert_eq!(error.to_string().matches("lathe-no-such-host.invalid").count(), 1, "ssh's own words, not a second prefix: {error}");
 }
+
+/// What a remote project costs over a real ssh: the connect (probe, the copy's check, the dial and
+/// the hello), a file open (the read of a 10,000-line file), and the listing of `LATHE_TEST_SSH_ROOT`.
+/// Targets: connect < 3 s, file open < 150 ms on a LAN, listing a 1,000-file tree < 500 ms.
+///     LATHE_REMOTE_DIR=… LATHE_TEST_SSH_HOST=hp-agent LATHE_TEST_SSH_ROOT=/home/alex/code/local/lathe \
+///         cargo test --release -p lathe-remote --test over_ssh -- --ignored --nocapture remote_costs
+#[test]
+#[ignore]
+fn remote_costs() {
+    use std::time::{Duration, Instant};
+    let host = std::env::var("LATHE_TEST_SSH_HOST").expect("LATHE_TEST_SSH_HOST names a host");
+    let root = std::env::var("LATHE_TEST_SSH_ROOT").expect("LATHE_TEST_SSH_ROOT names a folder on it");
+    let ms = |d: Duration| d.as_secs_f64() * 1000.;
+    let at = Instant::now();
+    let project = lathe_remote::ssh::connect(&host, &root, &|_| {}).expect("it connects");
+    println!("connect: {:.1} ms", ms(at.elapsed()));
+    let text: String = (0..10_000).map(|i| format!("let line_{i} = {i};\n")).collect();
+    project.write("lathe-bench.rs", text.as_bytes()).unwrap();
+    let mut reads: Vec<Duration> = (0..20)
+        .map(|_| {
+            let at = Instant::now();
+            assert_eq!(project.read("lathe-bench.rs").unwrap().len(), text.len());
+            at.elapsed()
+        })
+        .collect();
+    reads.sort();
+    println!("file open, {} KB: median {:.2} ms, p95 {:.2} ms", text.len() / 1024, ms(reads[10]), ms(reads[18]));
+    let mut lists: Vec<Duration> = (0..20)
+        .map(|_| {
+            let at = Instant::now();
+            project.list().unwrap();
+            at.elapsed()
+        })
+        .collect();
+    lists.sort();
+    let files = project.list().unwrap().iter().filter(|e| !e.dir).count();
+    println!("listing {files} files: median {:.2} ms, p95 {:.2} ms", ms(lists[10]), ms(lists[18]));
+    std::fs::remove_file(std::path::Path::new(&root).join("lathe-bench.rs")).ok();
+    let _ = std::process::Command::new("ssh").args([host.as_str(), &format!("rm -f {root}/lathe-bench.rs")]).status();
+}
