@@ -997,7 +997,6 @@ fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
     let options = all.iter().map(|t| beui::select::SelectOption::from(t.name.clone()).group(t.family.clone()));
     Select::new("theme", options)
         .selected(all.iter().position(|t| t.name == theme.name))
-        .upward(true)
         .on_change(|i, _, cx| {
             let Some(picked) = beui::themes::all().get(i) else { return };
             beui::theme::set_theme(picked.clone(), cx);
