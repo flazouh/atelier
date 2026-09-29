@@ -12,7 +12,20 @@ pub fn workers() -> Arc<Workers> {
     WORKERS
         .get_or_init(|| {
             let disk = Arc::new(lathe_project::LocalProject::open("/").expect("the disk opens"));
-            Arc::new(Workers::new(disk, Store::from_env(), READY, ASK))
+            Arc::new(Workers::new(disk, store(), READY, ASK))
         })
         .clone()
+}
+
+/// The servers the user has, or downloads them.
+#[cfg(not(test))]
+fn store() -> Store {
+    Store::from_env()
+}
+
+/// In a test, no server: a real one answers from threads of its own, which GPUI's test scheduler
+/// rejects. lathe-lsp's own tests prove the servers.
+#[cfg(test)]
+fn store() -> Store {
+    Store::new(std::env::temp_dir().join("lathe-gallery-tests"), Vec::new(), true)
 }
