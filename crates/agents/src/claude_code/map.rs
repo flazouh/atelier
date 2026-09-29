@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use super::{
     control::{self, mode_from_name},
-    tools,
+    tools::{self, TodoTool},
     wire::{Block, CanUseTool, Content, ControlBody, ControlRequest, Delta, Finish, Line, Message, Stream, StreamEvent, System},
 };
 use crate::session::{
@@ -104,30 +104,32 @@ impl Mapper {
         })
     }
 
-    /// The events for the end of the stream: `exited` is the process's exit code. A turn or a tool
-    /// still open fails, so the UI never waits for an agent that is gone. A second call gives nothing:
-    /// a session ends once.
-    pub fn finish(&mut self, exited: Option<i32>, closed_by_lathe: bool) -> Vec<Event> {
+    /// The events for a process that ended: `code` is its exit code, `None` when a signal ended it. A
+    /// turn or a tool still open fails, so the UI never waits for an agent that is gone. A session ends
+    /// once: a second call to `exited` or `closed` gives nothing.
+    pub fn exited(&mut self, code: Option<i32>) -> Vec<Event> {
         if std::mem::replace(&mut self.ended, true) {
             return Vec::new();
         }
-        let mut events = Vec::new();
-        if !closed_by_lathe {
-            let why = match exited {
-                Some(code) => format!("the agent exited with code {code}"),
-                None => "the agent was stopped by a signal".to_string(),
-            };
-            events.extend(self.fail_open_tools(&why));
-            events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
-            let mut open: Vec<_> = self.subagents.drain().collect();
-            open.sort();
-            events.extend(open.into_iter().map(|id| Event::SubagentEnded { id, ok: false, summary: Some(why.clone()) }));
-            if std::mem::take(&mut self.turn_open) {
-                events.push(Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed(why), summary: None }));
-            }
+        let why = match code {
+            Some(code) => format!("the agent exited with code {code}"),
+            None => "the agent was stopped by a signal".to_string(),
+        };
+        let mut events = self.fail_open_tools(&why);
+        events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
+        let mut open: Vec<_> = self.subagents.drain().collect();
+        open.sort();
+        events.extend(open.into_iter().map(|id| Event::SubagentEnded { id, ok: false, summary: Some(why.clone()) }));
+        if std::mem::take(&mut self.turn_open) {
+            events.push(Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed(why), summary: None }));
         }
-        events.push(Event::Ended(if closed_by_lathe { EndReason::Closed } else { EndReason::Exited(exited) }));
+        events.push(Event::Ended(EndReason::Exited(code)));
         events
+    }
+
+    /// The event for a session lathe closed on purpose: it ends, and nothing else fails.
+    pub fn closed(&mut self) -> Vec<Event> {
+        if std::mem::replace(&mut self.ended, true) { Vec::new() } else { vec![Event::Ended(EndReason::Closed)] }
     }
 
     fn system(&mut self, system: System) -> Vec<Event> {
@@ -187,7 +189,7 @@ impl Mapper {
                 }
                 Block::ToolUse { id, name, .. } => {
                     self.open.insert(index, Open::Tool);
-                    if tools::starts_subagent(&name) || tools::edits_todos(&name) {
+                    if tools::starts_subagent(&name) || tools::todo_tool(&name).is_some() {
                         return Vec::new();
                     }
                     self.announce(ToolId::new(id), name, Value::Null, parent)
@@ -353,9 +355,9 @@ impl Mapper {
             let task = text("description").or_else(|| text("prompt")).unwrap_or_default();
             return vec![Event::SubagentStarted(Subagent { id, task, kind: text("subagent_type"), model: text("model") })];
         }
-        if tools::edits_todos(&name) {
+        if let Some(tool) = tools::todo_tool(&name) {
             self.hidden.insert(id.clone());
-            return self.edit_todos(id, &name, &input);
+            return self.edit_todos(id, tool, &input);
         }
         if self.running.contains(&id) {
             return vec![Event::ToolInput { id, file: tools::file(&input), input }];
@@ -363,10 +365,10 @@ impl Mapper {
         self.announce(id, name, input, parent)
     }
 
-    fn edit_todos(&mut self, id: ToolId, name: &str, input: &Value) -> Vec<Event> {
+    fn edit_todos(&mut self, id: ToolId, tool: TodoTool, input: &Value) -> Vec<Event> {
         let text = |value: &Value, key: &str| value.get(key).and_then(Value::as_str).map(str::to_string);
-        match name {
-            "TodoWrite" => {
+        match tool {
+            TodoTool::Write => {
                 let items = input.get("todos").and_then(Value::as_array).map(Vec::as_slice).unwrap_or_default();
                 self.todos = items
                     .iter()
@@ -379,11 +381,11 @@ impl Mapper {
                     .collect();
                 vec![Event::Todos(self.todos.clone())]
             }
-            "TaskCreate" => {
+            TodoTool::Create => {
                 self.creating.insert(id, text(input, "subject").unwrap_or_default());
                 Vec::new()
             }
-            _ => {
+            TodoTool::Update => {
                 let Some(task) = text(input, "taskId") else { return Vec::new() };
                 if text(input, "status").as_deref() == Some("deleted") {
                     self.todos.retain(|todo| todo.id != task);

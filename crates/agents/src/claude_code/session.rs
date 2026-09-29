@@ -3,7 +3,7 @@
 use std::{
     io::Write,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, MutexGuard,
         atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc,
     },
@@ -44,15 +44,15 @@ impl ClaudeSession {
                 if closing_in.load(Ordering::SeqCst) {
                     return;
                 }
-                let events = mapper_in.lock().unwrap_or_else(|e| e.into_inner()).line(&line, Instant::now());
+                let events = lock(&mapper_in).line(&line, Instant::now());
                 events.into_iter().for_each(|event| sink_in(event));
             }
-            let code = control_in.lock().unwrap_or_else(|e| e.into_inner()).wait().ok().flatten();
+            let code = lock(&control_in).wait().ok().flatten();
             // A session lathe closed says so itself, in `drop`, without waiting for this thread.
             if closing_in.load(Ordering::SeqCst) {
                 return;
             }
-            let events = mapper_in.lock().unwrap_or_else(|e| e.into_inner()).finish(code, false);
+            let events = lock(&mapper_in).exited(code);
             events.into_iter().for_each(|event| sink_in(event));
         });
 
@@ -68,6 +68,12 @@ impl ClaudeSession {
     }
 }
 
+/// The state of a session is plain data that a panic on the other thread cannot leave half-written,
+/// so a poisoned lock is still good to read.
+fn lock<T: ?Sized>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 fn write_lines(mut stdin: Box<dyn Write + Send>, queued: mpsc::Receiver<String>) {
     for line in queued {
         if writeln!(stdin, "{line}").and_then(|()| stdin.flush()).is_err() {
@@ -80,11 +86,11 @@ impl Session for ClaudeSession {
     fn send(&self, command: Command) -> Result<(), SessionError> {
         let line = match command {
             Command::Send { text } => {
-                self.mapper.lock().unwrap_or_else(|e| e.into_inner()).user_sent();
+                lock(&self.mapper).user_sent();
                 control::user_message(&text)
             }
             Command::Answer { request, choice } => {
-                let answer = self.mapper.lock().unwrap_or_else(|e| e.into_inner()).answer(&request, &choice);
+                let answer = lock(&self.mapper).answer(&request, &choice);
                 answer.ok_or(SessionError::Unsupported("an answer to a request that is not waiting"))?
             }
             Command::Interrupt => control::interrupt(&self.request_id()),
@@ -100,10 +106,10 @@ impl Drop for ClaudeSession {
         self.closing.store(true, Ordering::SeqCst);
         // Closing stdin asks `claude` to stop; the kill covers one that does not listen.
         self.lines = None;
-        let _ = self.control.lock().unwrap_or_else(|e| e.into_inner()).kill();
+        let _ = lock(&self.control).kill();
         // The process may have children that hold its pipes open, so the reader can wait long for an
         // end of stream. The session ends now.
-        let events = self.mapper.lock().unwrap_or_else(|e| e.into_inner()).finish(None, true);
+        let events = lock(&self.mapper).closed();
         events.into_iter().for_each(|event| (self.sink)(event));
     }
 }

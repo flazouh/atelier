@@ -26,6 +26,19 @@ pub(super) fn starts_subagent(name: &str) -> bool {
 }
 
 /// The tools that write the todo list. lathe shows the list, not the calls.
-pub(super) fn edits_todos(name: &str) -> bool {
-    matches!(name, "TodoWrite" | "TaskCreate" | "TaskUpdate")
+#[derive(Clone, Copy)]
+pub(super) enum TodoTool {
+    /// `TodoWrite` sends the whole list.
+    Write,
+    Create,
+    Update,
+}
+
+pub(super) fn todo_tool(name: &str) -> Option<TodoTool> {
+    match name {
+        "TodoWrite" => Some(TodoTool::Write),
+        "TaskCreate" => Some(TodoTool::Create),
+        "TaskUpdate" => Some(TodoTool::Update),
+        _ => None,
+    }
 }

@@ -255,7 +255,7 @@ fn a_crash_mid_turn_fails_the_open_tool_and_the_turn_then_ends_the_session() {
     mapper.user_sent();
     let start = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t9","name":"Bash","input":{}}}}"#;
     assert!(matches!(mapper.line(start, Instant::now()).as_slice(), [Event::ToolStarted(_)]));
-    let events = mapper.finish(Some(3), false);
+    let events = mapper.exited(Some(3));
     let [Event::ToolFinished { id, output }, Event::TurnEnded(end), Event::Ended(reason)] = events.as_slice() else {
         panic!("{events:#?}")
     };
@@ -267,21 +267,22 @@ fn a_crash_mid_turn_fails_the_open_tool_and_the_turn_then_ends_the_session() {
 
 #[test]
 fn a_crash_with_no_turn_open_only_ends_the_session() {
-    assert_eq!(Mapper::new().finish(None, false), [Event::Ended(EndReason::Exited(None))]);
+    assert_eq!(Mapper::new().exited(None), [Event::Ended(EndReason::Exited(None))]);
 }
 
 #[test]
 fn a_session_lathe_closed_ends_closed_and_fails_nothing() {
     let mut mapper = Mapper::new();
     mapper.user_sent();
-    assert_eq!(mapper.finish(None, true), [Event::Ended(EndReason::Closed)]);
+    assert_eq!(mapper.closed(), [Event::Ended(EndReason::Closed)]);
 }
 
 #[test]
 fn a_session_ends_once() {
     let mut mapper = Mapper::new();
-    assert_eq!(mapper.finish(Some(0), false).len(), 1);
-    assert!(mapper.finish(None, true).is_empty());
+    assert_eq!(mapper.exited(Some(0)).len(), 1);
+    assert!(mapper.closed().is_empty());
+    assert!(mapper.exited(None).is_empty());
 }
 
 #[test]
@@ -289,7 +290,7 @@ fn a_permission_question_left_open_by_a_crash_is_cancelled() {
     let mut mapper = Mapper::new();
     let ask = r#"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{}}}"#;
     mapper.line(ask, Instant::now());
-    let events = mapper.finish(Some(1), false);
+    let events = mapper.exited(Some(1));
     assert!(events.contains(&Event::PermissionCancelled(RequestId::new("r1"))));
 }
 

@@ -30,7 +30,7 @@ fn folder(project: &dyn Project) -> String {
 
 pub(super) fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
     let script = format!(
-        r#"for f in $(ls -t "{dir}"/*.jsonl 2>/dev/null | head -n {LIST_LIMIT}); do
+        r#"ls -t "{dir}"/*.jsonl 2>/dev/null | head -n {LIST_LIMIT} | while IFS= read -r f; do
   printf '{MARK}%s %s\n' "$f" "$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")"
   head -n {TITLE_LINES} "$f" | cut -c1-4000
 done"#,
@@ -102,8 +102,5 @@ pub(super) fn read_history(project: &dyn Project, session: &SessionId) -> Result
 pub fn history(transcript: &str) -> Vec<Event> {
     let mut mapper = Mapper::new();
     let now = Instant::now();
-    let mut events: Vec<Event> = transcript.lines().flat_map(|line| mapper.line(line, now)).collect();
-    // A transcript of a session that ended mid-turn leaves calls open; they never finish.
-    events.extend(mapper.finish(None, true).into_iter().filter(|e| matches!(e, Event::ToolFinished { .. })));
-    events
+    transcript.lines().flat_map(|line| mapper.line(line, now)).collect()
 }

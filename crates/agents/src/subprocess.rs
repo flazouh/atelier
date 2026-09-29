@@ -34,13 +34,13 @@ pub fn lines(stream: impl Read) -> impl Iterator<Item = String> {
 
 /// Runs `command` to the end and returns what it wrote to stdout.
 pub fn output(project: &dyn Project, command: &Command) -> Result<String, SessionError> {
-    let mut process = start(project, command)?;
-    drop(std::mem::replace(&mut process.stdin, Box::new(io::sink())));
+    let Process { stdin, stdout, mut control } = start(project, command)?;
+    drop(stdin);
     let mut text = String::new();
-    for line in lines(process.stdout) {
+    for line in lines(stdout) {
         text.push_str(&line);
         text.push('\n');
     }
-    let _ = process.control.wait();
+    let _ = control.wait();
     Ok(text)
 }
