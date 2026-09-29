@@ -164,3 +164,23 @@ The input is the captured runs in `crates/agents/tests/fixtures/claude_code`, re
   mapper's memory per session is the todo list, the open blocks and the running calls.
 - A live session, on the HP: the reader and writer threads sleep on the pipes. A `send` only queues a
   line. It never waits for the agent.
+
+## The app
+
+The `lathe` binary on the HP under Xvfb (Mesa's software Vulkan), release. The load average came
+from alex-31's builds running at the same time.
+
+| Case | Target | Median | Worst | Runs | Load | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| First frame, from process start, a project open | < 300 ms | 220.4 ms | 373.6 ms | 11 | 14.2 | Passes |
+| Listing 10,000 files (`Project::list`, a .gitignore, 2,000 ignored) | < 200 ms | 9.79 ms | 10.43 ms (p95) | 20 | 3.7 | Passes |
+| The app's tree of 10,000 files: listing and building the rows model | < 200 ms | 11 ms | 13 ms | 7 | 14 | Passes |
+
+    cargo test --release -p lathe-project --test list_bench -- --ignored --nocapture
+    LATHE_TIMINGS=1 target/release/lathe <folder>     # prints the first frame's time
+    target/release/lathe /tmp/qa-10k                    # the status line says "listed in N ms"
+
+- The listing and the tree build run on a background thread. The tree draws as a virtual list, so
+  only the rows on screen lay out.
+- The first frame waits for no disk work: the settings file is read before the event loop, and the
+  project lists after the window shows.

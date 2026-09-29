@@ -2,6 +2,19 @@
 
 lathe's own words, and the ones it keeps from GitQuiet. Code uses the same names.
 
+## The app
+
+- **Project** (`Project`): a folder lathe works in, wherever it lives. Everything lathe does to its
+  files, processes and git goes through this one interface.
+- **Local project** (`LocalProject`): a project in a folder on this machine. A remote project (M1b)
+  lives on an SSH host.
+- **Location** (`Location`): where a project lives, as the recent list keeps it: a local path, or a
+  host and a path.
+- **Open project** (`OpenProject`): a project open in a window, with its tree, tabs, buffers and
+  language servers.
+- **Buffer**: an open file's text in its tab. **Dirty**: it holds edits not yet saved.
+- **Changed on disk**: the file changed under a dirty buffer. The tab keeps its edits and asks.
+
 ## Merging
 
 - **Merge facts** (`MergeFacts`): everything the app knows about merging one pull request, as the
