@@ -99,3 +99,16 @@ request_layout and prepaint; "diff paint" is building its scene on the CPU.
 - FileDiff's rows are a virtual list, so its layout no longer grows with the row count. Before, a
   whole frame took 192 ms with 500 rows and 592 ms with 5000.
 - The HP renders in software (Mesa's Vulkan under Xvfb), so the whole frame says little about a Mac.
+
+## Themes
+
+Loading every theme at start (`themes::all()`: lathe's two files parsed, eight VS Code files
+imported), once, before the first window opens. Load average 0.16:
+
+    cargo test --release -p beui --features cursor-themes --test theme_bench -- --ignored --nocapture
+
+| Case | Target | Median | p95 | Result |
+| --- | --- | --- | --- | --- |
+| All 10 themes loaded | < 30 ms | 23.26 ms | 23.54 ms | Passes |
+
+A switch reads the loaded theme; it parses nothing.
