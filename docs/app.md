@@ -53,6 +53,8 @@ wake from the watcher's own thread; lathe-project tests the real watcher.
 - Keys: GitQuiet's table where a command applies (⌘B the left pane, ⌘⇧B the right pane), ⌘O open
   folder, ⌘S save, ⌘W close tab, ⌘J the bottom panel once there is one. The side panes keep their
   width when one hides; the agent panel takes what is left.
+- `t` (GitQuiet's Go to file, while nothing is being typed) opens beui's Finder over the project's
+  files; Enter opens the one picked, Escape closes it.
 - `lathe [folder…]` opens each folder named as a project.
 
 ## Projects
@@ -88,5 +90,6 @@ recordings and stills are in `~/shots/m1/` on the HP.
 | Edit and save | `qa-4-dirty.png` (the dot), `qa-5-saved.png` ("Saved crates/app/src/shell.rs"); `git diff` in the clone shows the line |
 | Several projects, switching | `multi-*.png`: three projects; an empty folder and one with no git say so |
 | ⌘B, ⌘⇧B | `panes-*.png` |
+| Go to file | `goto-1.png` ("openpro" finds `open_project.rs`), `goto.png` (Enter opens it) |
 | Changed on disk | `disk-*.png`: a clean tab reloads; a dirty one asks; Keep mine and Reload |
 | Recording | `qa-local.mp4`, `multi.mp4`, `disk.mp4` |
