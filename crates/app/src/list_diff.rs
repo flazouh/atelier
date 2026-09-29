@@ -45,7 +45,7 @@ pub enum Row {
 }
 
 /// The rows for `items` conversation items, with each turn's changed files after the item it ended at:
-/// `marks` holds `(items before the card, turn)`, in order.
+/// `marks` holds `(items before the card, turn)`, in order; one past the last item goes at the end.
 pub fn rows(items: usize, marks: &[(usize, usize)]) -> Vec<Row> {
     let mut out = Vec::with_capacity(items + marks.len());
     let mut marks = marks.iter().peekable();
@@ -60,6 +60,8 @@ pub fn rows(items: usize, marks: &[(usize, usize)]) -> Vec<Row> {
             out.push(Row::Item(ix));
         }
     }
+    // A card kept for an item the list no longer has (a resumed history keeps no questions) goes last.
+    out.extend(marks.map(|&(_, turn)| Row::Changes { turn }));
     out
 }
 

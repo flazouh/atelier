@@ -31,3 +31,11 @@ fn a_turns_card_follows_the_item_its_turn_ended_at() {
     // Two turns that ended at the same item keep their order.
     assert_eq!(rows(1, &[(1, 0), (1, 1)]), [Item(0), Changes { turn: 0 }, Changes { turn: 1 }]);
 }
+
+/// A resumed session's history can hold fewer items than the live turn did (it keeps no questions), so
+/// a card kept for a later item goes at the end rather than nowhere.
+#[test]
+fn a_card_past_the_last_item_goes_at_the_end() {
+    use Row::*;
+    assert_eq!(rows(2, &[(5, 0)]), [Item(0), Item(1), Changes { turn: 0 }]);
+}
