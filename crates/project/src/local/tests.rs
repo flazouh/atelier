@@ -129,12 +129,13 @@ fn a_process_that_fails_leaves_its_stderr_and_only_the_tail_of_a_long_one() {
     let (_dir, p) = project(&[]);
     let mut failing = p.spawn(&Command::new("sh").args(["-c", "echo 'no such model' >&2; exit 3"])).unwrap();
     assert_eq!(failing.control.wait().unwrap(), Some(3));
-    // The reader thread may still hold the last chunk for a moment after the exit.
-    let deadline = std::time::Instant::now() + Duration::from_secs(2);
-    while failing.control.stderr().is_empty() && std::time::Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    assert_eq!(failing.control.stderr(), "no such model\n");
+    assert_eq!(failing.control.stderr(), "no such model\n", "complete the moment wait returns");
+    // A grandchild that keeps stderr open does not hold the wait up for long.
+    let mut lingering = p.spawn(&Command::new("sh").args(["-c", "echo started >&2; sleep 5 >&2 & exit 0"])).unwrap();
+    let at = std::time::Instant::now();
+    assert_eq!(lingering.control.wait().unwrap(), Some(0));
+    assert!(at.elapsed() < Duration::from_secs(2), "{:?}", at.elapsed());
+    assert_eq!(lingering.control.stderr(), "started\n");
     let tail = crate::Tail::default();
     tail.push(&vec![b'a'; crate::STDERR_KEEP]);
     tail.push(b"the end");
