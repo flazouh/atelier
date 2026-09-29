@@ -306,7 +306,9 @@ the agent still exists, and `open` says what to set. A `Secret` prints as `***`.
 never in an event, an error, a log, the record of a session or the repository, and a test checks each.
 **The request.** Three cache breakpoints (the last tool, the system prompt, the end of the conversation), adaptive
 thinking with `display: "summarized"` so the reasoning can be shown, no sampling settings, no forced `tool_choice`,
-no prefill. The system prompt holds nothing that changes from call to call, so the cache keeps it. Thinking blocks
+no prefill, and `eager_input_streaming` on every tool, so the input of a call streams as it is made (a
+file to write shows up as it is written). The API does not validate such an input, so one that is cut off
+or is not JSON is marked malformed and the model is told. The system prompt holds nothing that changes from call to call, so the cache keeps it. Thinking blocks
 go back signed, as the API needs them in a turn that used a tool. A reply cut off by the token limit, or refused,
 keeps no tool call that has no result.
 **Retry.** A rate limit (429), a server failure (5xx, 529) and a dropped connection are tried again, up to

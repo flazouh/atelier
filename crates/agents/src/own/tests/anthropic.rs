@@ -177,6 +177,7 @@ fn three_cache_breakpoints_stand_at_the_last_tool_the_system_prompt_and_the_end(
     let b = body(&[Message::user("hi")], "claude-opus-5-5", Thinking::Auto);
     let tools = b["tools"].as_array().unwrap();
     assert!(tools[0].get("cache_control").is_none());
+    assert!(tools.iter().all(|t| t["eager_input_streaming"] == true), "tool inputs stream as they are made");
     assert_eq!(tools[1]["cache_control"]["type"], "ephemeral");
     assert_eq!(b["system"][0]["cache_control"]["type"], "ephemeral");
     assert_eq!(b["messages"][0]["content"][0]["cache_control"]["type"], "ephemeral");

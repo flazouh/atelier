@@ -117,7 +117,9 @@ pub fn request_body(request: &ModelRequest<'_>) -> Value {
     let mut tools: Vec<Value> = request
         .tools
         .iter()
-        .map(|t| json!({"name": t.name, "description": t.description, "input_schema": t.schema}))
+        // `eager_input_streaming` makes a big input (a file to write) stream as it is made. The API then does
+        // not validate it, so a cut-off or invalid input is caught by the stream state (`malformed`).
+        .map(|t| json!({"name": t.name, "description": t.description, "input_schema": t.schema, "eager_input_streaming": true}))
         .collect();
     if let Some(last) = tools.last_mut() {
         *last = cached(last.clone());
