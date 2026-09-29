@@ -7,10 +7,15 @@ use std::{path::PathBuf, time::Instant};
 
 use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
 
+mod agent_session;
+mod agents_view;
 mod editor_pane;
+mod list_diff;
 mod open_project;
+mod session_view;
 mod shell;
 mod ssh_form;
+mod status;
 mod tabs;
 mod tree;
 mod tree_view;
@@ -40,9 +45,9 @@ fn main() {
             }),
             ..Default::default()
         };
-        let recent = saved.recent.clone();
         cx.open_window(options, move |window, cx| {
-            let shell = cx.new(|cx| shell::Shell::new(recent, cx));
+            let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
+            shell.update(cx, |s, cx| s.listen(window, cx));
             window.focus(&shell.read(cx).focus_handle(), cx);
             for folder in folders {
                 shell.update(cx, |s, cx| match folder {

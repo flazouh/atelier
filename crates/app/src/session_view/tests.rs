@@ -1,0 +1,60 @@
+use std::rc::Rc;
+
+use beui::{
+    agent_panels::AgentPanels,
+    panel_types::{PanelData, ProjectLabel},
+    session_status::SessionStatus,
+    sidebar_model::Location,
+};
+use gpui_kit::{
+    AppContext, Context, Entity, Focusable, InteractiveElement, IntoElement, ParentElement, Render, Styled, TestAppContext,
+    Window, div, px,
+    component::input::{Input, InputState},
+};
+
+/// Agent panels holding one panel whose content is an input, as a session's composer is.
+struct Host {
+    panels: Entity<AgentPanels>,
+    input: Entity<InputState>,
+}
+
+impl Render for Host {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().size_full().child(self.panels.clone())
+    }
+}
+
+/// A press on an input inside a panel leaves the focus in the input, so typing goes there and not to
+/// the window's bare-letter keys.
+#[gpui_kit::test]
+fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        beui::init(cx);
+        beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
+        cx.set_reduce_motion(true);
+    });
+    let (host, cx) = cx.add_window_view(|window, cx| {
+        let input = cx.new(|cx| InputState::new(window, cx));
+        let panels = cx.new(AgentPanels::new);
+        let shown = input.clone();
+        let panel = PanelData {
+            id: "p".into(),
+            project: ProjectLabel { id: "project".into(), name: "project".into(), location: Location::Local },
+            title: "A session".into(),
+            look: lathe_agents::registry::agents()[0].look.clone(),
+            status: SessionStatus::Idle,
+            content: Rc::new(move |_, _| {
+                div().size_full().child(div().debug_selector(|| "composer".into()).h(px(40.)).child(Input::new(&shown))).into_any_element()
+            }),
+        };
+        panels.update(cx, |p, cx| p.set_panels(vec![panel], vec!["project".into()], cx));
+        Host { panels, input }
+    });
+    cx.run_until_parked();
+    let at = cx.debug_bounds("composer").expect("the panel draws its input");
+    cx.simulate_click(at.center(), gpui_kit::Modifiers::default());
+    cx.run_until_parked();
+    let focused = cx.update(|window, cx| host.read(cx).input.read(cx).focus_handle(cx).is_focused(window));
+    assert!(focused, "the input kept the focus");
+}

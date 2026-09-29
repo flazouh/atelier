@@ -25,14 +25,25 @@ use gpui_kit::{
 use lathe_project::LocalProject;
 use lathe_settings::Location;
 
+use std::collections::BTreeMap;
+
+use beui::{
+    agent_panels::AgentPanels,
+    panel_types::{Layout, PanelsEvent, PanelsState},
+    sidebar::{Sidebar, SidebarEvent},
+};
+use gpui_kit::AnyElement;
+
 use crate::{
+    agent_session::{self, AgentSession},
+    agents_view,
     ssh_form::{Phase, SshForm, SshFormEvent},
     editor_pane::editor_pane,
     open_project::{Git, Listing, OpenProject, ProjectEvent},
     tree_view::tree_view,
 };
 
-actions!(lathe, [OpenFolder, OpenRemote, Save, CloseTab, ToggleSidebar, ToggleRight]);
+actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -44,6 +55,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("secondary-shift-o", OpenRemote, None),
         KeyBinding::new("secondary-shift-O", OpenRemote, None),
         KeyBinding::new("secondary-s", Save, None),
+        KeyBinding::new("secondary-n", NewSession, None),
         KeyBinding::new("secondary-w", CloseTab, None),
         KeyBinding::new("secondary-b", ToggleSidebar, None),
         // A shifted combo arrives with the letter either way, depending on the platform.
@@ -65,22 +77,182 @@ pub struct Shell {
     /// "Open over SSH…", while it is open.
     ssh: Option<(Entity<SshForm>, Subscription)>,
     focus: FocusHandle,
+    /// The projects and their sessions.
+    agents_sidebar: Entity<Sidebar>,
+    /// The open sessions' panels.
+    panels: Entity<AgentPanels>,
+    /// Names the reader gave sessions, by the agent's id.
+    names: BTreeMap<String, String>,
     _subscriptions: Vec<Subscription>,
 }
 
 impl Shell {
-    pub fn new(recent: Vec<Location>, cx: &mut Context<Self>) -> Self {
+    pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
+        let agents_sidebar = cx.new(Sidebar::new);
+        let panels = cx.new(|cx| {
+            let mut panels = AgentPanels::new(cx);
+            let layout = if saved.panels.single { Layout::Single } else { Layout::SideBySide };
+            let widths = saved.panels.widths.iter().map(|(id, w)| (SharedString::from(id.clone()), *w)).collect();
+            panels.restore(PanelsState { layout, grouped: saved.panels.grouped, widths }, cx);
+            panels
+        });
         Self {
             projects: Vec::new(),
             active: 0,
             sidebar: true,
             right: true,
-            recent,
+            recent: saved.recent.clone(),
             said: None,
             finder: None,
             ssh: None,
             focus: cx.focus_handle(),
+            agents_sidebar,
+            panels,
+            names: saved.session_names.clone(),
             _subscriptions: Vec::new(),
+        }
+    }
+
+    /// Hears the sidebar and the panels. Called once the window exists.
+    pub fn listen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let sidebar = self.agents_sidebar.clone();
+        let panels = self.panels.clone();
+        self._subscriptions.push(cx.subscribe_in(&sidebar, window, Self::sidebar_event));
+        self._subscriptions.push(cx.subscribe_in(&panels, window, Self::panels_event));
+    }
+
+    /// The sidebar and the panels, drawn again from the projects as they are now.
+    fn sync(&mut self, cx: &mut Context<Self>) {
+        let projects = agents_view::sidebar(&self.projects, &self.names, cx);
+        let (panels, order) = agents_view::panels(&self.projects, cx);
+        let now = agent_session::now();
+        self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
+        self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));
+        cx.notify();
+    }
+
+    fn project_by_id(&self, id: &str, cx: &App) -> Option<usize> {
+        self.projects.iter().position(|p| agents_view::project_id(p.read(cx)).as_ref() == id)
+    }
+
+    /// The open session keyed `key`, and the index of its project.
+    fn session_by_key(&self, key: &str, cx: &App) -> Option<(usize, Entity<AgentSession>)> {
+        self.projects.iter().enumerate().find_map(|(i, p)| {
+            p.read(cx).sessions.iter().find(|s| s.read(cx).key.as_ref() == key).map(|s| (i, s.clone()))
+        })
+    }
+
+    fn new_session(&mut self, project: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(p) = self.projects.get(project).cloned() else { return };
+        let session = p.update(cx, |p, cx| p.open_session(None, window, cx));
+        self.show_session(project, &session, window, cx);
+    }
+
+    /// Makes `session` the panel in front, and its project the one the tree and the editor show.
+    fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
+        self.active = project;
+        self.sync(cx);
+        let key = session.read(cx).key.clone();
+        self.panels.update(cx, |p, cx| p.activate(&key, cx));
+        self.seen(&key, cx);
+        let composer = session.read(cx).composer.clone();
+        composer.read(cx).focus_handle(cx).focus(window, cx);
+    }
+
+    /// The session keyed `key` is the one the reader looks at; no other is.
+    fn seen(&mut self, key: &str, cx: &mut Context<Self>) {
+        for p in &self.projects {
+            for s in p.read(cx).sessions.clone() {
+                s.update(cx, |s, cx| s.set_seen(s.key.as_ref() == key, cx));
+            }
+        }
+        self.sync(cx);
+    }
+
+    fn sidebar_event(&mut self, _: &Entity<Sidebar>, event: &SidebarEvent, window: &mut Window, cx: &mut Context<Self>) {
+        match event {
+            SidebarEvent::Open { project, session } => {
+                let Some(at) = self.project_by_id(project, cx) else { return };
+                match agents_view::pick(session) {
+                    agents_view::Pick::Open(key) => {
+                        if let Some((at, session)) = self.session_by_key(&key, cx) {
+                            self.show_session(at, &session, window, cx);
+                        }
+                    }
+                    agents_view::Pick::Past(id) => {
+                        let p = self.projects[at].clone();
+                        let title = p.read(cx).past.iter().find(|s| s.id == id).map(|s| s.title.clone()).unwrap_or_default();
+                        let title = self.names.get(&id.0).cloned().unwrap_or(title);
+                        let session = p.update(cx, |p, cx| p.open_session(Some((id.clone(), title.into())), window, cx));
+                        if let Some(name) = self.names.get(&id.0) {
+                            session.update(cx, |s, _| s.name = Some(name.clone().into()));
+                        }
+                        self.show_session(at, &session, window, cx);
+                    }
+                }
+            }
+            SidebarEvent::NewSession { project } => {
+                if let Some(at) = self.project_by_id(project, cx) {
+                    self.new_session(at, window, cx);
+                }
+            }
+            SidebarEvent::RevealProject { project } => {
+                if let Some(at) = self.project_by_id(project, cx) {
+                    self.active = at;
+                    self.sidebar = true;
+                    cx.notify();
+                }
+            }
+            SidebarEvent::CopyPath { project } => cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(project.to_string())),
+            SidebarEvent::CloseProject { project } => {
+                if let Some(at) = self.project_by_id(project, cx) {
+                    self.projects.remove(at);
+                    self.active = self.active.min(self.projects.len().saturating_sub(1));
+                    self.sync(cx);
+                }
+            }
+            // A remote project reconnects by itself; Retry says so.
+            SidebarEvent::Retry { .. } => self.say("Reconnecting on its own; it retries every few seconds.".into(), cx),
+        }
+    }
+
+    fn panels_event(&mut self, _: &Entity<AgentPanels>, event: &PanelsEvent, _: &mut Window, cx: &mut Context<Self>) {
+        match event {
+            PanelsEvent::Activated(key) => {
+                if let Some((at, _)) = self.session_by_key(key, cx) {
+                    self.active = at;
+                }
+                self.seen(key, cx);
+            }
+            PanelsEvent::Closed(key) => {
+                if let Some((at, _)) = self.session_by_key(key, cx) {
+                    let key = key.to_string();
+                    self.projects[at].update(cx, |p, cx| p.close_session(&key, cx));
+                    self.sync(cx);
+                }
+            }
+            PanelsEvent::StateChanged => {
+                let state = self.panels.read(cx).state();
+                let panels = lathe_settings::Panels {
+                    single: state.layout == Layout::Single,
+                    grouped: state.grouped,
+                    widths: state.widths.iter().map(|(id, w)| (id.to_string(), *w)).collect(),
+                };
+                if let Some(path) = lathe_settings::path() {
+                    cx.background_spawn(async move {
+                        if let Err(error) = lathe_settings::update(&path, |s| s.panels = panels) {
+                            eprintln!("could not save the panels: {error}");
+                        }
+                    })
+                    .detach();
+                }
+            }
+        }
+    }
+
+    fn new_session_key(&mut self, _: &NewSession, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.projects.is_empty() {
+            self.new_session(self.active, window, cx);
         }
     }
 
@@ -189,11 +361,27 @@ impl Shell {
         let entity = cx.new(|cx| OpenProject::new(location.clone(), project, window, cx));
         self._subscriptions.push(cx.subscribe(&entity, |this, _, event: &ProjectEvent, cx| match event {
             ProjectEvent::Said(line) => this.say(line.to_string(), cx),
+            ProjectEvent::Sessions => this.sync(cx),
+            ProjectEvent::Renamed { id, name } => {
+                this.names.insert(id.0.clone(), name.to_string());
+                let (id, name) = (id.0.clone(), name.to_string());
+                if let Some(path) = lathe_settings::path() {
+                    cx.background_spawn(async move {
+                        if let Err(error) = lathe_settings::update(&path, |s| drop(s.session_names.insert(id, name))) {
+                            eprintln!("could not save the name: {error}");
+                        }
+                    })
+                    .detach();
+                }
+                this.sync(cx);
+            }
         }));
+        // A project's branch or link changing redraws its sidebar header.
+        self._subscriptions.push(cx.observe(&entity, |this, _, cx| this.sync(cx)));
         self.projects.push(entity);
         self.active = self.projects.len() - 1;
         self.remember(location, cx);
-        cx.notify();
+        self.sync(cx);
     }
 
     /// Puts `location` first in the recent list, here and in the settings file.
@@ -417,41 +605,20 @@ impl Shell {
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let projects = self.projects.iter().enumerate().map(|(i, p)| {
-            let name = p.read(cx).name();
-            let shown = i == self.active;
-            div()
-                .id(("project", i))
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .h(px(28.))
-                .px(px(8.))
-                .mx(px(6.))
-                .rounded(radius::MD)
-                .cursor_pointer()
-                .text_size(TextSize::Sm.font_size())
-                .when(shown, |d| d.bg(theme.muted_hover()).font_weight(gpui_kit::FontWeight::MEDIUM))
-                .hover(|s| s.bg(theme.muted_hover()))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.active = i;
-                    cx.notify();
-                }))
-                .child(FileIcon::folder(&name, shown).size(px(14.)))
-                .child(div().min_w_0().truncate().child(name))
-        });
-        let heading = |words: &'static str| div().px(px(14.)).pt(px(10.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(words);
+        let heading = |words: SharedString| div().px(px(14.)).pt(px(10.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(words);
         let tree = self.active().map(|p| tree_view(p, cx));
+        let tree_heading: SharedString = match self.active() {
+            Some(p) => format!("Files in {}", p.read(cx).name()).into(),
+            None => "Files".into(),
+        };
         let current = theme.clone();
         div()
             .flex()
             .flex_col()
             .size_full()
-            .child(heading("Projects"))
-            .children(projects)
-            .child(heading("Sessions"))
-            .child(div().px(px(14.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("No sessions yet."))
-            .child(heading("Files"))
+            // The projects and their sessions, then the front project's files, each half the height.
+            .child(div().flex_1().min_h_0().child(self.agents_sidebar.clone()))
+            .child(heading(tree_heading))
             .child(div().flex_1().min_h_0().children(tree))
             .child(div().flex_none().p(px(8.)).child(beui::theme_picker::theme_picker("theme", &current, |picked, cx| {
                 let name = picked.name.to_string();
@@ -466,7 +633,12 @@ impl Shell {
             })))
     }
 
-    fn agent_panel(&self, cx: &App) -> impl IntoElement {
+    /// The open sessions' panels, or, with none open, a way to start one.
+    fn agent_panel(&self, cx: &mut Context<Self>) -> AnyElement {
+        let open = self.projects.iter().any(|p| !p.read(cx).sessions.is_empty());
+        if open {
+            return self.panels.clone().into_any_element();
+        }
         let muted = cx.theme().muted_foreground;
         div()
             .flex()
@@ -474,9 +646,18 @@ impl Shell {
             .size_full()
             .items_center()
             .justify_center()
-            .gap(px(4.))
-            .child(div().text_size(TextSize::Sm.font_size()).child("No session"))
-            .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("An agent session for this project shows here."))
+            .gap(px(8.))
+            .child(div().text_size(TextSize::Sm.font_size()).child("No session open"))
+            .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("Start one, or open a past one from the sidebar."))
+            .child(
+                Button::new("new-session")
+                    .label("New session")
+                    .size(ButtonSize::Md)
+                    .variant(ButtonVariant::Primary)
+                    .cap(keys::cap("⌘n"))
+                    .on_click(cx.listener(|this, _, window, cx| this.new_session_key(&NewSession, window, cx))),
+            )
+            .into_any_element()
     }
 
     fn status_line(&self, cx: &App) -> impl IntoElement {
@@ -564,6 +745,7 @@ impl Render for Shell {
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::open_folder))
             .on_action(cx.listener(Self::open_ssh_form))
+            .on_action(cx.listener(Self::new_session_key))
             .on_action(cx.listener(Self::save))
             .on_action(cx.listener(Self::close_tab))
             .on_action(cx.listener(Self::toggle_sidebar))

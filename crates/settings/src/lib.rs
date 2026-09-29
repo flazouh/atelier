@@ -23,9 +23,25 @@ pub struct Settings {
     pub theme: Option<String>,
     /// Newest first.
     pub recent: Vec<Location>,
+    /// Names the reader gave sessions, by the agent's id for the session.
+    pub session_names: std::collections::BTreeMap<String, String>,
+    /// How the agent panels were laid out last.
+    pub panels: Panels,
     /// Keys a newer or older lathe wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
+}
+
+/// The agent panels' layout, as the window left it.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Panels {
+    /// One panel with tabs, rather than side by side.
+    pub single: bool,
+    /// Grouped by project.
+    pub grouped: bool,
+    /// Each panel's width, by its session.
+    pub widths: Vec<(String, f32)>,
 }
 
 /// Where a project lives.
