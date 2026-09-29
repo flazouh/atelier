@@ -6,6 +6,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export LC_ALL=C.UTF-8
+# A plain `ssh hp-agent tools/check.sh` gets no login PATH: cargo, and the go that gopls needs, live here.
+for dir in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+  if [ -d "$dir" ]; then PATH="$dir:$PATH"; fi
+done
+export PATH
 LATHE_REQUIRE_LSP=rust,typescript,python,go cargo test -q --workspace
 cargo clippy -q --workspace --all-targets -- -D warnings
 cargo build -q -p beui-gallery
