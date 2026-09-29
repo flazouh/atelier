@@ -205,10 +205,6 @@ impl OpenProject {
         self.list_sessions(cx);
     }
 
-    pub fn project(&self) -> Arc<dyn Project> {
-        self.project.clone()
-    }
-
     pub fn name(&self) -> String {
         self.location.name()
     }
