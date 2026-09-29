@@ -134,7 +134,8 @@ The copy to upload comes from `$LATHE_REMOTE_DIR/<system>-<arch>/lathe-remote` (
 `darwin-aarch64`), or, for a host like this machine, the `lathe-remote` beside the app. In
 development the HP builds the linux-x86_64 copy (`cargo build --release -p lathe-remote`); a Mac
 app that opens a project on the HP points `LATHE_REMOTE_DIR` at a folder holding that file as
-`linux-x86_64/lathe-remote`.
+`linux-x86_64/lathe-remote`. `tools/build-remote.sh` builds it and prints that folder; it sets its
+own PATH, so a plain `ssh hp-agent ~/code/local/lathe/tools/build-remote.sh` works.
 
 ### Failures
 

@@ -236,7 +236,8 @@ The first run of the disk case took 250 ms: it read the last commit's text of ea
 
 `RemoteProject` over a real `ssh` from the HP to itself (`hp-agent`, loopback through sshd), the
 release lathe-remote, `/tmp/qa-lathe` (1,009 files). Load average 9 to 11. Three runs of 20
-samples each; the LAN number waits on a run from the Mac to the HP.
+samples each. The LAN row is alex-9c's run from Alex's Mac to the HP over Wi-Fi, a clone of
+1,150 files, the same bench.
 
     LATHE_REMOTE_DIR=… LATHE_TEST_SSH_HOST=hp-agent LATHE_TEST_SSH_ROOT=/tmp/qa-lathe \
         cargo test --release -p lathe-remote --test over_ssh -- --ignored --nocapture remote_costs
@@ -247,3 +248,7 @@ samples each; the LAN number waits on a run from the Mac to the HP.
 | Connect, uploading a new copy first | < 5 s | 966 ms | Yes |
 | File open: reading a 10,000-line file (212 KB) | < 150 ms on a LAN | 1.17 to 2.04 ms median, 1.39 to 3.12 ms p95 (loopback) | Yes, on loopback |
 | Listing 1,009 files | < 500 ms | 3.89 to 4.82 ms median, 4.86 to 6.36 ms p95 | Yes |
+| LAN, Mac to HP over Wi-Fi: connect, the copy there | < 3 s | 0.68 to 0.77 s | Yes |
+| LAN: connect, uploading a new copy first | < 5 s | 1.4 s | Yes |
+| LAN: file open, 212 KB | < 150 ms | 19 to 49 ms median | Yes |
+| LAN: listing 1,150 files | < 500 ms | about 20 ms | Yes |
