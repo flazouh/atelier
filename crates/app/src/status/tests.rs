@@ -50,3 +50,10 @@ fn a_failure_says_why_short() {
     assert_eq!(after(&SessionStatus::Idle, &exited(Some(0), ""), true), SessionStatus::Idle);
     assert_eq!(opened(&failed), failed, "opening a failed session keeps its reason");
 }
+
+#[test]
+fn a_session_stopped_mid_turn_is_no_longer_working() {
+    assert_eq!(after(&SessionStatus::Working, &Event::Ended(EndReason::Closed), true), SessionStatus::Idle);
+    assert_eq!(after(&SessionStatus::NeedsYou(Need::Approval), &Event::Ended(EndReason::Closed), false), SessionStatus::Idle);
+    assert_eq!(after(&SessionStatus::Finished, &Event::Ended(EndReason::Closed), false), SessionStatus::Finished, "its news stays");
+}
