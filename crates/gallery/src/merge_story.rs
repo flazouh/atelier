@@ -31,6 +31,7 @@ pub fn states() -> Vec<(&'static str, MergeFacts)> {
         ("Behind its base", MergeFacts { behind: Some(vec![UpdateWay::Merge, UpdateWay::Rebase]), ..open.clone() }),
         ("Checks failing", MergeFacts { checks_failing: 1, ..open.clone() }),
         ("Checks running", MergeFacts { checks_running: 2, ..open.clone() }),
+        ("Checks running, auto chosen", MergeFacts { checks_running: 2, ..open.clone() }),
         ("Review missing", MergeFacts { review: ReviewNeed::Missing, ..open.clone() }),
         ("Changes asked", MergeFacts { review: ReviewNeed::ChangesAsked(vec!["Ada".into()]), ..open.clone() }),
         ("Merge when ready on", MergeFacts { checks_running: 2, auto_merge: Some(true), ..open.clone() }),
@@ -38,6 +39,7 @@ pub fn states() -> Vec<(&'static str, MergeFacts)> {
         ("In the queue", MergeFacts { queue: Some(Queue { queued: true, position: Some(3) }), ..open.clone() }),
         ("Admin, checks failing", MergeFacts { checks_failing: 1, rights: Rights::Bypass, ..open.clone() }),
         ("Cannot merge", MergeFacts { rights: Rights::Cannot, ..open.clone() }),
+        // Last, as the PR card story reads it.
         ("Merged", MergeFacts { state: PullState::Merged, ..open }),
     ]
 }
@@ -61,7 +63,11 @@ const BODY: &str = "Before this, a client that aborted between two chunks left t
 impl MergeStory {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let states = states();
-        let choices = states.iter().map(|(_, facts)| first_choice(facts, None)).collect();
+        // The one row whose reader turned merge when ready on in the menu.
+        let choices = states
+            .iter()
+            .map(|(name, facts)| Choice { auto: name.ends_with("auto chosen"), ..first_choice(facts, None) })
+            .collect();
         let title = pr_3344().title;
         let boxed = |facts: MergeFacts, window: &mut Window, cx: &mut Context<Self>| {
             let choice = first_choice(&facts, None);
@@ -157,7 +163,8 @@ impl Render for MergeStory {
                 .child(self.button(i, cx))
         })
         .collect::<Vec<_>>();
-        let cards = [(0, PrState::Open, Checks { passed: 3, ..Default::default() }, ReviewState::Approved), (13, PrState::Merged, Checks { passed: 3, ..Default::default() }, ReviewState::Approved)]
+        let merged = self.states.len() - 1;
+        let cards = [(0, PrState::Open, Checks { passed: 3, ..Default::default() }, ReviewState::Approved), (merged, PrState::Merged, Checks { passed: 3, ..Default::default() }, ReviewState::Approved)]
             .map(|(i, state, checks, review)| {
                 let (acted, chose) = (cx.entity().downgrade(), cx.entity().downgrade());
                 PrCard::new(("merge-card", i), PrChipData { state, ..pr_3344() })
