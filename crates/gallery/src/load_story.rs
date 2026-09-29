@@ -112,7 +112,7 @@ impl LoadStory {
             report("highlight in frame", &mut self.highlighting);
             report("diff layout", &mut self.diff_layout);
             report("diff paint", &mut self.diff_paint);
-            report_count("layout nodes", &mut self.nodes);
+            report_count("layout nodes", &self.nodes);
             cx.quit();
             return;
         }
@@ -138,19 +138,19 @@ fn report(name: &str, samples: &mut [Duration]) {
     );
 }
 
-/// Prints the median and the largest of a count that `Duration::from_nanos` carries.
-fn report_count(name: &str, samples: &mut [Duration]) {
-    samples.sort();
+/// Prints the node count of the first frame. Taffy reuses freed slots after that, so only the first
+/// frame, built on a fresh tree, gives the exact count; the largest index of any frame comes next.
+fn report_count(name: &str, samples: &[Duration]) {
     let count = |d: Duration| d.as_nanos();
-    println!("{name:<20} median {:>8}     max {:>8}", count(samples[samples.len() / 2]), count(*samples.last().unwrap()));
+    println!("{name:<20} first frame {:>6}  max {:>6}", count(samples[0]), count(*samples.iter().max().unwrap()));
 }
 /// Time spent laying out and painting one element in a frame.
 #[derive(Default)]
 struct Stages {
     layout: Duration,
     paint: Duration,
-    /// The highest layout node index seen: taffy hands out indices from zero each frame, so this is
-    /// the frame's node count when the timed element wraps the whole tree.
+    /// The highest layout node index seen: on a fresh tree taffy hands out indices from zero, so this is
+    /// the node count when the timed element wraps the whole tree.
     nodes: usize,
 }
 /// A layout id's node index, read from its debug form (`LayoutId(NodeId(n))`), for gpui keeps it private.
