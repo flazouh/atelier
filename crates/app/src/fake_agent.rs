@@ -80,7 +80,9 @@ pub fn start_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, f
         beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
     });
     let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(fail_first), work: Mutex::default() });
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    // Its data folder is the test's own, never this machine's.
+    let data = tempfile::tempdir().unwrap().keep();
+    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap().with_data_dir(&data));
     let mut agent = lathe_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(fake.clone()));
     let mut made = None;

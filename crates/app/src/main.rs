@@ -17,6 +17,7 @@ mod frame_meter;
 mod list_diff;
 mod open_project;
 mod review_pane;
+mod review_state;
 mod review_text;
 mod session_view;
 mod shell;

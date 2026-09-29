@@ -601,6 +601,7 @@ dependencies = [
  "lathe-agents",
  "lathe-editor",
  "lathe-lsp",
+ "lathe-pr-view",
  "lathe-project",
  "lathe-settings",
  "lsp-types",
@@ -3787,6 +3788,7 @@ dependencies = [
  "lathe-remote",
  "lathe-review",
  "lathe-settings",
+ "serde",
  "serde_json",
  "tempfile",
 ]
@@ -3852,6 +3854,7 @@ dependencies = [
 name = "lathe-project"
 version = "0.1.0"
 dependencies = [
+ "dirs 6.0.0",
  "ignore",
  "notify",
  "regex",

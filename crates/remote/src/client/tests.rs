@@ -32,6 +32,11 @@ struct Host {
 }
 
 fn host() -> (Host, Dial) {
+    host_with_data(None)
+}
+
+/// A host whose projects keep their data folders under `data`.
+fn host_with_data(data: Option<std::path::PathBuf>) -> (Host, Dial) {
     let (tx, cuts) = mpsc::channel();
     let refuse = Arc::new(Mutex::new(false));
     let refusing = refuse.clone();
@@ -43,7 +48,8 @@ fn host() -> (Host, Dial) {
         let (host_reader, app_writer) = io::pipe()?;
         let cut = Cut(Arc::new(Mutex::new(Some(host_writer))));
         let _ = tx.send(cut.clone());
-        thread::spawn(move || crate::server::serve(host_reader, cut));
+        let data = data.clone();
+        thread::spawn(move || crate::server::serve_with_data(host_reader, cut, data));
         Ok(Connection {
             reader: Box::new(app_reader),
             writer: Box::new(app_writer),
@@ -192,4 +198,22 @@ fn a_process_starts_after_a_reconnect() {
     let mut out = String::new();
     after.stdout.read_to_string(&mut out).unwrap();
     assert_eq!(out, "again\n");
+}
+
+#[test]
+fn a_remote_project_removes_files_and_keeps_its_data_on_the_host() {
+    let dir = folder(&[("a.txt", "a")]);
+    let data = tempfile::tempdir().unwrap();
+    let (_host, dial) = host_with_data(Some(data.path().to_path_buf()));
+    let remote = connect(&dir, dial);
+    remote.remove("a.txt").unwrap();
+    assert!(!dir.path().join("a.txt").exists());
+    assert_eq!(remote.remove("a.txt").unwrap_err().kind(), io::ErrorKind::NotFound);
+    remote.data_write("review/one.json", b"{}").unwrap();
+    assert_eq!(remote.data_read("review/one.json").unwrap(), b"{}");
+    let listed: Vec<String> = remote.data_list("review").unwrap().into_iter().map(|e| e.path).collect();
+    assert_eq!(listed, ["review/one.json"]);
+    assert_eq!(remote.data_write("../x", b"").unwrap_err().kind(), io::ErrorKind::InvalidInput);
+    assert!(std::fs::read_dir(data.path().join("projects")).unwrap().next().is_some(), "the data is on the host, under its data folder");
+    assert!(!dir.path().join("review").exists());
 }

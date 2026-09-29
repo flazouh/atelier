@@ -14,6 +14,12 @@ fn a_folder_over_ssh_lists_and_reads() {
     let project = lathe_remote::ssh::connect(&host, &dir.path().display().to_string(), &|line| eprintln!("{line}")).expect("it connects");
     assert_eq!(project.read("hello.txt").unwrap(), b"over ssh\n");
     assert!(project.list().unwrap().iter().any(|e| e.path == "hello.txt"));
+    // Protocol 2: a remove, and the data folder on the host.
+    project.remove("hello.txt").unwrap();
+    assert!(!dir.path().join("hello.txt").exists());
+    project.data_write("over-ssh/check.txt", b"kept").unwrap();
+    assert_eq!(project.data_read("over-ssh/check.txt").unwrap(), b"kept");
+    assert!(project.data_list("over-ssh").unwrap().iter().any(|e| e.path == "over-ssh/check.txt"));
 }
 
 #[test]

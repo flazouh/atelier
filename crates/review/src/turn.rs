@@ -10,7 +10,8 @@ pub struct TurnReview {
 }
 
 impl TurnReview {
-    pub(crate) fn new(mut files: Vec<FileReview>) -> Self {
+    /// A turn of these files. Public so a store can rebuild a turn it kept.
+    pub fn new(mut files: Vec<FileReview>) -> Self {
         files.sort_by(|a, b| a.path.cmp(&b.path));
         Self { files }
     }

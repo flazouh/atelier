@@ -140,10 +140,44 @@ fn a_turn_ends_with_its_changed_files_after_its_rows(cx: &mut TestAppContext) {
     cx.run_until_parked();
     let (turns, shown, counts) = cx.update(|_, cx| {
         let s = session.read(cx);
-        let files = s.review.turns().first().map(|t| t.files().iter().map(|f| (f.path.clone(), f.counts())).collect::<Vec<_>>());
-        (s.review.turns().len(), s.shown.clone(), files)
+        let files = s.reviews.turns.turns().first().map(|t| t.files().iter().map(|f| (f.path.clone(), f.counts())).collect::<Vec<_>>());
+        (s.reviews.turns.turns().len(), s.shown.clone(), files)
     });
     assert_eq!(turns, 1);
     assert_eq!(counts.unwrap(), [("a.txt".to_string(), (1, 0)), ("c.txt".to_string(), (1, 0))], "b.txt did not change");
     assert_eq!(shown.last(), Some(&list_diff::Row::Changes { turn: 0 }), "the card comes after the turn's rows");
+}
+
+/// The review is kept in the data folder with the session: a session resumed after a restart opens its
+/// turns, its cards and the reader's marks as they were.
+#[gpui_kit::test]
+fn a_resumed_session_opens_its_review_as_it_was_left(cx: &mut TestAppContext) {
+    let dir = git_project(&[("a.txt", "one\n")]);
+    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![ended()]], false);
+    let root = dir.clone();
+    fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "two\n").unwrap()));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        session.update(cx, |s, cx| {
+            let a = s.reviews.turns.turns()[0].file("a.txt").cloned().unwrap();
+            s.reviews.set_reviewed(0, &a, true);
+            s.save_review(cx);
+        })
+    });
+    cx.executor().advance_clock(SAVE_AFTER * 2);
+    cx.run_until_parked();
+    let (project, agent, id, marks) = cx.update(|_, cx| {
+        let s = session.read(cx);
+        (s.project.clone(), s.agent.clone(), s.id.clone().unwrap(), s.reviews.turn_marks.clone())
+    });
+    let resumed = cx.update(|window, cx| cx.new(|cx| AgentSession::start("k2".into(), agent, project, Some((id, "edit".into())), window, cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let r = &resumed.read(cx).reviews;
+        assert_eq!(r.turns.turns().len(), 1, "the turn came back");
+        let a = r.turns.turns()[0].file("a.txt").unwrap();
+        assert!(r.is_reviewed(0, a), "and the mark on it");
+        assert_eq!(r.turn_marks, marks, "and where its card sits");
+    });
 }

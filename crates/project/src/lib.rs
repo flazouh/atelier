@@ -13,9 +13,11 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
+mod data;
 mod local;
 mod process;
 
+pub use data::DataEntry;
 pub use local::LocalProject;
 pub use process::{Command, Control, Process, STDERR_KEEP, Tail};
 
@@ -107,6 +109,10 @@ pub trait Project: Send + Sync {
     fn read(&self, path: &str) -> io::Result<Vec<u8>>;
     /// Writes the file whole, so a reader never sees half of it.
     fn write(&self, path: &str, bytes: &[u8]) -> io::Result<()>;
+    /// Removes the file at `path`; a folder is refused.
+    fn remove(&self, path: &str) -> io::Result<()> {
+        Err(unsupported("remove", path))
+    }
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch>;
     fn search(&self, query: &Query) -> io::Result<Vec<Match>>;
     fn spawn(&self, command: &Command) -> io::Result<Process>;
@@ -118,6 +124,25 @@ pub trait Project: Send + Sync {
     fn host(&self) -> Option<&str> {
         None
     }
+    /// A file of the project's data folder: lathe's own data about this project, on the project's
+    /// host and outside the repository (`data.rs`). Paths are relative to that folder; `..` and
+    /// absolute paths are refused, as in `read` and `write`.
+    fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
+        Err(unsupported("data_read", path))
+    }
+    /// Writes a file of the data folder whole, making its folders.
+    fn data_write(&self, path: &str, _bytes: &[u8]) -> io::Result<()> {
+        Err(unsupported("data_write", path))
+    }
+    /// The data folder's files under `prefix` (a folder, or `""` for all), newest first.
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<DataEntry>> {
+        Err(unsupported("data_list", prefix))
+    }
+}
+
+/// What a project that keeps no data folder, or removes nothing, answers: a test's stand-in, say.
+fn unsupported(call: &str, path: &str) -> io::Error {
+    io::Error::new(io::ErrorKind::Unsupported, format!("this project has no {call} ({path})"))
 }
 
 /// The host path of a root-relative `path`. A path that climbs out of the root (`..`), or names a

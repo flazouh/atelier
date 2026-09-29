@@ -67,7 +67,7 @@ fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
 /// name opens it in the editor.
 fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElement {
     let s = session.read(cx);
-    let Some(files) = s.review.turns().get(turn).map(|t| lathe_review::present::changed_files(t.files())) else {
+    let Some(files) = s.reviews.turns.turns().get(turn).map(|t| lathe_review::present::changed_files(t.files())) else {
         return div().into_any_element();
     };
     let (review, open) = (session.clone(), session.clone());

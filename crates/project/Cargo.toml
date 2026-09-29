@@ -6,6 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+dirs = "6"
 ignore = "0.4.33"
 notify = "7"
 regex = "1"

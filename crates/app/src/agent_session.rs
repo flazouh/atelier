@@ -28,10 +28,17 @@ use lathe_agents::{
     },
 };
 use lathe_project::Project;
-use lathe_review::{Comments, Merged, Reviewed, SessionReview, TurnReview, TurnTracker};
+use lathe_review::{TurnReview, TurnTracker};
 use std::sync::Mutex;
 
-use crate::{list_diff, review_pane::Scope, status};
+use crate::{
+    list_diff,
+    review_state::{Record, ReviewState, record_path},
+    status,
+};
+
+/// How long after the review's last change it is written to the data folder.
+const SAVE_AFTER: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// How far past the view the list lays out rows.
 const OVERDRAW: f32 = 160.;
@@ -97,20 +104,10 @@ pub struct AgentSession {
     tracker: Arc<Mutex<Option<TurnTracker>>>,
     /// Turns the sink finished, waiting for the next drain.
     finished: Arc<Mutex<Vec<TurnReview>>>,
-    /// Every finished turn of the session.
-    pub review: SessionReview,
-    /// Which files the reader has read, per turn.
-    pub reviewed: Reviewed,
-    /// The review comments that go with the next message.
-    pub comments: Comments,
-    /// Comments sent with a message, and whether the agent's turn after it has ended: then they show
-    /// resolved.
-    pub sent_comments: Vec<(lathe_review::ReviewComment, bool)>,
-    /// After how many conversation items each finished turn's changed files show, and which turn.
-    pub turn_marks: Vec<(usize, usize)>,
-    /// Each reviewed file as the review left it, by scope and path: its hunks after the reader's
-    /// decisions and edits, and the text the review last wrote or read on disk.
-    pub decided: HashMap<(Scope, String), (Option<Merged>, Option<String>)>,
+    /// The session's review: its turns, decisions, marks and comments, kept in the data folder.
+    pub reviews: ReviewState,
+    /// Writes the review to the data folder a moment after it last changed.
+    _saving: Task<()>,
     pub composer: Entity<PromptInput>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
@@ -201,12 +198,8 @@ impl AgentSession {
             rows: Vec::new(),
             tracker,
             finished,
-            review: SessionReview::new(),
-            reviewed: Reviewed::new(),
-            comments: Comments::new(),
-            sent_comments: Vec::new(),
-            turn_marks: Vec::new(),
-            decided: HashMap::new(),
+            reviews: ReviewState::default(),
+            _saving: Task::ready(()),
             composer,
             renaming: None,
             _renaming: None,
@@ -225,18 +218,25 @@ impl AgentSession {
         let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink());
         let request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode };
         let opening = cx.background_spawn(async move {
-            let history = match &resume {
-                Some(id) if read_history => backend.history(project.as_ref(), id).unwrap_or_default(),
-                _ => Vec::new(),
+            let (history, record) = match &resume {
+                Some(id) if read_history => {
+                    // The review kept with the session; none, or one this build cannot read, is a fresh one.
+                    let record = project.data_read(&record_path(&id.0)).ok().and_then(|bytes| serde_json::from_slice::<Record>(&bytes).ok());
+                    (backend.history(project.as_ref(), id).unwrap_or_default(), record)
+                }
+                _ => (Vec::new(), None),
             };
-            (history, backend.open(project, request, sink))
+            (history, record, backend.open(project, request, sink))
         });
         self._start = cx.spawn(async move |this, cx| {
-            let (history, opened) = opening.await;
+            let (history, record, opened) = opening.await;
             _ = this.update(cx, |s, cx| {
                 s.starting = false;
                 for event in &history {
                     s.conversation.apply(event);
+                }
+                if let Some(record) = record {
+                    s.reviews = ReviewState::from_record(record);
                 }
                 match opened {
                     Ok(session) => {
@@ -310,16 +310,12 @@ impl AgentSession {
                 _ => {}
             }
         }
+        let ended_turns = !turns.is_empty();
         for turn in turns {
-            let at = self.review.push(turn);
-            // A turn that changed nothing shows no card.
-            if !self.review.turns()[at].files().is_empty() {
-                self.turn_marks.push((self.conversation.items().len(), at));
-            }
-            // The comments that went with this turn's message are answered now.
-            for (_, answered) in &mut self.sent_comments {
-                *answered = true;
-            }
+            self.reviews.finish_turn(turn, self.conversation.items().len());
+        }
+        if ended_turns {
+            self.save_review(cx);
         }
         self.active_at = now();
         self.refresh_rows();
@@ -334,7 +330,7 @@ impl AgentSession {
     /// Tells the list which rows to measure again.
     fn refresh_rows(&mut self) {
         let items = self.conversation.items();
-        let shown = list_diff::rows(items.len(), &self.turn_marks);
+        let shown = list_diff::rows(items.len(), &self.reviews.turn_marks);
         let after: Vec<_> = shown
             .iter()
             .map(|row| match *row {
@@ -376,8 +372,11 @@ impl AgentSession {
         self.refresh_rows();
         self.list.scroll_to_end();
         // The review comments go with the message, and show resolved once the agent's turn ends.
-        self.sent_comments.extend(self.comments.all().iter().cloned().map(|c| (c, false)));
-        let command = Command::Send { text, attachments: self.comments.take_attachments() };
+        let attachments = self.reviews.send_comments();
+        if !attachments.is_empty() {
+            self.save_review(cx);
+        }
+        let command = Command::Send { text, attachments };
         match (&self.session, &self.id) {
             // The agent stopped (a crash, Stop): the session resumes, and the message goes then.
             (None, Some(id)) if !self.starting => {
@@ -464,6 +463,28 @@ impl AgentSession {
     pub fn stop(&mut self, cx: &mut Context<Self>) {
         self.session = None;
         cx.notify();
+    }
+
+    /// Writes the review to the project's data folder, a moment after its last change, off the UI thread.
+    /// A session the agent has not named yet has nowhere to keep it.
+    pub fn save_review(&mut self, cx: &mut Context<Self>) {
+        let Some(id) = self.id.clone() else { return };
+        let record = self.reviews.record();
+        let project = self.project.clone();
+        let timer = cx.background_executor().timer(SAVE_AFTER);
+        let background = cx.background_executor().clone();
+        self._saving = cx.spawn(async move |this, cx| {
+            timer.await;
+            let written = background
+                .spawn(async move { serde_json::to_vec(&record).map_err(std::io::Error::other).and_then(|bytes| project.data_write(&record_path(&id.0), &bytes)) })
+                .await;
+            if let Err(error) = written {
+                _ = this.update(cx, |s, cx| {
+                    s.problem = Some(format!("The review was not kept: {error}").into());
+                    cx.notify();
+                });
+            }
+        });
     }
 
     /// A new session takes another agent until its first message: then its conversation belongs to one.

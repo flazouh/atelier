@@ -161,3 +161,38 @@ fn a_file_is_not_a_project() {
     assert!(LocalProject::open(dir.path().join("a.txt")).is_err());
     assert!(LocalProject::open(dir.path().join("missing")).is_err());
 }
+
+#[test]
+fn a_removed_file_is_gone_and_a_folder_or_a_path_outside_is_refused() {
+    let (dir, p) = project(&[("a.txt", "a"), ("sub/b.txt", "b")]);
+    p.remove("a.txt").unwrap();
+    assert!(!dir.path().join("a.txt").exists());
+    assert_eq!(p.remove("a.txt").unwrap_err().kind(), io::ErrorKind::NotFound);
+    assert!(p.remove("sub").is_err(), "a folder is not removed");
+    assert!(dir.path().join("sub/b.txt").exists());
+    assert_eq!(p.remove("../x").unwrap_err().kind(), io::ErrorKind::InvalidInput);
+}
+
+#[test]
+fn a_project_keeps_its_data_outside_the_repository_and_lists_it_newest_first() {
+    let (dir, _) = project(&[("a.txt", "a")]);
+    let data = tempfile::tempdir().unwrap();
+    let p = LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    p.data_write("agent/sessions/one.jsonl", b"1").unwrap();
+    std::thread::sleep(Duration::from_millis(20));
+    p.data_write("agent/sessions/two.jsonl", b"2").unwrap();
+    p.data_write("review/x.json", b"x").unwrap();
+    assert_eq!(p.data_read("agent/sessions/one.jsonl").unwrap(), b"1");
+    let listed: Vec<String> = p.data_list("agent/sessions").unwrap().into_iter().map(|e| e.path).collect();
+    assert_eq!(listed, ["agent/sessions/two.jsonl", "agent/sessions/one.jsonl"], "newest first, only under the prefix");
+    assert!(p.data_list("nothing/here").unwrap().is_empty());
+    assert!(!dir.path().join("agent").exists(), "nothing lands in the project");
+    assert_eq!(p.data_write("../escape", b"x").unwrap_err().kind(), io::ErrorKind::InvalidInput);
+    assert_eq!(p.data_read("a/../../x").unwrap_err().kind(), io::ErrorKind::InvalidInput);
+    // The same root finds the same folder; another root another.
+    let again = LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    assert_eq!(again.data_read("review/x.json").unwrap(), b"x");
+    let (other, _) = project(&[]);
+    let other = LocalProject::open(other.path()).unwrap().with_data_dir(data.path());
+    assert_eq!(other.data_read("review/x.json").unwrap_err().kind(), io::ErrorKind::NotFound);
+}

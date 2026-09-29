@@ -109,7 +109,7 @@ fn a_comment_goes_with_the_next_message_and_is_answered_by_its_turn(cx: &mut Tes
     let (pane, session, fake, _, cx) = reviewing(cx);
     // Row 2 of the merged text is "TWO", line 2 of the file now.
     cx.update(|_, cx| pane.update(cx, |p, cx| p.comment(2, "Why upper case?", cx)));
-    assert_eq!(cx.update(|_, cx| session.read(cx).comments.all().len()), 1);
+    assert_eq!(cx.update(|_, cx| session.read(cx).reviews.comments.all().len()), 1);
     fake.turns.lock().unwrap().push(vec![ended()]);
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("see my comment".into(), cx)));
     cx.run_until_parked();
@@ -119,7 +119,7 @@ fn a_comment_goes_with_the_next_message_and_is_answered_by_its_turn(cx: &mut Tes
     });
     let sent = sent.unwrap();
     assert!(matches!(&sent[..], [Attachment::LineComment { path, first_line: 2, body, .. }] if path == "a.txt" && body == "Why upper case?"), "{sent:?}");
-    let s = cx.update(|_, cx| (session.read(cx).comments.all().len(), session.read(cx).sent_comments.clone()));
+    let s = cx.update(|_, cx| (session.read(cx).reviews.comments.all().len(), session.read(cx).reviews.sent.clone()));
     assert_eq!(s.0, 0, "sent, so no longer waiting");
     assert!(s.1.iter().all(|(_, answered)| *answered), "the agent's turn after it ended");
 }
@@ -178,7 +178,7 @@ fn a_comment_typed_and_sent_with_its_key_is_kept_whole(cx: &mut TestAppContext) 
     cx.run_until_parked();
     cx.simulate_keystrokes("secondary-enter");
     cx.run_until_parked();
-    let bodies = cx.update(|_, cx| session.read(cx).comments.all().iter().map(|c| c.body.clone()).collect::<Vec<_>>());
+    let bodies = cx.update(|_, cx| session.read(cx).reviews.comments.all().iter().map(|c| c.body.clone()).collect::<Vec<_>>());
     assert_eq!(bodies, ["Why upper case?"]);
 }
 
@@ -254,4 +254,32 @@ fn typing_just_before_the_review_closes_reaches_the_disk(cx: &mut TestAppContext
     cx.update(|_, _| ());
     cx.run_until_parked();
     assert!(read(&dir, "a.txt").contains("TWO!"), "{}", read(&dir, "a.txt"));
+}
+
+/// Rejecting a file the agent made removes it, instead of leaving it empty.
+#[gpui_kit::test]
+fn a_rejected_new_file_is_removed(cx: &mut TestAppContext) {
+    let dir = git_project(&[("a.txt", BEFORE)]);
+    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![ended()]], false);
+    let root = dir.clone();
+    fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("new.txt"), "made\n").unwrap()));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("make a file".into(), cx)));
+    cx.run_until_parked();
+    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project, Scope::Turn(0), Some("new.txt"), window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_file(Decision::Reject, window, cx)));
+    cx.run_until_parked();
+    assert!(!dir.join("new.txt").exists(), "the file the agent made is gone");
+}
+
+/// The whole session is diffed off the UI thread: the switch keeps the turn drawn until its files land.
+#[gpui_kit::test]
+fn the_whole_session_is_read_off_the_ui_thread(cx: &mut TestAppContext) {
+    let (pane, _, _, _, cx) = reviewing(cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.switch_scope(window, cx)));
+    assert_eq!(cx.update(|_, cx| pane.read(cx).scope), Scope::Turn(0), "the turn stays until the session's files land");
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| pane.read(cx).scope), Scope::Whole);
+    assert_eq!(hunk_ids(&pane, cx).len(), 2);
 }

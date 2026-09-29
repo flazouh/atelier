@@ -27,10 +27,18 @@ over the SSH pipe and waits for the answer, with a timeout. Nothing above the tr
 | `list()` | Every file and folder under the root, `.gitignore` respected, `.git` left out, sorted by path. |
 | `read(path)` | A file's bytes. |
 | `write(path, bytes)` | Writes a file whole: a temporary file beside it, then a rename. |
+| `remove(path)` | Removes a file; a folder is refused. |
 | `watch(sink)` | Reports created, changed and removed paths in batches, until the handle drops. |
 | `search(query)` | Lines that match a literal or a regex, `.gitignore` respected, with a cap. |
 | `spawn(command)` | A process with piped stdin and stdout, and a handle to kill it, wait for it, and read the last 64KB of its stderr. |
 | `git(args)` | Runs `git` in the root and returns its status and output. |
+| `data_read(path)`, `data_write(path, bytes)`, `data_list(prefix)` | The project's data folder: lathe's own files about the project, on its host and outside the repository. The list is newest first, with each file's time. |
+
+The data folder is `<data>/lathe/projects/<folder>-<hash of the root>/`, where `<data>` is the host's data
+folder (`~/Library/Application Support` on macOS, `$XDG_DATA_HOME` or `~/.local/share` elsewhere), or
+`LATHE_DATA_DIR`. The hash is FNV-1a of the root's host path, so the same project always finds the same
+folder (`crates/project/src/data.rs`). A remote project's is on the host: `lathe-remote` answers the calls
+from its own data folder. A project that keeps no data folder (a test's stand-in) answers `Unsupported`.
 
 Paths are relative to the root in the interface, except `spawn`'s working folder and a language
 server's own paths, which are the host's absolute paths. A path that climbs out of the root (`..`),
@@ -110,7 +118,9 @@ servers all go through the same calls. The servers run on the host, started thro
   frames are the interface's own serde types. A frame over 256 MB is refused.
 - The app sends `Request { id, call }`; the host answers `Response { id, result }` and on its own
   sends `Event`s: a watch's `Changes`, a process's `Output`, its `Exited`. The first call is
-  `Hello { version, root }`; a version the host does not speak fails the hello.
+  `Hello { version, root }`; a version the host does not speak fails the hello. Version 2 added
+  `Remove` and the data folder's calls; the deploy path holds the binary's hash, so a new app puts its
+  own `lathe-remote` on the host.
 - The host runs each request on a thread of its own, so a slow search never holds up a read. A
   process's stdin is fed in order by a thread of its own. Its stderr's last 64 KB is kept.
 - Every call has a timeout: 60 s for a listing, a search or git, 30 s for the rest. A timeout is an
@@ -240,10 +250,13 @@ in place of the editor on the right; a file's name opens it in the editor.
   nothing shows no card. A message sent while a turn runs joins that turn.
 - **The review pane** (`crates/app/src/review_pane.rs`). alex-31's `ReviewBar`, `ChangedFileTree`, the
   file card with `ReviewFileHeader`, and the real editor with `InlineReview`'s hunks from each file's
-  `Merged`. The bar's switch shows one turn or the whole session (`SessionReview::whole`). A review
+  `Merged`. The bar's switch shows one turn or the whole session (`SessionReview::whole`, diffed on a
+  background task; the turn stays drawn until the session's files land). A review
   widens the right pane to 860 px, or to what leaves the agent panel a session panel's default width,
   and gives the old width back when it closes. Below 680 px the tree hides; review mode shows it.
-- **Decisions reach the disk.** Accept or reject a hunk, a file (the header, ⌃⇧↵ ⌃⇧⌫), or every file
+- **Decisions reach the disk.** A file the agent made and the reader rejected whole is removed
+  (`Project::remove`).
+- **Deciding.** Accept or reject a hunk, a file (the header, ⌃⇧↵ ⌃⇧⌫), or every file
   (the bar's ⋯ menu, ⌃⌥↵ ⌃⌥⌫). The file on disk is `Merged::current()`: the pane writes it through the
   Project at once after a decision, and 300 ms after the reader stops typing. The editor stays writable,
   and the reader's edits move the hunks (`Merged::edited`). An undo in the editor brings back the file as
@@ -253,8 +266,11 @@ in place of the editor on the right; a file's name opens it in the editor.
   (`Merged::rebased_on`) and puts the difference in the editor as one small edit, so the caret and the
   scroll stay where they were.
 - **Kept with the session.** What the reader decided and edited, per scope and file, and the Reviewed
-  marks (`x`), per turn; the review opens again as it was left. They live in memory with the session,
-  not across launches.
+  marks (`x`), per turn; the review opens again as it was left. The turns, their cards, the decisions,
+  the marks and the comments are kept in the project's data folder (`review/<session id>.json`, written
+  half a second after the last change, off the UI thread; `crates/app/src/review_state.rs`), so a session
+  resumed after a restart opens its review as it was left. A mark on a file that changed since stays
+  expired. A resumed session's cards sit after the conversation item they followed.
 - **Comments.** The gutter's + opens a `LineComposer` on the row; ⌃↵ adds the comment to the session
   (`Comments::add`, anchored with `Merged::anchor`), where it shows "not sent yet". The next message
   carries every waiting comment as `Attachment::LineComment` (`Command::Send { text, attachments }`); the
@@ -269,11 +285,9 @@ in place of the editor on the right; a file's name opens it in the editor.
 
 Limits:
 
-- Rejecting a file the agent created writes it empty: the Project has no remove.
 - A file's `+a -r` in the tree and the header stay as the turn left them; the bar's count of reviewed
   files moves.
 - The review's editor has syntax colours but no language server: its text holds both sides of each hunk.
-- The whole session is diffed on the UI thread when the switch opens it (`SessionReview::whole`).
 
 ## QA, M3
 

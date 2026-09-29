@@ -35,6 +35,8 @@ struct State {
     running: Mutex<HashMap<Pid, Running>>,
     next_pid: AtomicU64,
     watch: Mutex<Option<Watch>>,
+    /// Where projects keep their data folders; `None` for the host's own data folder.
+    data_dir: Option<PathBuf>,
 }
 
 fn send(out: &Out, frame: &Frame) {
@@ -45,9 +47,14 @@ fn send(out: &Out, frame: &Frame) {
 
 /// Serves requests from `input` until it closes, answering on `output`. Every process it started is
 /// killed when the app goes away.
-pub fn serve(mut input: impl Read, output: impl Write + Send + 'static) -> io::Result<()> {
+pub fn serve(input: impl Read, output: impl Write + Send + 'static) -> io::Result<()> {
+    serve_with_data(input, output, None)
+}
+
+/// [`serve`], with the projects' data folders under `data_dir`, as a test wants.
+pub fn serve_with_data(mut input: impl Read, output: impl Write + Send + 'static, data_dir: Option<PathBuf>) -> io::Result<()> {
     let out: Out = Arc::new(Mutex::new(Box::new(output)));
-    let state = Arc::new(State::default());
+    let state = Arc::new(State { data_dir, ..State::default() });
     while let Some(frame) = read_frame(&mut input)? {
         let Frame::Request { id, call } = frame else { continue };
         match call {
@@ -106,6 +113,10 @@ fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Reply> {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("the app speaks version {version}, this lathe-remote {VERSION}")));
             }
             let project = LocalProject::open(expand(&root))?;
+            let project = match &state.data_dir {
+                Some(dir) => project.with_data_dir(dir),
+                None => project,
+            };
             let root = project.root().display().to_string();
             *state.project.lock().unwrap_or_else(|p| p.into_inner()) = Some(Arc::new(project));
             Ok(Reply::Hello { root })
@@ -113,6 +124,10 @@ fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Reply> {
         Call::List => Ok(Reply::Entries(project(state)?.list()?)),
         Call::Read { path } => Ok(Reply::Bytes(project(state)?.read(&path)?)),
         Call::Write { path, bytes } => project(state)?.write(&path, &bytes).map(|()| Reply::Done),
+        Call::Remove { path } => project(state)?.remove(&path).map(|()| Reply::Done),
+        Call::DataRead { path } => Ok(Reply::Bytes(project(state)?.data_read(&path)?)),
+        Call::DataWrite { path, bytes } => project(state)?.data_write(&path, &bytes).map(|()| Reply::Done),
+        Call::DataList { prefix } => Ok(Reply::DataEntries(project(state)?.data_list(&prefix)?)),
         Call::Watch => {
             let out = out.clone();
             let watch = project(state)?.watch(Box::new(move |changes| send(&out, &Frame::Event(Event::Changes(changes)))))?;

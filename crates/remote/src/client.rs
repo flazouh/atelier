@@ -21,7 +21,7 @@ use std::{
 };
 
 use lathe_project::{
-    ChangeSink, Command, Control, Entry, GitOutput, Link, LinkSink, Match, Process, Project, Query, Watch,
+    ChangeSink, Command, Control, DataEntry, Entry, GitOutput, Link, LinkSink, Match, Process, Project, Query, Watch,
 };
 
 use crate::protocol::{Call, Event, Failure, Frame, Pid, Reply, VERSION, read_frame, write_frame};
@@ -344,6 +344,34 @@ impl Project for RemoteProject {
     fn write(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
         match self.call(Call::Write { path: path.into(), bytes: bytes.to_vec() })? {
             Reply::Done => Ok(()),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    fn remove(&self, path: &str) -> io::Result<()> {
+        match self.call(Call::Remove { path: path.into() })? {
+            Reply::Done => Ok(()),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
+        match self.call(Call::DataRead { path: path.into() })? {
+            Reply::Bytes(bytes) => Ok(bytes),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    fn data_write(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
+        match self.call(Call::DataWrite { path: path.into(), bytes: bytes.to_vec() })? {
+            Reply::Done => Ok(()),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<DataEntry>> {
+        match self.call(Call::DataList { prefix: prefix.into() })? {
+            Reply::DataEntries(entries) => Ok(entries),
             other => Err(unexpected(other)),
         }
     }
