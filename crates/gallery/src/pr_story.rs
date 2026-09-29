@@ -209,9 +209,14 @@ impl PrStory {
         let subs = vec![
             cx.subscribe_in(&merge, window, |_, merge, event: &beui::MergeBoxEvent, _, cx| {
                 println!("merge: {event:?}");
-                if let beui::MergeBoxEvent::Act { action: beui::merge::Action::Merge(_), choice, .. } = event {
-                    merge.update(cx, |b, cx| b.merged(choice.delete_branch, cx));
-                }
+                use beui::merge::Action;
+                let beui::MergeBoxEvent::Act { action, choice, .. } = event else { return };
+                let deleted = match action {
+                    Action::Merge(_) | Action::BypassAndMerge(_) => choice.delete_branch,
+                    Action::DeleteBranch => true,
+                    _ => return,
+                };
+                merge.update(cx, |b, cx| b.merged(deleted, cx));
             }),
             cx.subscribe(&composer, |_, _, event: &CommentComposerEvent, _| println!("comment: {event:?}")),
             cx.subscribe_in(&verdict, window, |_, verdict, event: &VerdictEvent, window, cx| {
