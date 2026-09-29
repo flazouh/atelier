@@ -271,7 +271,17 @@ worst frames vary from run to run.
 
 Filtering and grouping 5,000 tasks in `set_filters` took 0.3 to 0.9 ms. The node count does not grow with
 the data. A few frames in a run pass 8 ms in layout (4 to 21 in three runs; the index differs each time),
-which the run shows only under load; the lead measures the Mac. The board is not measured.
+which the run shows only under load. The Mac row is alex-9c's run (M4 Pro, release, window in front):
+
+| Case (5,000 tasks) | Frame, median | p95 | Layout and prepaint, median | max | Paint, median | Layout nodes |
+| --- | --- | --- | --- | --- | --- | --- |
+| List, Mac | 8.33 ms (120 Hz) | 9.0 ms | 1.0 ms | 2.7 ms, 0 frames over budget | 0.8 ms | 126 to 493 |
+
+The board, on the HP (`TASKS_VIEW=board`, scrolled up and down and sideways every frame, a filter at frames
+75 and 225): layout and prepaint median 3.2 ms, p95 11.5 ms, 62 of 298 frames over 8.33 ms under a load
+average of 8; the frames with a filter took 2.7 ms in layout; paint median 1.1 ms; at most 827 layout
+nodes. A column's card list reads shared data (`Rc`), so a frame clones a pointer and the cards in view,
+not the column; before that change the median was 4.0 ms. The Mac row for the board is still to be run.
 
 ## Remote projects
 

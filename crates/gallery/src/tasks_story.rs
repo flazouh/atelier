@@ -1,7 +1,7 @@
 //! The "Tasks" story: a list, a board, one task in full, and the create dialog, over 200 fixture tasks. The
 //! four share one set of tasks: a change in one shows in the others. `TASKS_VIEW=list|board|task|create`
 //! picks the tab to start on (for screenshots). `GALLERY_SCROLL=1` scrolls a list of `TASK_COUNT` tasks
-//! (5,000 by default), applies a filter in the middle of the run and takes it off again, and prints the
+//! (5,000 by default; with `TASKS_VIEW=board`, the board) applies a filter in the middle of the run and takes it off again, and prints the
 //! frame numbers; the frames with a filter are counted apart.
 use beui::{
     ActiveTheme, AgentLook, Button, ButtonSize, ButtonVariant,
@@ -60,7 +60,8 @@ impl TasksStory {
             list
         });
         let board = cx.new(|cx| {
-            let mut board = TaskBoard::new(ME);
+            let mut board = TaskBoard::new(ME, cx);
+            board.set_people(people.clone());
             board.set_tasks(data.clone(), BASE, cx);
             board
         });
@@ -76,6 +77,7 @@ impl TasksStory {
         subscriptions.push(cx.subscribe_in(&board, window, |this: &mut Self, _, event: &TaskBoardEvent, window, cx| match event {
             TaskBoardEvent::Open(id) => this.show(id.clone(), window, cx),
             TaskBoardEvent::Changed { ids, change } => this.changed(ids, change, Source::Board, cx),
+            TaskBoardEvent::NewTask => this.go(Tab::Create, window, cx),
         }));
         subscriptions.push(cx.subscribe_in(&view, window, |this: &mut Self, _, event: &TaskViewEvent, window, cx| match event {
             TaskViewEvent::Changed { id, change } => this.changed(std::slice::from_ref(id), change, Source::View, cx),
@@ -119,7 +121,7 @@ impl TasksStory {
         self.tab = tab;
         match tab {
             Tab::List => window.focus(&self.list.focus_handle(cx), cx),
-            Tab::Board => {}
+            Tab::Board => window.focus(&self.board.focus_handle(cx), cx),
             Tab::Task => {
                 if let Some(task) = self.tasks.iter().find(|t| t.id == self.open).cloned() {
                     let (all, people) = (self.tasks.clone(), self.people.clone());
@@ -171,12 +173,24 @@ impl Render for TasksStory {
                     let total = FRAMES_OF_RUN;
                     // A filter for the middle half of the run; the frame that changes it is counted apart.
                     let want = if (total / 4..total * 3 / 4).contains(&n) { Some(Priority::Urgent) } else { None };
-                    let has = self.list.read(cx).filters().priority;
-                    if want != has {
-                        run.switched();
-                        self.list.update(cx, |l, cx| l.set_filters(Filters { priority: want, ..Filters::default() }, cx));
+                    if self.tab == Tab::Board {
+                        let has = self.board.read(cx).filters().priority;
+                        if want != has {
+                            run.switched();
+                            self.board.update(cx, |b, cx| b.set_filters(Filters { priority: want, ..Filters::default() }, cx));
+                        }
+                        self.board.update(cx, |b, cx| {
+                            b.set_scroll_top((n % 120) as f32 * 40.);
+                            b.scroll_to((n % 60) as f32 * 30., cx);
+                        });
+                    } else {
+                        let has = self.list.read(cx).filters().priority;
+                        if want != has {
+                            run.switched();
+                            self.list.update(cx, |l, cx| l.set_filters(Filters { priority: want, ..Filters::default() }, cx));
+                        }
+                        self.list.update(cx, |l, _| l.set_scroll_top((n % 120) as f32 * 40.));
                     }
-                    self.list.update(cx, |l, _| l.set_scroll_top((n % 120) as f32 * 40.));
                 }
                 None => {
                     cx.quit();
