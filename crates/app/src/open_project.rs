@@ -272,7 +272,12 @@ impl OpenProject {
                 match read {
                     Ok(bytes) => {
                         this.add_buffer(path.clone(), String::from_utf8_lossy(&bytes).into_owned(), window, cx);
-                        this.place_caret(&path, window, cx);
+                        // The editor scrolls to the caret from its last layout, which a new buffer
+                        // gets in its first frame, so the caret moves after it.
+                        let this = cx.entity().downgrade();
+                        window.on_next_frame(move |window, cx| {
+                            this.update(cx, |p, cx| p.place_caret(&path, window, cx)).ok();
+                        });
                     }
                     Err(error) => cx.emit(ProjectEvent::Said(format!("Could not open {path}: {error}").into())),
                 }
