@@ -283,3 +283,24 @@ fn the_whole_session_is_read_off_the_ui_thread(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|_, cx| pane.read(cx).scope), Scope::Whole);
     assert_eq!(hunk_ids(&pane, cx).len(), 2);
 }
+
+/// The review opens its file once: the language server's session attaches to the editor the pane
+/// made, rather than a second editor made for it.
+#[gpui_kit::test]
+fn a_review_with_a_language_server_opens_its_file_once(cx: &mut TestAppContext) {
+    let (pane, _, _, dir, cx) = reviewing(cx);
+    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let workers = Arc::new(lathe_lsp::Workers::new(project, lathe_lsp::Store::from_env(), lathe_editor::READY, lathe_editor::ASK));
+    let given = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let seen = given.clone();
+    let language: SessionFor = std::rc::Rc::new(move |path, editor, rows, cx| {
+        seen.borrow_mut().push(editor.entity_id());
+        cx.new(|cx| lathe_editor::EditorSession::for_review(workers.clone(), editor, dir.join(path), rows, None, cx))
+    });
+    let before = cx.update(|_, cx| pane.read(cx).editor.entity_id());
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.attach_language(language, window, cx)));
+    cx.run_until_parked();
+    let after = cx.update(|_, cx| pane.read(cx).editor.entity_id());
+    assert_eq!(after, before, "the same editor");
+    assert_eq!(*given.borrow(), [before], "one session, on that editor");
+}

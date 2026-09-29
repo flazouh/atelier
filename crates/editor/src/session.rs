@@ -240,7 +240,8 @@ impl EditorSession {
     }
 
     /// The shown rows the file does not have changed: a review's hunk was decided, or its text edited.
-    /// The server reads the file with the new map from the next question on, and checks it again.
+    /// The server reads the file with the new map from the next question on, and checks it again. An
+    /// answer asked on the old map and shown on the new one can sit a row off until that check lands.
     pub fn set_rows(&mut self, rows: RowMap, cx: &mut Context<Self>) {
         *self.rows.map() = rows;
         self.schedule_recheck(cx);
