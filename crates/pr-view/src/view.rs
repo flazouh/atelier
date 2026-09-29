@@ -56,8 +56,12 @@ pub enum PullEvent {
 }
 
 /// A file's diff, by where it came from: the base, the path, and the version at the head.
+/// One block under a row: drawn again on each frame.
+type Block = Rc<dyn Fn() -> AnyElement>;
+
 pub(crate) type FileKey = (String, String, String);
 
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Msg {
     Cached { data: Option<PullData>, marks: HashMap<String, String> },
     Part(Part),
@@ -69,6 +73,7 @@ pub(crate) enum Msg {
     File { key: FileKey, view: Arc<FileView> },
     FileFailed { key: FileKey, error: String },
     Brought { path: String, blob: Result<Blob, String> },
+    Files { epoch: u64, files: Vec<String> },
     Job { id: u64, job: Option<JobLog> },
     Refreshed(Result<Refreshed, ForgeError>),
     Wrote(Result<String, ForgeError>),
@@ -99,11 +104,18 @@ enum DraftKind {
     Reply(ThreadId),
 }
 
-/// The list of bases the reader can pick, and what each one means.
-struct BasePicker {
+/// A finder over the pull request: the bases the reader can pick, or the files of the head.
+struct Lookup {
     finder: Entity<Finder>,
-    choices: Vec<BaseChoice>,
+    kind: LookupKind,
     _events: Subscription,
+}
+
+enum LookupKind {
+    /// What each row means.
+    Base(Vec<BaseChoice>),
+    /// The paths of the rows, once the listing has arrived.
+    Files(Vec<String>),
 }
 
 pub struct PullView {
@@ -127,7 +139,7 @@ pub struct PullView {
     pub(crate) verdict: Entity<VerdictBox>,
     pub(crate) merge: Entity<MergeBox>,
     draft: Option<Draft>,
-    picker: Option<BasePicker>,
+    picker: Option<Lookup>,
     /// A line to put the caret on once the file it belongs to is shown.
     pending_caret: Option<Position>,
     /// The words under the header: what changed, what is being sent, what went wrong.
@@ -137,7 +149,9 @@ pub struct PullView {
     opening_checked: bool,
     /// A copy of the data before a refresh, to tell what changed.
     before_refresh: Option<PullData>,
-    first_load_done: bool,
+    pub(crate) first_load_done: bool,
+    /// The notice is the error of a failed read, so the next good read clears it.
+    sync_failed: bool,
     cadence: Cadence,
     refreshing: bool,
     stopped: bool,
@@ -225,6 +239,7 @@ impl PullView {
             opening_checked: false,
             before_refresh: None,
             first_load_done: false,
+            sync_failed: false,
             refreshing: false,
             stopped: false,
             focus: cx.focus_handle(),
@@ -317,6 +332,7 @@ impl PullView {
     /// The reader asked again, after a failure that stopped the asking.
     pub fn retry(&mut self, cx: &mut Context<Self>) {
         self.stopped = false;
+        self.sync_failed = false;
         self.notice = None;
         self.refresh(cx);
         cx.notify();
@@ -364,13 +380,17 @@ impl PullView {
                 match result {
                     Ok(refreshed) => {
                         self.cadence.after_answer(refreshed.changed);
-                        self.notice = None;
+                        // A quiet answer leaves the last notice alone, unless that notice was a failed read.
+                        if std::mem::take(&mut self.sync_failed) {
+                            self.notice = None;
+                        }
                         if refreshed.changed {
                             self.after_change(window, cx);
                         }
                     }
                     Err(error) => {
                         self.stopped = self.cadence.after_failure(&error).is_none();
+                        self.sync_failed = true;
                         self.notice = Some(error.to_string());
                     }
                 }
@@ -428,6 +448,16 @@ impl PullView {
                 self.brought.insert(path, blob.unwrap_or(Blob::Missing));
                 self.show(window, cx);
                 cx.notify();
+            }
+            Msg::Files { epoch, files } => {
+                if epoch == self.epoch
+                    && let Some(Lookup { finder, kind: LookupKind::Files(paths), .. }) = &mut self.picker
+                {
+                    let changed: HashSet<String> = self.model.files().iter().map(|f| f.path.to_string()).collect();
+                    let items = files.iter().map(|f| FinderItem::new(f.clone(), if changed.contains(f) { "changed" } else { "" }).icon(f.clone())).collect();
+                    *paths = files;
+                    finder.update(cx, |f, cx| f.set_items(items, cx));
+                }
             }
             Msg::Job { id, job } => {
                 if let Some(job) = job {
@@ -494,7 +524,7 @@ impl PullView {
         let Some(pull) = self.model.pull().cloned() else { return };
         self.epoch += 1;
         let epoch = self.epoch;
-        let choice = if self.chose_base || !self.opening_checked { self.model.choice.clone() } else { self.model.choice.clone() };
+        let choice = self.model.choice.clone();
         let review_point = self.model.data.review_point.clone();
         let (services, tx) = (self.services.clone(), self.tx.clone());
         cx.background_spawn(async move {
@@ -732,6 +762,13 @@ impl PullView {
         cx.notify();
     }
 
+    /// Opens any file of the head: the changed one in its diff, another Brought In beside them.
+    pub(crate) fn bring_in(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.model.jump_to(path, None);
+        self.show(window, cx);
+        cx.notify();
+    }
+
     pub(crate) fn step(&mut self, by: isize, window: &mut Window, cx: &mut Context<Self>) {
         if self.model.step(by) {
             self.show(window, cx);
@@ -780,14 +817,45 @@ impl PullView {
             finder.set_items(items, cx);
             finder
         });
+        self.open_lookup(finder, LookupKind::Base(choices), window, cx);
+    }
+
+    /// Go to file: any file of the head. Opens one the pull request changed, or Brought In one it did not.
+    pub fn go_to_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(prepared) = self.prepared.clone() else { return };
+        let finder = cx.new(|cx| {
+            let mut finder = Finder::new("Go to file", "Part of a path", Filter::Here, window, cx).command(beui::keys::Command::GoToFile);
+            finder.set_note("Loading files", cx);
+            finder
+        });
+        self.open_lookup(finder, LookupKind::Files(Vec::new()), window, cx);
+        let (services, tx, epoch) = (self.services.clone(), self.tx.clone(), self.epoch);
+        cx.background_spawn(async move {
+            let files = services.git.head_files(&prepared).unwrap_or_default();
+            let _ = tx.unbounded_send(Msg::Files { epoch, files });
+        })
+        .detach();
+    }
+
+    fn open_lookup(&mut self, finder: Entity<Finder>, kind: LookupKind, window: &mut Window, cx: &mut Context<Self>) {
         let events = cx.subscribe_in(&finder, window, |view, _, event: &FinderEvent, window, cx| match event {
             FinderEvent::Pick(at) => {
-                let choice = view.picker.as_ref().and_then(|p| p.choices.get(*at).cloned());
-                view.picker = None;
+                let picked = view.picker.take();
                 view.focus.focus(window, cx);
-                if let Some(choice) = choice {
-                    view.choose_base(choice, cx);
+                match picked.map(|p| p.kind) {
+                    Some(LookupKind::Base(choices)) => {
+                        if let Some(choice) = choices.get(*at).cloned() {
+                            view.choose_base(choice, cx);
+                        }
+                    }
+                    Some(LookupKind::Files(paths)) => {
+                        if let Some(path) = paths.get(*at).cloned() {
+                            view.bring_in(&path, window, cx);
+                        }
+                    }
+                    None => {}
                 }
+                cx.notify();
             }
             FinderEvent::Dismiss => {
                 view.picker = None;
@@ -797,7 +865,7 @@ impl PullView {
             FinderEvent::Query(_) => {}
         });
         gpui_kit::Focusable::focus_handle(&finder, cx).focus(window, cx);
-        self.picker = Some(BasePicker { finder, choices, _events: events });
+        self.picker = Some(Lookup { finder, kind, _events: events });
         cx.notify();
     }
 
@@ -822,7 +890,7 @@ impl PullView {
     }
 
     /// Runs a write to its end and takes the answer in as a message.
-    fn write_and_report(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn lathe_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) {
+    pub(crate) fn write_and_report(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn lathe_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) {
         let Some(task) = self.write(words, cx, send) else { return };
         let tx = self.tx.clone();
         cx.spawn(async move |_, _| {
@@ -831,11 +899,11 @@ impl PullView {
         .detach();
     }
 
-    fn post_remark(&mut self, text: String, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn post_remark(&mut self, text: String, _window: &mut Window, cx: &mut Context<Self>) {
         self.write_and_report("Posting…", cx, move |forge, reference| forge.comment(reference, &text).map(|_| "Commented.".to_string()));
     }
 
-    fn send_verdict(&mut self, verb: Verb, note: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn send_verdict(&mut self, verb: Verb, note: String, window: &mut Window, cx: &mut Context<Self>) {
         let verdict = match verb {
             Verb::Approve => Verdict::Approve,
             Verb::RequestChanges => Verdict::RequestChanges,
@@ -863,7 +931,7 @@ impl PullView {
         self.write_and_report("Sending your comments…", cx, |forge, reference| forge.submit_review(reference, Verdict::Comment, "").map(|()| "Sent.".to_string()));
     }
 
-    fn merge_pull(&mut self, action: beui::merge::Action, choice: beui::merge::Choice, title: String, message: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn merge_pull(&mut self, action: beui::merge::Action, choice: beui::merge::Choice, title: String, message: String, window: &mut Window, cx: &mut Context<Self>) {
         let Some(head) = self.model.pull().map(|p| p.head_sha.clone()) else { return };
         let request = match crate::actions::merge_request(action, choice, &title, &message, &head) {
             Ok(request) => request,
@@ -900,7 +968,7 @@ impl PullView {
         .detach();
     }
 
-    fn reply(&mut self, thread: ThreadId, text: String, cx: &mut Context<Self>) {
+    pub(crate) fn reply(&mut self, thread: ThreadId, text: String, cx: &mut Context<Self>) {
         self.write_and_report("Replying…", cx, move |forge, _| forge.reply(&thread, &text).map(|_| "Replied.".to_string()));
     }
 
@@ -909,7 +977,7 @@ impl PullView {
     }
 
     /// A new comment on a line: held when a review is open or the reader chose to start one, else sent.
-    fn line_comment(&mut self, line: NewLine, hold: bool, cx: &mut Context<Self>) {
+    pub(crate) fn line_comment(&mut self, line: NewLine, hold: bool, cx: &mut Context<Self>) {
         let in_review = self.model.in_review();
         self.write_and_report(if hold || in_review { "Adding to your review…" } else { "Commenting…" }, cx, move |forge, reference| {
             forge.hold_comment(reference, &line)?;
@@ -981,7 +1049,7 @@ impl PullView {
     /// The blocks that sit under rows of the diff: the threads and the composer being written.
     pub(crate) fn row_blocks(&self, view: &FileView, cx: &mut Context<Self>) -> Vec<RowBlock> {
         let placement = place(&self.model.data.threads, view);
-        let mut by_row: Vec<(usize, Vec<Rc<dyn Fn() -> AnyElement>>)> = Vec::new();
+        let mut by_row: Vec<(usize, Vec<Block>)> = Vec::new();
         let now = now();
         let this = cx.entity().downgrade();
         for (row, index) in &placement.rows {
@@ -1074,6 +1142,7 @@ impl PullView {
                 cx.notify();
             }))
             .on_put_back(with(|s, _, cx| s.put_back(cx)))
+            .on_go_to_file(with(|s, w, cx| s.go_to_file(w, cx)))
     }
 
     pub(crate) fn layout(&self) -> Fit {

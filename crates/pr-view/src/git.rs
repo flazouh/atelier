@@ -151,6 +151,9 @@ pub struct PrGit {
     data: std::sync::OnceLock<Result<String, GitError>>,
     /// The URL to fetch from, when it is not the one the project's remotes give.
     remote: Option<String>,
+    /// One thing at a time touches the cache and the checkouts: two views of one repository must not both
+    /// make the cache, or both make a checkout.
+    busy: std::sync::Mutex<()>,
 }
 
 struct Ran {
@@ -163,7 +166,7 @@ impl PrGit {
     /// `data` is the folder for caches and checkouts on the project's host: an absolute path, or one that
     /// starts with `~/` or `$HOME/`, which the host's own home replaces.
     pub fn new(project: Arc<dyn Project>, data: &str) -> Self {
-        Self { project, given: data.to_string(), data: std::sync::OnceLock::new(), remote: None }
+        Self { project, given: data.to_string(), data: std::sync::OnceLock::new(), remote: None, busy: std::sync::Mutex::new(()) }
     }
 
     /// Fetches from `url` in place of the project's remotes.
@@ -312,6 +315,7 @@ impl PrGit {
     /// Fetches what a pull request needs into the cache, unless it is there, and finds where its own
     /// changes start.
     pub fn prepare(&self, pull: &Pull) -> GitResult<Prepared> {
+        let _one_at_a_time = self.busy.lock().unwrap_or_else(|e| e.into_inner());
         let head = check_sha(&pull.head_sha)?.to_string();
         let base_branch = check_branch(&pull.base)?.to_string();
         let repo = &pull.reference.repo;
@@ -411,6 +415,7 @@ impl PrGit {
     /// The head as files on the host, for the language server. Made with `git archive` into a folder of
     /// the cache's own; kept while the head stays the same and made again when it moves. Returns the folder.
     pub fn checkout(&self, prepared: &Prepared) -> GitResult<String> {
+        let _one_at_a_time = self.busy.lock().unwrap_or_else(|e| e.into_inner());
         let dir = self.checkout_path(&prepared.reference)?;
         let marker = format!("{dir}.sha");
         let script = "if [ \"$(cat \"$2\" 2>/dev/null)\" = \"$3\" ] && [ -d \"$1\" ]; then exit 0; fi\n\
@@ -436,6 +441,7 @@ impl PrGit {
     /// Forgets a pull request: its checkout and the refs it fetched. The cache repository stays for the
     /// next one.
     pub fn remove(&self, reference: &PullRef) -> GitResult<()> {
+        let _one_at_a_time = self.busy.lock().unwrap_or_else(|e| e.into_inner());
         let dir = self.checkout_path(reference)?;
         let cache = self.cache_path(&reference.repo)?;
         let number = reference.number.to_string();

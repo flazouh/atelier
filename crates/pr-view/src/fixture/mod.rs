@@ -14,6 +14,9 @@ use lathe_forge::{
 
 use crate::data::PullData;
 
+pub mod relay;
+pub mod repo;
+
 /// A change the reader made, as the forge got it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Write {

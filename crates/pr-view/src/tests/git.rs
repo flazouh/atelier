@@ -63,9 +63,9 @@ fn a_merged_pull_request_is_still_the_diff_it_was() {
     let s = scenario();
     let base = s.main_tip();
     let head = s.pull(7, "main", &[&|r: &Path| put(r, "src/b.rs", "pub fn b() { 7 }\n")]);
-    git(&s.dir.path().join("scratch"), &["checkout", "-q", "main"]);
-    git(&s.dir.path().join("scratch"), &["merge", "-q", "--ff-only", &head]);
-    git(&s.dir.path().join("scratch"), &["push", "-q", "origin", "main"]);
+    git(&s.root().join("scratch"), &["checkout", "-q", "main"]);
+    git(&s.root().join("scratch"), &["merge", "-q", "--ff-only", &head]);
+    git(&s.root().join("scratch"), &["push", "-q", "origin", "main"]);
     let (_, pull) = s.pull_data(7, &head, &base);
     let prgit = s.prgit();
     let prepared = prgit.prepare(&pull).unwrap();
@@ -306,4 +306,33 @@ fn the_parsers_read_git_output() {
     let batch = b"abc blob 5\nhello\nfoo bar missing\nabc blob 3\nl\0x\ndir/with space blob 2\nhi\n";
     assert_eq!(parse_batch(batch), vec![Blob::Text("hello".into()), Blob::Missing, Blob::Binary, Blob::Text("hi".into())]);
     assert!(parse_batch(b"abc blob 500\nshort").is_empty(), "a body cut short is dropped, not read past");
+}
+
+#[test]
+fn two_prepares_at_once_make_the_cache_once() {
+    let s = scenario();
+    let base = s.main_tip();
+    let head = s.pull(30, "main", &[&|r: &Path| put(r, "src/a.rs", "concurrent\n")]);
+    let (_, pull) = s.pull_data(30, &head, &base);
+    let prgit = std::sync::Arc::new(s.prgit());
+    let results: Vec<_> = (0..4)
+        .map(|_| {
+            let (prgit, pull) = (prgit.clone(), pull.clone());
+            std::thread::spawn(move || prgit.prepare(&pull))
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|t| t.join().unwrap())
+        .collect();
+    assert!(results.iter().all(|r| r.is_ok()), "{results:?}");
+    let dirs: Vec<_> = (0..3)
+        .map(|_| {
+            let (prgit, prepared) = (prgit.clone(), results[0].clone().unwrap());
+            std::thread::spawn(move || prgit.checkout(&prepared))
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|t| t.join().unwrap())
+        .collect();
+    assert!(dirs.iter().all(|d| d.is_ok()), "{dirs:?}");
 }
