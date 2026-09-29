@@ -22,6 +22,7 @@ mod workers;
 mod load_story;
 mod panels_story;
 mod sidebar_story;
+mod pr_view_story;
 mod tasks_story;
 mod replay_story;
 mod merge_story;
@@ -69,10 +70,11 @@ enum Story {
     AgentPanels,
     AgentReplay,
     Tasks,
+    PullRequestView,
 }
 
 impl Story {
-    const ALL: [Story; 30] = [
+    const ALL: [Story; 31] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -103,6 +105,7 @@ impl Story {
         Story::AgentPanels,
         Story::AgentReplay,
         Story::Tasks,
+        Story::PullRequestView,
     ];
 
     fn title(self) -> &'static str {
@@ -136,6 +139,7 @@ impl Story {
             Story::AgentSidebar => "Sidebar",
             Story::AgentPanels => "Panels",
             Story::AgentReplay => "Agent replay",
+            Story::PullRequestView => "Pull request view",
             Story::Tasks => "Tasks",
         }
     }
@@ -196,6 +200,7 @@ struct Gallery {
     agent_sidebar: Option<Entity<sidebar_story::SidebarStory>>,
     agent_panels: Option<Entity<panels_story::PanelsStory>>,
     agent_replay: Option<Entity<replay_story::ReplayStory>>,
+    pr_view: Option<Entity<pr_view_story::PrViewStory>>,
     tasks: Option<Entity<tasks_story::TasksStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
@@ -300,6 +305,7 @@ impl Gallery {
             merge,
             load: None,
             agent_sidebar: None,
+            pr_view: None,
             tasks: None,
             agent_panels: None,
             agent_replay: None,
@@ -327,6 +333,9 @@ impl Gallery {
         }
         if self.story == Story::Tasks && self.tasks.is_none() {
             self.tasks = Some(cx.new(|cx| tasks_story::TasksStory::new(window, cx)));
+        }
+        if self.story == Story::PullRequestView && self.pr_view.is_none() {
+            self.pr_view = Some(cx.new(|cx| pr_view_story::PrViewStory::new(window, cx)));
         }
         if self.story == Story::AgentPanels && self.agent_panels.is_none() {
             self.agent_panels = Some(cx.new(|cx| panels_story::PanelsStory::new(window, cx)));
@@ -446,6 +455,7 @@ impl Gallery {
             Story::AgentSidebar => self.agent_sidebar.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentPanels => self.agent_panels.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Tasks => self.tasks.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::PullRequestView => self.pr_view.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequests => pr_story::pull_requests().into_any_element(),
             Story::Merge => self.merge.clone().into_any_element(),
