@@ -66,6 +66,8 @@ pub struct AgentSession {
     pub stderr: Option<SharedString>,
     /// Starting, or reading its history: the panel shows it.
     pub starting: bool,
+    /// A message written while the agent was not running: it goes once the session resumes.
+    waiting_send: Option<String>,
     pub list: ListState,
     rows: Vec<(u8, usize, usize)>,
     pub composer: Entity<PromptInput>,
@@ -146,6 +148,7 @@ impl AgentSession {
             problem: None,
             stderr: None,
             starting: true,
+            waiting_send: None,
             list: ListState::new(0, ListAlignment::Bottom, px(600.)),
             rows: Vec::new(),
             composer,
@@ -156,18 +159,19 @@ impl AgentSession {
             _pump,
             _start: Task::ready(()),
         };
-        this.open(resume.map(|(id, _)| id), cx);
+        this.open(resume.map(|(id, _)| id), true, cx);
         this
     }
 
-    /// Opens the agent's session off the UI thread: its history first when it resumes, then the agent.
-    fn open(&mut self, resume: Option<SessionId>, cx: &mut Context<Self>) {
+    /// Opens the agent's session off the UI thread: its history first when it resumes and the panel
+    /// has not got it (`read_history`), then the agent.
+    fn open(&mut self, resume: Option<SessionId>, read_history: bool, cx: &mut Context<Self>) {
         let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.queue.sink());
         let request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode };
         let opening = cx.background_spawn(async move {
             let history = match &resume {
-                Some(id) => backend.history(project.as_ref(), id).unwrap_or_default(),
-                None => Vec::new(),
+                Some(id) if read_history => backend.history(project.as_ref(), id).unwrap_or_default(),
+                _ => Vec::new(),
             };
             (history, backend.open(project, request, sink))
         });
@@ -179,8 +183,17 @@ impl AgentSession {
                     s.conversation.apply(event);
                 }
                 match opened {
-                    Ok(session) => s.session = Some(session),
-                    Err(error) => s.problem = Some(problem_words(&error).into()),
+                    Ok(session) => {
+                        s.session = Some(session);
+                        if let Some(text) = s.waiting_send.take() {
+                            s.command(Command::send(text), cx);
+                        }
+                    }
+                    Err(error) => {
+                        s.waiting_send = None;
+                        s.status = SessionStatus::Failed(beui::session_status::short_reason(&problem_words(&error)));
+                        s.problem = Some(problem_words(&error).into());
+                    }
                 }
                 s.refresh_rows();
                 cx.emit(SessionEvent::Changed);
@@ -261,9 +274,20 @@ impl AgentSession {
         self.conversation.user_sent(text.clone());
         self.status = status::sent();
         self.problem = None;
+        self.stderr = None;
         self.refresh_rows();
         self.list.scroll_to_end();
-        self.command(Command::send(text), cx);
+        match (&self.session, &self.id) {
+            // The agent stopped (a crash, Stop): the session resumes, and the message goes then.
+            (None, Some(id)) if !self.starting => {
+                self.waiting_send = Some(text);
+                self.starting = true;
+                let id = id.clone();
+                self.open(Some(id), false, cx);
+            }
+            (None, _) if self.starting => self.waiting_send = Some(text),
+            _ => self.command(Command::send(text), cx),
+        }
         cx.emit(SessionEvent::Changed);
     }
 
