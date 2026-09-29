@@ -122,7 +122,7 @@ fn live_button(playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     Button::new("live")
         .label(if playing { "Pause" } else { "Play live" })
         .variant(ButtonVariant::Secondary)
-        .size(ButtonSize::Sm)
+        .size(ButtonSize::Md)
         .on_click(cx.listener(|this, _, _, cx| this.toggle_live(cx)))
 }
 

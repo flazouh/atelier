@@ -163,7 +163,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
             let selected = index == tabs.selected;
             Button::new(ElementId::Name(format!("editor-tab-{index}").into()))
                 .label(tab.label)
-                .size(ButtonSize::Chip)
+                .size(ButtonSize::Sm)
                 .variant(if selected { ButtonVariant::Secondary } else { ButtonVariant::Ghost })
                 .on_click(cx.listener(move |this, _, _, cx| this.editors.select(index, cx)))
         })))
@@ -176,19 +176,19 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
                 .child(div().font_family(MONO_FONT_FAMILY).child(tab.shown))
                 .child(Badge::new(lathe_lsp::language_id(&tab.path).unwrap_or("text")))
                 .child(div().flex_1())
-                .child(Button::new("lsp-check").label("Check").size(ButtonSize::Chip).on_click(check))
+                .child(Button::new("lsp-check").label("Check").size(ButtonSize::Sm).on_click(check))
                 .child(
                     Button::new("lsp-go")
                         .label("Go to definition")
                         .variant(ButtonVariant::Ghost)
-                        .size(ButtonSize::Chip)
+                        .size(ButtonSize::Sm)
                         .on_click(go),
                 )
                 .child(
                     Button::new("lsp-refs")
                         .label("Find references")
                         .variant(ButtonVariant::Ghost)
-                        .size(ButtonSize::Chip)
+                        .size(ButtonSize::Sm)
                         .on_click(find),
                 ),
         )
@@ -226,7 +226,7 @@ fn references_list(
                 .text_color(theme.muted_foreground)
                 .child(SharedString::from(format!("{count} uses")))
                 .child(div().flex_1())
-                .child(Button::new("refs-close").label("Close").variant(ButtonVariant::Ghost).size(ButtonSize::Chip).on_click(close)),
+                .child(Button::new("refs-close").label("Close").variant(ButtonVariant::Ghost).size(ButtonSize::Sm).on_click(close)),
         )
         .children(references.iter().enumerate().map(|(index, target)| {
             let open = {
