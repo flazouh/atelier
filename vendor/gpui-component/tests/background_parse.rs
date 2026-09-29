@@ -169,3 +169,51 @@ fn fifty_fast_keystrokes_make_two_parses_and_the_last_one_lands() {
     assert_matches_fresh(&h, "rust", &text, "after the last parse");
     assert!(queue.request(), "the queue is idle again");
 }
+
+/// Several edits between two parses, as when keystrokes coalesce while one runs: the layers moved
+/// with each, then one background parse updates them in place over the edits' merged span. Once it
+/// lands, the colours are a synchronous parse's; most parses take the in-place path.
+#[test]
+fn coalesced_edits_update_the_layers_in_place_and_equal_a_fresh_parse() {
+    let cases = [
+        ("rust", "fn a() { let s = format!(\"{}\", 1); }\nfn b() { vec![1, 2]; println!(\"x\"); }\n", &["x", "m!(a)", "\"", "(", ")", "\n", "!"][..]),
+        ("markdown", "# `a` *b*\n\n```rust\nfn a() {}\n```\n\n- `c` [l](u)\n\ntext *em*\n", &["```", "`", "*", "\n", "x", "```rust\n", "_"][..]),
+        ("html", "<p><script>let a = 1;</script><style>p { color: red }</style><b>x</b></p>\n", &["<script>", "</script>", "x", "\"", ">", "<style>", "{"][..]),
+    ];
+    for (language, start, snippets) in cases {
+        let mut text = start.to_string();
+        let mut h = fresh(language, &text);
+        let mut state = 0x2545_f491_4f6c_dd1du64;
+        let mut next = |n: usize| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state % n as u64) as usize
+        };
+        let (parses, mut in_place) = (80, 0);
+        for step in 0..parses {
+            for _ in 0..1 + next(6) {
+                let mut at = next(text.len() + 1);
+                while !text.is_char_boundary(at) {
+                    at -= 1;
+                }
+                let edit = if next(3) == 0 {
+                    let mut end = (at + next(8)).min(text.len());
+                    while !text.is_char_boundary(end) {
+                        end -= 1;
+                    }
+                    replace(&mut text, at, end, "")
+                } else {
+                    replace(&mut text, at, at, snippets[next(snippets.len())])
+                };
+                h.edit_tree(Some(edit), &Rope::from(text.as_str()));
+            }
+            let parsed = h.background_parse().unwrap().run().unwrap();
+            in_place += usize::from(parsed.injections_in_place());
+            assert!(h.apply_parsed(parsed));
+            assert_matches_fresh(&h, language, &text, &format!("{language}, parse {step}"));
+        }
+        println!("{language}: {in_place} of {parses} parses updated the layers in place");
+        assert!(in_place * 4 >= parses * 3, "{language}: only {in_place} of {parses} parses were in place");
+    }
+}
