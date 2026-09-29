@@ -194,8 +194,8 @@ pub enum Event {
     Thinking { block: BlockId, delta: String },
     ThinkingDone { block: BlockId, took: Duration },
     ToolStarted(ToolCall),
-    /// The whole input of a call announced before its input was known.
-    ToolInput { id: ToolId, input: Value },
+    /// The whole input of a call announced before its input was known, and the file it names.
+    ToolInput { id: ToolId, input: Value, file: Option<String> },
     ToolStatus { id: ToolId, status: ToolStatus },
     ToolFinished { id: ToolId, output: ToolOutput },
     SubagentStarted(Subagent),

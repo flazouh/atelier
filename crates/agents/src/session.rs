@@ -6,6 +6,7 @@
 mod backend;
 mod coalesce;
 mod command;
+mod conversation;
 mod event;
 #[cfg(test)]
 mod fake;
@@ -14,6 +15,7 @@ pub use backend::{
     Backend, Capabilities, EventSink, ModelChoice, OpenRequest, Session, SessionError, SessionSummary,
 };
 pub use coalesce::EventQueue;
+pub use conversation::{Answer, Call, Conversation, Item, SubagentStatus};
 pub use command::{Command, PermissionMode};
 pub use event::{
     BlockId, Choice, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started,

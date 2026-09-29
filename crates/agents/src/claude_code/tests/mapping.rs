@@ -66,7 +66,7 @@ fn a_tool_call_starts_gets_its_input_and_finishes_with_its_output() {
     let call = tool_named(&events, "Bash");
     assert_eq!(call.kind, ToolKind::Shell);
     let input = events.iter().find_map(|e| match e {
-        Event::ToolInput { id, input } if *id == call.id => Some(input.clone()),
+        Event::ToolInput { id, input, .. } if *id == call.id => Some(input.clone()),
         _ => None,
     });
     assert!(input.expect("the whole input arrives")["command"].as_str().unwrap().contains("note.txt"));
@@ -314,4 +314,42 @@ fn a_transcript_shows_history_with_no_streaming() {
     assert_eq!(call.file.as_deref(), Some("/a.rs"));
     assert!(events.iter().any(|e| matches!(e, Event::ToolFinished { id, output } if *id == call.id && output.text == "fn main() {}")));
     assert_eq!(events.len(), 5, "{events:#?}");
+}
+
+#[test]
+fn every_captured_run_folds_into_a_finished_conversation() {
+    use crate::session::{Conversation, Item, SubagentStatus};
+    for name in [
+        "plain", "tool_read", "permission_allow", "permission_deny", "permission_interrupt", "task_list",
+        "subagent_background", "subagent_foreground", "long_output",
+    ] {
+        let mut conversation = Conversation::new();
+        conversation.user_sent("go");
+        replay(name).iter().for_each(|event| conversation.apply(event));
+        assert!(!conversation.working(), "{name}: the turn is over");
+        assert!(conversation.started().is_some(), "{name}");
+        assert!(
+            conversation.items().iter().all(|item| !matches!(item, Item::Notice(_))),
+            "{name}: {:?}",
+            conversation.items()
+        );
+        assert!(
+            conversation.items().iter().all(|item| !matches!(item, Item::Permission { answer: crate::session::Answer::Asking, .. })),
+            "{name}: no question is left open"
+        );
+        assert!(conversation.items().iter().all(|item| !matches!(item, Item::Subagent { status: SubagentStatus::Failed, .. })), "{name}");
+    }
+}
+
+#[test]
+fn the_foreground_subagent_run_folds_with_its_call_inside_the_subagent() {
+    use crate::session::{Conversation, Item};
+    let mut conversation = Conversation::new();
+    replay("subagent_foreground").iter().for_each(|event| conversation.apply(event));
+    let inside = conversation.items().iter().find_map(|item| match item {
+        Item::Subagent { calls, .. } => Some(calls.iter().map(|c| c.call.name.clone()).collect::<Vec<_>>()),
+        _ => None,
+    });
+    assert_eq!(inside, Some(vec!["Read".to_string()]));
+    assert!(conversation.items().iter().all(|item| !matches!(item, Item::Tool(c) if c.call.name == "Read")));
 }

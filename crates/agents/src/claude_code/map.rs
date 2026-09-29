@@ -358,7 +358,7 @@ impl Mapper {
             return self.edit_todos(id, &name, &input);
         }
         if self.running.contains(&id) {
-            return vec![Event::ToolInput { id, input }];
+            return vec![Event::ToolInput { id, file: tools::file(&input), input }];
         }
         self.announce(id, name, input, parent)
     }
