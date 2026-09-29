@@ -96,6 +96,13 @@ request_layout and prepaint; "diff paint" is building its scene on the CPU.
 | Time in `syntax::highlight` per frame | 0.031 ms | 0.093 ms | 0.262 ms | 0.319 ms | 0 of 300 |
 | Whole frame | 64.0 ms | 64.0 ms | 80.1 ms | 209 ms | 300 of 300 |
 
+CodeBlock draws its code as one styled text per block, with its gutter as one text and each tinted
+line as one band, not one element per line. The story prints its layout node count on the first frame
+(`layout nodes first frame N`): 505 for the whole story, with 20 blocks of 25 to 44 lines, the editor and
+a 500-row diff. The count before the change is not known exactly, since the story only reported the
+highest index of a frame then (3875, with slots that taffy reuses). Frame times on the HP are software
+render and say little about the Mac.
+
 - FileDiff's rows are a virtual list, so its layout no longer grows with the row count. Before, a
   whole frame took 192 ms with 500 rows and 592 ms with 5000.
 - The HP renders in software (Mesa's Vulkan under Xvfb), so the whole frame says little about a Mac.
@@ -124,3 +131,25 @@ disk, network or process work. The case is the worst one, every blocker at once.
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
 | Merge model, every blocker | < 50 µs | 0.64 µs | 0.68 µs | Passes |
+## Agent sessions
+What runs when an agent streams. Parsing and mapping run on the session's reader thread, never on the UI
+thread. The UI thread only drains a queue once a frame. Machine and method as above; the load average
+was 5.7 (the HP is shared). Each number is the median and p95 of 15 runs.
+
+    cargo test --release -p lathe-agents --test perf -- --ignored --nocapture --test-threads=1
+
+The input is the captured runs in `crates/agents/tests/fixtures/claude_code`, repeated to fill 10 MB.
+
+| Case | Target | Median | p95 | Result |
+| --- | --- | --- | --- | --- |
+| Parse and map a 10 MB transcript (21,090 lines) | < 250 ms | 40.9 ms (261 MB/s) | 50.2 ms | Passes |
+| Parse and map one streamed text delta line | < 10 µs | 0.96 µs | 1.60 µs | Passes |
+| Push 100,000 text deltas into `EventQueue` | < 50 ms, 1 event, 1 wake | 3.5 ms (35 ns each), 1 event, 1 wake | 3.8 ms | Passes |
+
+- A model streams about 100 lines a second, so one delta line costs 0.01% of a core.
+- `EventQueue` joins the deltas of a block while they wait and wakes the UI once per batch. A stream costs
+  one wake and one repaint a frame, however many tokens land in it.
+- A tool result over 64 KiB is cut to its head, so one huge result cannot reach the UI whole. The
+  mapper's memory per session is the todo list, the open blocks and the running calls.
+- A live session, on the HP: the reader and writer threads sleep on the pipes. A `send` only queues a
+  line. It never waits for the agent.

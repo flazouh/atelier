@@ -97,6 +97,15 @@ fn a_real_session_end_to_end() {
     until(&rx, &mut seen, turn_ended);
     assert!(seen.iter().any(|e| matches!(e, Event::Text { delta, .. } if delta.to_lowercase().contains("ok"))));
     println!("resume: the session remembers");
+
+    // 4b. A model switch shows as a new Started with the new model, and the turn still runs.
+    seen.clear();
+    resumed.send(Command::SetModel { model: "sonnet".into() }).unwrap();
+    resumed.send(Command::SetPermissionMode { mode: PermissionMode::AcceptEdits }).unwrap();
+    resumed.send(Command::Send { text: "Reply with the single word ok.".into() }).unwrap();
+    until(&rx, &mut seen, turn_ended);
+    assert!(seen.iter().any(|e| matches!(e, Event::Started(s) if s.model.as_deref().is_some_and(|m| m.contains("sonnet")))));
+    println!("set model: the next turn runs on sonnet");
     drop(resumed);
     until(&rx, &mut seen, |e| matches!(e, Event::Ended(EndReason::Closed)));
 
