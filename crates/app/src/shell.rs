@@ -5,7 +5,7 @@
 //! Keys: ⌘O opens a folder, ⌘S saves, ⌘W closes the tab, and GitQuiet's ⌘B and ⌘⇧B hide and show
 //! the left and the right pane.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 use beui::{
     button::{Button, ButtonSize, ButtonVariant},
@@ -18,7 +18,7 @@ use gpui_kit::{
     App, AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement, KeyBinding, ParentElement,
     PathPromptOptions, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea, actions,
-    base::resizable::{h_resizable, resizable_panel},
+    base::{ResizeHandleRenderer, h_resizable, resizable_panel},
     div, prelude::FluentBuilder, px,
 };
 use lathe_project::LocalProject;
@@ -375,6 +375,7 @@ impl Render for Shell {
         let body = match self.active().cloned() {
             None => self.start_screen(cx).into_any_element(),
             Some(project) => h_resizable("shell-splits")
+                .with_handle_appearance(borderless_handle(&theme))
                 .child(resizable_panel().visible(self.sidebar).size(px(260.)).size_range(px(180.)..px(480.)).child(self.sidebar(cx)))
                 .child(resizable_panel().size(px(440.)).size_range(px(320.)..px(2000.)).child(self.agent_panel(cx)))
                 .child(
@@ -405,4 +406,10 @@ impl Render for Shell {
             .child(div().flex().flex_1().min_h_0().child(body))
             .child(self.status_line(cx))
     }
+}
+
+/// Borderless: a split's handle paints nothing at rest, and a wash while it is dragged.
+fn borderless_handle(theme: &beui::Theme) -> ResizeHandleRenderer {
+    let wash = theme.muted_hover();
+    Rc::new(move |handle, _, _| Some(div().size_full().when(handle.is_active(), |d| d.bg(wash)).into_any_element()))
 }
