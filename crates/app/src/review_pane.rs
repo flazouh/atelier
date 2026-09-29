@@ -169,7 +169,7 @@ impl ReviewPane {
             _session,
         };
         pane.check_disk(pane.files.iter().map(|f| f.review.path.clone()).collect(), window, cx);
-        timing(window, format!("review of {} files: first frame", pane.files.len()), pressed);
+        timing(window, format!("review of {} files opened", pane.files.len()), pressed, pressed.elapsed());
         pane
     }
 
@@ -371,7 +371,12 @@ impl ReviewPane {
 
     /// Decides every hunk of the open file at once, writes it, and moves to the next file.
     fn decide_file(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
-        timing(window, "review: a whole file decided, to its frame".into(), Instant::now());
+        let started = Instant::now();
+        self.decide_file_now(decision, window, cx);
+        timing(window, "review: a whole file decided".into(), started, started.elapsed());
+    }
+
+    fn decide_file_now(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
         let at = self.current;
         let Some(merged) = self.files.get(at).and_then(|f| f.merged.clone()) else { return self.step(1, window, cx) };
         let hunks = merged.hunks().to_vec();
@@ -556,10 +561,16 @@ fn focus_once_painted(handle: FocusHandle, frames: usize, window: &mut Window, c
     }
 }
 
-/// With `LATHE_TIMINGS=1`, prints how long after `since` the next frame was drawn.
-fn timing(window: &Window, what: String, since: Instant) {
+/// With `LATHE_TIMINGS=1`, prints what an action cost: its own `work`, the layout and paint of the frame
+/// that shows it (with `LATHE_FRAMES=1`), and how long after `since` that frame was drawn, which adds
+/// the wait for the display.
+fn timing(window: &Window, what: String, since: Instant, work: Duration) {
     if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
-        window.on_next_frame(move |_, _| eprintln!("{what} after {:.1} ms", since.elapsed().as_secs_f64() * 1000.));
+        let ms = |d: Duration| d.as_secs_f64() * 1000.;
+        window.on_next_frame(move |_, _| {
+            let frame = crate::frame_meter::last_frame();
+            eprintln!("{what}: work {:.1} ms, its frame {:.1} ms, drawn after {:.1} ms", ms(work), ms(frame), ms(since.elapsed()));
+        });
     }
 }
 
