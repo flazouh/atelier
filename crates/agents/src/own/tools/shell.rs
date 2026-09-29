@@ -130,7 +130,13 @@ impl Tool for Shell {
             thread::sleep(Duration::from_millis(10));
         }
         if stopped.is_some() {
-            let root = out.lock().unwrap_or_else(|p| p.into_inner()).group.clone();
+            // The shell says who it is as its first act; a stop that comes at once waits a moment for it.
+            let wait_until = Instant::now() + Duration::from_millis(500);
+            let mut root = out.lock().unwrap_or_else(|p| p.into_inner()).group.clone();
+            while root.is_none() && Instant::now() < wait_until && process.control.running() {
+                thread::sleep(Duration::from_millis(5));
+                root = out.lock().unwrap_or_else(|p| p.into_inner()).group.clone();
+            }
             if let Some(root) = root.filter(|g| g.chars().all(|c| c.is_ascii_digit())) {
                 // Children first, then the shell, through the project so it reaches an SSH host too. Without
                 // `pgrep` on the host only the shell stops.
