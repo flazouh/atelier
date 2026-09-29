@@ -1,14 +1,14 @@
 //! What people said on a pull request: remarks about the whole, threads on lines, and the review that
 //! carries a verdict.
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Author {
     Person,
     /// An automated reviewer.
     Bot,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Comment {
     pub id: String,
     pub author: String,
@@ -22,10 +22,10 @@ pub struct Comment {
 /// Something said about the pull request as a whole.
 pub type Remark = Comment;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ThreadId(pub String);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Side {
     /// The old file.
     Left,
@@ -34,7 +34,7 @@ pub enum Side {
 }
 
 /// A conversation on one line, one range or one whole file.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Thread {
     pub id: ThreadId,
     pub resolved: bool,
@@ -55,7 +55,7 @@ pub struct Thread {
 }
 
 /// The reviewer's verdict.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Verdict {
     Comment,
     Approve,
@@ -63,7 +63,7 @@ pub enum Verdict {
 }
 
 /// A comment on a line, before it is sent.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NewLine {
     pub path: String,
     pub line: u32,
@@ -73,7 +73,7 @@ pub struct NewLine {
 }
 
 /// A comment the forge holds for the reader.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HeldComment {
     pub thread: ThreadId,
     pub comment: Comment,

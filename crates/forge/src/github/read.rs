@@ -169,6 +169,7 @@ pub(super) fn pull(repo: &Repo, node: &PullNode) -> ForgeResult<Pull> {
         url: node.url.clone(),
         author: login(&node.author),
         base: node.base_ref_name.clone(),
+        base_sha: node.base_ref_oid.clone(),
         head: node.head_ref_name.clone(),
         head_sha: node.head_ref_oid.clone(),
         created_at: time::parse(&node.created_at).unwrap_or(0),

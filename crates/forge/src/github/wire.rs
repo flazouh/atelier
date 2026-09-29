@@ -88,6 +88,9 @@ pub(super) struct PullNode {
     pub updated_at: String,
     pub author: Option<Login>,
     pub base_ref_name: String,
+    /// The base branch's commit the pull request stands on. Older recordings lack it.
+    #[serde(default)]
+    pub base_ref_oid: String,
     pub head_ref_name: String,
     pub head_ref_oid: String,
     pub mergeable: Option<String>,

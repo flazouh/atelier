@@ -16,6 +16,7 @@ lathe-agents = { path = "crates/agents" }
 lathe-editor = { path = "crates/editor" }
 lathe-forge = { path = "crates/forge" }
 lathe-lsp = { path = "crates/lsp" }
+lathe-pr-view = { path = "crates/pr-view" }
 lathe-project = { path = "crates/project" }
 lathe-remote = { path = "crates/remote" }
 lathe-review = { path = "crates/review" }

@@ -1,0 +1,23 @@
+[package]
+name = "lathe-pr-view"
+description = "The pull request view on real data: the list of pull requests, and one pull request with its checks, conversation, files and diff, over the forge and the project's git."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui-kit.workspace = true
+beui.workspace = true
+lathe-editor.workspace = true
+lathe-forge.workspace = true
+lathe-lsp.workspace = true
+lathe-project.workspace = true
+lathe-review.workspace = true
+lsp-types = "0.97"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+gpui-kit = { workspace = true, features = ["test-support"] }
+tempfile = "3"
