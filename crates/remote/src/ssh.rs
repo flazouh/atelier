@@ -138,7 +138,9 @@ fn run(host: &str, script: &str, stdin: Option<&[u8]>) -> io::Result<String> {
     let said = String::from_utf8_lossy(&out.stderr);
     let said = said.lines().rfind(|l| !l.trim().is_empty()).unwrap_or("no message").trim().to_string();
     let kind = if said.contains("Permission denied") { io::ErrorKind::PermissionDenied } else { io::ErrorKind::ConnectionRefused };
-    Err(io::Error::new(kind, format!("{host}: {said}")))
+    // ssh often names the host itself ("ssh: Could not resolve hostname x"); then it is not said twice.
+    let said = if said.contains(host) { said } else { format!("{host}: {said}") };
+    Err(io::Error::new(kind, said))
 }
 
 /// The host's platform and home folder.
