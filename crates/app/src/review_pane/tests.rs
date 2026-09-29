@@ -272,3 +272,14 @@ fn a_rejected_new_file_is_removed(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(!dir.join("new.txt").exists(), "the file the agent made is gone");
 }
+
+/// The whole session is diffed off the UI thread: the switch keeps the turn drawn until its files land.
+#[gpui_kit::test]
+fn the_whole_session_is_read_off_the_ui_thread(cx: &mut TestAppContext) {
+    let (pane, _, _, _, cx) = reviewing(cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.switch_scope(window, cx)));
+    assert_eq!(cx.update(|_, cx| pane.read(cx).scope), Scope::Turn(0), "the turn stays until the session's files land");
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| pane.read(cx).scope), Scope::Whole);
+    assert_eq!(hunk_ids(&pane, cx).len(), 2);
+}

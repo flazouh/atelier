@@ -35,6 +35,7 @@ use lathe_review::{Content, FileReview, Merged};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
+    review_state::Decided,
     review_text::{moved_caret, row_of, splice},
 };
 
@@ -155,6 +156,12 @@ pub struct ReviewPane {
     composer: Option<(usize, Entity<LineComposer>, [Subscription; 2])>,
     width: f32,
     writing: Option<Task<()>>,
+    /// The whole session's files, read off the UI thread; dropping it drops the read.
+    loading: Task<()>,
+    /// No files yet: the whole session is being read.
+    reading: bool,
+    /// The file to open once the files are read.
+    opening_at: Option<String>,
     _edits: Subscription,
     _session: Subscription,
 }
@@ -169,7 +176,14 @@ impl ReviewPane {
         cx: &mut Context<Self>,
     ) -> Self {
         let pressed = Instant::now();
-        let files = read_files(session.read(cx), scope);
+        // A turn's files are at hand; the whole session's come from a background read.
+        let files = match scope {
+            Scope::Turn(turn) => {
+                let s = session.read(cx);
+                files_of(s.reviews.turns.turns().get(turn).map(|t| t.files().to_vec()).unwrap_or_default(), scope, &s.reviews.decided)
+            }
+            Scope::Whole => Vec::new(),
+        };
         let current = path.and_then(|p| files.iter().position(|f| f.review.path == p)).unwrap_or(0);
         let (editor, _edits) = Self::editor_for(files.get(current), window, cx);
         let _session = cx.subscribe_in(&session, window, |this, _, event: &SessionEvent, window, cx| {
@@ -201,9 +215,15 @@ impl ReviewPane {
             composer: None,
             width: f32::MAX,
             writing: None,
+            loading: Task::ready(()),
+            reading: scope == Scope::Whole,
+            opening_at: path.map(str::to_string),
             _edits,
             _session,
         };
+        if scope == Scope::Whole {
+            pane.set_scope(Scope::Whole, window, cx);
+        }
         pane.check_disk(pane.files.iter().map(|f| f.review.path.clone()).collect(), window, cx);
         timing(window, format!("review of {} files opened", pane.files.len()), pressed, pressed.elapsed());
         pane
@@ -466,18 +486,42 @@ impl ReviewPane {
     }
 
     /// Reads the files of `scope` from the session, and opens the one at the same path if it has it.
+    /// A turn's files are at hand; the whole session is diffed off the UI thread, and the scope drawn
+    /// now stays until its files land. A later switch drops a read still running.
     fn set_scope(&mut self, scope: Scope, window: &mut Window, cx: &mut Context<Self>) {
+        let session = self.session.read(cx);
+        let turns = session.reviews.turns.turns().len();
+        match scope {
+            Scope::Turn(turn) => {
+                let reviews = session.reviews.turns.turns().get(turn).map(|t| t.files().to_vec()).unwrap_or_default();
+                self.loading = Task::ready(());
+                self.show_scope(scope, reviews, turns, window, cx);
+            }
+            Scope::Whole => {
+                let all = session.reviews.turns.clone();
+                let whole = cx.background_spawn(async move { all.whole() });
+                self.loading = cx.spawn_in(window, async move |this, cx| {
+                    let reviews = whole.await;
+                    _ = this.update_in(cx, |pane, window, cx| pane.show_scope(scope, reviews, turns, window, cx));
+                });
+            }
+        }
+    }
+
+    /// Shows `reviews`, the files of `scope`, with what the reader decided before, at the same file.
+    fn show_scope(&mut self, scope: Scope, reviews: Vec<FileReview>, turns: usize, window: &mut Window, cx: &mut Context<Self>) {
         if self.writing.take().is_some() {
             self.write(&[self.current], cx);
         }
-        let path = self.files.get(self.current).map(|f| f.review.path.clone());
+        let path = self.files.get(self.current).map(|f| f.review.path.clone()).or_else(|| self.opening_at.take());
         if let Scope::Turn(turn) = scope {
             self.turn = turn;
         }
         self.scope = scope;
-        self.files = read_files(self.session.read(cx), scope);
+        self.reading = false;
+        self.files = files_of(reviews, scope, &self.session.read(cx).reviews.decided);
         self.changed = changed_of(&self.files);
-        self.turns = self.session.read(cx).reviews.turns.turns().len();
+        self.turns = turns;
         self.current = path.and_then(|p| self.files.iter().position(|f| f.review.path == p)).unwrap_or(0);
         self.resolving.clear();
         self.composer = None;
@@ -641,16 +685,12 @@ fn changed_of(files: &[PaneFile]) -> Vec<ChangedFile> {
 }
 
 /// The files of `scope`, with what the reader decided before where the session kept it.
-pub fn read_files(session: &AgentSession, scope: Scope) -> Vec<PaneFile> {
-    let reviews = match scope {
-        Scope::Turn(turn) => session.reviews.turns.turns().get(turn).map(|t| t.files().to_vec()).unwrap_or_default(),
-        Scope::Whole => session.reviews.turns.whole(),
-    };
+fn files_of(reviews: Vec<FileReview>, scope: Scope, decided: &Decided) -> Vec<PaneFile> {
     reviews
         .into_iter()
         .map(|review| {
             let mut file = PaneFile::new(review);
-            if let Some((merged, on_disk)) = session.reviews.decided.get(&(scope, file.review.path.clone())) {
+            if let Some((merged, on_disk)) = decided.get(&(scope, file.review.path.clone())) {
                 (file.merged, file.on_disk) = (merged.clone(), on_disk.clone());
             }
             file
@@ -703,7 +743,7 @@ impl Render for ReviewPane {
                 .size_full()
                 .gap(px(8.))
                 .child(bar)
-                .child(div().flex().flex_1().items_center().justify_center().text_size(TextSize::Sm.font_size()).text_color(theme.muted_foreground).child("Nothing changed"));
+                .child(div().flex().flex_1().items_center().justify_center().text_size(TextSize::Sm.font_size()).text_color(theme.muted_foreground).child(if self.reading { "Reading the session's changes…" } else { "Nothing changed" }));
             return handlers.keys(empty, &self.focus).into_any_element();
         };
         let path: SharedString = file.review.path.clone().into();

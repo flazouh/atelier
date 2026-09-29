@@ -250,7 +250,8 @@ in place of the editor on the right; a file's name opens it in the editor.
   nothing shows no card. A message sent while a turn runs joins that turn.
 - **The review pane** (`crates/app/src/review_pane.rs`). alex-31's `ReviewBar`, `ChangedFileTree`, the
   file card with `ReviewFileHeader`, and the real editor with `InlineReview`'s hunks from each file's
-  `Merged`. The bar's switch shows one turn or the whole session (`SessionReview::whole`). A review
+  `Merged`. The bar's switch shows one turn or the whole session (`SessionReview::whole`, diffed on a
+  background task; the turn stays drawn until the session's files land). A review
   widens the right pane to 860 px, or to what leaves the agent panel a session panel's default width,
   and gives the old width back when it closes. Below 680 px the tree hides; review mode shows it.
 - **Decisions reach the disk.** A file the agent made and the reader rejected whole is removed
@@ -287,7 +288,6 @@ Limits:
 - A file's `+a -r` in the tree and the header stay as the turn left them; the bar's count of reviewed
   files moves.
 - The review's editor has syntax colours but no language server: its text holds both sides of each hunk.
-- The whole session is diffed on the UI thread when the switch opens it (`SessionReview::whole`).
 
 ## QA, M3
 
