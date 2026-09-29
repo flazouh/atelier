@@ -2,8 +2,8 @@
 # Drives the lathe app on a headless Linux box and screenshots or records it: the screen is the
 # window's size, so the window sits at 0,0 and the xdotool script's coordinates are the window's.
 # Build first: cargo build -p lathe-app.
-# Usage: tools/app-drive-linux.sh "<folder or ->" "<theme>" <width>x<height> out.png|out.mp4 ["<shell script>"]
-# "-" opens no folder, for the start screen. The run keeps its own settings file, with that theme,
+# Usage: tools/app-drive-linux.sh "<folders, or ->" "<theme>" <width>x<height> out.png|out.mp4 ["<shell script>"]
+# "-" opens no folder, for the start screen; several folders, split by spaces, open as several projects. The run keeps its own settings file, with that theme,
 # unless LATHE_SETTINGS names one. APP_WAIT=<seconds> sets how long it runs before the script.
 set -euo pipefail
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
@@ -17,7 +17,7 @@ XVFB=$!
 trap 'kill $APP $XVFB 2>/dev/null || true' EXIT
 sleep 1
 FOLDER=()
-if [ "$1" != "-" ]; then FOLDER=("$1"); fi
+if [ "$1" != "-" ]; then read -r -a FOLDER <<<"$1"; fi
 DISPLAY=$DISPLAY_NUM WAYLAND_DISPLAY= LATHE_SIZE=$3 LATHE_TIMINGS=1 "$TARGET/debug/lathe" "${FOLDER[@]}" >/tmp/lathe-app.log 2>&1 &
 APP=$!
 sleep "${APP_WAIT:-6}"

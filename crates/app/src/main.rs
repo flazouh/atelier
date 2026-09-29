@@ -1,4 +1,4 @@
-//! lathe, the app. `lathe [folder]` opens the window, with the folder when one is named.
+//! lathe, the app. `lathe [folder…]` opens the window, with each folder named as a project in it.
 //!
 //! `LATHE_TIMINGS=1` prints when the first frame showed, counted from the start of the process.
 
@@ -17,7 +17,7 @@ fn main() {
     let started = Instant::now();
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
-    let folder = std::env::args_os().nth(1).map(PathBuf::from);
+    let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
     gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
         beui::init(cx);
         shell::bind_keys(cx);
@@ -41,9 +41,33 @@ fn main() {
         cx.open_window(options, move |window, cx| {
             let shell = cx.new(|cx| shell::Shell::new(recent, cx));
             window.focus(&shell.read(cx).focus_handle(), cx);
-            if let Some(folder) = folder {
+            for folder in folders {
                 shell.update(cx, |s, cx| s.open_local(folder, window, cx));
             }
+            // Closing the window with unsaved edits asks first.
+            let asking = shell.downgrade();
+            window.on_window_should_close(cx, move |window, cx| {
+                let unsaved = asking.upgrade().map_or(0, |s| s.read(cx).unsaved(cx));
+                if unsaved == 0 {
+                    return true;
+                }
+                let tabs = if unsaved == 1 { "1 tab has".to_string() } else { format!("{unsaved} tabs have") };
+                let answer = window.prompt(
+                    gpui_kit::PromptLevel::Warning,
+                    &format!("{tabs} unsaved changes."),
+                    Some("They are lost if you close the window."),
+                    &["Close Anyway", "Cancel"],
+                    cx,
+                );
+                let handle = window.window_handle();
+                cx.spawn(async move |cx| {
+                    if answer.await == Ok(0) {
+                        _ = handle.update(cx, |_, window, _| window.remove_window());
+                    }
+                })
+                .detach();
+                false
+            });
             if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
                 window.on_next_frame(move |_, _| eprintln!("first frame after {:.1} ms", started.elapsed().as_secs_f64() * 1000.));
             }

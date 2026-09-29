@@ -191,3 +191,24 @@ Live, against GitHub through `gh` on the HP (`cargo test -p lathe-forge --test l
 The working set is the slow one, and it is network and GitHub's own time: each search reads the checks of
 every row. It never runs on the UI thread, and the UI can show the remembered list first. Fewer fields per
 row would cut it; that is open.
+
+
+## The app
+
+The `lathe` binary on the HP under Xvfb (Mesa's software Vulkan), release. The load average came
+from alex-31's builds running at the same time.
+
+| Case | Target | Median | Worst | Runs | Load | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| First frame, from process start, a project open | < 300 ms | 220.4 ms | 373.6 ms | 11 | 14.2 | Passes |
+| Listing 10,000 files (`Project::list`, a .gitignore, 2,000 ignored) | < 200 ms | 9.79 ms | 10.43 ms (p95) | 20 | 3.7 | Passes |
+| The app's tree of 10,000 files: listing and building the rows model | < 200 ms | 11 ms | 13 ms | 7 | 14 | Passes |
+
+    cargo test --release -p lathe-project --test list_bench -- --ignored --nocapture
+    LATHE_TIMINGS=1 target/release/lathe <folder>     # prints the first frame's time
+    target/release/lathe /tmp/qa-10k                    # the status line says "listed in N ms"
+
+- The listing and the tree build run on a background thread. The tree draws as a virtual list, so
+  only the rows on screen lay out.
+- The first frame waits for no disk work: the settings file is read before the event loop, and the
+  project lists after the window shows.

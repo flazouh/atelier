@@ -14,7 +14,7 @@ use std::{
 use futures_channel::mpsc;
 use futures_util::StreamExt;
 use gpui_kit::{
-    AppContext, Context, Entity, EventEmitter, SharedString, Subscription, Task, Window,
+    AppContext, Context, Entity, EventEmitter, PromptLevel, SharedString, Subscription, Task, Window,
     base::input::{InputEvent, Position},
     component::input::EditorState,
 };
@@ -307,9 +307,15 @@ impl OpenProject {
         self.tabs.open(&path);
     }
 
-    /// Writes the tab showing, when it has edits.
+    /// Writes the tab showing.
     pub fn save(&mut self, cx: &mut Context<Self>) {
-        let Some(path) = self.tabs.active().map(str::to_string) else { return };
+        if let Some(path) = self.tabs.active().map(str::to_string) {
+            self.save_path(path, false, cx);
+        }
+    }
+
+    /// Writes `path`'s tab; with `then_close`, closes it once the write lands.
+    fn save_path(&mut self, path: String, then_close: bool, cx: &mut Context<Self>) {
         let Some(buffer) = self.buffers.get(&path) else { return };
         let text = buffer.editor.read(cx).value().to_string();
         let project = self.project.clone();
@@ -328,12 +334,46 @@ impl OpenProject {
                             buffer.changed_on_disk = false;
                         }
                         cx.emit(ProjectEvent::Said(format!("Saved {path}").into()));
+                        if then_close {
+                            this.close(&path, cx);
+                        }
                     }
                     Err(error) => cx.emit(ProjectEvent::Said(format!("Could not save {path}: {error}").into())),
                 }
                 cx.notify();
             });
         }));
+    }
+
+    /// How many tabs hold unsaved edits.
+    pub fn unsaved(&self) -> usize {
+        self.buffers.values().filter(|b| b.dirty).count()
+    }
+
+    /// Closes `path`'s tab. A tab with unsaved edits asks first: Save, Don't Save, or Cancel.
+    pub fn close_asking(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.buffers.get(path).is_some_and(|b| b.dirty) {
+            self.close(path, cx);
+            return;
+        }
+        let name = path.rsplit('/').next().unwrap_or(path);
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            &format!("Save the changes to {name}?"),
+            Some("They are lost if you close it without saving."),
+            &["Save", "Don't Save", "Cancel"],
+            cx,
+        );
+        let path = path.to_string();
+        cx.spawn(async move |this, cx| {
+            let Ok(answer) = answer.await else { return };
+            _ = this.update(cx, |this, cx| match answer {
+                0 => this.save_path(path, true, cx),
+                1 => this.close(&path, cx),
+                _ => {}
+            });
+        })
+        .detach();
     }
 
     /// Closes `path`'s tab and drops its buffer.
