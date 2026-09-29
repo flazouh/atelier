@@ -1,4 +1,4 @@
-use gpui_kit::{AppContext, TestAppContext, px, size};
+use gpui_kit::{TestAppContext, px, size};
 
 use super::*;
 
