@@ -3,23 +3,30 @@
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use beui::{ActiveTheme, ColorSelector, Swatch};
 use gpui_kit::{
-    AnyElement, Context, Hsla, IntoElement, ParentElement, Render, SharedString, Styled, Window, div, px, rgb,
+    AnyElement, Context, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
 
-/// The demo's accents, from `color-selector.preview.tsx`.
-const ACCENTS: [(&str, u32, &str); 8] = [
-    ("blue", 0x3478f6, "Blue"),
-    ("purple", 0x9270e8, "Purple"),
-    ("pink", 0xe66aa4, "Pink"),
-    ("red", 0xe55656, "Red"),
-    ("orange", 0xed9141, "Orange"),
-    ("amber", 0xe5b63c, "Amber"),
-    ("green", 0x65a65a, "Green"),
-    ("teal", 0x169d83, "Teal"),
+/// The demo's accents, from `color-selector.preview.tsx`, as red, green and blue bytes: they are the
+/// user's data, not the UI's colours.
+const ACCENTS: [(&str, [u8; 3], &str); 8] = [
+    ("blue", [52, 120, 246], "Blue"),
+    ("purple", [146, 112, 232], "Purple"),
+    ("pink", [230, 106, 164], "Pink"),
+    ("red", [229, 86, 86], "Red"),
+    ("orange", [237, 145, 65], "Orange"),
+    ("amber", [229, 182, 60], "Amber"),
+    ("green", [101, 166, 90], "Green"),
+    ("teal", [22, 157, 131], "Teal"),
 ];
 
 fn accents() -> Vec<Swatch> {
-    ACCENTS.iter().map(|(value, hex, label)| Swatch::new(*value, Hsla::from(rgb(*hex)), *label)).collect()
+    ACCENTS
+        .iter()
+        .map(|(value, [r, g, b], label)| {
+            let color = Hsla::from(Rgba { r: *r as f32 / 255., g: *g as f32 / 255., b: *b as f32 / 255., a: 1. });
+            Swatch::new(*value, color, *label)
+        })
+        .collect()
 }
 
 pub struct MotionStory {
