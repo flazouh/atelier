@@ -7,7 +7,7 @@
 use std::time::Duration;
 
 use beui::{
-    Button, ButtonSize, ButtonVariant, ChangedFile, ChangedFiles, Checks, FileChange, ModelBadge, PrCard, PrChip,
+    Button, ButtonVariant, ChangedFile, ChangedFiles, Checks, FileChange, ModelBadge, PrCard, PrChip,
     PrChipData, PrState, ReviewState, SubagentCard, SubagentRow, SubagentStrip, ToolCall, ToolStatus,
     AgentText, AgentTextStatus,
 };
