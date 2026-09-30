@@ -1,9 +1,10 @@
 //! The "Motion" story: the components ported from beui.dev's `motion/` and `blocks/`, each in every state it
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
-use beui::{ActiveTheme, Checkbox, ColorSelector, RangeSlider, Swatch};
+use gpui_kit::AppContext as _;
+use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, RangeSlider, Swatch};
 use gpui_kit::{
-    AnyElement, Context, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
+    AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
 
 /// The demo's accents, from `color-selector.preview.tsx`, as red, green and blue bytes: they are the
@@ -19,6 +20,21 @@ const ACCENTS: [(&str, [u8; 3], &str); 8] = [
     ("teal", [22, 157, 131], "Teal"),
 ];
 
+/// The demo's teams, from `multi-select.preview.tsx`; the dots are Tailwind's rose, sky, amber, violet, emerald and slate 500.
+fn teams() -> Vec<MultiOption> {
+    let dot = |r: u8, g: u8, b: u8| Hsla::from(Rgba { r: r as f32 / 255., g: g as f32 / 255., b: b as f32 / 255., a: 1. });
+    let product = "Product teams";
+    let business = "Business teams";
+    vec![
+        MultiOption::new("design", "Design").group(product).dot(dot(244, 63, 94)),
+        MultiOption::new("engineering", "Engineering").group(product).dot(dot(14, 165, 233)),
+        MultiOption::new("product", "Product").group(product).dot(dot(245, 158, 11)),
+        MultiOption::new("research", "Research").group(product).dot(dot(139, 92, 246)),
+        MultiOption::new("marketing", "Marketing").group(business).dot(dot(16, 185, 129)),
+        MultiOption::new("operations", "Operations").group(business).dot(dot(100, 116, 139)),
+    ]
+}
+
 fn accents() -> Vec<Swatch> {
     ACCENTS
         .iter()
@@ -31,6 +47,7 @@ fn accents() -> Vec<Swatch> {
 
 pub struct MotionStory {
     part: Option<String>,
+    teams: Entity<MultiSelect>,
     accent: SharedString,
     /// Owned by the "every state" rows below.
     second: SharedString,
@@ -43,7 +60,7 @@ pub struct MotionStory {
 }
 
 impl MotionStory {
-    pub fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // `MOTION_PICK=2,133,247` puts a primary colour in force, to set the web demo's blue beside ours.
         if let Ok(pick) = std::env::var("MOTION_PICK") {
             let bytes: Vec<f32> = pick.split(',').filter_map(|n| n.trim().parse::<f32>().ok()).collect();
@@ -51,7 +68,8 @@ impl MotionStory {
                 beui::theme::set_pick(Some(Hsla::from(Rgba { r: r / 255., g: g / 255., b: b / 255., a: 1. })), cx);
             }
         }
-        Self { part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
+        let teams = cx.new(|cx| MultiSelect::new("teams", teams(), window, cx).placeholder("Choose teams").empty("No teams found.").with_values(["design", "engineering"]));
+        Self { teams, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
     }
 
     fn shows(&self, name: &str) -> bool {
@@ -227,6 +245,22 @@ impl Render for MotionStory {
                         .child(RangeSlider::new("r5", 0.).step(10.).on_change(|_, _, _| {})),
                 ));
             }
+        }
+        if self.part.as_deref() == Some("button") {
+            // The web's `button-base` primary (crop this one), and the same with a key cap, as the Settings QA found it.
+            parts.push(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .child(Button::new("continue").label("Continue").trailing_icon(beui::IconName::ArrowForward).variant(ButtonVariant::Primary).size(ButtonSize::Md))
+                    .child(Button::new("new-session").label("New session").cap("⌃ N").variant(ButtonVariant::Primary).size(ButtonSize::Md))
+                    .into_any_element(),
+            );
+        }
+        if self.shows("multi-select") {
+            let demo = div().w(px(384.)).child(self.teams.clone());
+            parts.push(if alone { demo.into_any_element() } else { section("Multi select: the demo", &theme, demo) });
         }
         div()
             .size_full()

@@ -71,7 +71,7 @@ impl Anthropic {
 }
 
 /// True for a model that needs a token budget for thinking (Haiku 4.5) instead of adaptive thinking.
-fn wants_budget(model: &str) -> bool {
+pub(crate) fn wants_budget(model: &str) -> bool {
     model.starts_with("claude-haiku-4-5") || model.starts_with("claude-sonnet-4-5") || model.starts_with("claude-opus-4-5")
 }
 
