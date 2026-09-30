@@ -2,7 +2,7 @@
 //! same pull request, reads it off the UI thread at the pace `poll` sets, while a card of it is on
 //! screen. The card's merge actions write to the forge only after the reader confirms a merge or a
 //! branch delete, and the forge's refusals show in its own words.
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use beui::{
     ActiveTheme, PrCard, PrChipData,
     button::{Button, ButtonVariant},
@@ -60,7 +60,7 @@ impl PullCard {
 
     /// The wait before the next read; `None` when the card reads no more on its own.
     #[cfg(test)]
-    pub fn next(&self, cx: &App) -> Option<Duration> {
+    pub fn next(&self, cx: &App) -> Option<std::time::Duration> {
         self.watch.read(cx).next
     }
 
