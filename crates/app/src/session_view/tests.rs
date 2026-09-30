@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use beui::{
     agent_panels::AgentPanels,
     panel_types::{PanelData, ProjectLabel},
@@ -44,9 +42,9 @@ fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
             title: "A session".into(),
             look: lathe_agents::registry::agents()[0].look.clone(),
             status: SessionStatus::Idle,
-            content: Rc::new(move |_, _| {
+            content: beui::panel_types::content_from(move |_, _| {
                 div().size_full().child(div().debug_selector(|| "composer".into()).h(px(40.)).child(Input::new(&shown))).into_any_element()
-            }),
+            }, cx),
         };
         panels.update(cx, |p, cx| p.set_panels(vec![panel], vec!["project".into()], cx));
         Host { panels, input }

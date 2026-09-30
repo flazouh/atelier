@@ -406,6 +406,10 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
             let rename = session.clone();
             div()
                 .id(gpui_kit::ElementId::Name(format!("{key}-title").into()))
+                .debug_selector({
+                    let title = shown_title.clone();
+                    move || format!("panel-title:{title}")
+                })
                 .flex_1()
                 .min_w_0()
                 .truncate()

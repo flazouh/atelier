@@ -4,22 +4,19 @@
 //! A session open in the window is keyed by its panel's key. A past one, which the agent lists but no
 //! panel holds, is keyed `past:<the agent's id>`, so opening it resumes it.
 
-use std::{collections::BTreeMap, rc::Rc};
+use std::collections::BTreeMap;
 
 use beui::{
     panel_types::{PanelData, ProjectLabel},
     session_status::SessionStatus,
     sidebar_model::{Connection, Location as RowLocation, ProjectData, SessionData},
 };
-use gpui_kit::{App, Entity, IntoElement, SharedString};
+use gpui_kit::{App, Entity, SharedString};
 use lathe_agents::session::SessionId;
 use lathe_project::Link;
 use lathe_settings::Location;
 
-use crate::{
-    open_project::OpenProject,
-    session_view::session_view,
-};
+use crate::{agent_session::AgentSession, open_project::OpenProject};
 
 const PAST: &str = "past:";
 
@@ -94,7 +91,12 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
 }
 
 /// A panel for each open session, and the projects' order for grouping.
-pub fn panels(projects: &[Entity<OpenProject>], cx: &App) -> (Vec<PanelData>, Vec<SharedString>) {
+/// The open sessions as panels. `view_of` gives each session's own view (`SessionPanel`), kept across syncs.
+pub fn panels(
+    projects: &[Entity<OpenProject>],
+    view_of: &dyn Fn(&Entity<AgentSession>) -> gpui_kit::AnyView,
+    cx: &App,
+) -> (Vec<PanelData>, Vec<SharedString>) {
     let order = projects.iter().map(|p| project_id(p.read(cx))).collect();
     let panels = projects
         .iter()
@@ -104,14 +106,13 @@ pub fn panels(projects: &[Entity<OpenProject>], cx: &App) -> (Vec<PanelData>, Ve
         })
         .map(|(project, session)| {
             let s = session.read(cx);
-            let content = session.clone();
             PanelData {
                 id: s.key.clone(),
                 project,
                 title: s.shown_title(),
                 look: s.agent.look.clone(),
                 status: s.status.clone(),
-                content: Rc::new(move |window, cx| session_view(&content, window, cx).into_any_element()),
+                content: view_of(&session),
             }
         })
         .collect();

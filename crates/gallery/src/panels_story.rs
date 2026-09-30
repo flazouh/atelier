@@ -2,7 +2,6 @@
 //! project and not. `PANELS=12` opens twelve. `GALLERY_SCROLL=1` scrolls the strip sideways and prints the
 //! frame numbers; with `GALLERY_SWITCH=1` it also switches the layout every 30th frame and counts those
 //! frames apart.
-use std::rc::Rc;
 
 use beui::{
     ActiveTheme, AgentPanels, Button, ButtonSize, ButtonVariant, Location, Need, PanelData, PanelLayout, PanelsEvent, PanelsState, ProjectLabel,
@@ -64,7 +63,7 @@ fn body(title: SharedString, status: SessionStatus) -> impl Fn(&mut Window, &mut
     }
 }
 
-fn panel(n: usize, look: &AgentLook) -> PanelData {
+fn panel(n: usize, look: &AgentLook, cx: &mut gpui_kit::App) -> PanelData {
     let project = projects()[n % 2].clone();
     let title: SharedString = if n < TITLES.len() { TITLES[n].into() } else { format!("Session number {n}").into() };
     let status = status_of(n);
@@ -74,7 +73,7 @@ fn panel(n: usize, look: &AgentLook) -> PanelData {
         title: title.clone(),
         look: look.clone(),
         status: status.clone(),
-        content: Rc::new(body(title, status)),
+        content: beui::panel_types::content_from(body(title, status), cx),
     }
 }
 
@@ -92,7 +91,7 @@ impl PanelsStory {
     pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
         let look = claude::look();
         let count = std::env::var("PANELS").ok().and_then(|v| v.parse().ok()).unwrap_or(6);
-        let data: Vec<PanelData> = (0..count).map(|n| panel(n, &look)).collect();
+        let data: Vec<PanelData> = (0..count).map(|n| panel(n, &look, cx)).collect();
         let order: Vec<SharedString> = projects().iter().map(|p| p.id.clone()).collect();
         let panels = cx.new(|cx| {
             let mut panels = AgentPanels::new(cx);
@@ -122,7 +121,8 @@ impl PanelsStory {
     }
 
     fn open_another(&mut self, cx: &mut Context<Self>) {
-        self.data.push(panel(self.next, &self.look));
+        let next = panel(self.next, &self.look, cx);
+        self.data.push(next);
         self.next += 1;
         let (data, order) = (self.data.clone(), projects().iter().map(|p| p.id.clone()).collect());
         self.panels.update(cx, |p, cx| p.set_panels(data, order, cx));

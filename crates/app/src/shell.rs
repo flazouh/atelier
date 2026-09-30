@@ -125,6 +125,8 @@ pub struct Shell {
     /// The open sessions and the one in front as the settings file has them, to write only a change.
     saved_open: (Vec<lathe_settings::OpenSession>, Option<String>),
     _subscriptions: Vec<Subscription>,
+    /// Each open session's panel view, by the session's entity.
+    panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
     /// The right pane's own view (`right_pane.rs`), cached.
     right_view: Entity<crate::right_pane::RightPane>,
     /// Gives the cached sidebar the time each minute, so a session's age moves on.
@@ -173,6 +175,7 @@ impl Shell {
             saved_open: (saved.open.clone(), saved.front.clone()),
             before_review: None,
             _subscriptions: Vec::new(),
+            panel_views: Default::default(),
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
             _ages: cx.spawn(async move |this, cx| {
                 loop {
@@ -206,7 +209,16 @@ impl Shell {
     /// The sidebar and the panels, drawn again from the projects as they are now.
     fn sync(&mut self, cx: &mut Context<Self>) {
         let projects = agents_view::sidebar(&self.projects, &self.names, cx);
-        let (panels, order) = agents_view::panels(&self.projects, cx);
+        // Each open session keeps one view across syncs, so its panel is drawn from its last frame.
+        let sessions: Vec<Entity<AgentSession>> = self.projects.iter().flat_map(|p| p.read(cx).sessions.clone()).collect();
+        self.panel_views.retain(|id, _| sessions.iter().any(|s| s.entity_id() == *id));
+        for session in &sessions {
+            self.panel_views
+                .entry(session.entity_id())
+                .or_insert_with(|| cx.new(|cx| crate::session_panel::SessionPanel::new(session.clone(), cx)));
+        }
+        let views = &self.panel_views;
+        let (panels, order) = agents_view::panels(&self.projects, &|s| views[&s.entity_id()].clone().into(), cx);
         let now = agent_session::now();
         self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
         self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));

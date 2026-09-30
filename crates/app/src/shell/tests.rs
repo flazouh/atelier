@@ -247,3 +247,27 @@ fn a_cached_right_pane_follows_its_project(cx: &mut TestAppContext) {
     settle(&shell, cx);
     assert!(cx.debug_bounds("editor-tab-0").is_some(), "the cached right pane shows no tab for a.txt");
 }
+
+/// View cache: each session's panel is drawn from its last frame until its session changes. A renamed
+/// session's panel header shows the new title in the next frame.
+#[gpui_kit::test]
+fn a_cached_panel_follows_its_session(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1600.), px(900.)));
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.new_session_key(&NewSession, window, cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("panel-title:New session").is_some(), "the panel shows its title");
+    let session = shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).sessions[0].clone());
+    session.update(cx, |s, cx| {
+        s.name = Some("Renamed by the reader".into());
+        cx.emit(crate::agent_session::SessionEvent::Renamed);
+        cx.notify();
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("panel-title:Renamed by the reader").is_some(), "the cached panel still shows the old title");
+}
