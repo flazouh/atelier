@@ -127,6 +127,10 @@ pub struct Shell {
     _subscriptions: Vec<Subscription>,
     /// Each open session's panel view, by the session's entity.
     panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
+    /// The ⋯ layout menu is open.
+    layout_menu: bool,
+    /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
+    session_right: Option<f32>,
     /// The right pane's own view (`right_pane.rs`), cached.
     right_view: Entity<crate::right_pane::RightPane>,
     /// Gives the cached sidebar the time each minute, so a session's age moves on.
@@ -176,6 +180,8 @@ impl Shell {
             before_review: None,
             _subscriptions: Vec::new(),
             panel_views: Default::default(),
+            layout_menu: false,
+            session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
             _ages: cx.spawn(async move |this, cx| {
                 loop {
@@ -1075,9 +1081,98 @@ impl Shell {
             .text_size(TextSize::Sm.font_size())
             .child(div().font_weight(gpui_kit::FontWeight::MEDIUM).child(name.unwrap_or_else(|| "lathe".into())))
             .children(branch.map(|b| div().text_color(theme.muted_foreground).child(b)))
+            .relative()
+            .children(self.layout_button(cx))
             .child(div().flex_1().flex().justify_center().child(beui::SessionsIsland::new("sessions-island", counts).on_press(
                 move |window, cx| drop(this.update(cx, |shell, cx| shell.open_most_urgent(window, cx))),
             )))
+    }
+
+    /// The ⋯ at the top right of the session area, and its layout menu: side by side or single, grouped by
+    /// project or not, each with its key. `None` while no session is open.
+    fn layout_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        use beui::{
+            agent_panels::chord,
+            menu::{self, Choice, Entry, Menu, MenuItem, MenuLook, Origin},
+            panel_types::Layout,
+            popover::{Hang, Popover},
+        };
+        if !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
+            return None;
+        }
+        let (layout, grouped) = {
+            let panels = self.panels.read(cx);
+            (panels.layout(), panels.grouped())
+        };
+        let this = cx.entity().downgrade();
+        let menu = self.layout_menu.then(|| {
+            let (side, single, group, close) = (this.clone(), this.clone(), this.clone(), this.clone());
+            let entries: Vec<Entry> = vec![
+                Entry::from(
+                    MenuItem::new("Side by side")
+                        .debug_name("layout-side-by-side")
+                        .choice(Choice::Radio(layout == Layout::SideBySide))
+                        .cap(keys::cap(chord::TOGGLE_LAYOUT))
+                        .on_select(move |_, cx| drop(side.update(cx, |s, cx| s.choose_layout(Layout::SideBySide, cx)))),
+                ),
+                Entry::from(
+                    MenuItem::new("Single view")
+                        .debug_name("layout-single")
+                        .choice(Choice::Radio(layout == Layout::Single))
+                        .on_select(move |_, cx| drop(single.update(cx, |s, cx| s.choose_layout(Layout::Single, cx)))),
+                ),
+                Entry::from(
+                    MenuItem::new("Group by project")
+                        .debug_name("layout-grouped")
+                        .choice(Choice::Check(grouped))
+                        .cap(keys::cap(chord::TOGGLE_GROUPING))
+                        .on_select(move |_, cx| drop(group.update(cx, |s, cx| s.choose_grouping(!grouped, cx)))),
+                ),
+            ];
+            Popover::new("layout-menu-popover")
+                .open(true)
+                .hang(Hang::Right(0., 30.))
+                .keep_focus()
+                .height(menu::height_in(MenuLook::PROJECT, 3))
+                .on_close(move |_, cx| drop(close.update(cx, |s, cx| s.close_layout_menu(cx))))
+                .child(Menu::new("layout-menu-panel", entries).look(MenuLook::PROJECT).origin(Origin::TopRight))
+        });
+        let toggle = this.clone();
+        let button = Button::new("layout-menu")
+            .debug_name("layout-menu")
+            .icon(beui::IconName::MoreHoriz)
+            .variant(ButtonVariant::Ghost)
+            .size(ButtonSize::IconSm)
+            .tooltip("Layout")
+            .open(self.layout_menu)
+            .on_click(move |_, _, cx| {
+                cx.stop_propagation();
+                drop(toggle.update(cx, |s, cx| {
+                    s.layout_menu = !s.layout_menu;
+                    cx.notify();
+                }))
+            });
+        let at = div().absolute().top(px(7.));
+        let at = match self.session_right {
+            Some(right) => at.left(px(right - 36.)),
+            None => at.right(px(12.)),
+        };
+        Some(at.child(div().relative().child(button).children(menu)).into_any_element())
+    }
+
+    fn choose_layout(&mut self, layout: beui::panel_types::Layout, cx: &mut Context<Self>) {
+        self.panels.update(cx, |p, cx| p.set_layout(layout, cx));
+        self.close_layout_menu(cx);
+    }
+
+    fn choose_grouping(&mut self, grouped: bool, cx: &mut Context<Self>) {
+        self.panels.update(cx, |p, cx| p.set_grouped(grouped, cx));
+        self.close_layout_menu(cx);
+    }
+
+    fn close_layout_menu(&mut self, cx: &mut Context<Self>) {
+        self.layout_menu = false;
+        cx.notify();
     }
 
     fn start_screen(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1235,6 +1330,7 @@ impl Shell {
         let total = f32::from(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
+            self.session_right = None;
             return self.narrow_panes(project, window, cx);
         }
         let wants = fit::Wants {
@@ -1242,6 +1338,7 @@ impl Shell {
             right: self.right.then_some(self.right_width),
         };
         let widths = fit::widths(total, wants);
+        self.session_right = Some(widths.sidebar.unwrap_or(0.) + widths.agent);
         // The strip lays its columns out from this width in this frame; the strip keeps 8 px each side.
         self.panels.update(cx, |p, cx| p.fit_to(widths.agent - 16., cx));
         let wash = cx.theme().muted_hover();
