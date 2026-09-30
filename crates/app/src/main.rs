@@ -24,6 +24,7 @@ mod pulls;
 mod review_pane;
 mod review_state;
 mod review_text;
+mod session_title;
 mod session_view;
 mod settings_pane;
 mod ship;

@@ -181,3 +181,19 @@ fn a_resumed_session_opens_its_review_as_it_was_left(cx: &mut TestAppContext) {
         assert_eq!(r.turn_marks, marks, "and where its card sits");
     });
 }
+/// After its first turn, a session takes a short title the agent drafts; a name the reader gave stays.
+#[gpui_kit::test]
+fn the_first_turn_drafts_a_short_title(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![vec![ended()]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("please could you fix the flaky test in the lease module".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).shown_title().to_string()), "Keep TWO", "the fake agent drafts this");
+}
+#[gpui_kit::test]
+fn a_name_the_reader_gave_stays(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![vec![ended()]], false);
+    cx.update(|_, cx| session.update(cx, |s, _| s.name = Some("Mine".into())));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("fix it".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).shown_title().to_string()), "Mine");
+}
