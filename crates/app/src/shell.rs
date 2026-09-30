@@ -56,6 +56,9 @@ actions!(lathe, [OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, 
 pub const TITLE_BAR: f32 = 38.;
 const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else { 12. };
 
+/// How often the sidebar's ages are brought up to date.
+const AGE_TICK: std::time::Duration = std::time::Duration::from_secs(60);
+
 pub fn bind_keys(cx: &mut App) {
     crate::ship::strip::bind_keys(cx);
     crate::ship::pull_form::bind_keys(cx);
@@ -123,6 +126,8 @@ pub struct Shell {
     /// The open sessions and the one in front as the settings file has them, to write only a change.
     saved_open: (Vec<lathe_settings::OpenSession>, Option<String>),
     _subscriptions: Vec<Subscription>,
+    /// Gives the cached sidebar the time each minute, so a session's age moves on.
+    _ages: gpui_kit::Task<()>,
 }
 
 /// The right pane's width a review opens at, room for its tree beside the file: less when the window
@@ -167,7 +172,25 @@ impl Shell {
             saved_open: (saved.open.clone(), saved.front.clone()),
             before_review: None,
             _subscriptions: Vec::new(),
+            _ages: cx.spawn(async move |this, cx| {
+                loop {
+                    cx.background_executor().timer(AGE_TICK).await;
+                    if this.update(cx, |shell, cx| shell.tick_ages(cx)).is_err() {
+                        break;
+                    }
+                }
+            }),
         }
+    }
+
+    /// The sidebar's rows again with the time now, for their ages; nothing when no session row shows.
+    fn tick_ages(&mut self, cx: &mut Context<Self>) {
+        if !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
+            return;
+        }
+        let projects = agents_view::sidebar(&self.projects, &self.names, cx);
+        let now = agent_session::now();
+        self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
     }
 
     /// Hears the sidebar and the panels. Called once the window exists.
@@ -1158,7 +1181,7 @@ impl Shell {
             .flex_col()
             .size_full()
             // The projects and their sessions, then the front project's files, each half the height.
-            .child(div().flex_1().min_h_0().child(self.agents_sidebar.clone()))
+            .child(div().flex_1().min_h_0().child(crate::view_cache::draw(&self.agents_sidebar)))
             .child(heading(tree_heading))
             .child(div().flex_1().min_h_0().children(tree))
             .child(self.sidebar_foot(cx))

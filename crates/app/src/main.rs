@@ -41,6 +41,7 @@ mod timings;
 mod tasks;
 mod tree;
 mod tree_view;
+mod view_cache;
 
 fn main() {
     exit_log::install();

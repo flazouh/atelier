@@ -177,3 +177,48 @@ fn every_global_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext)
     }
     assert!(lost.is_empty(), "chords that do not reach their action {lost:#?}");
 }
+
+/// View cache: the sidebar is drawn from its last frame until it changes. A renamed session must still show
+/// its new title in the next frame.
+#[gpui_kit::test]
+fn a_cached_sidebar_shows_a_renamed_session(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.new_session_key(&NewSession, window, cx));
+    settle(&shell, cx);
+    let session = shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).sessions[0].clone());
+    let before = "New session";
+    assert!(cx.debug_bounds("row-title:New session").is_some(), "the row shows {before:?}");
+    session.update(cx, |s, cx| {
+        s.name = Some("Renamed by the reader".into());
+        cx.emit(crate::agent_session::SessionEvent::Renamed);
+        cx.notify();
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("row-title:Renamed by the reader").is_some(), "the cached sidebar still shows {before:?}");
+}
+
+/// View cache: a session's age ("2m") comes from the time of the last sync. The cached sidebar is given the
+/// time again each minute while it shows a session, so an age never stands still.
+#[gpui_kit::test]
+fn a_cached_sidebar_is_given_the_time_each_minute(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.new_session_key(&NewSession, window, cx));
+    settle(&shell, cx);
+    let sidebar = shell.read_with(cx, |s, _| s.agents_sidebar.clone());
+    let told = std::rc::Rc::new(std::cell::Cell::new(0));
+    let count = told.clone();
+    let _watch = cx.update(|_, cx| cx.observe(&sidebar, move |_, _| count.set(count.get() + 1)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(61));
+    cx.run_until_parked();
+    assert!(told.get() >= 1, "no new time reached the sidebar in a minute");
+}
