@@ -229,3 +229,30 @@ fn a_remote_project_names_its_data_folder_on_the_host() {
     assert_eq!(remote.data_path(), local.data_path());
     assert!(remote.data_path().is_some_and(|p| p.starts_with(data.path())));
 }
+
+/// A process that ended gives back its pipes at once: a burst of short commands (a commit runs one per
+/// file) must not run the host out of open files while each is kept a while for a last Stderr ask.
+#[cfg(target_os = "linux")]
+#[test]
+fn ended_processes_give_back_their_pipes() {
+    let dir = folder(&[("a.txt", "a")]);
+    let (_host, dial) = host();
+    let remote = connect(&dir, dial);
+    let open_files = || std::fs::read_dir("/proc/self/fd").unwrap().count();
+    let run = || {
+        let mut p = remote.spawn(&lathe_project::Command::new("true")).unwrap();
+        drop(p.stdin);
+        let mut out = Vec::new();
+        std::io::Read::read_to_end(&mut p.stdout, &mut out).unwrap();
+        p.control.wait().unwrap();
+    };
+    run();
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let before = open_files();
+    for _ in 0..60 {
+        run();
+    }
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    let after = open_files();
+    assert!(after <= before + 10, "{before} open files before 60 commands, {after} after");
+}

@@ -187,11 +187,18 @@ fn spawn(state: &Arc<State>, out: &Out, command: &lathe_project::Command) -> io:
             }
             send(&out, &Frame::Event(Event::Output { pid, bytes: chunk[..n].to_vec() }));
         }
+        // Its end is read: the pipe goes now, not when this thread does, 30 seconds on.
+        drop(stdout);
         // stdout closed: wait for the exit without holding the lock a kill needs.
         while control.lock().unwrap_or_else(|p| p.into_inner()).running() {
             thread::sleep(Duration::from_millis(10));
         }
         let code = control.lock().unwrap_or_else(|p| p.into_inner()).wait().ok().flatten();
+        // Its stdin goes now, which ends the thread that fed it and closes the pipe: a burst of short
+        // commands must not run the host out of open files while each is kept for a last Stderr ask.
+        if let Some(running) = state.running.lock().unwrap_or_else(|p| p.into_inner()).get_mut(&pid) {
+            running.input = None;
+        }
         send(&out, &Frame::Event(Event::Exited { pid, code }));
         // Kept a little while, so a last Stderr request still finds it.
         thread::sleep(Duration::from_secs(30));
