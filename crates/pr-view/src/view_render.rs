@@ -24,6 +24,13 @@ use crate::{
 /// The description shows this tall until the reader asks for all of it.
 const BODY_CLIP: f32 = 160.;
 
+/// Whether a description is long enough to be clipped at [`BODY_CLIP`], so it needs the "Show the whole description"
+/// button: about seven lines of a rail's width, or more than six lines of its own.
+pub(crate) fn body_needs_fold(body: &str) -> bool {
+    let lines: usize = body.lines().map(|l| l.chars().count().div_ceil(48).max(1)).sum();
+    lines > 6
+}
+
 /// The line under the diff.
 const STATUS_HEIGHT: f32 = 26.;
 
@@ -88,6 +95,7 @@ impl PullView {
             .when_some(note, |d, note| d.child(div().text_size(TextSize::Xs.font_size()).text_color(if error { theme.danger } else { muted }).child(SharedString::from(note))))
             .when(!pull.body.trim().is_empty(), |d| {
                 let open = self.body_open;
+                let needs_fold = body_needs_fold(&pull.body);
                 let toggle = cx.listener(|view, _, _, cx| {
                     view.body_open = !view.body_open;
                     cx.notify();
@@ -99,7 +107,9 @@ impl PullView {
                         .flex_col()
                         .gap(px(4.))
                         .child(div().when(!open, |d| d.max_h(px(BODY_CLIP)).overflow_hidden()).child(AgentText::new("pr-body", body)))
-                        .child(Button::new("pr-body-more").label(if open { "Show less" } else { "Show the whole description" }).variant(ButtonVariant::Ghost).size(ButtonSize::Sm).on_click(move |e, w, cx| toggle(e, w, cx))),
+                        .when(needs_fold || open, |d| {
+                            d.child(Button::new("pr-body-more").label(if open { "Show less" } else { "Show the whole description" }).variant(ButtonVariant::Ghost).size(ButtonSize::Sm).on_click(move |e, w, cx| toggle(e, w, cx)))
+                        }),
                 )
             })
             .into_any_element()
@@ -355,5 +365,17 @@ impl Render for PullView {
             .children(picker);
         let rail = layout.rail.map(|width| self.rail(height - 16., width.min(RAIL_MAX), cx));
         handlers.keys(root(div().flex().flex_1().min_w_0().gap(px(RAIL_GAP)).children(rail).child(right).into_any_element()), &self.focus)
+    }
+}
+
+#[cfg(test)]
+mod fold_tests {
+    use super::body_needs_fold;
+
+    #[test]
+    fn a_short_description_needs_no_fold_button_and_a_long_one_does() {
+        assert!(!body_needs_fold("A QA pull request for the lathe pull request view. It adds add, sub and div, and a README line. Safe to close."));
+        assert!(body_needs_fold(&"A line of the description.\n".repeat(7)));
+        assert!(body_needs_fold(&"word ".repeat(200)));
     }
 }
