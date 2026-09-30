@@ -432,3 +432,29 @@ fn a_narrow_pane_shows_details_or_files_and_the_switch_and_the_keys_change_it(cx
     assert!(cx.debug_bounds("pr-part-details").is_none(), "no switch when both show");
     assert!(cx.debug_bounds("pr-rail").is_some() && cx.debug_bounds("pr-diff").is_some());
 }
+
+/// The rail scrolls; a fade at its foot says there is more, and goes at the end.
+#[gpui_kit::test]
+fn the_rail_fades_at_its_foot_while_there_is_more_below_and_not_at_the_end(cx: &mut TestAppContext) {
+    use gpui_kit::{point, px, size};
+    setup(cx);
+    let h = harness();
+    let (view, cx) = open(&h, cx);
+    settle(&view, cx, |v| v.current_view().is_some());
+    cx.simulate_resize(size(px(450.), px(360.)));
+    for _ in 0..5 {
+        cx.run_until_parked();
+        view.update(cx, |_, cx| cx.notify());
+    }
+    assert!(cx.debug_bounds("pr-rail-fade").is_some(), "the rail is taller than the pane: a fade shows");
+    let max = view.read_with(cx, |v, _| v.rail_scroll.max_offset().y);
+    view.update(cx, |v, cx| {
+        v.rail_scroll.set_offset(point(px(0.), -max));
+        cx.notify();
+    });
+    for _ in 0..3 {
+        cx.run_until_parked();
+        view.update(cx, |_, cx| cx.notify());
+    }
+    assert!(cx.debug_bounds("pr-rail-fade").is_none(), "at the end there is no fade");
+}
