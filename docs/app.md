@@ -56,14 +56,33 @@ wake from the watcher's own thread; lathe-project tests the real watcher.
 - Left: the sidebar, with the projects open in this window and each project's sessions (empty until
   M2), then its file tree.
 - Middle: the agent panel. Right: the editor tabs, or the review.
-- The splits are gpui-base's resizable panels, with a handle that shows only as a wash on hover.
+- A pane's edge is a handle that shows only as a wash on hover; a drag sizes the pane beside it.
 - Foot: the status line: the project, its branch, and the language server's state.
 - Keys: GitQuiet's table where a command applies (⌘B the left pane, ⌘⇧B the right pane), ⌘O open
   folder, ⌘S save, ⌘W close tab, ⌘J the bottom panel once there is one. The side panes keep their
-  width when one hides; the agent panel takes what is left.
+  width when one hides; the agent panel takes what is left, within the width rules below.
 - `t` (GitQuiet's Go to file, while nothing is being typed) opens beui's Finder over the project's
   files; Enter opens the one picked, Escape closes it.
 - `lathe [folder…]` opens each folder named as a project.
+
+## Window widths
+Nothing clips, and nothing draws under the next pane, at any width from 640 px up. The window does
+not go narrower than 640 by 480. `crates/app/src/shell/fit.rs` holds the rules, and its tests check
+them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
+- **From 1100 px:** the sidebar, the session column and the right pane, side by side.
+- **From 900 to 1099 px:** the session column and the right pane. The sidebar shows on ⌘B.
+- **Below 900 px:** one pane at a time, with tabs: Projects (⌘B), Session, and Editor (⌘⇧B). The
+  third tab says Review or Pull requests while one of them is in the right pane. Opening a session
+  shows the Session tab, and opening a review shows the Review tab.
+- **Least widths:** the session column 320 px, the right pane 320 px, and the sidebar 180 px.
+- **Who gives way:** the session column keeps its least width. The right pane gives way first, down
+  to its least width; then the sidebar. A pane that cannot keep its least width hides. The widths
+  a reader dragged stay as they were, and come back when the window grows.
+- **Inside the session column:** a session panel is never wider than its column. The panel bar says
+  "Columns", "Single" and "Group", with their keys, when the full words do not fit.
+- **Text:** a tool call's name keeps its width, and its path gives way with an ellipsis. On the
+  status line, the place and the branch keep their width; the parts after them truncate with an
+  ellipsis.
 
 ## Projects
 

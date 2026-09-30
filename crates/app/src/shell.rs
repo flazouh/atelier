@@ -18,15 +18,16 @@ use beui::{
 };
 use gpui_kit::{
     App, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, KeyDownEvent, ParentElement,
-    PathPromptOptions, Pixels, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
+    PathPromptOptions, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea, actions,
-    base::{ResizableState, ResizeHandleRenderer, h_resizable, resizable_panel},
     div, prelude::FluentBuilder, px,
 };
 use lathe_project::LocalProject;
 use lathe_settings::Location;
 
 use std::collections::BTreeMap;
+mod fit;
+use fit::{Fit, Pane};
 
 use beui::{
     agent_panels::AgentPanels,
@@ -93,18 +94,22 @@ pub struct Shell {
     names: BTreeMap<String, String>,
     /// With `LATHE_FRAMES=1`, times every frame.
     meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
-    /// The widths of the sidebar, the agent panel and the right pane.
-    splits: Entity<ResizableState>,
+    /// The sidebar's and the right pane's widths as the reader dragged them; the window's width may
+    /// show them narrower (`fit::widths`).
+    sidebar_width: f32,
+    right_width: f32,
+    /// Whether the sidebar shows in a window too narrow for it by default, after ⌘B.
+    sidebar_in_medium: bool,
+    /// The pane a narrow window shows.
+    narrow: Pane,
     /// The right pane's width before a review widened it, to give back when the review closes.
-    before_review: Option<Pixels>,
+    before_review: Option<f32>,
     _subscriptions: Vec<Subscription>,
 }
 
 /// The right pane's width a review opens at, room for its tree beside the file: less when the window
 /// has not got it, since the agent panel keeps its least width.
 const REVIEW_WIDTH: f32 = 860.;
-/// The agent panel's least width, which a reader can drag it to.
-const AGENT_LEAST: f32 = 320.;
 /// What a review leaves the agent panel: a session panel at its default width, and its margins.
 const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::panel_layout::GAP + 4.;
 
@@ -133,7 +138,10 @@ impl Shell {
             panels,
             names: saved.session_names.clone(),
             meter: crate::frame_meter::enabled().then(Default::default),
-            splits: cx.new(|_| ResizableState::default()),
+            sidebar_width: fit::SIDEBAR_DEFAULT,
+            right_width: fit::RIGHT_DEFAULT,
+            sidebar_in_medium: false,
+            narrow: Pane::Session,
             before_review: None,
             _subscriptions: Vec::new(),
         }
@@ -177,6 +185,7 @@ impl Shell {
     /// Makes `session` the panel in front, and its project the one the tree and the editor show.
     fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
         self.active = project;
+        self.narrow = Pane::Session;
         self.sync(cx);
         let key = session.read(cx).key.clone();
         self.panels.update(cx, |p, cx| p.activate(&key, cx));
@@ -423,16 +432,28 @@ impl Shell {
 
     /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
     /// still fits in it.
-    fn widen_for_review(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let sizes = self.splits.read(cx).sizes().clone();
-        let (Some(&right), Some(last)) = (sizes.last(), sizes.len().checked_sub(1)) else { return };
-        let others = sizes[..last].iter().fold(px(0.), |a, b| a + *b);
-        let sidebar = if self.sidebar { sizes[0] } else { px(0.) };
-        let room = right + others - sidebar - px(AGENT_BESIDE_REVIEW);
-        let want = px(REVIEW_WIDTH).min(room);
-        if right < want {
-            self.before_review.get_or_insert(right);
-            self.splits.update(cx, |s, cx| s.resize_panel(last, want, window, cx));
+    fn widen_for_review(&mut self, window: &mut Window, _: &mut Context<Self>) {
+        let total = f32::from(window.viewport_size().width);
+        let fit = Fit::of(total);
+        if fit == Fit::Narrow {
+            self.narrow = Pane::Right;
+            return;
+        }
+        let sidebar = if self.sidebar_shown(fit) { self.sidebar_width } else { 0. };
+        let want = REVIEW_WIDTH.min(total - sidebar - AGENT_BESIDE_REVIEW);
+        if self.right_width < want {
+            self.before_review.get_or_insert(self.right_width);
+            self.right_width = want;
+        }
+    }
+
+    /// Whether the sidebar shows at `fit`: by the reader's choice in a wide window, after ⌘B in a
+    /// medium one, and as its own tab in a narrow one.
+    fn sidebar_shown(&self, fit: Fit) -> bool {
+        match fit {
+            Fit::Wide => self.sidebar,
+            Fit::Medium => self.sidebar_in_medium,
+            Fit::Narrow => false,
         }
     }
 
@@ -472,9 +493,12 @@ impl Shell {
             }
             ProjectEvent::ReviewClosed => {
                 if let Some(width) = this.before_review.take() {
-                    let last = this.splits.read(cx).sizes().len().saturating_sub(1);
-                    this.splits.update(cx, |s, cx| s.resize_panel(last, width, window, cx));
+                    this.right_width = width;
                 }
+                if this.narrow == Pane::Right {
+                    this.narrow = Pane::Session;
+                }
+                cx.notify();
             }
             ProjectEvent::Sessions => this.sync(cx),
             ProjectEvent::Renamed { id, name } => {
@@ -611,13 +635,19 @@ impl Shell {
         cx.notify();
     }
 
-    fn toggle_sidebar(&mut self, _: &ToggleSidebar, _: &mut Window, cx: &mut Context<Self>) {
-        self.sidebar = !self.sidebar;
+    fn toggle_sidebar(&mut self, _: &ToggleSidebar, window: &mut Window, cx: &mut Context<Self>) {
+        match Fit::of(f32::from(window.viewport_size().width)) {
+            Fit::Wide => self.sidebar = !self.sidebar,
+            Fit::Medium => self.sidebar_in_medium = !self.sidebar_in_medium,
+            Fit::Narrow => self.narrow = if self.narrow == Pane::Projects { Pane::Session } else { Pane::Projects },
+        }
         cx.notify();
     }
-
-    fn toggle_right(&mut self, _: &ToggleRight, _: &mut Window, cx: &mut Context<Self>) {
-        self.right = !self.right;
+    fn toggle_right(&mut self, _: &ToggleRight, window: &mut Window, cx: &mut Context<Self>) {
+        match Fit::of(f32::from(window.viewport_size().width)) {
+            Fit::Narrow => self.narrow = if self.narrow == Pane::Right { Pane::Session } else { Pane::Right },
+            Fit::Medium | Fit::Wide => self.right = !self.right,
+        }
         cx.notify();
     }
 
@@ -781,6 +811,115 @@ impl Shell {
             .into_any_element()
     }
 
+    /// The panes for the window's width: the three side by side, the two without the sidebar, or one at
+    /// a time with tabs (docs/app.md, "Window widths").
+    fn panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let total = f32::from(window.viewport_size().width);
+        let fit = Fit::of(total);
+        if fit == Fit::Narrow {
+            return self.narrow_panes(project, cx);
+        }
+        let wants = fit::Wants {
+            sidebar: self.sidebar_shown(fit).then_some(self.sidebar_width),
+            right: self.right.then_some(self.right_width),
+        };
+        let widths = fit::widths(total, wants);
+        let wash = cx.theme().muted_hover();
+        let handle = move |edge: Edge| {
+            let d = div().id(match edge {
+                Edge::Sidebar => "edge-sidebar",
+                Edge::Right => "edge-right",
+            });
+            let d = match edge {
+                Edge::Sidebar => d.right(px(-4.)),
+                Edge::Right => d.left(px(-4.)),
+            };
+            d.absolute()
+                .top_0()
+                .bottom_0()
+                .w(px(8.))
+                .cursor(gpui_kit::CursorStyle::ResizeLeftRight)
+                .hover(|d| d.bg(wash))
+                .on_drag(edge, |_, _, _, cx| cx.new(|_| gpui_kit::Empty))
+        };
+        div()
+            .id("shell-panes")
+            .flex()
+            .size_full()
+            .min_h_0()
+            .on_drag_move::<Edge>(cx.listener(|this, event: &gpui_kit::DragMoveEvent<Edge>, _, cx| {
+                let x = f32::from(event.event.position.x - event.bounds.origin.x);
+                match event.drag(cx) {
+                    Edge::Sidebar => this.sidebar_width = x.clamp(fit::SIDEBAR_LEAST, fit::SIDEBAR_MOST),
+                    Edge::Right => this.right_width = (f32::from(event.bounds.size.width) - x).clamp(fit::RIGHT_LEAST, fit::RIGHT_MOST),
+                }
+                cx.notify();
+            }))
+            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.sidebar(cx)).child(handle(Edge::Sidebar))))
+            .child(div().flex_1().min_w_0().h_full().child(self.agent_panel(cx)))
+            .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.right_pane(project, cx)).child(handle(Edge::Right))))
+            .into_any_element()
+    }
+
+    /// One pane at a time, with a tab for each: the sidebar, the sessions, and the editor or what
+    /// stands in its place.
+    fn narrow_panes(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        let right = {
+            let p = project.read(cx);
+            if p.review.is_some() {
+                "Review"
+            } else if p.pulls.as_ref().is_some_and(|pulls| pulls.shown) {
+                "Pull requests"
+            } else {
+                "Editor"
+            }
+        };
+        let tab = |pane: Pane, label: &'static str, cap: Option<&'static str>, cx: &mut Context<Self>| {
+            let button = Button::new(label)
+                .label(label)
+                .size(ButtonSize::Sm)
+                .variant(if self.narrow == pane { ButtonVariant::Secondary } else { ButtonVariant::Ghost })
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.narrow = pane;
+                    cx.notify();
+                }));
+            match cap {
+                Some(cap) => button.cap(keys::cap(cap)),
+                None => button,
+            }
+        };
+        let tabs = div()
+            .flex()
+            .flex_none()
+            .items_center()
+            .gap(px(4.))
+            .px(px(8.))
+            .h(px(36.))
+            .child(tab(Pane::Projects, "Projects", Some("⌘b"), cx))
+            .child(tab(Pane::Session, "Session", None, cx))
+            .child(tab(Pane::Right, right, Some("⌘⇧b"), cx));
+        let body = match self.narrow {
+            Pane::Projects => self.sidebar(cx).into_any_element(),
+            Pane::Session => self.agent_panel(cx),
+            Pane::Right => self.right_pane(project, cx),
+        };
+        div().flex().flex_col().size_full().min_h_0().child(tabs).child(div().flex_1().min_h_0().child(body)).into_any_element()
+    }
+
+    /// The right pane: the review, the pull requests, or the editor.
+    fn right_pane(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let p = project.read(cx);
+        let pulls = p.pulls.as_ref().filter(|pulls| pulls.shown).map(|pulls| pulls.hub.clone());
+        let inner = match (p.review.as_ref(), pulls) {
+            // The review and the pull requests draw their own cards on the page.
+            (Some((pane, _)), _) => div().size_full().pt(px(6.)).child(pane.clone()),
+            (None, Some(hub)) => div().size_full().pt(px(6.)).child(hub),
+            (None, None) => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
+        };
+        div().size_full().pr(px(8.)).pb(px(2.)).child(inner).into_any_element()
+    }
+
     fn status_line(&self, cx: &App) -> impl IntoElement {
         let theme = cx.theme();
         let muted = theme.muted_foreground;
@@ -814,7 +953,11 @@ impl Shell {
             .text_size(TextSize::Xs.font_size())
             .text_color(muted)
             .overflow_hidden()
-            .children(parts.into_iter().map(|part| div().flex_none().whitespace_nowrap().child(part)))
+            // The place and the branch keep their width; the rest gives way with an ellipsis, never a clip.
+            .children(parts.into_iter().enumerate().map(|(at, part)| {
+                let d = div().whitespace_nowrap().child(part);
+                if at < 2 { d.flex_none() } else { d.min_w_0().truncate() }
+            }))
     }
 }
 
@@ -829,34 +972,12 @@ impl Render for Shell {
 }
 
 impl Shell {
-    fn root(&mut self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
             None => self.start_screen(cx).into_any_element(),
-            Some(project) => h_resizable("shell-splits")
-                .with_state(&self.splits)
-                .with_handle_appearance(borderless_handle(&theme))
-                .child(resizable_panel().visible(self.sidebar).size(px(260.)).size_range(px(180.)..px(480.)).flex_none().child(self.sidebar(cx)))
-                .child(resizable_panel().size_range(px(AGENT_LEAST)..px(4000.)).child(self.agent_panel(cx)))
-                .child(
-                    resizable_panel()
-                        .visible(self.right)
-                        .size(px(560.))
-                        .size_range(px(320.)..px(2400.))
-                        .flex_none()
-                        .child(div().size_full().pr(px(8.)).pb(px(2.)).child({
-                            let p = project.read(cx);
-                            let pulls = p.pulls.as_ref().filter(|pulls| pulls.shown).map(|pulls| pulls.hub.clone());
-                            match (p.review.as_ref(), pulls) {
-                                // The review and the pull requests draw their own cards on the page.
-                                (Some((pane, _)), _) => div().size_full().pt(px(6.)).child(pane.clone()),
-                                (None, Some(hub)) => div().size_full().pt(px(6.)).child(hub),
-                                (None, None) => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(&project, cx)),
-                            }
-                        })),
-                )
-                .into_any_element(),
+            Some(project) => self.panes(&project, window, cx),
         };
         let link_down = self.active().and_then(|p| match &p.read(cx).link {
             lathe_project::Link::Down(why) => Some((p.read(cx).location.place(), why.clone())),
@@ -929,8 +1050,9 @@ impl Shell {
     }
 }
 
-/// Borderless: a split's handle paints nothing at rest, and a wash while it is dragged.
-fn borderless_handle(theme: &beui::Theme) -> ResizeHandleRenderer {
-    let wash = theme.muted_hover();
-    Rc::new(move |handle, _, _| Some(div().size_full().when(handle.is_active(), |d| d.bg(wash)).into_any_element()))
+/// A pane edge a reader drags to size the pane beside it.
+#[derive(Clone, Copy)]
+enum Edge {
+    Sidebar,
+    Right,
 }

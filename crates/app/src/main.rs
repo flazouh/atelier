@@ -54,6 +54,8 @@ fn main() {
             .unwrap_or((1280., 820.));
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(w), px(h)), cx))),
+            // The narrowest width the layout keeps readable (docs/app.md, "Window widths").
+            window_min_size: Some(size(px(640.), px(480.))),
             titlebar: Some(TitlebarOptions {
                 title: Some("lathe".into()),
                 appears_transparent: true,
