@@ -64,8 +64,8 @@ fn session_names_and_panels_come_back() {
 
 #[test]
 fn the_mode_and_the_primary_colour_are_kept_and_an_old_file_without_them_still_loads() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("settings.json");
+    let path = scratch("mode");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(&path, r#"{"theme": "lathe Dark", "recent": []}"#).unwrap();
     let old = load(&path);
     assert_eq!((old.mode, old.primary), (None, None));

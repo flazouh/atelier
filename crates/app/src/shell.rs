@@ -45,7 +45,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests]);
+actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -63,6 +63,7 @@ pub fn bind_keys(cx: &mut App) {
         // A shifted combo arrives with the letter either way, depending on the platform.
         KeyBinding::new("secondary-shift-b", ToggleRight, None),
         KeyBinding::new("secondary-shift-B", ToggleRight, None),
+        KeyBinding::new("secondary-,", OpenSettings, None),
         KeyBinding::new("secondary-shift-p", PullRequests, None),
         KeyBinding::new("secondary-shift-P", PullRequests, None),
     ]);
@@ -79,6 +80,8 @@ pub struct Shell {
     /// Go to file, while it is open: the finder and the paths its rows stand for.
     finder: Option<(Entity<Finder>, Vec<String>, Subscription)>,
     /// "Open over SSH…", while it is open.
+    /// The Settings pane, while it is open.
+    settings: Option<(Entity<crate::settings_pane::SettingsPane>, Subscription)>,
     ssh: Option<(Entity<SshForm>, Subscription)>,
     focus: FocusHandle,
     /// The projects and their sessions.
@@ -123,6 +126,7 @@ impl Shell {
             said: None,
             finder: None,
             ssh: None,
+            settings: None,
             focus: cx.focus_handle(),
             agents_sidebar,
             panels,
@@ -305,6 +309,34 @@ impl Shell {
             });
         })
         .detach();
+    }
+
+    /// ⌘,: the Settings pane over the window, or back to the window when it is open.
+    fn open_settings(&mut self, _: &OpenSettings, window: &mut Window, cx: &mut Context<Self>) {
+        if self.settings.take().is_some() {
+            window.focus(&self.focus, cx);
+            cx.notify();
+            return;
+        }
+        let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
+        let agents = lathe_agents::registry::agents()
+            .into_iter()
+            .map(|agent| crate::settings_pane::AgentRow {
+                name: agent.name.into(),
+                models: agent.backend.capabilities().models.into_iter().map(|m| SharedString::from(m.label)).collect(),
+            })
+            .collect();
+        let pane = cx.new(|cx| crate::settings_pane::SettingsPane::new(&saved, agents, cx));
+        let events = cx.subscribe_in(&pane, window, |this, _, event: &crate::settings_pane::SettingsEvent, window, cx| match event {
+            crate::settings_pane::SettingsEvent::Close => {
+                this.settings = None;
+                window.focus(&this.focus, cx);
+                cx.notify();
+            }
+        });
+        pane.read(cx).focus_handle(cx).focus(window, cx);
+        self.settings = Some((pane, events));
+        cx.notify();
     }
 
     fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
@@ -862,6 +894,7 @@ impl Shell {
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::open_folder))
             .on_action(cx.listener(Self::open_ssh_form))
+            .on_action(cx.listener(Self::open_settings))
             .on_action(cx.listener(Self::new_session_key))
             .on_action(cx.listener(Self::save))
             .on_action(cx.listener(Self::close_tab))
@@ -880,6 +913,7 @@ impl Shell {
             .children(banner)
             .child(div().flex().flex_1().min_h_0().child(body))
             .child(self.status_line(cx))
+            .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
             // Both on the shared Popover: a press outside only closes, as do Escape and Tab.
             .children(self.ssh.as_ref().map(|(form, _)| {
                 let this = cx.entity().downgrade();

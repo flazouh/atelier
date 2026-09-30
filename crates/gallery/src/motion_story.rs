@@ -43,7 +43,14 @@ pub struct MotionStory {
 }
 
 impl MotionStory {
-    pub fn new(_: &mut Window, _: &mut Context<Self>) -> Self {
+    pub fn new(_: &mut Window, cx: &mut Context<Self>) -> Self {
+        // `MOTION_PICK=2,133,247` puts a primary colour in force, to set the web demo's blue beside ours.
+        if let Ok(pick) = std::env::var("MOTION_PICK") {
+            let bytes: Vec<f32> = pick.split(',').filter_map(|n| n.trim().parse::<f32>().ok()).collect();
+            if let [r, g, b] = bytes[..] {
+                beui::theme::set_pick(Some(Hsla::from(Rgba { r: r / 255., g: g / 255., b: b / 255., a: 1. })), cx);
+            }
+        }
         Self { part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
     }
 
