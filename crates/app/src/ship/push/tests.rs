@@ -170,3 +170,42 @@ fn edits_that_clash_stay_in_their_named_entry() {
     assert!(words.contains("a.txt") && words.contains(ENTRY_NAME), "{words}");
     assert_eq!(git(&work, &["log", "--format=%s", "-2"]).lines().collect::<Vec<_>>(), ["Mine", "Theirs"]);
 }
+/// Another entry pushed during the rebase is left alone: the pop takes the entry lathe made.
+#[test]
+fn the_pop_takes_lathes_own_entry() {
+    let (_top, work, other, project) = remote();
+    commit(&other, "b.txt", "theirs\n", "Theirs");
+    git(&other, &["push", "-q", "origin", "main"]);
+    commit(&work, "a.txt", "1\nTWO\n3\n", "Mine");
+    std::fs::write(work.join("a.txt"), "1\nTWO\n3\nmore\n").unwrap();
+    let w = work.clone();
+    let during = move || {
+        std::fs::write(w.join("c.txt"), "someone else\n").unwrap();
+        git(&w, &["add", "c.txt"]);
+        git(&w, &["stash", "push", "-q", "-m", "someone else's"]);
+    };
+    let rebased = pull_rebase_setting_aside_with(project.as_ref(), "main", &during).unwrap();
+    assert_eq!(rebased.edits, Some(PutBack::Back));
+    assert_eq!(std::fs::read_to_string(work.join("a.txt")).unwrap(), "1\nTWO\n3\nmore\n", "lathe's entry came back");
+    let list = git(&work, &["stash", "list"]);
+    assert!(list.contains("someone else's") && !list.contains(ENTRY_NAME), "{list}");
+}
+/// When the rebase stops and the edits cannot go back, the words keep the rebase's reason and name
+/// the entry that holds the edits.
+#[test]
+fn a_stopped_rebase_keeps_its_reason_and_names_the_entry() {
+    let (_top, work, other, project) = remote();
+    commit(&other, "b.txt", "theirs\n", "Theirs");
+    git(&other, &["push", "-q", "origin", "main"]);
+    commit(&work, "a.txt", "1\nTWO\n3\n", "Mine");
+    std::fs::write(work.join("a.txt"), "1\nTWO\n3\nmore\n").unwrap();
+    let w = work.clone();
+    // Something writes the same file while the edits are aside: the rebase refuses, and so would a pop.
+    let during = move || std::fs::write(w.join("a.txt"), "1\nTWO\n3\nsomething else\n").unwrap();
+    let error = pull_rebase_setting_aside_with(project.as_ref(), "main", &during).unwrap_err();
+    let RebaseError::EditsKept { why, entry } = &error else { panic!("{error:?}") };
+    assert!(!why.is_empty() && entry.starts_with("stash@{"), "{error:?}");
+    let words = error.to_string();
+    assert!(words.contains(why.as_str()) && words.contains(ENTRY_NAME), "{words}");
+    assert!(git(&work, &["stash", "list"]).contains(ENTRY_NAME), "the edits stay in the entry");
+}

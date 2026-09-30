@@ -41,6 +41,8 @@ pub enum RebaseError {
     Conflict(Vec<String>),
     Offline(String),
     Git(String),
+    /// The rebase stopped for `why`, and the edits set aside could not go back: they stay in `entry`.
+    EditsKept { why: String, entry: String },
 }
 
 impl std::fmt::Display for RebaseError {
@@ -50,6 +52,7 @@ impl std::fmt::Display for RebaseError {
             Self::Conflict(files) => write!(f, "The remote changed the same lines in {}. Nothing changed: the rebase was undone", files.join(", ")),
             Self::Offline(words) => write!(f, "Could not reach the remote ({})", first(words)),
             Self::Git(words) => write!(f, "Pull and rebase failed: {}", first(words)),
+            Self::EditsKept { why, entry } => write!(f, "{why}. Your edits stay in {entry} (\"{ENTRY_NAME}\")"),
         }
     }
 }
@@ -163,6 +166,12 @@ pub fn pull_rebase(project: &dyn Project, branch: &str) -> Result<Rebased, Rebas
 /// As `pull_rebase`, on the reader's word to set their edits aside: they go to a stash entry named
 /// `ENTRY_NAME` and come back after the rebase. A rebase that stops puts them back as they were.
 pub fn pull_rebase_setting_aside(project: &dyn Project, branch: &str) -> Result<Rebased, RebaseError> {
+    pull_rebase_setting_aside_with(project, branch, &|| {})
+}
+
+/// As `pull_rebase_setting_aside`, with `during` run between setting the edits aside and the rebase:
+/// the seam where the tests make another entry or break the rebase.
+pub(crate) fn pull_rebase_setting_aside_with(project: &dyn Project, branch: &str, during: &dyn Fn()) -> Result<Rebased, RebaseError> {
     if !has_origin(project) {
         return Err(RebaseError::Git("no remote named origin".into()));
     }
@@ -170,24 +179,35 @@ pub fn pull_rebase_setting_aside(project: &dyn Project, branch: &str) -> Result<
         return pull_rebase(project, branch);
     }
     plain(project, &["stash", "push", "-m", ENTRY_NAME]).map_err(RebaseError::Git)?;
+    // The entry is known by its id: the reader, or another tool, may push an entry meanwhile.
+    let made = plain(project, &["rev-parse", "stash@{0}"]).map_err(RebaseError::Git)?.trim().to_string();
+    during();
     let moved = match rebase(project, branch) {
         Ok(moved) => moved,
         Err(error) => {
             // The branch is as it was, so the edits go back as they were.
-            plain(project, &["stash", "pop", "--index"]).map_err(RebaseError::Git)?;
-            return Err(error);
+            let entry = entry_of(project, &made);
+            let back = entry.as_deref().map(|entry| plain(project, &["stash", "pop", "--index", entry]));
+            return Err(match (back, entry) {
+                (Some(Ok(_)), _) => error,
+                (_, entry) => RebaseError::EditsKept { why: error.to_string(), entry: entry.unwrap_or_else(|| ENTRY_NAME.into()) },
+            });
         }
     };
-    let edits = match plain(project, &["stash", "pop"]) {
+    let Some(entry) = entry_of(project, &made) else {
+        return Err(RebaseError::EditsKept { why: "The rebase worked, but the entry with your edits is gone from the stash list".into(), entry: made });
+    };
+    let edits = match plain(project, &["stash", "pop", &entry]) {
         Ok(_) => PutBack::Back,
-        Err(_) => {
-            let files = unmerged(project);
-            let list = plain(project, &["stash", "list", "--format=%gd %s"]).unwrap_or_default();
-            let entry = list.lines().find(|l| l.contains(ENTRY_NAME)).and_then(|l| l.split(' ').next()).unwrap_or("the stash").to_string();
-            PutBack::Kept { entry, files }
-        }
+        Err(_) => PutBack::Kept { entry: entry_of(project, &made).unwrap_or(entry), files: unmerged(project) },
     };
     Ok(Rebased { moved, edits: Some(edits) })
+}
+
+/// The stash ref (`stash@{n}`) of the entry whose commit is `made`, wherever it sits in the list now.
+fn entry_of(project: &dyn Project, made: &str) -> Option<String> {
+    let list = plain(project, &["stash", "list", "--format=%gd %H"]).ok()?;
+    list.lines().find_map(|line| line.split_once(' ').filter(|(_, sha)| *sha == made).map(|(entry, _)| entry.to_string()))
 }
 
 /// Whether the working tree holds edits to tracked files that no commit has.
