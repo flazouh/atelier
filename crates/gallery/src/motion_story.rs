@@ -2,7 +2,7 @@
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use gpui_kit::AppContext as _;
-use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, RangeSlider, Swatch};
+use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
 use gpui_kit::{
     AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -48,6 +48,8 @@ fn accents() -> Vec<Swatch> {
 pub struct MotionStory {
     part: Option<String>,
     teams: Entity<MultiSelect>,
+    toasts: Entity<ToastStack>,
+    position: ToastPosition,
     accent: SharedString,
     /// Owned by the "every state" rows below.
     second: SharedString,
@@ -69,7 +71,8 @@ impl MotionStory {
             }
         }
         let teams = cx.new(|cx| MultiSelect::new("teams", teams(), window, cx).placeholder("Choose teams").empty("No teams found.").with_values(["design", "engineering"]));
-        Self { teams, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
+        let toasts = cx.new(|_| ToastStack::new("story-toasts").limit(5).default_duration(std::time::Duration::from_millis(3600)));
+        Self { teams, toasts, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
     }
 
     fn shows(&self, name: &str) -> bool {
@@ -258,11 +261,87 @@ impl Render for MotionStory {
                     .into_any_element(),
             );
         }
+        if self.shows("toast-stack") {
+            let toasts = self.toasts.clone();
+            let example = |label: &'static str, toast: Toast, promise: bool| {
+                let toasts = toasts.clone();
+                Button::new(label).label(label).variant(ButtonVariant::Secondary).size(ButtonSize::Sm).pill(true).on_click(move |_, _, cx| {
+                    let id = toasts.update(cx, |s, cx| s.show(toast.clone(), cx));
+                    if promise {
+                        let toasts = toasts.clone();
+                        cx.spawn(async move |cx| {
+                            cx.background_executor().timer(std::time::Duration::from_millis(1800)).await;
+                            toasts
+                                .update(cx, |s, cx| {
+                                    s.update(
+                                        &id,
+                                        ToastPatch {
+                                            title: Some("Publish complete".into()),
+                                            description: Some(Some("Toast updated in-place from loading to success.".into())),
+                                            status: Some(ToastStatus::Success),
+                                            duration: Some(std::time::Duration::from_millis(3200)),
+                                        },
+                                        cx,
+                                    )
+                                });
+                        })
+                        .detach();
+                    }
+                })
+            };
+            let clear = {
+                let toasts = toasts.clone();
+                Button::new("toast-clear").label("Clear").variant(ButtonVariant::Ghost).size(ButtonSize::Sm).pill(true).on_click(move |_, _, cx| {
+                    toasts.update(cx, |s, cx| s.clear(cx));
+                })
+            };
+            let pills = ToastPosition::ALL.into_iter().map(|position| {
+                let (toasts, this) = (toasts.clone(), cx.entity().downgrade());
+                Button::new(position.word())
+                    .label(position.word())
+                    .variant(if self.position == position { ButtonVariant::Invert } else { ButtonVariant::Ghost })
+                    .size(ButtonSize::Sm)
+                    .pill(true)
+                    .on_click(move |_, _, cx| {
+                        this.update(cx, |s, cx| {
+                            s.position = position;
+                            cx.notify();
+                        })
+                        .ok();
+                        toasts.update(cx, |s, cx| {
+                            s.set_position(position, cx);
+                            s.show(Toast::new("Position changed").status(ToastStatus::Info).description(format!("New toasts open from {}.", position.word())), cx);
+                        });
+                    })
+            });
+            let demo = div()
+                .flex()
+                .flex_col()
+                .items_center()
+                .gap(px(24.))
+                .pt(px(60.))
+                .child(div().flex().flex_col().items_center().gap(px(8.)).child(div().text_size(px(14.)).font_weight(gpui_kit::FontWeight::MEDIUM).text_color(theme.foreground).child("Open a real toast")).child(div().max_w(px(384.)).text_center().text_size(px(12.)).text_color(theme.muted_foreground).child("Toasts render fixed on the screen. Change position to open a toast from that edge.")))
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .justify_center()
+                        .gap(px(8.))
+                        .child(example("Title only", Toast::new("Saved").status(ToastStatus::Success).sticky(), false))
+                        .child(example("Promise", Toast::new("Publishing component").status(ToastStatus::Loading).description("Bundling source, preview, and registry metadata.").sticky(), true))
+                        .child(example("Success", Toast::new("Component published").status(ToastStatus::Success).description("Registry endpoint and raw source are available."), false))
+                        .child(example("Error", Toast::new("Snapshot failed").status(ToastStatus::Error).description("Retry after the browser target settles."), false))
+                        .child(clear),
+                )
+                .child(div().flex().flex_wrap().justify_center().gap(px(6.)).children(pills));
+            parts.push(if alone { demo.into_any_element() } else { section("Toast stack: the demo (toasts open in the corner of the window)", &theme, demo) });
+        }
         if self.shows("multi-select") {
             let demo = div().w(px(384.)).child(self.teams.clone());
             parts.push(if alone { demo.into_any_element() } else { section("Multi select: the demo", &theme, demo) });
         }
         div()
+            .relative()
             .size_full()
             .flex()
             .flex_col()
@@ -270,5 +349,6 @@ impl Render for MotionStory {
             .p(px(24.))
             .bg(theme.background)
             .children(parts)
+            .child(self.toasts.clone())
     }
 }
