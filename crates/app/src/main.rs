@@ -27,6 +27,7 @@ mod pulls;
 mod review_pane;
 mod review_state;
 mod review_text;
+mod right_pane;
 mod session_title;
 mod session_view;
 mod settings_pane;
@@ -41,6 +42,7 @@ mod timings;
 mod tasks;
 mod tree;
 mod tree_view;
+mod view_cache;
 
 fn main() {
     exit_log::install();

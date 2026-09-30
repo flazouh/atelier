@@ -178,3 +178,12 @@ height, and the view stayed at the top. `set_value` now marks the layout stale; 
 the offset (`reveal_after_layout`) while the layout is stale or missing, and the next paint reveals
 it.
 Test: `test_a_caret_set_before_the_first_layout_is_revealed`.
+
+## 18. A stopped caret stays still
+
+`BlinkCursor::stop` (on blur) set the epoch to 0, but a later `pause` (a text change, from
+`pause_blink_cursor`) took a new epoch and scheduled the resume timer, so the cursor blinked again with no
+focus. An unfocused editor (the review's, beside a focused composer) then asked for two frames a second
+for ever. The cursor now knows it is on (started and not stopped); a pause while it is off shows it and
+schedules nothing.
+Test: `a_pause_does_not_start_a_stopped_cursor`.
