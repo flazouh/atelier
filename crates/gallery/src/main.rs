@@ -886,6 +886,26 @@ fn tools() -> impl IntoElement {
                             .on_deny(|_, _, _| {}),
                     )
                     .child(
+                        ToolApproval::new("approve-edit", "Edit")
+                            .title("Edit src/main.rs")
+                            .preview(beui::ToolPreview::edit(
+                                "src/main.rs",
+                                "}\n\nfn main() {\n    println!(\"{}\", add(2, 3));\n}\n",
+                                "}\n\nfn subtract(a: i32, b: i32) -> i32 {\n    a - b\n}\n\nfn main() {\n    println!(\"{}\", add(2, 3));\n    println!(\"{}\", subtract(5, 2));\n}\n",
+                            ))
+                            .parameter("file_path", "/tmp/lathe-ux/scratch/src/main.rs")
+                            .on_approve(|_, _, _| {})
+                            .on_always_allow(|_, _, _| {})
+                            .on_deny(|_, _, _| {}),
+                    )
+                    .child(
+                        ToolApproval::new("approve-command", "Bash")
+                            .preview(beui::ToolPreview::command("cargo test --workspace -- --nocapture"))
+                            .parameter("command", "cargo test --workspace -- --nocapture")
+                            .on_approve(|_, _, _| {})
+                            .on_deny(|_, _, _| {}),
+                    )
+                    .child(
                         ToolApproval::new("approve-running", "terminal.run")
                             .title("Terminal access")
                             .description("The agent wants to run the project test suite in the current workspace.")
