@@ -361,3 +361,62 @@ fn a_file_rejected_whole_says_rejected(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(cx.update(|_, cx| pane.read(cx).decided_words(0)).as_deref(), Some("Rejected"));
 }
+/// Typing, then the editor's Command-Z, brings the text back and leaves the decisions alone; Undo
+/// decision after typing does nothing and says why, so no typing is lost.
+#[gpui_kit::test]
+fn command_z_undoes_typing_and_undo_decision_waits_for_it(cx: &mut TestAppContext) {
+    let (pane, _, _, _dir, cx) = reviewing(cx);
+    let ids = hunk_ids(&pane, cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| {
+        p.decide_hunk(&ids[0], Decision::Accept, window, cx);
+    }));
+    cx.run_until_parked();
+    let decided = editor_text(&pane, cx);
+    let said = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+    let heard = said.clone();
+    let _sub = cx.update(|_, cx| {
+        cx.subscribe(&pane, move |_, event: &PaneEvent, _| {
+            if let PaneEvent::Said(words) = event {
+                heard.borrow_mut().push(words.to_string());
+            }
+        })
+    });
+    // The reader types at the end of the file.
+    cx.update(|window, cx| {
+        let editor = pane.read(cx).editor.clone();
+        editor.update(cx, |e, cx| {
+            let end = e.value().len();
+            e.set_selected_range(end..end, cx);
+            e.insert("typed\n", window, cx);
+        });
+    });
+    cx.run_until_parked();
+    assert!(editor_text(&pane, cx).ends_with("typed\n"));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.undo_decision(window, cx)));
+    cx.run_until_parked();
+    assert!(editor_text(&pane, cx).ends_with("typed\n"), "Undo decision leaves the typing");
+    assert_eq!(hunk_ids(&pane, cx).len(), 1, "and the decision");
+    assert!(said.borrow().iter().any(|w| w.contains("⌘Z")), "it says to undo the typing first: {:?}", said.borrow());
+    // The editor's own undo takes the typing back, from a real key, in a window that draws the pane.
+    struct Shows(Entity<ReviewPane>);
+    impl gpui_kit::Render for Shows {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl gpui_kit::IntoElement {
+            use gpui_kit::{ParentElement, Styled};
+            gpui_kit::div().size_full().child(self.0.clone())
+        }
+    }
+    let shown = pane.clone();
+    let (_root, win) = cx.add_window_view(move |_, _| Shows(shown));
+    win.run_until_parked();
+    win.update(|window, cx| {
+        let editor = pane.read(cx).editor.clone();
+        editor.focus_handle(cx).focus(window, cx);
+    });
+    win.simulate_keystrokes(if cfg!(target_os = "macos") { "cmd-z" } else { "ctrl-z" });
+    win.run_until_parked();
+    assert_eq!(editor_text(&pane, cx), decided, "the typing is gone, the decision stays");
+    assert_eq!(hunk_ids(&pane, cx).len(), 1);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.undo_decision(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(hunk_ids(&pane, cx).len(), 2, "now Undo decision brings the hunk back");
+}
