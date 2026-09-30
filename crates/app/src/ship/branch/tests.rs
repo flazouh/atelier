@@ -38,3 +38,13 @@ fn the_default_branch_asks_for_a_new_one_and_a_bad_name_is_refused() {
     assert_eq!(current(project.as_ref()).as_deref(), Some("fix/lease"));
     assert_eq!(std::fs::read_to_string(work.join("a.txt")).unwrap(), "changed\n", "the working tree comes along");
 }
+/// A drafted name that a branch already has gets the first free number.
+#[test]
+fn a_taken_name_gets_a_number() {
+    let (_top, work, project) = clone();
+    assert_eq!(free(project.as_ref(), "fix/a"), "fix/a");
+    git(&work, &["branch", "fix/a"]);
+    assert_eq!(free(project.as_ref(), "fix/a"), "fix/a-2");
+    git(&work, &["branch", "fix/a-2"]);
+    assert_eq!(free(project.as_ref(), "fix/a"), "fix/a-3");
+}

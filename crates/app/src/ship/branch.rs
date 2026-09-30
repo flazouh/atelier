@@ -23,6 +23,17 @@ pub fn is_default(project: &dyn Project, branch: &str) -> bool {
     }
 }
 
+/// `name`, or `name-2`, `name-3` and on when a branch has it already.
+pub fn free(project: &dyn Project, name: &str) -> String {
+    let taken = |candidate: &str| {
+        let full = format!("refs/heads/{candidate}");
+        project.git(&["rev-parse", "--verify", "-q", &full]).is_ok_and(|o| o.ok())
+    };
+    if !taken(name) {
+        return name.to_string();
+    }
+    (2..).map(|n| format!("{name}-{n}")).find(|candidate| !taken(candidate)).expect("some number is free")
+}
 /// Makes `name` and checks it out, keeping the working tree and the index as they are.
 pub fn create(project: &dyn Project, name: &str) -> Result<(), String> {
     let words = |out: lathe_project::GitOutput| out.stderr.trim().to_string();

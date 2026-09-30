@@ -494,7 +494,7 @@ impl OpenProject {
                 cx.notify();
             }
             PaneEvent::Said(line) => cx.emit(ProjectEvent::Said(line.clone())),
-            PaneEvent::Committed => this.refresh_git(cx),
+            PaneEvent::GitChanged => this.refresh_git(cx),
         });
         pane.focus_handle(cx).focus(window, cx);
         self.review = Some((pane, sub));

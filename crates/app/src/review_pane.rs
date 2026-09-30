@@ -12,7 +12,7 @@
 //! What the reader decided and marked is kept with the session, per scope and file, so the review opens
 //! again as it was left. Comments go to the session, which sends them with the next message.
 
-use std::{collections::HashSet, sync::Arc, time::{Duration, Instant}};
+use std::{collections::{HashMap, HashSet}, sync::Arc, time::{Duration, Instant}};
 
 use beui::{
     ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer, LineComposerEvent, RowMap,
@@ -81,6 +81,8 @@ pub struct PaneFile {
     pub on_disk: Option<String>,
     /// The file before each decision, newest last: an undo in the editor brings one back.
     undo: Vec<Merged>,
+    /// The short id of the commit that took this file's decisions.
+    pub committed: Option<String>,
 }
 
 impl PaneFile {
@@ -90,7 +92,7 @@ impl PaneFile {
             Content::Binary | Content::Unknown => None,
         };
         let on_disk = review.after.clone();
-        Self { review, merged, on_disk, undo: Vec::new() }
+        Self { review, merged, on_disk, undo: Vec::new(), committed: None }
     }
 
     fn hunks(&self) -> &[InlineHunk] {
@@ -140,8 +142,8 @@ pub enum PaneEvent {
     Close,
     /// A line for the status line, such as a write that failed.
     Said(SharedString),
-    /// The strip made a commit, so the branch and its changes are to be read again.
-    Committed,
+    /// The strip made a commit or a branch, so the branch and its changes are to be read again.
+    GitChanged,
 }
 
 impl EventEmitter<PaneEvent> for ReviewPane {}
@@ -197,7 +199,7 @@ impl ReviewPane {
         let files = match scope {
             Scope::Turn(turn) => {
                 let s = session.read(cx);
-                files_of(s.reviews.turns.turns().get(turn).map(|t| t.files().to_vec()).unwrap_or_default(), scope, &s.reviews.decided)
+                files_of(s.reviews.turns.turns().get(turn).map(|t| t.files().to_vec()).unwrap_or_default(), scope, &s.reviews.decided, &s.reviews.committed)
             }
             Scope::Whole => Vec::new(),
         };
@@ -218,7 +220,8 @@ impl ReviewPane {
         let ship = cx.new(|cx| ShipStrip::new(project.clone(), backend, model, window, cx));
         let _ship = cx.subscribe_in(&ship, window, |this, _, event: &StripEvent, window, cx| match event {
             StripEvent::WantsOpen => this.open_ship(window, cx),
-            StripEvent::Committed => cx.emit(PaneEvent::Committed),
+            StripEvent::Committed { sha, paths } => this.committed(sha, paths, cx),
+            StripEvent::BranchMade => cx.emit(PaneEvent::GitChanged),
         });
         // Typing not yet written when the pane goes is written as it goes.
         cx.on_release(|pane: &mut Self, cx| pane.flush(cx)).detach();
@@ -294,8 +297,40 @@ impl ReviewPane {
         self.files.iter().filter_map(|f| kept(&f.review, f.merged.as_ref())).collect()
     }
 
+    /// The strip committed `paths`: each shows as committed, with no undo left that would change it
+    /// under the commit, and the project reads git again.
+    fn committed(&mut self, sha: &str, paths: &[String], cx: &mut Context<Self>) {
+        let short: String = sha.chars().take(7).collect();
+        let scope = self.scope;
+        let mut keys = Vec::new();
+        for file in self.files.iter_mut().filter(|f| paths.contains(&f.review.path)) {
+            file.committed = Some(short.clone());
+            file.undo.clear();
+            keys.push((scope, file.review.path.clone()));
+        }
+        self.session.update(cx, |s, cx| {
+            s.reviews.committed.extend(keys.into_iter().map(|key| (key, short.clone())));
+            s.save_review(cx);
+        });
+        cx.emit(PaneEvent::GitChanged);
+        cx.notify();
+    }
+
+    /// "Committed in <id>" for file `at` once its decisions are committed and none is left to make.
+    pub fn committed_words(&self, at: usize) -> Option<SharedString> {
+        let file = self.files.get(at)?;
+        let short = file.committed.as_ref().filter(|_| file.hunks().is_empty())?;
+        Some(format!("Committed in {short}").into())
+    }
+
+    /// Whether an undo in the editor can bring back file `at` before a decision.
+    #[cfg(test)]
+    pub fn can_undo(&self, at: usize) -> bool {
+        self.files.get(at).is_some_and(|f| !f.undo.is_empty())
+    }
+
     /// Opens the Ship strip on what the review kept. Typing not yet written is written first.
-    fn open_ship(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open_ship(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.writing.take().is_some() {
             self.write(&[self.current], cx);
         }
@@ -597,7 +632,7 @@ impl ReviewPane {
         }
         self.scope = scope;
         self.reading = false;
-        self.files = files_of(reviews, scope, &self.session.read(cx).reviews.decided);
+        self.files = files_of(reviews, scope, &self.session.read(cx).reviews.decided, &self.session.read(cx).reviews.committed);
         self.changed = changed_of(&self.files);
         self.turns = turns;
         self.current = path.and_then(|p| self.files.iter().position(|f| f.review.path == p)).unwrap_or(0);
@@ -764,7 +799,7 @@ fn changed_of(files: &[PaneFile]) -> Vec<ChangedFile> {
 }
 
 /// The files of `scope`, with what the reader decided before where the session kept it.
-fn files_of(reviews: Vec<FileReview>, scope: Scope, decided: &Decided) -> Vec<PaneFile> {
+fn files_of(reviews: Vec<FileReview>, scope: Scope, decided: &Decided, committed: &HashMap<(Scope, String), String>) -> Vec<PaneFile> {
     reviews
         .into_iter()
         .map(|review| {
@@ -772,6 +807,7 @@ fn files_of(reviews: Vec<FileReview>, scope: Scope, decided: &Decided) -> Vec<Pa
             if let Some((merged, on_disk)) = decided.get(&(scope, file.review.path.clone())) {
                 (file.merged, file.on_disk) = (merged.clone(), on_disk.clone());
             }
+            file.committed = committed.get(&(scope, file.review.path.clone())).cloned();
             file
         })
         .collect()
@@ -865,7 +901,7 @@ impl Render for ReviewPane {
             .on_add_comment(move |row, window, cx| add(&row, window, cx))
             .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx))
             .on_resolved(move |id, decision, window, cx| resolved(&(id.clone(), decision), window, cx));
-        let header = ReviewFileHeader::new("review-file", path.clone(), added, removed, handlers.clone());
+        let header = ReviewFileHeader::new("review-file", path.clone(), added, removed, handlers.clone()).committed(self.committed_words(self.current));
         let file_card = div()
             .flex()
             .flex_col()

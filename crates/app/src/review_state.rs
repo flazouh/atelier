@@ -33,6 +33,8 @@ pub struct ReviewState {
     /// After how many conversation items each turn's card shows, and which turn.
     pub turn_marks: Vec<(usize, usize)>,
     pub decided: Decided,
+    /// The files whose decisions went into a commit, by scope and path: the commit's short id.
+    pub committed: HashMap<(Scope, String), String>,
     reviewed: Reviewed,
     /// The marks as `reviewed` holds them, which it does not list: by scope key, path and version.
     marks: Vec<(usize, String, u64)>,
@@ -89,6 +91,12 @@ impl ReviewState {
                     on_disk: on_disk.clone(),
                 })
                 .collect(),
+            committed: {
+                let mut committed: Vec<_> = self.committed.iter().map(|((scope, path), sha)| (ScopeRecord::of(*scope), path.clone(), sha.clone())).collect();
+                // One order, so the same state gives the same record.
+                committed.sort_by(|a, b| (&a.1, &a.2).cmp(&(&b.1, &b.2)));
+                committed
+            },
             marks: self.marks.clone(),
             comments: self.comments.all().iter().map(CommentRecord::of).collect(),
             sent: self.sent.iter().map(|(c, answered)| (CommentRecord::of(c), *answered)).collect(),
@@ -106,6 +114,7 @@ impl ReviewState {
             .into_iter()
             .map(|d| ((d.scope.rebuild(), d.path), (d.texts.map(|(baseline, current)| Merged::diff(&baseline, &current)), d.on_disk)))
             .collect();
+        state.committed = record.committed.into_iter().map(|(scope, path, sha)| ((scope.rebuild(), path), sha)).collect();
         for (key, path, version) in record.marks {
             let file = match key {
                 usize::MAX => state.turns.whole().into_iter().find(|f| f.path == path),
@@ -132,6 +141,9 @@ pub struct Record {
     turns: Vec<Vec<FileRecord>>,
     turn_marks: Vec<(usize, usize)>,
     decided: Vec<DecidedRecord>,
+    /// Missing from records written before commits were kept.
+    #[serde(default)]
+    committed: Vec<(ScopeRecord, String, String)>,
     marks: Vec<(usize, String, u64)>,
     comments: Vec<CommentRecord>,
     sent: Vec<(CommentRecord, bool)>,

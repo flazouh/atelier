@@ -47,7 +47,12 @@ pub fn branch_prompt(diff: &str) -> String {
 
 /// The agent's answer as a message: no code fences, no surrounding quotes.
 pub fn message(draft: &str) -> String {
-    let lines: Vec<&str> = draft.trim().lines().filter(|l| !l.trim_start().starts_with("```")).collect();
+    // The trailers are the reader's to add: an agent adds its own out of habit, with a name it guesses.
+    let trailer = |l: &str| {
+        let l = l.trim_start().to_ascii_lowercase();
+        l.starts_with("co-authored-by:") || l.starts_with("signed-off-by:")
+    };
+    let lines: Vec<&str> = draft.trim().lines().filter(|l| !l.trim_start().starts_with("```") && !trailer(l)).collect();
     let text = lines.join("\n");
     text.trim().trim_matches(|c| c == '"' || c == '`' || c == '\'').trim().to_string()
 }

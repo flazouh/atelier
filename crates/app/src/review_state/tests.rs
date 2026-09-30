@@ -22,6 +22,7 @@ fn a_review_comes_back_from_its_record() {
     let attachments = state.send_comments();
     assert_eq!(attachments.len(), 1);
     state.comments.add(0, "a.txt", anchor, "and this?");
+    state.committed.insert((Scope::Turn(0), "a.txt".into()), "b89cbbe".into());
 
     let json = serde_json::to_string(&state.record()).unwrap();
     let back = ReviewState::from_record(serde_json::from_str(&json).unwrap());
@@ -32,6 +33,7 @@ fn a_review_comes_back_from_its_record() {
     assert_eq!(kept.0.as_ref().map(|m| m.hunks().len()), Some(1), "one hunk still to decide");
     assert_eq!(kept.0.as_ref().map(Merged::current), Some(decided.current()));
     assert!(back.is_reviewed(0, &a));
+    assert_eq!(back.committed[&(Scope::Turn(0), "a.txt".to_string())], "b89cbbe");
     assert_eq!(back.comments.all().len(), 1);
     assert_eq!(back.sent.iter().map(|(c, answered)| (c.body.as_str(), *answered)).collect::<Vec<_>>(), [("why?", false)]);
 }
@@ -53,4 +55,10 @@ fn a_mark_on_an_older_version_does_not_come_back() {
 fn a_session_id_makes_a_safe_file_name() {
     assert_eq!(record_path("abc-123"), "review/abc-123.json");
     assert_eq!(record_path("../x/y"), "review/___x_y.json");
+}
+/// A record written before commits were kept still reads.
+#[test]
+fn a_record_with_no_commits_reads() {
+    let back: Record = serde_json::from_str(r#"{"turns":[],"turn_marks":[],"decided":[],"marks":[],"comments":[],"sent":[]}"#).unwrap();
+    assert!(ReviewState::from_record(back).committed.is_empty());
 }

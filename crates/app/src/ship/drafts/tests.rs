@@ -25,3 +25,11 @@ fn the_prompt_holds_the_kept_diff() {
     assert!(commit_prompt(&diff).contains(&diff));
     assert!(branch_prompt(&diff).contains("branch"));
 }
+/// A drafted message loses the trailers the agent adds on its own habit, such as Co-Authored-By;
+/// the reader adds their own.
+#[test]
+fn a_drafted_message_loses_its_trailers() {
+    let draft = "Add a note\n\nOne line in NOTES.md.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nSigned-off-by: A <a@a>";
+    assert_eq!(message(draft), "Add a note\n\nOne line in NOTES.md.");
+    assert_eq!(message("Add a note\n\nco-authored-by: x <x@x>"), "Add a note");
+}

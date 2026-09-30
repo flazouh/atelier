@@ -45,7 +45,10 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
 pub enum StripEvent {
     /// The reader asked to commit: the owner opens the strip with what the review kept.
     WantsOpen,
-    Committed,
+    /// A commit of these paths, with its full id.
+    Committed { sha: String, paths: Vec<String> },
+    /// A new branch is checked out, though the commit on it was refused.
+    BranchMade,
 }
 
 impl EventEmitter<StripEvent> for ShipStrip {}
@@ -82,6 +85,8 @@ pub struct ShipStrip {
     pub branch: Option<String>,
     pub on_default: bool,
     pub drafting: bool,
+    /// Why the last Commit did not commit, such as a hook's words; the card stays open.
+    pub refused: Option<SharedString>,
     pub message: Entity<TextareaState>,
     pub new_branch: Entity<InputState>,
     work: Task<()>,
@@ -101,6 +106,7 @@ impl ShipStrip {
             branch: None,
             on_default: false,
             drafting: false,
+            refused: None,
             message,
             new_branch,
             work: Task::ready(()),
@@ -115,6 +121,7 @@ impl ShipStrip {
             return cx.notify();
         }
         self.stage = Stage::Reading;
+        self.refused = None;
         self.kept = kept.clone();
         let project = self.project.clone();
         let reading = cx.background_spawn(async move {
@@ -149,7 +156,7 @@ impl ShipStrip {
         let (project, backend, model) = (self.project.clone(), self.backend.clone(), self.model.clone());
         let drafting = cx.background_spawn(async move {
             let message = backend.draft(project.as_ref(), &drafts::commit_prompt(&diff), model.as_deref()).map(|d| drafts::message(&d));
-            let branch = on_default.then(|| backend.draft(project.as_ref(), &drafts::branch_prompt(&diff), model.as_deref()).ok().and_then(|d| drafts::branch_name(&d)));
+            let branch = on_default.then(|| backend.draft(project.as_ref(), &drafts::branch_prompt(&diff), model.as_deref()).ok().and_then(|d| drafts::branch_name(&d)).map(|name| branch::free(project.as_ref(), &name)));
             (message, branch.flatten())
         });
         self.work = cx.spawn_in(window, async move |this, cx| {
@@ -190,17 +197,19 @@ impl ShipStrip {
         }
         let new_branch = self.on_default.then(|| self.new_branch.read(cx).value().trim().to_string());
         if new_branch.as_ref().is_some_and(String::is_empty) {
-            self.stage = Stage::Failed("Name the new branch: this is the default branch".into());
+            self.refused = Some("Name the new branch: this is the default branch".into());
             return cx.notify();
         }
         self.stage = Stage::Committing;
+        self.refused = None;
         let (project, kept) = (self.project.clone(), self.kept.clone());
         let committing = cx.background_spawn(async move {
+            // The branch made here stays made when the commit is refused after it.
             if let Some(name) = &new_branch {
-                branch::create(project.as_ref(), name)?;
+                branch::create(project.as_ref(), name).map_err(|words| (None, words))?;
             }
-            let done = commit::commit(project.as_ref(), &kept, &message).map_err(|e| e.to_string())?;
-            Ok::<_, String>((done, branch::current(project.as_ref())))
+            let done = commit::commit(project.as_ref(), &kept, &message).map_err(|e| (new_branch.clone(), e.to_string()))?;
+            Ok::<_, (Option<String>, String)>((done, branch::current(project.as_ref())))
         });
         self.work = cx.spawn_in(window, async move |this, cx| {
             let result = committing.await;
@@ -213,9 +222,21 @@ impl ShipStrip {
                         // The next commit drafts its own words.
                         strip.message.update(cx, |m, cx| m.set_value("", window, cx));
                         strip.new_branch.update(cx, |b, cx| b.set_value("", window, cx));
-                        cx.emit(StripEvent::Committed);
+                        let paths = strip.kept.iter().map(|k| k.path.clone()).collect();
+                        cx.emit(StripEvent::Committed { sha: done.sha.clone(), paths });
                     }
-                    Err(words) => strip.stage = Stage::Failed(words.into()),
+                    Err((made, words)) => {
+                        strip.stage = Stage::Open;
+                        let words = match made {
+                            Some(name) => {
+                                (strip.branch, strip.on_default) = (Some(name.clone()), false);
+                                cx.emit(StripEvent::BranchMade);
+                                format!("{}. You are on {name} now; Commit tries again there.", words.trim_end_matches('.'))
+                            }
+                            None => words,
+                        };
+                        strip.refused = Some(words.into());
+                    }
                 }
                 cx.notify();
             });
@@ -289,6 +310,9 @@ impl Render for ShipStrip {
                     })
                     .child(div().rounded(radius::MD).bg(theme.card_strong).p(px(6.)).child(Textarea::new(&self.message)))
                     .when(self.drafting, |d| d.child(words("The agent is drafting…".into())))
+                    .when_some(self.refused.clone(), |d, refused| {
+                        d.child(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(refused))
+                    })
                     .child(
                         div()
                             .flex()
