@@ -465,14 +465,15 @@ impl Render for MotionStory {
             let this = cx.entity().downgrade();
             let track = |slot: usize, id: &'static str, names: &[&'static str], caps: bool| {
                 let this = this.clone();
-                let segments = names.iter().enumerate().map(|(i, n)| if caps && i == 1 { Segment::new(*n).cap("⌘L") } else { Segment::new(*n) });
-                Segmented::new(id, segments, self.segs[slot]).on_change(move |i, _, cx| {
+                let segments = names.iter().map(|n| Segment::new(*n));
+                let track = Segmented::new(id, segments, self.segs[slot]).on_change(move |i, _, cx| {
                     this.update(cx, |s, cx| {
                         s.segs[slot] = i;
                         cx.notify();
                     })
                     .ok();
-                })
+                });
+                if caps { track.cap("⌘\\") } else { track }
             };
             let demo = div()
                 .flex()
