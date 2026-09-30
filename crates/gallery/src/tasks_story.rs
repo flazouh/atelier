@@ -202,8 +202,16 @@ impl Render for TasksStory {
             Tab::List => self.list.clone().into_any_element(),
             Tab::Board => self.board.clone().into_any_element(),
             Tab::Task => self.view.clone().into_any_element(),
-            Tab::Create => div().size_full().flex().items_start().justify_center().pt(px(64.)).child(self.dialog.clone()).into_any_element(),
-        };
+            Tab::Create => {
+                let this = cx.entity();
+                let focus = self.dialog.read(cx).focus_handle(cx);
+                beui::Modal::new("new-task-modal")
+                    .width(600.)
+                    .focus(&focus)
+                    .on_close(move |window, cx| this.update(cx, |s, cx| s.go(Tab::List, window, cx)))
+                    .child(self.dialog.clone())
+                    .into_any_element()
+            },        };
         let root = div()
             .size_full()
             .flex()
