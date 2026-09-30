@@ -696,6 +696,10 @@ impl ReviewPane {
             .on_accept_all(with(|s, w, cx| s.decide_every_file(Decision::Accept, w, cx)))
             .on_reject_all(with(|s, w, cx| s.decide_every_file(Decision::Reject, w, cx)))
             .on_switch_scope(with(|s, w, cx| s.switch_scope(w, cx)))
+            .on_comment(with(|s, w, cx| {
+                let row = s.editor.read(cx).cursor_position().line as usize;
+                s.open_composer(row, w, cx)
+            }))
             .on_commit(with(|s, w, cx| s.open_ship(w, cx)))
             .on_push(with(|s, w, cx| s.ship.update(cx, |strip, cx| strip.push(w, cx))))
             .on_mark(with(|s, _, cx| s.toggle_mark(cx)))

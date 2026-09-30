@@ -89,8 +89,8 @@ struct ShownKey {
 }
 
 /// A comment being written, and where.
-struct Draft {
-    row: usize,
+pub(crate) struct Draft {
+    pub(crate) row: usize,
     /// The file it belongs to.
     path: String,
     kind: DraftKind,
@@ -138,7 +138,7 @@ pub struct PullView {
     pub(crate) composer: Entity<CommentComposer>,
     pub(crate) verdict: Entity<VerdictBox>,
     pub(crate) merge: Entity<MergeBox>,
-    draft: Option<Draft>,
+    pub(crate) draft: Option<Draft>,
     picker: Option<Lookup>,
     /// A line to put the caret on once the file it belongs to is shown.
     pending_caret: Option<Position>,
@@ -1252,6 +1252,10 @@ impl PullView {
             }))
             .on_put_back(with(|s, _, cx| s.put_back(cx)))
             .on_go_to_file(with(|s, w, cx| s.go_to_file(w, cx)))
+            .on_comment(with(|s, w, cx| {
+                let row = s.editor.read(cx).cursor_position().line as usize;
+                s.open_composer(row, w, cx)
+            }))
     }
 
     pub(crate) fn layout(&self) -> Fit {

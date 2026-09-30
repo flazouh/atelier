@@ -369,3 +369,23 @@ fn a_read_only_view_sends_none_of_the_merge_box_presses(cx: &mut TestAppContext)
     cx.run_until_parked();
     assert!(h.forge.writes().is_empty(), "{:?}", h.forge.writes());
 }
+
+#[gpui_kit::test]
+fn the_comment_key_starts_a_draft_on_the_row_of_the_caret(cx: &mut TestAppContext) {
+    use gpui_kit::component::input::Position;
+    setup(cx);
+    let h = harness();
+    let (view, cx) = open(&h, cx);
+    settle(&view, cx, |v| v.current_view().is_some());
+    let handler = view.update(cx, |v, cx| v.handlers(cx)).for_command(beui::keys::Command::Comment).cloned().expect("the view answers the comment key");
+    assert!(view.read_with(cx, |v, _| v.draft.is_none()));
+    // Row 1 of the shown file is a row that changed or sits beside a change; any row with a line will do.
+    cx.update(|window, cx| {
+        let editor = view.read(cx).editor.clone();
+        editor.update(cx, |e, cx| e.set_cursor_position(Position { line: 1, character: 0 }, window, cx));
+        handler(window, cx);
+    });
+    cx.run_until_parked();
+    let row = view.read_with(cx, |v, _| v.draft.as_ref().map(|d| d.row));
+    assert_eq!(row, Some(1), "a draft is open on the caret's row");
+}
