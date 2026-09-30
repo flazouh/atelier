@@ -485,6 +485,26 @@ impl Render for MotionStory {
                 .child(track(2, "seg-c", &["Side by side", "Single view"], true));
             parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
         }
+        if self.shows("menu") {
+            let menu = beui::Menu::new(
+                "menu-demo",
+                [
+                    beui::menu::Entry::Label("Project files".into()),
+                    beui::MenuItem::new("Open").icon(beui::IconName::Visibility).shortcut("↵").into(),
+                    beui::MenuItem::new("Rename").icon(beui::IconName::Edit).shortcut("R").into(),
+                    beui::MenuItem::new("Duplicate").icon(beui::IconName::Copy).shortcut("⌘D").into(),
+                    beui::MenuItem::new("Download").icon(beui::IconName::Download).into(),
+                    beui::menu::Entry::Separator,
+                    beui::MenuItem::new("Keep offline").choice(beui::menu::Choice::Check(false)).close_on_select(false).into(),
+                    beui::menu::Entry::Separator,
+                    beui::MenuItem::new("Move to trash").icon(beui::IconName::Delete).tone(beui::menu::Tone::Destructive).shortcut("⌘⌫").into(),
+                ],
+            )
+            .min_width(240.)
+            .debug_name("menu-demo");
+            let demo = div().flex().child(menu);
+            parts.push(if alone { demo.into_any_element() } else { section("Menu", &theme, demo) });
+        }
         if self.shows("bloom-menu") {
             let demo = div().flex().w_full().min_h(px(420.)).justify_center().pt(px(96.)).items_start().child(self.bloom.clone());
             parts.push(if alone { demo.into_any_element() } else { section("Bloom menu: the demo", &theme, demo) });
