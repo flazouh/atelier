@@ -8,6 +8,7 @@
 use std::sync::Arc;
 
 use beui::{
+    ActionSwapButton,
     ActiveTheme, Field,
     button::{Button, ButtonVariant},
     keys::Command as Key,
@@ -441,7 +442,7 @@ impl Render for ShipStrip {
         let this = cx.entity().downgrade();
         let commit_button = |label: &'static str| {
             let this = this.clone();
-            Button::new("ship-commit").label(label).variant(ButtonVariant::Primary).command(Key::Commit).on_click(move |_, window, cx| {
+            ActionSwapButton::new("ship-primary", label).command(Key::Commit).on_click(move |_, window, cx| {
                 _ = this.update(cx, |strip, cx| strip.commit(window, cx));
             })
         };
@@ -492,18 +493,18 @@ impl Render for ShipStrip {
                 })))
                 .when_some(self.opened.clone().filter(|_| matches!(self.stage, Stage::PullOpened(_))), |row, reference| {
                     let shows = this.clone();
-                    row.child(Button::new("ship-show-pull").label(format!("Open #{}", reference.number)).variant(ButtonVariant::Ghost).command(Key::OpenPull).on_click(
+                    row.child(ActionSwapButton::new("ship-primary", format!("Open #{}", reference.number)).command(Key::OpenPull).on_click(
                         move |_, window, cx| drop(shows.update(cx, |strip, cx| strip.open_pull(window, cx))),
                     ))
                 })
                 .when(matches!(self.stage, Stage::Pushed(_) | Stage::Clashed(_)), |row| {
                     let opens = this.clone();
-                    row.child(Button::new("ship-open-pull").label("Open pull request").variant(ButtonVariant::Ghost).command(Key::OpenPull).on_click(
+                    row.child(ActionSwapButton::new("ship-primary", "Open pull request").command(Key::OpenPull).on_click(
                         move |_, window, cx| drop(opens.update(cx, |strip, cx| strip.open_pull(window, cx))),
                     ))
                 })
                 .when(pushable, |row| {
-                    row.child(Button::new("ship-push").label("Push").variant(ButtonVariant::Ghost).command(Key::Push).on_click(
+                    row.child(ActionSwapButton::new("ship-primary", "Push").command(Key::Push).on_click(
                         move |_, window, cx| drop(pushes.update(cx, |strip, cx| strip.push(window, cx))),
                     ))
                 })
