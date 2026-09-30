@@ -177,3 +177,27 @@ list on a busy account.
 - Only `github.com`. A GitHub Enterprise host needs `gh api --hostname` and a host in `RepoRef`.
 - Stacks: nothing here knows them. `file_courts` takes a function that says which pull requests stand on
   an unlanded one.
+
+## Live write QA
+`crates/forge/tests/live_writes.rs` runs the write calls once on one scratch repository, `flazouh/lathe-qa-scratch`
+(private), through the real `gh`, and only when `LATHE_REQUIRE_FORGE=1`:
+
+    LATHE_REQUIRE_FORGE=1 cargo test -p lathe-forge --test live_writes -- --ignored --nocapture
+
+It writes to no other repository, and a drop guard closes its pull requests, deletes its branches and removes its
+files from `main`, even when a step fails. Run on 2026-09-30 on the HP (the repository is on the free plan: no
+merge queue, no auto-merge):
+
+| Call | Result |
+| --- | --- |
+| `create_pull` (draft), `update_pull` ready | ok; the draft became open |
+| `delete_branch` on an open pull request | refused by lathe before any write, as designed |
+| `update_branch` with a head that had moved | refused by GitHub: "head sha didn't match the current head ref." |
+| `update_branch` (merge) after `main` moved | ok; the head moved from 9a06abc to 13b82ab |
+| `cancel_auto_merge` with no merge when ready on | GitHub answered ok |
+| `update_pull` closed, then `delete_branch` | ok; the ref is gone |
+| `dequeue` | not tested: the repository has no merge queue |
+| `cancel_auto_merge` of a real merge when ready | not tested: switching it on can merge the pull request at once |
+| `merge`, `delete_branch` after a merge, `revert` | not tested: they need a merge, which was not allowed |
+
+After each run the repository has no open pull request, only `main`, and none of the run's files.
