@@ -489,6 +489,17 @@ impl Render for MotionStory {
                 .child(track(2, "seg-c", &["Side by side", "Single view"], true));
             parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
         }
+        if self.shows("island") {
+            let demo = div()
+                .flex()
+                .flex_col()
+                .items_start()
+                .gap(px(16.))
+                .child(beui::SessionsIsland::new("island-a", beui::IslandCounts { running: 2, needs: 0, done: 0 }))
+                .child(beui::SessionsIsland::new("island-b", beui::IslandCounts { running: 2, needs: 1, done: 0 }))
+                .child(beui::SessionsIsland::new("island-c", beui::IslandCounts { running: 1, needs: 2, done: 3 }));
+            parts.push(if alone { demo.into_any_element() } else { section("Island (sessions)", &theme, demo) });
+        }
         if self.shows("action-swap") {
             const WORDS: [&str; 4] = ["Commit", "Push", "Open pull request", "Open #3344"];
             let this = cx.entity().downgrade();

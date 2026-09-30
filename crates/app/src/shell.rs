@@ -802,8 +802,17 @@ impl Shell {
         cx.notify();
     }
 
-    fn title_bar(&self, cx: &App) -> impl IntoElement {
-        let theme = cx.theme();
+    /// Opens the session that needs the reader most: one waiting for a yes or no, then a question, then one finished and unseen.
+    fn open_most_urgent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let sidebar = self.agents_sidebar.clone();
+        let Some((project, session)) = beui::most_urgent(sidebar.read(cx).projects()) else { return };
+        self.sidebar_event(&sidebar, &SidebarEvent::Open { project, session }, window, cx);
+    }
+
+    fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let counts = beui::counts_of(self.agents_sidebar.read(cx).projects());
+        let this = cx.entity().downgrade();
+        let theme = cx.theme().clone();
         let (name, branch) = match self.active() {
             Some(p) => {
                 let p = p.read(cx);
@@ -824,6 +833,9 @@ impl Shell {
             .text_size(TextSize::Sm.font_size())
             .child(div().font_weight(gpui_kit::FontWeight::MEDIUM).child(name.unwrap_or_else(|| "lathe".into())))
             .children(branch.map(|b| div().text_color(theme.muted_foreground).child(b)))
+            .child(div().flex_1().flex().justify_center().child(beui::SessionsIsland::new("sessions-island", counts).on_press(
+                move |window, cx| drop(this.update(cx, |shell, cx| shell.open_most_urgent(window, cx))),
+            )))
     }
 
     fn start_screen(&self, cx: &mut Context<Self>) -> impl IntoElement {
