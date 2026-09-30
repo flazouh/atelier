@@ -376,6 +376,38 @@ impl ReviewPane {
         Some(format!("Committed in {short}").into())
     }
 
+    /// How file `at` was decided, once no hunk of it is left to decide: "Accepted" when it holds the
+    /// turn's text, "Rejected" when it holds the text before the turn, "Decided" for a mix. `None` while
+    /// a hunk waits, and for a file whose decisions are committed.
+    pub fn decided_words(&self, at: usize) -> Option<SharedString> {
+        let file = self.files.get(at)?;
+        let merged = file.merged.as_ref()?;
+        if !file.hunks().is_empty() || file.committed.is_some() {
+            return None;
+        }
+        let now = merged.current();
+        let words = if file.review.after.as_deref() == Some(now.as_str()) {
+            "Accepted"
+        } else if file.review.before.as_deref().unwrap_or("") == now {
+            "Rejected"
+        } else {
+            "Decided"
+        };
+        Some(words.into())
+    }
+
+    /// Brings back the open file as it was before its last decision, on disk too.
+    pub fn undo_decision(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let at = self.current;
+        let Some(file) = self.files.get_mut(at) else { return };
+        let Some(before) = file.undo.pop() else { return };
+        file.merged = Some(before);
+        // The hunk comes back, so the editor is made again from the file's state, with its marks.
+        self.load_editor(window, cx);
+        self.write(&[at], cx);
+        cx.notify();
+    }
+
     /// Whether an undo in the editor can bring back file `at` before a decision.
     #[cfg(test)]
     pub fn can_undo(&self, at: usize) -> bool {
@@ -754,6 +786,7 @@ impl ReviewPane {
                 s.open_composer(row, w, cx)
             }))
             .on_commit(with(|s, w, cx| s.open_ship(w, cx)))
+            .on_undo_decision(with(|s, w, cx| s.undo_decision(w, cx)))
             .on_push(with(|s, w, cx| s.ship.update(cx, |strip, cx| strip.push(w, cx))))
             .on_open_pull(with(|s, w, cx| s.ship.update(cx, |strip, cx| strip.open_pull(w, cx))))
             .on_mark(with(|s, _, cx| s.toggle_mark(cx)))
@@ -960,7 +993,7 @@ impl Render for ReviewPane {
             .on_add_comment(move |row, window, cx| add(&row, window, cx))
             .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx))
             .on_resolved(move |id, decision, window, cx| resolved(&(id.clone(), decision), window, cx));
-        let header = ReviewFileHeader::new("review-file", path.clone(), added, removed, handlers.clone()).committed(self.committed_words(self.current));
+        let header = ReviewFileHeader::new("review-file", path.clone(), added, removed, handlers.clone()).committed(self.committed_words(self.current)).decided(self.decided_words(self.current));
         let file_card = div()
             .flex()
             .flex_col()

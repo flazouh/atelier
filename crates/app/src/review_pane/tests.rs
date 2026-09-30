@@ -320,3 +320,44 @@ fn the_comment_key_opens_the_composer_on_the_row_of_the_caret(cx: &mut TestAppCo
     let row = cx.update(|_, cx| pane.read(cx).composer.as_ref().map(|(_, composer, _)| composer.read(cx).row()));
     assert_eq!(row, Some(2), "the composer is on the caret's row");
 }
+/// A file with nothing left to decide says how it was decided, and Undo brings back its last decision,
+/// on disk too.
+#[gpui_kit::test]
+fn a_decided_file_says_so_and_undo_brings_it_back(cx: &mut TestAppContext) {
+    let (pane, _, _, dir, cx) = reviewing(cx);
+    assert_eq!(cx.update(|_, cx| pane.read(cx).decided_words(0)), None, "hunks wait");
+    let ids = hunk_ids(&pane, cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| {
+        for id in &ids {
+            p.decide_hunk(id, Decision::Accept, window, cx).unwrap();
+        }
+    }));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| pane.read(cx).decided_words(0)).as_deref(), Some("Accepted"));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.undo_decision(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(hunk_ids(&pane, cx).len(), 1, "the last accept is undone");
+    assert_eq!(cx.update(|_, cx| pane.read(cx).decided_words(0)), None);
+    let left = hunk_ids(&pane, cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&left[0], Decision::Reject, window, cx).unwrap()));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| pane.read(cx).decided_words(0)).as_deref(), Some("Decided"), "one accepted, one rejected");
+    assert_eq!(read(&dir, "a.txt"), "1\nTWO\n3\n4\n5\n6\n7\n8\n");
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.undo_decision(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(read(&dir, "a.txt"), AFTER, "the undone reject is back on disk");
+    assert!(editor_text(&pane, cx).contains("SEVEN"), "the editor shows it too");
+}
+/// Rejecting every hunk reads "Rejected".
+#[gpui_kit::test]
+fn a_file_rejected_whole_says_rejected(cx: &mut TestAppContext) {
+    let (pane, _, _, _dir, cx) = reviewing(cx);
+    let ids = hunk_ids(&pane, cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| {
+        for id in &ids {
+            p.decide_hunk(id, Decision::Reject, window, cx).unwrap();
+        }
+    }));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| pane.read(cx).decided_words(0)).as_deref(), Some("Rejected"));
+}
