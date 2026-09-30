@@ -81,6 +81,8 @@ pub struct PaneFile {
     pub on_disk: Option<String>,
     /// The file before each decision, newest last: an undo in the editor brings one back.
     undo: Vec<Merged>,
+    /// The text each decision left, beside `undo`: Undo decision acts only while the file holds it.
+    decided_text: Vec<String>,
     /// The short id of the commit that took this file's decisions.
     pub committed: Option<String>,
 }
@@ -92,7 +94,7 @@ impl PaneFile {
             Content::Binary | Content::Unknown => None,
         };
         let on_disk = review.after.clone();
-        Self { review, merged, on_disk, undo: Vec::new(), committed: None }
+        Self { review, merged, on_disk, undo: Vec::new(), decided_text: Vec::new(), committed: None }
     }
 
     fn hunks(&self) -> &[InlineHunk] {
@@ -326,6 +328,7 @@ impl ReviewPane {
         for file in self.files.iter_mut().filter(|f| paths.contains(&f.review.path)) {
             file.committed = Some(short.clone());
             file.undo.clear();
+            file.decided_text.clear();
             keys.push((scope, file.review.path.clone()));
         }
         self.session.update(cx, |s, cx| {
@@ -407,7 +410,13 @@ impl ReviewPane {
     pub fn undo_decision(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let at = self.current;
         let Some(file) = self.files.get_mut(at) else { return };
+        let now = file.merged.as_ref().map(|m| m.text().to_string());
+        // Typing after the decision would be lost: the editor's own undo takes it back first.
+        if file.decided_text.last().is_some_and(|left| Some(left) != now.as_ref()) {
+            return cx.emit(PaneEvent::Said("You typed after the last decision: undo the typing first with ⌘Z".into()));
+        }
         let Some(before) = file.undo.pop() else { return };
+        file.decided_text.pop();
         file.merged = Some(before);
         // The hunk comes back, so the editor is made again from the file's state, with its marks.
         self.load_editor(window, cx);
@@ -472,6 +481,7 @@ impl ReviewPane {
             Some(back) => {
                 let before = file.undo[back].clone();
                 file.undo.truncate(back);
+                file.decided_text.truncate(back);
                 before
             }
             None => merged.edited(&text),
@@ -569,6 +579,7 @@ impl ReviewPane {
         let rebased = merged.rebased_on(text.as_deref().unwrap_or(""));
         file.on_disk = text;
         file.undo.clear();
+        file.decided_text.clear();
         let new_text = rebased.text().to_string();
         file.merged = Some(rebased);
         self.keep(at, cx);
@@ -643,6 +654,7 @@ impl ReviewPane {
         let decided = decisions.iter().fold(merged.clone(), |m, (h, d)| m.decide(&h.id, *d).unwrap_or(m));
         let file = &mut self.files[at];
         file.undo.push(merged);
+        file.decided_text.push(decided.text().to_string());
         file.merged = Some(decided);
         if at == self.current {
             inline_review::apply(&self.editor, decisions, window, cx);

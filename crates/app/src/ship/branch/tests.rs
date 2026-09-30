@@ -64,3 +64,14 @@ fn a_taken_name_gets_a_number() {
     git(&work, &["branch", "fix/a-2"]);
     assert_eq!(free(project.as_ref(), "fix/a"), "fix/a-3");
 }
+/// When HEAD cannot move back after a failed commit, the words say so and where the reader is, and
+/// the new branch stays, since HEAD still names it.
+#[test]
+fn a_failed_move_back_is_named() {
+    let (_top, work, project) = clone();
+    let error = commit_on_new_with(project.as_ref(), "fix/lease", || Err::<(), _>("the hook said no".to_string()), |_| Err("HEAD is locked".to_string()))
+        .unwrap_err();
+    assert_eq!(error, "the hook said no, and HEAD could not move back to main: HEAD is locked. You are on fix/lease");
+    assert_eq!(current(project.as_ref()).as_deref(), Some("fix/lease"));
+    assert_eq!(git(&work, &["branch", "--list", "fix/lease"]).trim(), "* fix/lease", "the branch HEAD names stays");
+}
