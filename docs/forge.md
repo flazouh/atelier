@@ -61,6 +61,24 @@ numbers in one request. A number that is not a pull request there is looked for 
 the reader is involved in. An answer is kept 60 seconds, including "not a pull request"; the involved list
 is kept 5 minutes, since reading it is ten searches. It asks the forge only for what it does not hold.
 
+The app's chips do not use `Lookup::resolve`: a chip names the project's own repository only, so the app
+calls `Forge::briefs` for its repository with the numbers its pull request list lacks
+(`crates/app/src/open_project/chips.rs`), keeps each answer, and asks a number again after 5 minutes.
+
+### What the app calls (M4)
+Every call runs off the UI thread; every refusal shows in `ForgeError`'s own words.
+
+| Call | When | On a failure |
+|---|---|---|
+| `open_pull_for(repo, head)` | The pull request form opens: is there one for this branch already? | The form says why and offers no create, since it cannot rule out a second pull request. |
+| `create_pull(repo, new)` | Open in the form (after a push when the branch is ahead). | The form stays, with the words. |
+| `pull(ref)`, `checks(ref)` | The PR card, while a card of it is on screen in an active window: every 10 s while checks run, 30 s once they settle, never after a merge or a close. | 10 s, then doubling to 5 min; a rate limit waits as the forge says; signed out, gh missing, not found and denied stop the reads. The card says why. |
+| `merge`, `delete_branch`, `update_pull`, `update_branch`, `cancel_auto_merge`, `dequeue`, `revert` | The card's merge actions; a merge, a branch delete and a revert ask first. | The card shows the words and reads again. |
+| `briefs(repo, numbers)` | A session's text settles (a turn ends, the history loads) and names numbers the list lacks. | No chip, and no alarm. |
+
+`open_pull_for` is new in M4. Its default fails rather than answering "none", so a forge that cannot say
+never leads the app to open a second pull request. GitHub asks `pullRequests(headRefName:, states: OPEN)`.
+
 ## GitHub
 
 ### Auth and where it runs

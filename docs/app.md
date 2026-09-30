@@ -367,6 +367,20 @@ off the UI thread, through the project, so it works on a remote project the same
   "lathe: edits set aside to pull and rebase" and pops it after. A clash leaves the entry and names
   it. The marks and the record follow the rebased commits, matched by patch id.
 
+- **Open pull request** (⌘⇧R after a push) shows the form in the strip. It first asks the forge for the
+  branch's open pull request: with one, the strip says so, keeps it on the session, and offers "Open #N" in
+  place of a second create. The form fetches origin once (`--prune`), off the UI thread, and says
+  "Checking branches…" until it lands; the bases are origin's branches, the default first. The agent
+  drafts the title and the body; a draft fills only an empty field. When HEAD has commits origin lacks,
+  the button reads "Push and open pull request". Tab goes title, body, base, draft switch, Open.
+- **The PR card** sits above the composer once the session has a pull request, and comes back with the
+  session. It reads the pull request and its checks at the pace docs/forge.md gives, only while it is on
+  screen in an active window, one read per pull request whatever the number of cards. Its merge button
+  offers the repository's methods and "Delete branch after merging"; a merge, a branch delete and a revert
+  ask first ("Squash and merge #7 into main, and delete qa/…?").
+- **Chips.** A `#N` of the project's repository becomes a chip: from the pull request list when it holds
+  it, else from one `Forge::briefs` request when the session's text settles.
+
 ## Pull requests in the app (M5)
 
 alex-31's pull request view (`crates/pr-view`, `docs/pr-view.md`) is mounted per project, for the project's own repository only (the origin remote; its searches carry `repo:owner/name`, and its cache is its own). A project with no GitHub remote shows the menu entry off, with "No GitHub remote for this project". The reader's whole working set, on its Courts, waits for a top-level place outside any project.
