@@ -320,7 +320,7 @@ impl Render for PullForm {
                     })
                     .child(div().text_size(TextSize::Sm.font_size()).child(format!("Open a pull request from {}", self.head)))
                     .child(TextInput::new("pull-title", &self.title).surface(theme.card))
-                    .child(Field::new(body_focus, Textarea::new(&self.body).appearance(false)).radius(radius::MD).padding(px(6.)))
+                    .child(Field::new(body_focus, Textarea::new(&self.body).appearance(false)).radius(radius::MD).padding(px(0.)))
                     .when(self.drafting, |d| d.child(words("The agent is drafting…".into())))
                     .when(self.checking, |d| d.child(words("Checking branches…".into())))
                     .child(
