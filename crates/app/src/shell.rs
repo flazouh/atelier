@@ -549,7 +549,18 @@ impl Shell {
         project.update(cx, |p, cx| p.toggle_pulls(window, cx));
         self.right = true;
         self.widen_for_review(window, cx);
+        self.focus_front(&project, window, cx);
         cx.notify();
+    }
+
+    /// The keys go to what the right pane shows now: the review when it is in front, else the shell,
+    /// so no key is left with a pane that is no longer drawn.
+    fn focus_front(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) {
+        let p = project.read(cx);
+        match (p.front(), p.review.as_ref()) {
+            (crate::open_project::front::Front::Review, Some((pane, _))) => pane.focus_handle(cx).focus(window, cx),
+            _ => self.focus.focus(window, cx),
+        }
     }
 
     /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
@@ -611,6 +622,7 @@ impl Shell {
             ProjectEvent::PullsShown => {
                 this.right = true;
                 this.widen_for_review(window, cx);
+                this.focus_front(project, window, cx);
                 cx.notify();
             }
             ProjectEvent::ReviewClosed => {
@@ -1180,12 +1192,10 @@ impl Shell {
     fn narrow_panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let right = {
             let p = project.read(cx);
-            if p.review.is_some() {
-                "Review"
-            } else if p.pulls.as_ref().is_some_and(|pulls| pulls.shown) {
-                "Pull requests"
-            } else {
-                "Editor"
+            match p.front() {
+                crate::open_project::front::Front::Review => "Review",
+                crate::open_project::front::Front::Pulls => "Pull requests",
+                crate::open_project::front::Front::Editor => "Editor",
             }
         };
         let panes = [Pane::Projects, Pane::Session, Pane::Right];
@@ -1224,11 +1234,11 @@ impl Shell {
         let theme = cx.theme().clone();
         let p = project.read(cx);
         let pulls = p.pulls.as_ref().filter(|pulls| pulls.shown).map(|pulls| pulls.hub.clone());
-        let inner = match (p.review.as_ref(), pulls) {
-            // The review and the pull requests draw their own cards on the page.
-            (Some((pane, _)), _) => div().size_full().pt(px(6.)).child(pane.clone()),
-            (None, Some(hub)) => div().size_full().pt(px(6.)).child(hub),
-            (None, None) => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
+        // The review and the pull requests draw their own cards on the page; the last one asked shows.
+        let inner = match (p.front(), p.review.as_ref(), pulls) {
+            (crate::open_project::front::Front::Review, Some((pane, _)), _) => div().size_full().pt(px(6.)).child(pane.clone()),
+            (crate::open_project::front::Front::Pulls, _, Some(hub)) => div().size_full().pt(px(6.)).child(hub),
+            _ => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
         };
         div().size_full().pr(px(8.)).pb(px(2.)).child(inner).into_any_element()
     }

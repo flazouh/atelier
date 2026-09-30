@@ -146,6 +146,8 @@ pub struct OpenProject {
     pub review: Option<(Entity<ReviewPane>, Subscription)>,
     /// The project's pull requests, once asked for (`pulls.rs`).
     pub pulls: Option<Pulls>,
+    /// What the reader asked the right pane for last.
+    right_asked: front::Front,
     /// A pull request to show once the pull request view has mounted.
     pending_pull: Option<lathe_forge::PullRef>,
     /// The project's own repository on its forge, from the origin remote; `None` when it has none.
@@ -205,6 +207,7 @@ impl OpenProject {
             review: None,
             pulls: None,
             pending_pull: None,
+            right_asked: front::Front::Editor,
             repo: None,
             list_rows: Vec::new(),
             pr_chips: std::rc::Rc::default(),
@@ -420,10 +423,14 @@ impl OpenProject {
     /// Shows the project's pull requests in place of the editor, or hides them. The first time, the
     /// reader's login and the view's services are read off the UI thread.
     pub fn toggle_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let behind = self.front() != front::Front::Pulls;
         if let Some(pulls) = &mut self.pulls {
-            pulls.shown = !pulls.shown;
+            // Shown behind a review, they come to the front; in front, they hide.
+            pulls.shown = !pulls.shown || behind;
+            self.right_asked = if pulls.shown { front::Front::Pulls } else { front::Front::Review };
             return cx.notify();
         }
+        self.right_asked = front::Front::Pulls;
         // The pane holds the project's own repository only, so a project without one opens nothing.
         let Some(repo) = self.repo.clone() else {
             return cx.emit(ProjectEvent::Said(NO_FORGE_REMOTE.into()));
@@ -546,21 +553,29 @@ impl OpenProject {
         let hub = pulls.hub.clone();
         let Some(reference) = hub.read(cx).list().read(cx).model().reference_of(chip) else { return };
         pulls.shown = true;
+        self.right_asked = front::Front::Pulls;
         hub.update(cx, |hub, cx| hub.open(reference, window, cx));
         cx.emit(ProjectEvent::PullsShown);
         cx.notify();
+    }
+
+    /// What the right pane shows now.
+    pub fn front(&self) -> front::Front {
+        front::front(self.right_asked, self.review.is_some(), self.pulls.as_ref().is_some_and(|p| p.shown))
     }
 
     /// Shows `reference` in the pull request view, mounting the view first when it is not yet there.
     pub fn show_pull(&mut self, reference: lathe_forge::PullRef, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(pulls) = &mut self.pulls {
             pulls.shown = true;
+            self.right_asked = front::Front::Pulls;
             let hub = pulls.hub.clone();
             hub.update(cx, |hub, cx| hub.open(reference, window, cx));
             cx.emit(ProjectEvent::PullsShown);
             return cx.notify();
         }
         self.pending_pull = Some(reference);
+        self.right_asked = front::Front::Pulls;
         self.toggle_pulls(window, cx);
     }
 
@@ -593,6 +608,8 @@ impl OpenProject {
             hub.update(cx, |hub, cx| hub.open(reference, window, cx));
         }
         self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens, _chips] });
+        // Mounted, they are in front: the shell moves the keys to them.
+        cx.emit(ProjectEvent::PullsShown);
         cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
         cx.notify();
     }
@@ -601,6 +618,7 @@ impl OpenProject {
     pub fn open_review(&mut self, session: Entity<AgentSession>, scope: Scope, path: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
         let (project, language) = (self.project.clone(), self.language_for(cx));
         let pane = cx.new(|cx| ReviewPane::new(session, project, scope, path, window, cx).with_language(language, window, cx));
+        self.right_asked = front::Front::Review;
         let sub = cx.subscribe_in(&pane, window, |this, _, event: &PaneEvent, window, cx| match event {
             PaneEvent::Close => {
                 this.review = None;
@@ -968,6 +986,7 @@ impl OpenProject {
 }
 
 mod chips;
+pub mod front;
 mod past;
 #[cfg(test)]
 mod tests;
