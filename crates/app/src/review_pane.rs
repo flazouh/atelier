@@ -1004,7 +1004,7 @@ impl Render for ReviewPane {
             .on_add_comment(move |row, window, cx| add(&row, window, cx))
             .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx))
             .on_resolved(move |id, decision, window, cx| resolved(&(id.clone(), decision), window, cx));
-        let header = ReviewFileHeader::new("review-file", path.clone(), added, removed, handlers.clone()).committed(self.committed_words(self.current)).decided(self.decided_words(self.current));
+        let header = ReviewFileHeader::new("review-file", path.clone(), added, removed, handlers.clone()).path_shown(false).committed(self.committed_words(self.current)).decided(self.decided_words(self.current));
         let crumbs = {
             let parts: Vec<String> = path.split('/').map(str::to_string).collect();
             let this = cx.entity().downgrade();
