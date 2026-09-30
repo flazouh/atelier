@@ -3,7 +3,7 @@
 //! above the text, with Reload and Keep mine.
 
 use beui::{
-    CodeEditor,
+    CodeEditor, Tab, Tabs, TabsVariant,
     button::{Button, ButtonVariant, dot},
     file_icon::FileIcon,
     icon::{Icon, IconName},
@@ -22,35 +22,21 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
     let muted = theme.muted_foreground;
     let p = project.read(cx);
     let active = p.tabs.active().map(str::to_string);
-    let tabs = p.tabs.paths().iter().enumerate().map(|(i, path)| {
-        let shown = active.as_deref() == Some(path.as_str());
+    let paths: Vec<String> = p.tabs.paths().to_vec();
+    let selected = active.as_deref().and_then(|a| paths.iter().position(|p| p == a));
+    let tabs = paths.iter().enumerate().map(|(i, path)| {
         let dirty = p.buffers.get(path).is_some_and(|b| b.dirty);
         let name = path.rsplit('/').next().unwrap_or(path).to_string();
         let group: SharedString = format!("tab-{i}").into();
-        let (open, close) = (project.clone(), project.clone());
-        let (open_path, close_path) = (path.clone(), path.clone());
-        div()
-            .id(("tab", i))
+        let close = project.clone();
+        let close_path = path.clone();
+        Tab::new(name.clone())
             .group(group.clone())
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap(px(6.))
-            .h(px(28.))
-            .pl(px(10.))
-            .pr(px(4.))
-            .rounded(radius::MD)
-            .cursor_pointer()
-            .text_size(TextSize::Sm.font_size())
-            .text_color(if shown { theme.foreground } else { muted })
-            .when(shown, |d| d.bg(theme.card_strong))
-            .hover(|s| s.text_color(theme.foreground))
-            .tooltip(beui::tooltip::Tooltip::text(path.clone()))
-            .on_click(move |_, window, cx| open.update(cx, |p, cx| p.open_file(&open_path, window, cx)))
-            .child(FileIcon::file(&name).size(px(14.)))
-            .child(name)
+            .tooltip(path.clone())
+            .debug_name(format!("editor-tab-{i}"))
+            .leading(FileIcon::file(&name).size(px(14.)))
             // The dot and the close button share one slot, so nothing moves on hover.
-            .child(
+            .trailing(
                 div()
                     .id(("tab-close", i))
                     .relative()
@@ -82,17 +68,13 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
     // A file still being read shows as a pending tab, so a slow host is seen to be working.
     let opening = p.opening().enumerate().map(|(i, path)| {
         let name = path.rsplit('/').next().unwrap_or(path).to_string();
-        div()
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap(px(6.))
-            .h(px(28.))
-            .px(px(10.))
-            .text_size(TextSize::Sm.font_size())
-            .text_color(muted)
-            .child(beui::spinner::Spinner::new(("opening", i)).size(px(12.)).color(muted))
-            .child(name)
+        Tab::new(name).pending(true).leading(beui::spinner::Spinner::new(("opening", i)).size(px(12.)).color(muted))
+    });
+    let open = project.clone();
+    let strip = Tabs::new("editor-tabs", TabsVariant::Underline, tabs.chain(opening), selected).on_select(move |i, window, cx| {
+        if let Some(path) = paths.get(i) {
+            open.update(cx, |p, cx| p.open_file(path, window, cx));
+        }
     });
     let body = match p.active_buffer() {
         None => div()
@@ -153,18 +135,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         .flex()
         .flex_col()
         .size_full()
-        .child(
-            div()
-                .id("tabs")
-                .flex()
-                .flex_none()
-                .gap(px(2.))
-                .px(px(6.))
-                .pb(px(6.))
-                .overflow_x_scroll()
-                .children(tabs)
-                .children(opening),
-        )
+        .child(div().flex().flex_none().px(px(6.)).child(strip))
         .child(body)
 }
 

@@ -57,6 +57,7 @@ fn accents() -> Vec<Swatch> {
 pub struct MotionStory {
     part: Option<String>,
     segs: [usize; 3],
+    tabs: [usize; 3],
     email: Entity<gpui_kit::component::input::InputState>,
     teams: Entity<MultiSelect>,
     toasts: Entity<ToastStack>,
@@ -111,7 +112,7 @@ impl MotionStory {
         })
         .detach();
         let bloom = cx.new(|cx| BloomMenu::new("bloom", beui::bloom_menu::default_items(), cx));
-        let mut story = Self { segs: [0, 1, 1], email: cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("you@example.com")), bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
+        let mut story = Self { segs: [0, 1, 1], tabs: [0, 0, 0], email: cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("you@example.com")), bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
         story.tick_upload("release-video".to_string(), cx);
         story
     }
@@ -485,6 +486,30 @@ impl Render for MotionStory {
                 .child(track(1, "seg-b", &["Light", "Dark", "System"], false))
                 .child(track(2, "seg-c", &["Side by side", "Single view"], true));
             parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
+        }
+        if self.shows("tabs") {
+            let this = cx.entity().downgrade();
+            let set = |slot: usize, variant: beui::TabsVariant, id: &'static str, names: [&'static str; 3]| {
+                let this = this.clone();
+                beui::Tabs::new(id, variant, names.map(|n| beui::Tab::new(n).debug_name(format!("{id}-{n}"))), Some(self.tabs[slot])).on_select(
+                    move |i, _, cx| {
+                        this.update(cx, |s, cx| {
+                            s.tabs[slot] = i;
+                            cx.notify();
+                        })
+                        .ok();
+                    },
+                )
+            };
+            let demo = div()
+                .flex()
+                .flex_col()
+                .items_start()
+                .gap(px(24.))
+                .child(set(0, beui::TabsVariant::Pill, "tabs-pill", ["Overview", "Activity", "Settings"]))
+                .child(set(1, beui::TabsVariant::Segment, "tabs-segment", ["Day", "Week", "Month"]))
+                .child(set(2, beui::TabsVariant::Underline, "tabs-underline", ["All", "Open", "Closed"]));
+            parts.push(if alone { demo.into_any_element() } else { section("Tabs", &theme, demo) });
         }
         if self.shows("text-input") {
             let demo = div().w(px(360.)).child(
