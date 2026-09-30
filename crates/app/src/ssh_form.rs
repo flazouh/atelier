@@ -4,7 +4,7 @@
 //! on hp-agent…"); a failure shows ssh's own words and leaves the form open to try again.
 
 use beui::{
-    Field,
+    TextInput,
     button::{Button, ButtonSize, ButtonVariant},
     spinner::Spinner,
     theme::{ActiveTheme, popover_shadow, radius},
@@ -14,7 +14,7 @@ use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement,
     Render, SharedString, Styled, Window,
     base::input::Escape,
-    component::input::{Input, InputEvent, InputState},
+    component::input::{InputEvent, InputState},
     div, px,
 };
 
@@ -96,15 +96,7 @@ impl Render for SshForm {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let host_focus = self.host.focus_handle(cx);
-        let field = |label: &'static str, input: &Entity<InputState>, focus: FocusHandle| {
-            div()
-                .flex()
-                .flex_col()
-                .gap(px(4.))
-                .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(label))
-                .child(Field::new(focus, Input::new(input).appearance(false).px(px(10.)).text_size(TextSize::Sm.font_size())).radius(radius::LG).surface(theme.card_strong))
-        };
+        let field = TextInput::new("ssh-host-field", &self.host).label("Host").surface(theme.popover);
         let this = cx.entity().downgrade();
         // The config's hosts, as chips under the field: a press puts the name in it. They are filled chips that
         // change on hover, and the ones that do not fit the first line wrap under the first chip, not under the label.
@@ -161,7 +153,7 @@ impl Render for SshForm {
             .bg(theme.popover)
             .shadow(popover_shadow(&theme))
             .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open over SSH"))
-            .child(field("Host", &self.host, host_focus))
+            .child(field)
             .children(hosts)
             .children(status)
             .child(

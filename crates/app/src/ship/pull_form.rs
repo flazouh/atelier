@@ -3,7 +3,7 @@
 //! thread; a refusal keeps the form and says why.
 use std::sync::Arc;
 use beui::{
-    ActiveTheme, Field, IconName,
+    ActiveTheme, Field, IconName, TextInput,
     button::{Button, ButtonVariant},
     checkbox::Checkbox,
     select::{Select, SelectOption},
@@ -13,7 +13,7 @@ use beui::{
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
     Styled, Task, Window, actions,
-    component::input::{Input, InputState, Textarea, TextareaState},
+    component::input::{InputState, Textarea, TextareaState},
     div, prelude::FluentBuilder, px,
 };
 use lathe_agents::session::Backend;
@@ -308,7 +308,7 @@ impl Render for PullForm {
             }
             FormStage::Open | FormStage::Opening => {
                 let opening = self.stage == FormStage::Opening;
-                let (title_focus, body_focus) = (self.title.focus_handle(cx), self.body.focus_handle(cx));
+                let body_focus = self.body.focus_handle(cx);
                 let options: Vec<SelectOption> = self.bases.iter().map(|b| SelectOption::new(b.clone(), IconName::PrOpen)).collect();
                 let (pick, drafts, cancel, open) = (this.clone(), this.clone(), this.clone(), this.clone());
                 card.key_context(CONTEXT)
@@ -317,7 +317,7 @@ impl Render for PullForm {
                         move |_: &OpenNow, window, cx| drop(this.update(cx, |form, cx| form.submit(window, cx)))
                     })
                     .child(div().text_size(TextSize::Sm.font_size()).child(format!("Open a pull request from {}", self.head)))
-                    .child(Field::new(title_focus, Input::new(&self.title).appearance(false)).radius(radius::MD))
+                    .child(TextInput::new("pull-title", &self.title).surface(theme.card))
                     .child(Field::new(body_focus, Textarea::new(&self.body).appearance(false)).radius(radius::MD).padding(px(6.)))
                     .when(self.drafting, |d| d.child(words("The agent is drafting…".into())))
                     .when(self.checking, |d| d.child(words("Checking branches…".into())))

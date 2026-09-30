@@ -57,6 +57,7 @@ fn accents() -> Vec<Swatch> {
 pub struct MotionStory {
     part: Option<String>,
     segs: [usize; 3],
+    email: Entity<gpui_kit::component::input::InputState>,
     teams: Entity<MultiSelect>,
     toasts: Entity<ToastStack>,
     notes: Entity<NotificationStack>,
@@ -110,7 +111,7 @@ impl MotionStory {
         })
         .detach();
         let bloom = cx.new(|cx| BloomMenu::new("bloom", beui::bloom_menu::default_items(), cx));
-        let mut story = Self { segs: [0, 1, 1], bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
+        let mut story = Self { segs: [0, 1, 1], email: cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("you@example.com")), bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
         story.tick_upload("release-video".to_string(), cx);
         story
     }
@@ -484,6 +485,17 @@ impl Render for MotionStory {
                 .child(track(1, "seg-b", &["Light", "Dark", "System"], false))
                 .child(track(2, "seg-c", &["Side by side", "Single view"], true));
             parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
+        }
+        if self.shows("text-input") {
+            let demo = div().w(px(360.)).child(
+                beui::TextInput::new("email", &self.email)
+                    .label("Email")
+                    .left_icon(beui::IconName::Search)
+                    .reserve_error_line(true)
+                    .surface(theme.background)
+                    .debug_name("text-input"),
+            );
+            parts.push(if alone { demo.into_any_element() } else { section("Text input", &theme, demo) });
         }
         if self.shows("menu") {
             let menu = beui::Menu::new(
