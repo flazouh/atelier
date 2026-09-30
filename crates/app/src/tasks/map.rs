@@ -102,6 +102,11 @@ fn activity_of(line: &tracker::Activity) -> Option<Activity> {
     })
 }
 
+/// The log of a task as beui shows it.
+pub fn activity_data(lines: &[tracker::Activity]) -> Vec<Activity> {
+    lines.iter().filter_map(activity_of).collect()
+}
+
 /// A task as beui shows it. `activity` is the task's log, empty for a list that does not need it.
 pub fn task_data(task: &tracker::Task, activity: &[tracker::Activity], looks: Looks) -> TaskData {
     let mut data = TaskData::new(task.id.0.clone(), task.key.clone(), task.title.clone(), status_of(task.status));
@@ -122,7 +127,7 @@ pub fn task_data(task: &tracker::Task, activity: &[tracker::Activity], looks: Lo
         })
         .collect();
     data.prs = task.prs.iter().map(pr_of).collect();
-    data.activity = activity.iter().filter_map(activity_of).collect();
+    data.activity = activity_data(activity);
     data.created_at = task.created_at.max(0) as u64;
     data.updated_at = task.updated_at.max(0) as u64;
     data
