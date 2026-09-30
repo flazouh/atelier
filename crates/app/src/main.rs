@@ -116,6 +116,12 @@ fn main() {
             cx.new(|cx| gpui_kit::component::Root::new(shell, window, cx))
         })
         .expect("open the window");
+        // The app menu holds Quit, as every desktop app's does; where there is no app menu, this does nothing.
+        cx.set_menus([gpui_kit::Menu {
+            name: "lathe".into(),
+            items: vec![gpui_kit::MenuItem::action("Quit lathe", shell::Quit)],
+            disabled: false,
+        }]);
         // The last window closing ends the app, and says so: on Linux nothing else would end it.
         cx.on_window_closed(|cx, _| {
             if cx.windows().is_empty() {

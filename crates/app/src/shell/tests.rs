@@ -25,3 +25,15 @@ fn the_first_launch_shows_the_mark_and_one_line_about_what_lathe_is_above_the_bu
     }
     assert!(WHAT_LATHE_IS.split_whitespace().count() <= 20, "one short line");
 }
+/// Quit has a key, Command-Q on the Mac and Control-Q elsewhere.
+#[gpui_kit::test]
+fn quit_has_its_key(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        bind_keys(cx);
+        let keymap = cx.key_bindings();
+        let keymap = keymap.borrow();
+        let bound: Vec<String> = keymap.bindings_for_action(&Quit).map(|b| b.keystrokes().iter().map(|k| k.unparse()).collect::<Vec<_>>().join(" ")).collect();
+        let want = if cfg!(target_os = "macos") { "cmd-q" } else { "ctrl-q" };
+        assert!(bound.iter().any(|b| b == want), "{bound:?}");
+    });
+}

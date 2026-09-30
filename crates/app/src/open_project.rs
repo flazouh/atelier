@@ -228,7 +228,20 @@ impl OpenProject {
             let listed = listing.await;
             _ = this.update(cx, |this, cx| {
                 match listed {
-                    Ok(past) => this.past = past,
+                    Ok(listed) => {
+                        // An open session shows once, as the open one, and takes its place and stamp
+                        // from its last activity until it has some of its own.
+                        let open: Vec<SessionId> = this.sessions.iter().filter_map(|s| s.read(cx).id.clone()).collect();
+                        for session in &this.sessions {
+                            let when = session.read(cx).id.as_ref().and_then(|id| past::last_activity(&listed, id));
+                            session.update(cx, |s, _| {
+                                if s.active_at == 0 {
+                                    s.active_at = when.unwrap_or(0);
+                                }
+                            });
+                        }
+                        this.past = past::not_open(listed, &open);
+                    }
                     Err(error) => cx.emit(ProjectEvent::Said(format!("No past sessions: {error}").into())),
                 }
                 cx.emit(ProjectEvent::Sessions);
@@ -242,10 +255,15 @@ impl OpenProject {
     pub fn open_session(&mut self, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let key: SharedString = format!("session-{}", NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)).into();
+        let when = resume.as_ref().and_then(|(id, _)| past::last_activity(&self.past, id));
         if let Some((id, _)) = &resume {
             self.past.retain(|p| p.id != *id);
         }
         let session = self.start_session(key, self.agent.clone(), resume, window, cx);
+        // An opened past session keeps its place: its stamp is its last activity, not now.
+        if let Some(when) = when {
+            session.update(cx, |s, _| s.active_at = when);
+        }
         self.sessions.push(session.clone());
         cx.emit(ProjectEvent::Sessions);
         session
@@ -873,5 +891,6 @@ impl OpenProject {
     }
 }
 
+mod past;
 #[cfg(test)]
 mod tests;
