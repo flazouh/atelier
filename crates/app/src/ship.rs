@@ -2,5 +2,7 @@
 //! the pull request (`plans/m4-app.md`). The review pane's strip drives it; every git call runs off the
 //! UI thread, through the project, so it works on a remote project as on a local one.
 
+pub mod branch;
 pub mod commit;
+pub mod drafts;
 pub mod kept;

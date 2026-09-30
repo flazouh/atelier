@@ -439,3 +439,21 @@ for each input the component handles, for the render that starts its animation, 
 On the HP the same story draws a frame every 65 to 180 ms: its gallery is debug and software rendered, and the load
 average was 46 to 53 on 12 cores. A control run of the Tasks scroll drew a frame every 288 ms in the same period. The HP
 number says nothing about the component; the Mac number is the one to read.
+
+## Commit
+
+A commit of 200 changed files from a review (`crates/app/src/ship/commit.rs`), release, on the HP at a load
+average of 39 to 48 from other builds; over ssh to the HP itself through lathe-remote.
+
+    LATHE_REMOTE_DIR=… LATHE_TEST_SSH_HOST=hp-agent cargo test --release -p lathe-app -- --ignored --nocapture commit_of_200_files
+
+| Case | Median | Worst | Runs |
+| --- | --- | --- | --- |
+| Local, one hash-object, ls-tree and two update-index per file (first version) | 4,675 ms | 5,260 ms | 5 |
+| Over ssh, the same | 8,283 ms | 8,540 ms | 3 |
+| Local, a dozen git calls whatever the count (one ls-tree, one fast-import, one update-index --index-info per index) | 83 ms | 91 ms | 5 |
+| Over ssh, the same | 101 ms | 124 ms | 3 |
+
+- Over ssh each git call is a round trip, so the count of calls is what costs.
+- The first version over ssh also ran the host out of open files: each ended process kept its pipes
+  for 30 s. lathe-remote now closes them at once (cebc3d8).
