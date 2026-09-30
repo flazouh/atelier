@@ -533,3 +533,26 @@ over the stated span; frames from `LATHE_FRAMES=each`, one line per frame with i
   keep a view's last layout (`AnyView::cached`) until the view itself changes. Caching the sidebar, the session
   panels and the right pane would make a caret blink cost the input alone. It changes how each pane learns that
   its inputs changed, so it is a change of its own, measured on the Mac first.
+
+## View cache (2026-09-30)
+
+`plans/view-cache.md`, on the HP (release, llvmpipe, load 36 to 104 from other builds), d1 with 3 sessions
+restored, `LATHE_FRAMES=each`, which now names each part of a frame. Median/p95 ms of layout and paint.
+
+| Case, part | Before | After |
+| --- | --- | --- |
+| Caret blink: whole frame | 17.15 / 53.67 | 9.72 / 16.64 |
+| Caret blink: sidebar (cached, step 3) | 1.52 / 13.15 | 0.71 / 2.64 |
+| Caret blink, review open: right pane (cached, step 4) | 1.63 / 19.49 | 0.22 / 4.24 |
+| Caret blink: panels (not cached) | 14.51 / 43.21 | 8.57 / 14.30 (load differs) |
+| Caret blink: status line (not cached, step 2 dropped) | 0.05 / 0.06 | 0.05 / 0.06 |
+| Review open, focus on no input: frames in 10 s | 21 (83% CPU) | 1 (4% CPU), gpui-base patch 18 |
+
+- The target, under 2 ms for a caret blink, is not reached: the panels are most of it and are not cached.
+- Cached, a panel (whole, or its rows alone) made each caret blink draw a second frame about 130 ms
+  later: 40 frames in 10 s against 20, and more CPU than with no cache. In that second frame both panels'
+  rows draw again, with no notify from their sessions, no focus change, no geometry notify from the input
+  and no beui frame request. The cause is not found. So `SessionPanel` and `ConversationRows` are views
+  that observe their session (tests: the header and the rows follow the session), drawn uncached; caching
+  them is one line each once the cause is known.
+- Step 2 is dropped: the status line costs 0.05 ms and reads five sources.

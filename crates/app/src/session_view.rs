@@ -204,8 +204,25 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     div().px(px(16.)).pb(px(14.)).child(body).into_any_element()
 }
 
-/// The panel for `session`.
+/// The conversation's rows: a list that lays out only the rows on screen. Each row has a test name,
+/// `row-<index>`.
+pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
+    let s = session.read(cx);
+    let session = session.clone();
+    list(s.list.clone(), move |ix, _, cx| div().debug_selector(move || format!("row-{ix}")).child(row(&session, ix, cx)).into_any_element())
+        .size_full()
+        .into_any_element()
+}
+
+/// The panel for `session`, rows and all.
+#[cfg(test)]
 pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> AnyElement {
+    session_view_with(session, None, window, cx)
+}
+
+/// The panel for `session`, with its rows drawn by the caller (a cached view of their own), or here when
+/// `rows` is `None`.
+pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement>, window: &mut Window, cx: &mut App) -> AnyElement {
     let theme = cx.theme().clone();
     let muted = theme.muted_foreground;
     // The "Show details" fold keeps its state across frames, by the session's key.
@@ -214,10 +231,7 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
     let shown = *open.read(cx);
     let s = session.read(cx);
     let empty = s.conversation.items().is_empty();
-    let rows = {
-        let session = session.clone();
-        list(s.list.clone(), move |ix, _, cx| row(&session, ix, cx)).size_full()
-    };
+    let rows = rows.unwrap_or_else(|| self::rows(session, cx));
     // Why it stopped: the reason, and the agent's own last words behind a fold.
     // The whole reason: the row keeps the cut one.
     // A turn that failed in a live session says so in the conversation; the box is for an agent
