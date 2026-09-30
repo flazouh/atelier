@@ -23,6 +23,8 @@ fn a_review_comes_back_from_its_record() {
     assert_eq!(attachments.len(), 1);
     state.comments.add(0, "a.txt", anchor, "and this?");
     state.committed.insert((Scope::Turn(0), "a.txt".into()), "b89cbbe".into());
+    let scratch = lathe_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe-qa-scratch".into() };
+    state.pull = Some(lathe_forge::PullRef { repo: scratch, number: 7 });
 
     let json = serde_json::to_string(&state.record()).unwrap();
     let back = ReviewState::from_record(serde_json::from_str(&json).unwrap());
@@ -34,6 +36,7 @@ fn a_review_comes_back_from_its_record() {
     assert_eq!(kept.0.as_ref().map(Merged::current), Some(decided.current()));
     assert!(back.is_reviewed(0, &a));
     assert_eq!(back.committed[&(Scope::Turn(0), "a.txt".to_string())], "b89cbbe");
+    assert_eq!(back.pull.as_ref().map(|p| p.number), Some(7));
     assert_eq!(back.comments.all().len(), 1);
     assert_eq!(back.sent.iter().map(|(c, answered)| (c.body.as_str(), *answered)).collect::<Vec<_>>(), [("why?", false)]);
 }

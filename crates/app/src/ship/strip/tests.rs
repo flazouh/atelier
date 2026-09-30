@@ -307,3 +307,27 @@ fn push_with_no_remote_says_so(cx: &mut TestAppContext) {
     let stage = cx.update(|_, cx| strip.read(cx).stage.clone());
     assert!(matches!(&stage, Stage::Failed(w) if w.contains("no remote named origin")), "{stage:?}");
 }
+/// After the push, ⌘⇧R opens the pull request form in the strip; Open asks the forge, and the session
+/// keeps the pull request in its record.
+#[gpui_kit::test]
+fn after_the_push_the_strip_opens_the_pull_request(cx: &mut TestAppContext) {
+    let (dir, pane, strip, cx) = opened_strip(cx, |dir| drop(with_origin(dir)));
+    let forge = Arc::new(crate::fake_forge::FakeForge::default());
+    cx.update(|_, cx| strip.update(cx, |s, _| s.set_forge(forge.clone())));
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.push(window, cx)));
+    cx.run_until_parked();
+    // The pushed repository now answers as the scratch repository on GitHub, which nothing reaches.
+    crate::fake_forge::git(&dir, &["remote", "set-url", "origin", "https://github.com/flazouh/lathe-qa-scratch.git"]);
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.open_pull(window, cx)));
+    cx.run_until_parked();
+    let form = cx.update(|_, cx| strip.read(cx).pull.clone()).expect("the form opened");
+    assert_eq!(cx.update(|_, cx| form.read(cx).head.clone()), "fix/keep-two");
+    cx.update(|window, cx| form.update(cx, |f, cx| f.submit(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(forge.created.lock().unwrap().len(), 1);
+    assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::PullOpened("Opened pull request #7".into()));
+    let kept = cx.update(|_, cx| pane.read(cx).session_pull(cx));
+    assert_eq!(kept.map(|p| p.number), Some(7), "the session keeps the pull request");
+}

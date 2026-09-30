@@ -35,6 +35,8 @@ pub struct ReviewState {
     pub decided: Decided,
     /// The files whose decisions went into a commit, by scope and path: the commit's short id.
     pub committed: HashMap<(Scope, String), String>,
+    /// The pull request the session opened, if it opened one.
+    pub pull: Option<lathe_forge::PullRef>,
     reviewed: Reviewed,
     /// The marks as `reviewed` holds them, which it does not list: by scope key, path and version.
     marks: Vec<(usize, String, u64)>,
@@ -97,6 +99,7 @@ impl ReviewState {
                 committed.sort_by(|a, b| (&a.1, &a.2).cmp(&(&b.1, &b.2)));
                 committed
             },
+            pull: self.pull.clone(),
             marks: self.marks.clone(),
             comments: self.comments.all().iter().map(CommentRecord::of).collect(),
             sent: self.sent.iter().map(|(c, answered)| (CommentRecord::of(c), *answered)).collect(),
@@ -114,6 +117,7 @@ impl ReviewState {
             .into_iter()
             .map(|d| ((d.scope.rebuild(), d.path), (d.texts.map(|(baseline, current)| Merged::diff(&baseline, &current)), d.on_disk)))
             .collect();
+        state.pull = record.pull;
         state.committed = record.committed.into_iter().map(|(scope, path, sha)| ((scope.rebuild(), path), sha)).collect();
         for (key, path, version) in record.marks {
             let file = match key {
@@ -144,6 +148,9 @@ pub struct Record {
     /// Missing from records written before commits were kept.
     #[serde(default)]
     committed: Vec<(ScopeRecord, String, String)>,
+    /// Missing from records written before pull requests were kept.
+    #[serde(default)]
+    pull: Option<lathe_forge::PullRef>,
     marks: Vec<(usize, String, u64)>,
     comments: Vec<CommentRecord>,
     sent: Vec<(CommentRecord, bool)>,

@@ -21,12 +21,14 @@ use gpui_kit::{
     div, prelude::FluentBuilder, px,
 };
 use lathe_agents::session::Backend;
+use lathe_forge::{Forge, PullRef};
 use lathe_project::Project;
 
 use crate::ship::{
     branch,
     commit::{self, CommitError},
     push,
+    pull_form::{FormEvent, PullForm},
     drafts, head,
     kept::{Kept, against},
 };
@@ -54,6 +56,8 @@ pub enum StripEvent {
     Pushed,
     /// A rebase gave the branch's own commits new ids: each old id with its new one.
     Rewrote(Vec<(String, String)>),
+    /// The forge opened this pull request for the branch.
+    PullOpened(PullRef),
 }
 
 /// Why a pull and rebase stopped, for the strip.
@@ -86,6 +90,10 @@ pub enum Stage {
     EditsInTheWay,
     /// Pushed, but the edits set aside clash with the new commits: the words say where they are.
     Clashed(SharedString),
+    /// The pull request form shows.
+    Pull,
+    /// The pull request is open: the words that say so.
+    PullOpened(SharedString),
 }
 
 /// One file as the commit takes it: its path and its rows added and removed against HEAD.
@@ -111,6 +119,11 @@ pub struct ShipStrip {
     pub refused: Option<SharedString>,
     pub message: Entity<TextareaState>,
     pub new_branch: Entity<InputState>,
+    /// The forge that opens the pull request.
+    forge: Arc<dyn Forge>,
+    /// The pull request form, while it shows.
+    pub pull: Option<Entity<PullForm>>,
+    _pull: Option<gpui_kit::Subscription>,
     work: Task<()>,
 }
 
@@ -118,6 +131,7 @@ impl ShipStrip {
     pub fn new(project: Arc<dyn Project>, backend: Arc<dyn Backend>, model: Option<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let message = cx.new(|cx| TextareaState::new(window, cx).auto_grow(3, 10).placeholder("What this commit does"));
         let new_branch = cx.new(|cx| InputState::new(window, cx).placeholder("fix/what-it-does"));
+        let forge: Arc<dyn Forge> = Arc::new(lathe_forge::github::GitHub::new(project.clone()));
         Self {
             project,
             backend,
@@ -131,6 +145,9 @@ impl ShipStrip {
             refused: None,
             message,
             new_branch,
+            forge,
+            pull: None,
+            _pull: None,
             work: Task::ready(()),
         }
     }
@@ -208,8 +225,8 @@ impl ShipStrip {
         match self.stage {
             Stage::Rejected => return self.pull_and_rebase(window, cx),
             Stage::EditsInTheWay => return self.set_aside_and_rebase(window, cx),
-            Stage::Reading | Stage::Open | Stage::Committing | Stage::Pushing(_) => return,
-            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) => {}
+            Stage::Reading | Stage::Open | Stage::Committing | Stage::Pushing(_) | Stage::Pull => return,
+            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) | Stage::PullOpened(_) => {}
         }
         self.stage = Stage::Pushing("Pushing…".into());
         let project = self.project.clone();
@@ -301,6 +318,39 @@ impl ShipStrip {
         cx.notify();
     }
 
+    /// The forge the pull request goes to, in place of GitHub through gh.
+    #[cfg(test)]
+    pub fn set_forge(&mut self, forge: Arc<dyn Forge>) {
+        self.forge = forge;
+    }
+
+    /// Shows the pull request form for the branch checked out (⌘⇧R).
+    pub fn open_pull(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if matches!(self.stage, Stage::Reading | Stage::Open | Stage::Committing | Stage::Pushing(_) | Stage::Pull) {
+            return;
+        }
+        let (project, backend, model, forge) = (self.project.clone(), self.backend.clone(), self.model.clone(), self.forge.clone());
+        let form = cx.new(|cx| PullForm::new(project, backend, model, forge, window, cx));
+        self._pull = Some(cx.subscribe(&form, |strip, _, event: &FormEvent, cx| {
+            match event {
+                FormEvent::Opened(reference) => {
+                    strip.stage = Stage::PullOpened(format!("Opened pull request #{}", reference.number).into());
+                    strip.pull = None;
+                    cx.emit(StripEvent::PullOpened(reference.clone()));
+                }
+                FormEvent::Cancelled => {
+                    strip.stage = Stage::Closed;
+                    strip.pull = None;
+                }
+            }
+            cx.notify();
+        }));
+        form.update(cx, |f, cx| f.open(window, cx));
+        self.pull = Some(form);
+        self.stage = Stage::Pull;
+        cx.notify();
+    }
+
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.stage = Stage::Closed;
         self.work = Task::ready(());
@@ -382,6 +432,10 @@ impl Render for ShipStrip {
         let row = div().flex().items_center().gap(px(8.)).px(px(12.)).min_h(px(36.));
         match &self.stage {
             Stage::Pushing(w) => row.child(words(w.clone())).into_any_element(),
+            Stage::Pull => match self.pull.clone() {
+                Some(form) => form.into_any_element(),
+                None => row.into_any_element(),
+            },
             Stage::Rejected => {
                 let (again, cancel) = (this.clone(), this.clone());
                 row.child(div().flex_1().min_w_0().text_size(TextSize::Xs.font_size()).text_color(muted).child(push::PushError::Rejected.to_string()))
@@ -408,9 +462,9 @@ impl Render for ShipStrip {
                     )
                     .into_any_element()
             }
-            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) => {
+            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) | Stage::PullOpened(_) => {
                 let said = match &self.stage {
-                    Stage::Committed(w) | Stage::Failed(w) | Stage::Pushed(w) | Stage::Clashed(w) => Some(w.clone()),
+                    Stage::Committed(w) | Stage::Failed(w) | Stage::Pushed(w) | Stage::Clashed(w) | Stage::PullOpened(w) => Some(w.clone()),
                     _ => None,
                 };
                 let failed = matches!(self.stage, Stage::Failed(_) | Stage::Clashed(_));
@@ -420,6 +474,12 @@ impl Render for ShipStrip {
                 row.child(div().flex_1().min_w_0().children(said.map(|w| {
                     div().text_size(TextSize::Xs.font_size()).text_color(if failed { theme.danger } else { muted }).child(w)
                 })))
+                .when(matches!(self.stage, Stage::Pushed(_) | Stage::Clashed(_)), |row| {
+                    let opens = this.clone();
+                    row.child(Button::new("ship-open-pull").label("Open pull request").variant(ButtonVariant::Ghost).command(Key::OpenPull).on_click(
+                        move |_, window, cx| drop(opens.update(cx, |strip, cx| strip.open_pull(window, cx))),
+                    ))
+                })
                 .when(pushable, |row| {
                     row.child(Button::new("ship-push").label("Push").variant(ButtonVariant::Ghost).command(Key::Push).on_click(
                         move |_, window, cx| drop(pushes.update(cx, |strip, cx| strip.push(window, cx))),
