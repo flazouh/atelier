@@ -271,3 +271,32 @@ fn a_cached_panel_follows_its_session(cx: &mut TestAppContext) {
     settle(&shell, cx);
     assert!(cx.debug_bounds("panel-title:Renamed by the reader").is_some(), "the cached panel still shows the old title");
 }
+
+/// Views and commands, part 1: no panels bar. A ⋯ at the top right of the session area opens the layout
+/// menu: "Side by side" and "Single view" as a choice of one, "Group by project" as a check, each with its
+/// key; choosing one changes the panels.
+#[gpui_kit::test]
+fn the_layout_lives_in_a_menu_and_the_bar_is_gone(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1600.), px(900.)));
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.new_session_key(&NewSession, window, cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("layout-switch").is_none(), "the bar's layout switch is gone");
+    assert!(cx.debug_bounds("grouping-switch").is_none(), "and its grouping switch");
+    let button = cx.debug_bounds("layout-menu").expect("the ⋯ layout button is drawn");
+    cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    for row in ["layout-side-by-side", "layout-single", "layout-grouped"] {
+        assert!(cx.debug_bounds(row).is_some(), "the menu has {row}");
+    }
+    let single = cx.debug_bounds("layout-single").unwrap();
+    cx.simulate_click(single.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    let layout = shell.read_with(cx, |s, cx| s.panels.read(cx).layout());
+    assert_eq!(layout, beui::panel_types::Layout::Single, "Single view is chosen");
+}
