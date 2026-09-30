@@ -123,7 +123,7 @@ impl Render for SshForm {
                 .items_start()
                 .gap(px(8.))
                 .child(div().flex_none().h(px(28.)).flex().items_center().text_size(TextSize::Xs.font_size()).text_color(muted).child("From ~/.ssh/config"))
-                .child(div().debug_selector(|| "ssh-hosts".into()).flex().flex_1().min_w_0().flex_wrap().gap(px(6.)).children(chips))
+                .child(div().debug_selector(|| "ssh-hosts".into()).flex().flex_1().min_w_0().flex_wrap().gap(px(8.)).children(chips))
         });
         let status = match &self.phase {
             Phase::Idle => None,

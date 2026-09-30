@@ -19,6 +19,7 @@ mod fake_forge;
 mod frame_meter;
 mod key_table;
 mod list_diff;
+mod look_rules;
 mod open_project;
 mod pull_card;
 mod pulls;

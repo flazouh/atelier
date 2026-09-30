@@ -562,7 +562,7 @@ impl Render for ShipStrip {
                         let this = this.clone();
                         move |_: &CommitNow, window, cx| drop(this.update(cx, |strip, cx| strip.commit(window, cx)))
                     })
-                    .mx(px(6.))
+                    .mx(px(8.))
                     .p(px(12.))
                     .rounded(radius::LG)
                     .bg(theme.card)
@@ -570,7 +570,7 @@ impl Render for ShipStrip {
                     .flex_col()
                     .gap(px(8.))
                     .child(div().text_size(TextSize::Sm.font_size()).child(whole_words(&format!("Commit what you kept, on {on}"))))
-                    .child(div().flex().flex_col().gap(px(2.)).children(lines))
+                    .child(div().flex().flex_col().gap(px(4.)).children(lines))
                     .when(self.on_default, |d| {
                         d.child(words(format!("{on} is the default branch: this commit goes on a new one").into()))
                             .child(Field::new(branch_focus.clone(), Input::new(&self.new_branch).appearance(false)).radius(radius::MD))

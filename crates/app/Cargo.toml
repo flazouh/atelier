@@ -34,3 +34,4 @@ libc = "0.2"
 [dev-dependencies]
 gpui-kit = { workspace = true, features = ["test-support"] }
 tempfile = "3"
+regex = "1"
