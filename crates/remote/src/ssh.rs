@@ -190,7 +190,28 @@ pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     let env_dir = std::env::var_os("LATHE_REMOTE_DIR").map(PathBuf::from);
     let home = std::env::var_os("HOME").map(PathBuf::from);
-    candidates(&exe, platform, env_dir.as_deref(), home.as_deref(), *platform == Platform::here()).into_iter().find(|p| p.is_file())
+    first_matching(&candidates(&exe, platform, env_dir.as_deref(), home.as_deref(), *platform == Platform::here()))
+}
+
+/// The protocol a helper binary's bytes say it speaks, from its stamp; `None` for a copy with none, as
+/// helpers built before the stamp are.
+pub fn speaks(bytes: &[u8]) -> Option<u32> {
+    const MARK: &[u8] = b"lathe-remote-protocol:";
+    let at = bytes.windows(MARK.len()).position(|w| w == MARK)? + MARK.len();
+    let digits: Vec<u8> = bytes[at..].iter().take_while(|b| b.is_ascii_digit()).copied().collect();
+    let end = bytes.get(at + digits.len())?;
+    (*end == b';').then(|| std::str::from_utf8(&digits).ok()?.parse().ok()).flatten()
+}
+
+/// The first of `candidates` that is a file and speaks this protocol: an old copy is passed over.
+pub fn first_matching(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates.iter().find(|p| std::fs::read(p).is_ok_and(|bytes| speaks(&bytes) == Some(crate::protocol::VERSION))).cloned()
+}
+
+/// What a helper answers to `--version`: its build and its protocol. The copy on a host is used only
+/// when it answers this, else the matching one goes up in its place.
+pub fn version_line() -> String {
+    format!("{VERSION} protocol {}", crate::protocol::VERSION)
 }
 
 /// What the reader reads when no copy for the host is found: what is missing, and what to do.
@@ -215,7 +236,8 @@ pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Resu
     })?;
     let bytes = std::fs::read(&local)?;
     let path = remote_binary(VERSION, &short_hash(&bytes));
-    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| v.trim() == VERSION).unwrap_or(false);
+    // A copy that answers another protocol is replaced by the one that matches, with nothing to see.
+    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| v.trim() == version_line()).unwrap_or(false);
     if has {
         return Ok(path);
     }
@@ -223,8 +245,8 @@ pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Resu
     let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
     run(host, &format!("mkdir -p {dir} && cat > {path}.part && chmod +x {path}.part && mv {path}.part {path}"), Some(&bytes))?;
     let version = run(host, &format!("{path} --version"), None)?;
-    if version.trim() != VERSION {
-        return Err(io::Error::other(format!("{host}: the uploaded lathe-remote says {:?}", version.trim())));
+    if version.trim() != version_line() {
+        return Err(io::Error::other(format!("{host}: the helper lathe put there does not start as it should")));
     }
     Ok(path)
 }

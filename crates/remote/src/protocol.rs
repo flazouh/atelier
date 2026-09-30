@@ -15,6 +15,10 @@ use serde::{Deserialize, Serialize};
 /// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`.
 pub const VERSION: u32 = 4;
 
+/// The protocol, as bytes a helper binary carries, so the app reads a copy's protocol from the file
+/// with no need to run it (it may be built for another machine). Keep it in step with [`VERSION`].
+pub const STAMP: &[u8] = b"lathe-remote-protocol:4;";
+
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
 

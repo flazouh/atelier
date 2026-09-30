@@ -48,3 +48,28 @@ fn no_helper_says_what_to_do() {
     assert!(!words.contains("LATHE_REMOTE_DIR"), "{words}");
     assert!(words.contains("tools/build-remote.sh"), "{words}");
 }
+/// A helper's protocol reads from the stamp in its bytes, with no need to run it, since it may be built
+/// for another machine.
+#[test]
+fn a_helper_says_its_protocol_in_its_bytes() {
+    assert_eq!(speaks(b"\x7fELF..lathe-remote-protocol:4;..."), Some(4));
+    assert_eq!(speaks(b"lathe-remote-protocol:12;"), Some(12));
+    assert_eq!(speaks(b"an old helper with no stamp"), None);
+    assert_eq!(crate::protocol::STAMP, format!("lathe-remote-protocol:{};", crate::protocol::VERSION).as_bytes(), "the stamp names this protocol");
+}
+/// The search skips a helper of another protocol and takes the next one that matches.
+#[test]
+fn the_search_skips_a_helper_of_another_protocol() {
+    let dir = tempfile::tempdir().unwrap();
+    let (old, new) = (dir.path().join("old"), dir.path().join("new"));
+    std::fs::write(&old, b"lathe-remote-protocol:1;").unwrap();
+    std::fs::write(&new, crate::protocol::STAMP).unwrap();
+    let missing = dir.path().join("missing");
+    assert_eq!(first_matching(&[missing, old.clone(), new.clone()]), Some(new));
+    assert_eq!(first_matching(&[old]), None);
+}
+/// What the copy on a host answers to --version, for the check before it is used.
+#[test]
+fn the_version_names_the_protocol() {
+    assert_eq!(version_line(), format!("{VERSION} protocol {}", crate::protocol::VERSION));
+}

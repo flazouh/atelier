@@ -1,9 +1,13 @@
 //! `lathe-remote --stdio`: serves the Project interface on stdin and stdout, for an app that started
 //! it over ssh. `lathe-remote --version` prints the version the app checks before it uses a copy.
 
+/// The protocol stamp, kept in the binary so the app reads it from the file.
+#[used]
+static STAMP: &[u8] = lathe_remote::protocol::STAMP;
+
 fn main() {
     match std::env::args().nth(1).as_deref() {
-        Some("--version") => println!("{}", env!("CARGO_PKG_VERSION")),
+        Some("--version") => println!("{}", lathe_remote::ssh::version_line()),
         Some("--stdio") => {
             login_path();
             if let Err(error) = lathe_remote::server::serve(std::io::stdin().lock(), std::io::stdout()) {
