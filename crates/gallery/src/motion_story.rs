@@ -57,6 +57,7 @@ fn accents() -> Vec<Swatch> {
 pub struct MotionStory {
     part: Option<String>,
     segs: [usize; 3],
+    switches: [bool; 2],
     tabs: [usize; 3],
     email: Entity<gpui_kit::component::input::InputState>,
     teams: Entity<MultiSelect>,
@@ -112,7 +113,7 @@ impl MotionStory {
         })
         .detach();
         let bloom = cx.new(|cx| BloomMenu::new("bloom", beui::bloom_menu::default_items(), cx));
-        let mut story = Self { segs: [0, 1, 1], tabs: [0, 0, 0], email: cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("you@example.com")), bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
+        let mut story = Self { segs: [0, 1, 1], switches: [true, false], tabs: [0, 0, 0], email: cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("you@example.com")), bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
         story.tick_upload("release-video".to_string(), cx);
         story
     }
@@ -486,6 +487,28 @@ impl Render for MotionStory {
                 .child(track(1, "seg-b", &["Light", "Dark", "System"], false))
                 .child(track(2, "seg-c", &["Side by side", "Single view"], true));
             parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
+        }
+        if self.shows("switch") {
+            let this = cx.entity().downgrade();
+            let one = |slot: usize, id: &'static str, label: &'static str| {
+                let this = this.clone();
+                beui::Switch::new(id, self.switches[slot]).label(label).debug_name(id).on_change(move |on, _, cx| {
+                    this.update(cx, |s, cx| {
+                        s.switches[slot] = on;
+                        cx.notify();
+                    })
+                    .ok();
+                })
+            };
+            let demo = div()
+                .flex()
+                .flex_col()
+                .items_start()
+                .gap(px(12.))
+                .child(one(0, "switch-on", "Enable notifications"))
+                .child(one(1, "switch-off", "Off"))
+                .child(beui::Switch::new("switch-disabled", true).label("Disabled").disabled(true).debug_name("switch-disabled"));
+            parts.push(if alone { demo.into_any_element() } else { section("Switch", &theme, demo) });
         }
         if self.shows("tabs") {
             let this = cx.entity().downgrade();
