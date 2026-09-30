@@ -92,6 +92,8 @@ pub struct SettingsPane {
     mode: Mode,
     /// `"default"` or the name of one of [`PRIMARIES`].
     primary: SharedString,
+    /// Which task rules move a task by themselves.
+    rules: lathe_tracker::RuleSet,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -109,7 +111,8 @@ impl SettingsPane {
             .primary
             .and_then(|bytes| PRIMARIES.iter().find(|(_, b, _)| *b == bytes))
             .map_or("default", |(name, _, _)| *name);
-        Self { focus: cx.focus_handle(), agents, mode, primary: primary.into() }
+        let rules = lathe_tracker::RuleSet::from_disabled(saved.task_rules_off.iter().map(String::as_str));
+        Self { focus: cx.focus_handle(), agents, mode, primary: primary.into(), rules }
     }
 
     fn choose_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
@@ -119,6 +122,12 @@ impl SettingsPane {
         cx.notify();
     }
 
+    fn set_rule(&mut self, rule: lathe_tracker::Rule, on: bool, cx: &mut Context<Self>) {
+        self.rules.set(rule, on);
+        let off: Vec<String> = self.rules.disabled().into_iter().map(String::from).collect();
+        save(cx, move |s| s.task_rules_off = off);
+        cx.notify();
+    }
     fn choose_primary(&mut self, name: &SharedString, cx: &mut Context<Self>) {
         let bytes = PRIMARIES.iter().find(|(n, _, _)| *n == name.as_ref()).map(|(_, b, _)| *b);
         self.primary = name.clone();
@@ -128,6 +137,15 @@ impl SettingsPane {
     }
 }
 
+/// The name a test finds a rule's switch by.
+pub(crate) fn rule_switch(rule: lathe_tracker::Rule) -> &'static str {
+    match rule {
+        lathe_tracker::Rule::SessionStartMovesToInProgress => "rule-session-start",
+        lathe_tracker::Rule::AgentFinishMovesToInReview => "rule-agent-finish",
+        lathe_tracker::Rule::MergeMovesToDone => "rule-merge",
+        lathe_tracker::Rule::SessionResumeMovesToInProgress => "rule-session-resume",
+    }
+}
 /// Keeps a change, off the UI thread.
 fn save(cx: &mut gpui_kit::App, change: impl FnOnce(&mut lathe_settings::Settings) + Send + 'static) {
     if let Some(path) = lathe_settings::path() {
@@ -257,6 +275,20 @@ impl Render for SettingsPane {
                     .child(heading("Keys"))
                     .child(div().pb(px(6.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The keys of the review. They cannot be changed yet."))
                     .children(key_rows)
+                    .child(heading("Tasks"))
+                    .child(div().pb(px(6.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("What moves a task by itself. Every move shows in its activity, and you can move it back."))
+                    .children(lathe_tracker::Rule::ALL.into_iter().map(|rule| {
+                        let pane = this.clone();
+                        row(
+                            rule.words(),
+                            beui::Switch::new(rule.id(), self.rules.is_on(rule))
+                                .debug_name(rule_switch(rule))
+                                .on_change(move |on, _, cx| {
+                                    pane.update(cx, |p, cx| p.set_rule(rule, on, cx)).ok();
+                                })
+                                .into_any_element(),
+                        )
+                    }))
                     .child(heading("Agents"))
                     .child(div().flex().flex_col().children(agent_rows))
                     .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available."))),

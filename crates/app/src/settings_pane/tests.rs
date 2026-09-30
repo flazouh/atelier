@@ -160,3 +160,18 @@ fn a_short_window_scrolls_to_the_last_agent_and_the_close_button_closes_the_pane
     click(cx, "settings-close");
     assert_eq!(closed.get(), 1, "a click on it closes the pane");
 }
+
+/// The task rules show as switches, on unless the reader turned them off, and a switch changes the set.
+#[gpui_kit::test]
+fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestAppContext) {
+    let saved = lathe_settings::Settings { task_rules_off: vec!["merge".into()], ..Default::default() };
+    let (pane, cx, _) = open(&saved, cx);
+    for rule in lathe_tracker::Rule::ALL {
+        assert!(cx.debug_bounds(super::rule_switch(rule)).is_some(), "{} has its switch", rule.id());
+    }
+    let on = |cx: &mut VisualTestContext, rule| pane.read_with(cx, |p, _| p.rules.is_on(rule));
+    assert!(on(cx, lathe_tracker::Rule::SessionStartMovesToInProgress));
+    assert!(!on(cx, lathe_tracker::Rule::MergeMovesToDone), "kept off");
+    pane.update(cx, |p, _| p.rules.set(lathe_tracker::Rule::MergeMovesToDone, true));
+    assert!(on(cx, lathe_tracker::Rule::MergeMovesToDone));
+}

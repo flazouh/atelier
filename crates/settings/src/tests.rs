@@ -97,3 +97,12 @@ fn the_open_sessions_come_back() {
     assert_eq!(back.open[0].location, here);
     assert_eq!(back.front.as_deref(), Some("s2"));
 }
+
+#[test]
+fn the_task_rules_the_reader_turned_off_are_kept_and_an_old_file_has_none() {
+    let old: Settings = serde_json::from_str("{\"theme\":\"lathe Light\"}").unwrap();
+    assert!(old.task_rules_off.is_empty(), "a file from before the rules loads");
+    let kept = Settings { task_rules_off: vec!["merge".into()], ..Settings::default() };
+    let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
+    assert_eq!(round.task_rules_off, ["merge"]);
+}
