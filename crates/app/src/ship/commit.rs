@@ -59,6 +59,11 @@ pub(crate) fn git(project: &dyn Project, args: &[&str], index: Option<&str>, std
     if let Some(index) = index {
         command.env.push(("GIT_INDEX_FILE".into(), index.into()));
     }
+    run(project, command, stdin)
+}
+
+/// Runs `command` in the project's root, as `git` does.
+pub(crate) fn run(project: &dyn Project, command: Command, stdin: Option<Vec<u8>>) -> Result<String, String> {
     let process = project.spawn(&command).map_err(|e| e.to_string())?;
     let (mut input, mut output, mut control) = (process.stdin, process.stdout, process.control);
     let feeding = std::thread::spawn(move || {

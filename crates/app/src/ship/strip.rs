@@ -26,6 +26,7 @@ use lathe_project::Project;
 use crate::ship::{
     branch,
     commit::{self, CommitError},
+    push,
     drafts, head,
     kept::{Kept, against},
 };
@@ -49,6 +50,8 @@ pub enum StripEvent {
     Committed { sha: String, paths: Vec<String> },
     /// A new branch is checked out, though the commit on it was refused.
     BranchMade,
+    /// The branch went to origin.
+    Pushed,
 }
 
 impl EventEmitter<StripEvent> for ShipStrip {}
@@ -64,6 +67,12 @@ pub enum Stage {
     /// The last commit: its words for the strip.
     Committed(SharedString),
     Failed(SharedString),
+    /// A push, or a pull and a rebase, running: its words.
+    Pushing(SharedString),
+    /// The branch is on origin: the words that say so.
+    Pushed(SharedString),
+    /// The remote has commits the branch lacks; Pull and rebase is offered.
+    Rejected,
 }
 
 /// One file as the commit takes it: its path and its rows added and removed against HEAD.
@@ -180,6 +189,68 @@ impl ShipStrip {
         cx.notify();
     }
 
+    /// Pushes the branch checked out to origin, never forced. After a rejection, the push key pulls and
+    /// rebases first.
+    pub fn push(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match self.stage {
+            Stage::Rejected => return self.pull_and_rebase(window, cx),
+            Stage::Reading | Stage::Open | Stage::Committing | Stage::Pushing(_) => return,
+            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) => {}
+        }
+        self.stage = Stage::Pushing("Pushing…".into());
+        let project = self.project.clone();
+        let pushing = cx.background_spawn(async move {
+            let branch = branch::current(project.as_ref()).ok_or(None)?;
+            push::push(project.as_ref(), &branch).map(|()| branch).map_err(Some)
+        });
+        self.work = cx.spawn_in(window, async move |this, cx| {
+            let result = pushing.await;
+            _ = this.update(cx, |strip, cx| {
+                strip.stage = match result {
+                    Ok(branch) => {
+                        cx.emit(StripEvent::Pushed);
+                        Stage::Pushed(format!("Pushed {branch} to origin").into())
+                    }
+                    Err(Some(push::PushError::Rejected)) => Stage::Rejected,
+                    Err(Some(error)) => Stage::Failed(error.to_string().into()),
+                    Err(None) => Stage::Failed("HEAD is not on a branch: check one out to push".into()),
+                };
+                cx.notify();
+            });
+        });
+        cx.notify();
+    }
+
+    /// After a rejection: pulls origin's branch, puts the commits on top, and pushes. A conflict or the
+    /// reader's other edits stop it with nothing changed.
+    pub fn pull_and_rebase(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stage != Stage::Rejected {
+            return;
+        }
+        self.stage = Stage::Pushing("Pulling, rebasing and pushing…".into());
+        let project = self.project.clone();
+        let running = cx.background_spawn(async move {
+            let branch = branch::current(project.as_ref()).ok_or_else(|| "HEAD is not on a branch".to_string())?;
+            push::pull_rebase(project.as_ref(), &branch).map_err(|e| e.to_string())?;
+            push::push(project.as_ref(), &branch).map_err(|e| e.to_string())?;
+            Ok::<_, String>(branch)
+        });
+        self.work = cx.spawn_in(window, async move |this, cx| {
+            let result = running.await;
+            _ = this.update(cx, |strip, cx| {
+                strip.stage = match result {
+                    Ok(branch) => {
+                        cx.emit(StripEvent::Pushed);
+                        Stage::Pushed(format!("Pulled, rebased and pushed {branch}").into())
+                    }
+                    Err(words) => Stage::Failed(words.into()),
+                };
+                cx.notify();
+            });
+        });
+        cx.notify();
+    }
+
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.stage = Stage::Closed;
         self.work = Task::ready(());
@@ -260,16 +331,35 @@ impl Render for ShipStrip {
         };
         let row = div().flex().items_center().gap(px(8.)).px(px(12.)).min_h(px(36.));
         match &self.stage {
-            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) => {
+            Stage::Pushing(w) => row.child(words(w.clone())).into_any_element(),
+            Stage::Rejected => {
+                let (again, cancel) = (this.clone(), this.clone());
+                row.child(div().flex_1().min_w_0().text_size(TextSize::Xs.font_size()).text_color(muted).child(push::PushError::Rejected.to_string()))
+                    .child(Button::new("ship-cancel-push").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                        _ = cancel.update(cx, |strip, cx| strip.cancel(cx));
+                    }))
+                    .child(Button::new("ship-rebase").label("Pull and rebase").variant(ButtonVariant::Secondary).command(Key::Push).on_click(
+                        move |_, window, cx| drop(again.update(cx, |strip, cx| strip.pull_and_rebase(window, cx))),
+                    ))
+                    .into_any_element()
+            }
+            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) => {
                 let said = match &self.stage {
-                    Stage::Committed(w) | Stage::Failed(w) => Some(w.clone()),
+                    Stage::Committed(w) | Stage::Failed(w) | Stage::Pushed(w) => Some(w.clone()),
                     _ => None,
                 };
                 let failed = matches!(self.stage, Stage::Failed(_));
+                let pushable = matches!(self.stage, Stage::Committed(_) | Stage::Failed(_));
                 let asks = this.clone();
+                let pushes = this.clone();
                 row.child(div().flex_1().min_w_0().children(said.map(|w| {
                     div().text_size(TextSize::Xs.font_size()).text_color(if failed { theme.danger } else { muted }).child(w)
                 })))
+                .when(pushable, |row| {
+                    row.child(Button::new("ship-push").label("Push").variant(ButtonVariant::Ghost).command(Key::Push).on_click(
+                        move |_, window, cx| drop(pushes.update(cx, |strip, cx| strip.push(window, cx))),
+                    ))
+                })
                 .child(Button::new("ship-open").label("Commit what you kept").variant(ButtonVariant::Ghost).command(Key::Commit).on_click(
                     move |_, _, cx| drop(asks.update(cx, |_, cx| cx.emit(StripEvent::WantsOpen))),
                 ))
