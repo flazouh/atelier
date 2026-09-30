@@ -83,3 +83,64 @@ fn nothing_kept_is_no_commit() {
     let (_dir, project) = repo(&[("a.txt", "a\n")]);
     assert!(matches!(commit(project.as_ref(), &[], "x"), Err(CommitError::Nothing)));
 }
+
+/// What a commit of 200 changed files costs, on a local project and, with LATHE_TEST_SSH_HOST (and
+/// LATHE_REMOTE_DIR), over ssh to that host. docs/performance.md, "Commit".
+///     cargo test --release -p lathe-app -- --ignored --nocapture commit_of_200_files
+#[test]
+#[ignore]
+fn commit_of_200_files() {
+    let files: Vec<(String, String)> = (0..200).map(|i| (format!("f{i:03}.txt"), format!("line {i}\n"))).collect();
+    let refs: Vec<(&str, &str)> = files.iter().map(|(p, t)| (p.as_str(), t.as_str())).collect();
+    let kept: Vec<Kept> = files.iter().map(|(p, _)| write(p, "changed\n")).collect();
+    let time = |project: &dyn Project, runs: usize| {
+        let mut took: Vec<f64> = (0..runs)
+            .map(|run| {
+                let kept: Vec<Kept> = kept.iter().map(|k| write(&k.path, &format!("changed {run}\n"))).collect();
+                let at = std::time::Instant::now();
+                commit(project, &kept, &format!("run {run}")).unwrap_or_else(|e| panic!("commit: {e}"));
+                at.elapsed().as_secs_f64() * 1000.
+            })
+            .collect();
+        took.sort_by(f64::total_cmp);
+        (took[took.len() / 2], took[took.len() - 1])
+    };
+    let (_dir, project) = repo(&refs);
+    let (median, worst) = time(project.as_ref(), 5);
+    println!("local, 200 files: median {median:.0} ms, worst {worst:.0} ms (5 runs)");
+    if let Ok(host) = std::env::var("LATHE_TEST_SSH_HOST") {
+        let (dir, _) = repo(&refs);
+        let remote = lathe_remote::ssh::connect(&host, &dir.path().display().to_string(), &|_| {}).unwrap_or_else(|e| panic!("no connection: {e}"));
+        let (median, worst) = time(&remote, 3);
+        println!("over ssh to {host}, 200 files: median {median:.0} ms, worst {worst:.0} ms (3 runs)");
+    }
+}
+
+/// The branch moving between the index read from HEAD and the commit (the reader committed in a
+/// terminal meanwhile) must not undo that commit: the commit is refused, and nothing changes.
+#[test]
+fn a_branch_that_moves_while_committing_refuses_the_commit() {
+    let (dir, project) = repo(&[("a.txt", "a\n"), ("b.txt", "b\n")]);
+    let moved = || {
+        std::fs::write(dir.path().join("b.txt"), "b from the terminal\n").unwrap();
+        git(dir.path(), &["commit", "-qam", "from the terminal"]);
+    };
+    match commit_with(project.as_ref(), &[write("a.txt", "A\n")], "Keep A", &moved) {
+        Err(CommitError::Moved) => {}
+        other => panic!("wrong answer: {other:?}"),
+    }
+    assert_eq!(git(dir.path(), &["log", "-1", "--format=%s"]).trim(), "from the terminal", "the terminal's commit stands");
+    assert_eq!(git(dir.path(), &["show", "HEAD:b.txt"]), "b from the terminal\n");
+    assert!(git(dir.path(), &["diff", "--cached", "--name-only"]).trim().is_empty());
+}
+
+/// A hook that says a lot on stderr (a linter over the whole tree) does not stall the commit.
+#[test]
+fn a_hook_that_writes_a_megabyte_to_stderr_does_not_stall() {
+    let (dir, project) = repo(&[("a.txt", "a\n")]);
+    let hook = dir.path().join(".git/hooks/pre-commit");
+    std::fs::write(&hook, "#!/bin/sh\nhead -c 1048576 /dev/zero | tr '\\0' x >&2\nexit 0\n").unwrap();
+    Git::new("chmod").args(["+x", hook.to_str().unwrap()]).status().unwrap();
+    commit(project.as_ref(), &[write("a.txt", "A\n")], "Keep A").unwrap();
+    assert_eq!(git(dir.path(), &["show", "HEAD:a.txt"]), "A\n");
+}

@@ -25,5 +25,11 @@ pub fn kept(file: &FileReview, merged: Option<&Merged>) -> Option<Kept> {
     }
 }
 
+/// What the commit changes in this file against its text in HEAD (`None`: not in HEAD): rows added and
+/// removed, for the list the reader sees before committing.
+pub fn against(head: Option<&str>, kept: &Kept) -> (usize, usize) {
+    Merged::diff(head.unwrap_or(""), kept.text.as_deref().unwrap_or("")).counts()
+}
+
 #[cfg(test)]
 mod tests;

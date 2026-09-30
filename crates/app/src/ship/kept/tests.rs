@@ -40,3 +40,12 @@ fn new_files_deletions_and_binaries() {
     assert_eq!(kept(&gone, Some(&all(&m, beui::Decision::Accept))), Some(Kept { path: "g.txt".into(), text: None }));
     assert_eq!(kept(&gone, None), None);
 }
+
+/// What the commit takes, against HEAD: the counts the strip lists before Commit.
+#[test]
+fn the_kept_text_counts_against_head() {
+    let kept = Kept { path: "a.txt".into(), text: Some("1\nTWO\n3\n".into()) };
+    assert_eq!(against(Some("1\n2\n3\n"), &kept), (1, 1));
+    assert_eq!(against(None, &Kept { path: "n".into(), text: Some("a\nb\n".into()) }), (2, 0));
+    assert_eq!(against(Some("g\n"), &Kept { path: "g".into(), text: None }), (0, 1));
+}
