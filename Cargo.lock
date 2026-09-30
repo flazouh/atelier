@@ -3791,6 +3791,7 @@ dependencies = [
  "lathe-remote",
  "lathe-review",
  "lathe-settings",
+ "libc",
  "lsp-types",
  "serde",
  "serde_json",

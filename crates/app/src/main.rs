@@ -11,6 +11,7 @@ mod agent_session;
 mod agents_view;
 mod dirty;
 mod editor_pane;
+mod exit_log;
 #[cfg(test)]
 mod fake_agent;
 #[cfg(test)]
@@ -34,6 +35,7 @@ mod tree;
 mod tree_view;
 
 fn main() {
+    exit_log::install();
     let started = Instant::now();
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
@@ -81,6 +83,7 @@ fn main() {
             window.on_window_should_close(cx, move |window, cx| {
                 let unsaved = asking.upgrade().map_or(0, |s| s.read(cx).unsaved(cx));
                 if unsaved == 0 {
+                    exit_log::closed();
                     return true;
                 }
                 let tabs = if unsaved == 1 { "1 tab has".to_string() } else { format!("{unsaved} tabs have") };
