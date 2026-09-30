@@ -2,12 +2,16 @@ use std::{cell::RefCell, process::Command};
 
 use super::*;
 
-/// A fresh folder for one test.
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lathe-install-{name}-{}", std::process::id()));
-    _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).unwrap();
-    dir
+thread_local! {
+    static OWNED: std::cell::RefCell<Vec<tempfile::TempDir>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A fresh folder for one test, which goes when the test thread ends.
+fn scratch(_name: &str) -> PathBuf {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_path_buf();
+    OWNED.with(|owned| owned.borrow_mut().push(dir));
+    path
 }
 
 fn leak(text: String) -> &'static str {

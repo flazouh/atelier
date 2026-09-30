@@ -74,7 +74,7 @@ pub fn ended() -> Event {
 }
 
 pub fn start(cx: &mut TestAppContext, turns: Vec<Vec<Event>>, fail_first: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
-    start_in(cx, tempfile::tempdir().unwrap().keep(), turns, fail_first)
+    start_in(cx, crate::test_dirs::path(), turns, fail_first)
 }
 
 /// The same, on a project at `dir`.
@@ -86,7 +86,7 @@ pub fn start_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, f
     });
     let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(fail_first), work: Mutex::default() });
     // Its data folder is the test's own, never this machine's.
-    let data = tempfile::tempdir().unwrap().keep();
+    let data = crate::test_dirs::path();
     let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap().with_data_dir(&data));
     let mut agent = lathe_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(fake.clone()));
@@ -114,7 +114,7 @@ impl gpui_kit::Render for Root {
 
 /// A git repository with `files` committed, for a turn's review to diff against.
 pub fn git_project(files: &[(&str, &str)]) -> PathBuf {
-    let dir = tempfile::tempdir().unwrap().keep();
+    let dir = crate::test_dirs::path();
     for (path, text) in files {
         std::fs::write(dir.join(path), text).unwrap();
     }

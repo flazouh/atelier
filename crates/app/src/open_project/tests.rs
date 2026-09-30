@@ -89,7 +89,7 @@ fn open_with<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)], before: imp
     before(dir.path());
     let root = dir.path().to_path_buf();
     let sink = Arc::new(Mutex::new(None));
-    let data = tempfile::tempdir().unwrap().keep();
+    let data = crate::test_dirs::path();
     let quiet = Arc::new(Quiet { disk: LocalProject::open(&root).unwrap().with_data_dir(&data), sink: sink.clone() });
     let mut project = None;
     let (_pane, cx) = cx.add_window_view(|window, cx| {

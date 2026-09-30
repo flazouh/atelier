@@ -86,7 +86,7 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
 /// origin's address is made a GitHub one, which names the repository, and an `insteadOf` rule sends
 /// every fetch and push back to the bare remote, so GitHub is never reached.
 pub fn pushed_branch() -> PathBuf {
-    let top = tempfile::tempdir().unwrap().keep();
+    let top = crate::test_dirs::path();
     let (bare, work) = (top.join("remote.git"), top.join("work"));
     git(&top, &["init", "-q", "--bare", "-b", "main", bare.to_str().unwrap()]);
     git(&top, &["clone", "-q", bare.to_str().unwrap(), work.to_str().unwrap()]);

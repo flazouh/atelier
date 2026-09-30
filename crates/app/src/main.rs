@@ -34,6 +34,8 @@ mod shell;
 mod ssh_form;
 mod status;
 mod tabs;
+#[cfg(test)]
+mod test_dirs;
 mod tasks;
 mod tree;
 mod tree_view;

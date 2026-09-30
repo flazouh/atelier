@@ -1,9 +1,15 @@
 use super::*;
 
-fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lathe-settings-{name}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    dir.join("settings.json")
+thread_local! {
+    static OWNED: std::cell::RefCell<Vec<tempfile::TempDir>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A settings file in a folder that goes when the test thread ends.
+fn scratch(_name: &str) -> PathBuf {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    OWNED.with(|owned| owned.borrow_mut().push(dir));
+    path
 }
 
 #[test]
