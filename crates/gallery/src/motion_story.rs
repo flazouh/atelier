@@ -83,7 +83,6 @@ impl MotionStory {
                     NotificationItem::new("sla-breach", "SLA breach").description("2m 11s · Data enrichment"),
                     NotificationItem::new("sync-fixed", "Product sync auto-fixed").description("5m · 404 on GET /products"),
                 ],
-                window,
                 cx,
             )
         });
