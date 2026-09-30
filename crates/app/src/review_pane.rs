@@ -1050,14 +1050,14 @@ impl Render for ReviewPane {
             .h_full()
             .bg(theme.card)
             .rounded(radius::LG)
-            .p(px(6.))
+            .p(px(8.))
             .child(crumbs)
             .child(header)
-            .children(what.map(|w| div().px(px(10.)).pb(px(6.)).text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(w)))
+            .children(what.map(|w| div().px(px(12.)).pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(w)))
             .child(div().flex_1().min_h_0().child(review));
         let show_tree = self.review_mode || self.width >= TREE_FROM;
         let tree = show_tree.then(|| {
-            div().flex_none().w(px(220.)).h_full().bg(theme.card).rounded(radius::LG).p(px(6.)).child(
+            div().flex_none().w(px(220.)).h_full().bg(theme.card).rounded(radius::LG).p(px(8.)).child(
                 ChangedFileTree::new("review-tree", self.changed.clone()).reveal(self.reveal.0, self.reveal.1.clone()).reviewed(reviewed).current(path).on_open(move |path, window, cx| open(path, window, cx)),
             )
         });

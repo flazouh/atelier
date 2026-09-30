@@ -1037,9 +1037,9 @@ impl Shell {
                 .id(("recent", i))
                 .flex()
                 .items_center()
-                .gap(px(10.))
+                .gap(px(8.))
                 .h(px(40.))
-                .px(px(10.))
+                .px(px(12.))
                 .rounded(radius::LG)
                 .cursor_pointer()
                 .hover(|s| s.bg(theme.muted_hover()))
@@ -1132,7 +1132,7 @@ impl Shell {
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let heading = |words: SharedString| div().px(px(14.)).pt(px(10.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(words);
+        let heading = |words: SharedString| div().px(px(12.)).pt(px(12.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(words);
         let tree = self.active().map(|p| tree_view(p, cx));
         let tree_heading: SharedString = match self.active() {
             Some(p) => format!("Files in {}", p.read(cx).name()).into(),
@@ -1279,14 +1279,14 @@ impl Shell {
         let pulls = p.pulls.as_ref().filter(|pulls| pulls.shown).map(|pulls| pulls.hub.clone());
         // The review and the pull requests draw their own cards on the page; the last one asked shows.
         let inner = match (p.front(), p.review.as_ref(), pulls) {
-            (crate::open_project::front::Front::Review, Some((pane, _)), _) => div().size_full().pt(px(6.)).child(pane.clone()),
-            (crate::open_project::front::Front::Pulls, _, Some(hub)) => div().size_full().pt(px(6.)).child(hub),
+            (crate::open_project::front::Front::Review, Some((pane, _)), _) => div().size_full().pt(px(8.)).child(pane.clone()),
+            (crate::open_project::front::Front::Pulls, _, Some(hub)) => div().size_full().pt(px(8.)).child(hub),
             (crate::open_project::front::Front::Tasks, _, _) if p.tasks.is_some() => {
-                div().size_full().pt(px(6.)).children(p.tasks.as_ref().map(|t| t.pane.clone()))
+                div().size_full().children(p.tasks.as_ref().map(|t| t.pane.clone()))
             }
-            _ => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
+            _ => div().size_full().pt(px(8.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
         };
-        div().size_full().pr(px(8.)).pb(px(2.)).child(inner).into_any_element()
+        div().size_full().pr(px(8.)).pb(px(4.)).child(inner).into_any_element()
     }
 
     fn status_line(&self, cx: &App) -> impl IntoElement {
@@ -1319,8 +1319,8 @@ impl Shell {
             .flex()
             .flex_none()
             .items_center()
-            .gap(px(14.))
-            .h(px(26.))
+            .gap(px(16.))
+            .h(px(28.))
             .px(px(12.))
             .text_size(TextSize::Xs.font_size())
             .text_color(muted)
@@ -1369,9 +1369,9 @@ impl Shell {
                 .items_center()
                 .gap(px(8.))
                 .mx(px(8.))
-                .mb(px(6.))
+                .mb(px(8.))
                 .px(px(12.))
-                .py(px(6.))
+                .py(px(8.))
                 .rounded(radius::LG)
                 .bg(theme.card_strong)
                 .text_size(TextSize::Xs.font_size())

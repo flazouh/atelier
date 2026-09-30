@@ -164,7 +164,7 @@ impl Render for SettingsPane {
         let muted = theme.muted_foreground;
         let this = cx.entity().downgrade();
 
-        let heading = |words: &'static str| div().pt(px(28.)).pb(px(6.)).text_size(TextSize::Sm.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child(words);
+        let heading = |words: &'static str| div().pt(px(28.)).pb(px(8.)).text_size(TextSize::Sm.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child(words);
         let row = |label: &'static str, control: gpui_kit::AnyElement| {
             div()
                 .flex()
@@ -256,7 +256,7 @@ impl Render for SettingsPane {
                     .py(px(48.))
                     .flex()
                     .flex_col()
-                    .child(div().text_size(px(20.)).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child("Settings"))
+                    .child(div().text_size(TextSize::Xl.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child("Settings"))
                     .child(heading("Appearance"))
                     .child(row("Theme", div().w(px(220.)).child(theme_picker("settings-theme", &theme, |picked, cx| {
                         let name = picked.name.to_string();
@@ -273,10 +273,10 @@ impl Render for SettingsPane {
                             .child(picker),
                     )
                     .child(heading("Keys"))
-                    .child(div().pb(px(6.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The keys of the review. They cannot be changed yet."))
+                    .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The keys of the review. They cannot be changed yet."))
                     .children(key_rows)
                     .child(heading("Tasks"))
-                    .child(div().pb(px(6.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("What moves a task by itself. Every move shows in its activity, and you can move it back."))
+                    .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("What moves a task by itself. Every move shows in its activity, and you can move it back."))
                     .children(lathe_tracker::Rule::ALL.into_iter().map(|rule| {
                         let pane = this.clone();
                         row(

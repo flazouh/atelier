@@ -300,7 +300,7 @@ impl Render for PullForm {
         let muted = theme.muted_foreground;
         let words = |text: SharedString| div().text_size(TextSize::Xs.font_size()).text_color(muted).child(text);
         let this = cx.entity().downgrade();
-        let card = div().mx(px(6.)).p(px(12.)).rounded(radius::LG).bg(theme.card).flex().flex_col().gap(px(8.));
+        let card = div().mx(px(8.)).p(px(12.)).rounded(radius::LG).bg(theme.card).flex().flex_col().gap(px(8.));
         match &self.stage {
             FormStage::Reading => card.child(words("Reading the branch and its bases…".into())).into_any_element(),
             FormStage::Failed(why) => card.child(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(why.clone())).into_any_element(),

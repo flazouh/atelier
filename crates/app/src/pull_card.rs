@@ -230,7 +230,7 @@ impl Render for PullCard {
         div()
             .flex()
             .flex_col()
-            .gap(px(6.))
+            .gap(px(8.))
             .child(card)
             .children(confirm)
             .children(self.said.clone().map(|w| words(w, self.said_is_refusal())))

@@ -526,7 +526,7 @@ impl Render for TasksPane {
             .child(measure)
             .child(header)
             .when_some(self.said.clone(), |d, said| {
-                d.child(div().px(px(12.)).pb(px(6.)).text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(said))
+                d.child(div().px(px(12.)).pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(said))
             })
             .child(div().flex_1().min_h_0().child(body))
             .children(dialog)
