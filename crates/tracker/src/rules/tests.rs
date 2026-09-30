@@ -218,3 +218,17 @@ mod flow {
         assert!(handle(&t, &RuleSet::default(), &signal).is_err());
     }
 }
+#[test]
+fn a_reply_in_the_session_moves_a_task_in_review_back_to_in_progress() {
+    let rules = RuleSet::default();
+    let reply = Signal::SessionResumed { session_id: "s1".into() };
+    assert_eq!(to(&rules, Status::InReview, &reply), Some(Status::InProgress));
+    for status in [Status::Backlog, Status::Todo, Status::InProgress, Status::Done, Status::Canceled] {
+        assert_eq!(to(&rules, status, &reply), None, "{status:?} stays");
+    }
+    let mut off = RuleSet::default();
+    off.set(Rule::SessionResumeMovesToInProgress, false);
+    assert_eq!(to(&off, Status::InReview, &reply), None, "the switch turns it off");
+    assert_eq!(Rule::from_id("session-resume"), Some(Rule::SessionResumeMovesToInProgress));
+    assert_eq!(off.disabled(), ["session-resume"]);
+}

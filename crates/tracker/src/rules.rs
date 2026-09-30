@@ -13,10 +13,17 @@ pub enum Rule {
     AgentFinishMovesToInReview,
     /// The pull request merging moves the task to Done.
     MergeMovesToDone,
+    /// A reply in the session of a task in review moves it back to In Progress.
+    SessionResumeMovesToInProgress,
 }
 
 impl Rule {
-    pub const ALL: [Rule; 3] = [Self::SessionStartMovesToInProgress, Self::AgentFinishMovesToInReview, Self::MergeMovesToDone];
+    pub const ALL: [Rule; 4] = [
+        Self::SessionStartMovesToInProgress,
+        Self::AgentFinishMovesToInReview,
+        Self::MergeMovesToDone,
+        Self::SessionResumeMovesToInProgress,
+    ];
 
     /// The id kept in the settings, and written in the activity log as `rule:<id>`.
     pub fn id(self) -> &'static str {
@@ -24,6 +31,7 @@ impl Rule {
             Self::SessionStartMovesToInProgress => "session-start",
             Self::AgentFinishMovesToInReview => "agent-finish",
             Self::MergeMovesToDone => "merge",
+            Self::SessionResumeMovesToInProgress => "session-resume",
         }
     }
 
@@ -37,6 +45,7 @@ impl Rule {
             Self::SessionStartMovesToInProgress => "Starting a session on a task moves it to In Progress",
             Self::AgentFinishMovesToInReview => "The agent finishing its work moves the task to In Review",
             Self::MergeMovesToDone => "Merging the pull request moves the task to Done",
+            Self::SessionResumeMovesToInProgress => "A reply in the session moves a task in review back to In Progress",
         }
     }
 }
@@ -84,6 +93,7 @@ impl RuleSet {
                 &[Status::Backlog, Status::Todo, Status::InProgress, Status::InReview],
                 Status::Done,
             ),
+            Signal::SessionResumed { .. } => (Rule::SessionResumeMovesToInProgress, &[Status::InReview], Status::InProgress),
             Signal::SessionFinished { ok: false, .. } | Signal::PrOpened { .. } => return None,
         };
         (self.is_on(rule) && from.contains(&status)).then_some(Decision { rule, to })
@@ -104,6 +114,8 @@ pub enum Signal {
     SessionStarted { task: TaskId, session: SessionLink },
     /// A session ended. `ok` is false when it failed, which moves nothing.
     SessionFinished { session_id: String, ok: bool },
+    /// The reader sent a message in a session that is linked to tasks.
+    SessionResumed { session_id: String },
     /// A pull request was opened for this task, by `by`.
     PrOpened { task: TaskId, pr: PrLink, by: String },
     /// A pull request was merged, by `by`. Every task it is linked to hears of it.
@@ -131,7 +143,7 @@ pub fn handle(tracker: &dyn Tracker, rules: &RuleSet, signal: &Signal) -> Tracke
             tracker.record(task, &Entry::PrOpened(pr.clone()), by)?;
             Ok(vec![decide_and_move(tracker, rules, task, signal)?])
         }
-        Signal::SessionFinished { session_id, .. } => tracker
+        Signal::SessionFinished { session_id, .. } | Signal::SessionResumed { session_id } => tracker
             .tasks_of_session(session_id)?
             .iter()
             .map(|task| decide_and_move(tracker, rules, task, signal))
