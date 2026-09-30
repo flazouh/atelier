@@ -33,10 +33,26 @@ fn the_default_branch_asks_for_a_new_one_and_a_bad_name_is_refused() {
     assert!(is_default(project.as_ref(), "main"));
     assert!(!is_default(project.as_ref(), "fix/lease"));
     std::fs::write(work.join("a.txt"), "changed\n").unwrap();
-    assert!(create(project.as_ref(), "bad name..").is_err());
-    create(project.as_ref(), "fix/lease").unwrap();
+    assert!(commit_on_new(project.as_ref(), "bad name..", || Ok(())).is_err());
+    commit_on_new(project.as_ref(), "fix/lease", || Ok(())).unwrap();
     assert_eq!(current(project.as_ref()).as_deref(), Some("fix/lease"));
     assert_eq!(std::fs::read_to_string(work.join("a.txt")).unwrap(), "changed\n", "the working tree comes along");
+}
+/// A commit that fails on the new branch leaves the reader on the branch they were on, and the new
+/// branch is gone; the files stay as they are.
+#[test]
+fn a_failed_commit_on_a_new_branch_changes_nothing() {
+    let (_top, work, project) = clone();
+    std::fs::write(work.join("a.txt"), "changed\n").unwrap();
+    let error = commit_on_new(project.as_ref(), "fix/lease", || Err::<(), _>("the hook said no".to_string())).unwrap_err();
+    assert_eq!(error, "the hook said no");
+    assert_eq!(current(project.as_ref()).as_deref(), Some("main"));
+    assert_eq!(git(&work, &["branch", "--list", "fix/lease"]), "");
+    assert_eq!(std::fs::read_to_string(work.join("a.txt")).unwrap(), "changed\n");
+    // A name a branch already has is refused before anything moves.
+    git(&work, &["branch", "taken"]);
+    assert!(commit_on_new(project.as_ref(), "taken", || Ok(())).is_err());
+    assert_eq!(current(project.as_ref()).as_deref(), Some("main"));
 }
 /// A drafted name that a branch already has gets the first free number.
 #[test]

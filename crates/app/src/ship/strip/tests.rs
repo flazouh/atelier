@@ -166,42 +166,36 @@ fn a_drafted_branch_name_that_is_taken_gets_a_number(cx: &mut TestAppContext) {
     });
     cx.update(|_, cx| assert_eq!(strip.read(cx).new_branch.read(cx).value().as_ref(), "fix/keep-two-2"));
 }
-/// A hook that refuses the commit keeps the card open with its words, on the branch made for it, so
-/// Commit works again once the hook agrees.
+/// A hook that refuses the commit keeps the card open with its words, and leaves the reader where
+/// they were: on their branch, with no new branch made. Commit works once the hook agrees.
 #[gpui_kit::test]
-fn a_refused_commit_keeps_the_card_open_on_the_new_branch(cx: &mut TestAppContext) {
+fn a_refused_commit_leaves_the_reader_on_their_branch(cx: &mut TestAppContext) {
     let (dir, _pane, strip, cx) = opened_strip(cx, |dir| {
         let hook = dir.join(".git/hooks/pre-commit");
         std::fs::write(&hook, "#!/bin/sh\necho 'lint: no trailing spaces' >&2\nexit 1\n").unwrap();
         assert!(Git::new("chmod").args(["+x", hook.to_str().unwrap()]).status().unwrap().success());
     });
-    let moved = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let heard = moved.clone();
-    let _sub = cx.update(|_, cx| {
-        cx.subscribe(&strip, move |_, event: &StripEvent, _| {
-            if matches!(event, StripEvent::BranchMade) {
-                heard.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            }
-        })
-    });
+    let git = |args: &[&str]| String::from_utf8(Git::new("git").args(args).current_dir(&dir).output().unwrap().stdout).unwrap();
+    let (start, head) = (git(&["rev-parse", "--abbrev-ref", "HEAD"]), git(&["rev-parse", "HEAD"]));
     cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
     cx.run_until_parked();
-    assert_eq!(moved.load(std::sync::atomic::Ordering::SeqCst), 1, "the owner hears of the new branch");
-    let git = |args: &[&str]| String::from_utf8(Git::new("git").args(args).current_dir(&dir).output().unwrap().stdout).unwrap();
     cx.update(|_, cx| {
         let s = strip.read(cx);
         assert_eq!(s.stage, Stage::Open, "the card stays open");
         let refused = s.refused.clone().unwrap_or_default();
         assert!(refused.contains("lint: no trailing spaces"), "{refused}");
-        assert!(refused.contains("fix/keep-two"), "it says the branch was made: {refused}");
-        assert!(!s.on_default, "the next try commits on the new branch");
+        assert!(s.on_default, "still on the default branch, so the next try makes the branch again");
         assert_eq!(s.message.read(cx).value().as_ref(), "Keep TWO\n\nFrom the review.", "the message stays");
+        assert_eq!(s.new_branch.read(cx).value().as_ref(), "fix/keep-two", "and the branch name");
     });
-    assert_eq!(git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(), "fix/keep-two");
+    assert_eq!(git(&["rev-parse", "--abbrev-ref", "HEAD"]), start, "the reader is where they were");
+    assert_eq!(git(&["rev-parse", "HEAD"]), head);
+    assert_eq!(git(&["branch", "--list", "fix/keep-two"]), "", "no branch was left behind");
     std::fs::remove_file(dir.join(".git/hooks/pre-commit")).unwrap();
     cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
     cx.run_until_parked();
     assert!(matches!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::Committed(_)));
+    assert_eq!(git(&["rev-parse", "--abbrev-ref", "HEAD"]).trim(), "fix/keep-two");
     assert_eq!(git(&["log", "-1", "--format=%s"]).trim(), "Keep TWO");
 }
 /// Gives `dir` a bare remote as origin, with its main pushed; the remote's path.
