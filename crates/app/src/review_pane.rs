@@ -231,7 +231,7 @@ impl ReviewPane {
                 // The strip's fields close, so the review takes the keys back: the push key reaches it.
                 this.focus.focus(window, cx);
             }
-            StripEvent::BranchMade | StripEvent::Pushed => cx.emit(PaneEvent::GitChanged),
+            StripEvent::Pushed => cx.emit(PaneEvent::GitChanged),
             StripEvent::Rewrote(moved) => this.rewrote(moved, cx),
             StripEvent::ShowPull(reference) => cx.emit(PaneEvent::ShowPull(reference.clone())),
             StripEvent::PullOpened(reference) => {

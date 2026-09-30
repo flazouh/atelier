@@ -53,8 +53,6 @@ pub enum StripEvent {
     AcceptAllAndCommit,
     /// A commit of these paths, with its full id.
     Committed { sha: String, paths: Vec<String> },
-    /// A new branch is checked out, though the commit on it was refused.
-    BranchMade,
     /// The branch went to origin.
     Pushed,
     /// A rebase gave the branch's own commits new ids: each old id with its new one.
@@ -401,12 +399,14 @@ impl ShipStrip {
         self.refused = None;
         let (project, kept) = (self.project.clone(), self.kept.clone());
         let committing = cx.background_spawn(async move {
-            // The branch made here stays made when the commit is refused after it.
-            if let Some(name) = &new_branch {
-                branch::create(project.as_ref(), name).map_err(|words| (None, words))?;
-            }
-            let done = commit::commit(project.as_ref(), &kept, &message).map_err(|e| (new_branch.clone(), e.to_string()))?;
-            Ok::<_, (Option<String>, String)>((done, branch::current(project.as_ref())))
+            // A new branch is made for the commit and goes again if the commit fails: the reader stays
+            // where they were.
+            let commit = || commit::commit(project.as_ref(), &kept, &message).map_err(|e| e.to_string());
+            let done = match &new_branch {
+                Some(name) => branch::commit_on_new(project.as_ref(), name, commit)?,
+                None => commit()?,
+            };
+            Ok::<_, String>((done, branch::current(project.as_ref())))
         });
         self.work = cx.spawn_in(window, async move |this, cx| {
             let result = committing.await;
@@ -422,16 +422,8 @@ impl ShipStrip {
                         let paths = strip.kept.iter().map(|k| k.path.clone()).collect();
                         cx.emit(StripEvent::Committed { sha: done.sha.clone(), paths });
                     }
-                    Err((made, words)) => {
+                    Err(words) => {
                         strip.stage = Stage::Open;
-                        let words = match made {
-                            Some(name) => {
-                                (strip.branch, strip.on_default) = (Some(name.clone()), false);
-                                cx.emit(StripEvent::BranchMade);
-                                format!("{}. You are on {name} now; Commit tries again there.", words.trim_end_matches('.'))
-                            }
-                            None => words,
-                        };
                         strip.refused = Some(words.into());
                     }
                 }

@@ -34,16 +34,40 @@ pub fn free(project: &dyn Project, name: &str) -> String {
     }
     (2..).map(|n| format!("{name}-{n}")).find(|candidate| !taken(candidate)).expect("some number is free")
 }
-/// Makes `name` and checks it out, keeping the working tree and the index as they are.
-pub fn create(project: &dyn Project, name: &str) -> Result<(), String> {
+/// Runs `commit` on a new branch `name` at HEAD, and leaves the reader on it. If `commit` fails, HEAD
+/// goes back to the branch it was on and the new branch goes, so a failed commit moves nothing. HEAD
+/// moves by `symbolic-ref` alone: the new branch starts at the same commit, so the index and the files
+/// stay as they are, and the commit itself runs as it would anywhere, with its hooks and its signing.
+pub fn commit_on_new<T>(project: &dyn Project, name: &str, commit: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    let git = |args: &[&str]| project.git(args).map_err(|e| e.to_string());
     let words = |out: lathe_project::GitOutput| out.stderr.trim().to_string();
-    let checked = project.git(&["check-ref-format", "--branch", name]).map_err(|e| e.to_string())?;
-    if !checked.ok() {
+    if !git(&["check-ref-format", "--branch", name])?.ok() {
         return Err(format!("{name} is not a branch name git takes"));
     }
-    let switched = project.git(&["switch", "-c", name]).map_err(|e| e.to_string())?;
-    if switched.ok() { Ok(()) } else { Err(words(switched)) }
+    let full = format!("refs/heads/{name}");
+    if git(&["rev-parse", "--verify", "-q", &full])?.ok() {
+        return Err(format!("A branch named {name} is there already"));
+    }
+    let was = current(project).ok_or_else(|| "HEAD is not on a branch: check one out to commit".to_string())?;
+    // A repository with no commit has nothing for the branch to start at: HEAD names it, unborn.
+    let born = git(&["rev-parse", "--verify", "-q", "HEAD"])?.ok();
+    if born {
+        let made = git(&["branch", name])?;
+        if !made.ok() {
+            return Err(words(made));
+        }
+    }
+    let moved = git(&["symbolic-ref", "HEAD", &full])?;
+    if !moved.ok() {
+        return Err(words(moved));
+    }
+    commit().inspect_err(|_| {
+        let back = format!("refs/heads/{was}");
+        _ = git(&["symbolic-ref", "HEAD", &back]);
+        if born {
+            _ = git(&["branch", "-D", name]);
+        }
+    })
 }
-
 #[cfg(test)]
 mod tests;
