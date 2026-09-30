@@ -87,6 +87,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                 branch: p.git.branch().cloned(),
                 sessions: open.chain(past).collect(),
                 pulls_unavailable: p.pulls_unavailable().map(SharedString::from),
+                tasks_open: p.tasks_open(),
             }
         })
         .collect()

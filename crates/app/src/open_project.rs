@@ -173,6 +173,8 @@ pub struct OpenProject {
     task_signals: Task<()>,
     /// The merged pull requests the tasks were told of in this run.
     merged_told: HashSet<u64>,
+    /// The open tasks, as the Tasks pane last counted them.
+    task_count: Option<usize>,
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
     reading_dirty: Task<()>,
@@ -228,6 +230,7 @@ impl OpenProject {
             opening_pulls: Task::ready(()),
             task_signals: Task::ready(()),
             merged_told: HashSet::new(),
+            task_count: None,
             dirty: None,
             reading_dirty: Task::ready(()),
             opening: HashSet::new(),
@@ -583,6 +586,18 @@ impl OpenProject {
         hub.update(cx, |hub, cx| hub.open(reference, window, cx));
         cx.emit(ProjectEvent::PullsShown);
         cx.notify();
+    }
+
+    /// How many tasks are open (not Done, not Canceled), once the Tasks pane has read them.
+    pub fn tasks_open(&self) -> Option<usize> {
+        self.task_count
+    }
+
+    pub(crate) fn set_task_count(&mut self, open: usize, cx: &mut Context<Self>) {
+        if self.task_count != Some(open) {
+            self.task_count = Some(open);
+            cx.emit(ProjectEvent::Sessions);
+        }
     }
 
     /// Shows the project's tasks in the right pane, or hides them. The tracker opens on the first ask.
@@ -1158,12 +1173,13 @@ pub mod front;
 mod past;
 
 /// The tracker of a project for a session's sake: the pane's if it is open. Else the project has one only if
-/// it kept a file, so a session of a project that never used tasks makes none. Blocking.
+/// it kept a store, so a session of a project that never used tasks makes none. Blocking.
 fn find_tracker(open: Option<Arc<dyn lathe_tracker::Tracker>>, project: &Arc<dyn Project>) -> Option<Arc<dyn lathe_tracker::Tracker>> {
     if open.is_some() {
         return open;
     }
-    let kept = project.data_path().is_some_and(|dir| dir.join(lathe_project::TRACKER_FILE).exists());
+    // The data folder says whether the project kept a store, on this machine or on its host.
+    let kept = project.data_list("").is_ok_and(|entries| entries.iter().any(|e| e.path == lathe_project::TRACKER_FILE));
     if kept { project.tracker().ok() } else { None }
 }
 #[cfg(test)]

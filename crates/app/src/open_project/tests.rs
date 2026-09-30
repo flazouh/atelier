@@ -48,6 +48,9 @@ impl Project for Quiet {
     fn tracker(&self) -> lathe_tracker::TrackerResult<Arc<dyn lathe_tracker::Tracker>> {
         self.disk.tracker()
     }
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<lathe_project::DataEntry>> {
+        self.disk.data_list(prefix)
+    }
 }
 
 /// Tells the project `paths` changed, as its watch would.
@@ -517,4 +520,49 @@ fn a_session_opened_again_finds_its_task(cx: &mut TestAppContext) {
     cx.run_until_parked();
     let found = cx.update(|_, cx| session.read(cx).task.clone());
     assert_eq!(found.map(|t| t.key.to_string()), Some(task.key));
+}
+
+/// The sidebar hears how many tasks are open: a closed task does not count.
+#[gpui_kit::test]
+fn the_project_counts_its_open_tasks(cx: &mut TestAppContext) {
+    use lathe_tracker::{NewTask, Patch, Status};
+    let (_dir, project, _, cx) = open(cx, &[]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| project.read(cx).tasks_open()), Some(0));
+    let (pane, tracker) = cx.update(|_, cx| {
+        let slot = project.read(cx).tasks.as_ref().unwrap();
+        (slot.pane.clone(), slot.pane.read(cx).tracker().unwrap())
+    });
+    let a = tracker.create(&NewTask::titled("A"), "me").unwrap();
+    tracker.create(&NewTask::titled("B"), "me").unwrap();
+    cx.update(|_, cx| pane.update(cx, |p, cx| p.reload(cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| project.read(cx).tasks_open()), Some(2));
+    tracker.update(&a.id, &Patch::status(Status::Done), "me").unwrap();
+    cx.update(|_, cx| pane.update(cx, |p, cx| p.reload(cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| project.read(cx).tasks_open()), Some(1));
+}
+
+/// The session tells its task whether or not the Tasks pane is open: the tracker is found from the project.
+#[gpui_kit::test]
+fn a_session_tells_its_task_while_the_tasks_pane_is_closed(cx: &mut TestAppContext) {
+    use lathe_tracker::{NewTask, Status};
+    let (_dir, project, _, cx) = open(cx, &[]);
+    let (agent, _) = crate::fake_agent::scripted_agent("Fake", vec![vec![crate::fake_agent::ended()], vec![]]);
+    cx.update(|_, cx| project.update(cx, |p, _| p.agent = agent));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    cx.run_until_parked();
+    let tracker = cx.update(|_, cx| project.read(cx).tasks.as_ref().unwrap().pane.read(cx).tracker().unwrap());
+    let task = tracker.create(&NewTask::titled("Work"), "me").unwrap();
+    cx.update(|window, cx| project.update(cx, |p, cx| p.start_from_task(task.id.clone(), window, cx)));
+    cx.run_until_parked();
+    assert_eq!(tracker.get(&task.id).unwrap().unwrap().status, Status::InReview);
+    // The pane goes (a window that never opened it after a restart is the same): the reply still reaches the task.
+    cx.update(|_, cx| project.update(cx, |p, _| p.tasks = None));
+    let session = cx.update(|_, cx| project.read(cx).sessions[0].clone());
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("more".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(tracker.get(&task.id).unwrap().unwrap().status, Status::InProgress);
 }

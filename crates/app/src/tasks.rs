@@ -47,6 +47,9 @@ impl Slot {
         });
         let _events = cx.subscribe_in(&pane, window, |this: &mut OpenProject, _, event: &TasksEvent, window, cx| match event {
             TasksEvent::Start(id) => this.start_from_task(id.clone(), window, cx),
+            TasksEvent::Counted(open) => {
+                this.set_task_count(*open, cx);
+            }
         });
         Self { pane, shown: true, _events }
     }

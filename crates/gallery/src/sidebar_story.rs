@@ -34,6 +34,7 @@ fn sample(other: &AgentLook) -> Vec<ProjectData> {
         connection: Connection::Connected,
         branch: Some("main".into()),
         pulls_unavailable: None,
+        tasks_open: None,
         sessions: vec![
             session("l1", "Add the sidebar and the agent panels", &claude, SessionStatus::Working, 0),
             session("l2", "Why does the diff layout miss 120Hz on the Mac?", &claude, SessionStatus::NeedsYou(Need::Approval), 3),
@@ -53,6 +54,7 @@ fn sample(other: &AgentLook) -> Vec<ProjectData> {
         connection: Connection::Connected,
         branch: Some("feature/tokens".into()),
         pulls_unavailable: None,
+        tasks_open: None,
         sessions: vec![
             session("a1", "Which endpoints still return 500?", &claude, SessionStatus::NeedsYou(Need::Question), 1),
             session("a2", "Migrate the sessions table", &claude, SessionStatus::Finished, 25),
@@ -66,6 +68,7 @@ fn sample(other: &AgentLook) -> Vec<ProjectData> {
         connection: Connection::Reconnecting,
         branch: None,
         pulls_unavailable: None,
+        tasks_open: None,
         sessions: vec![],
     };
     vec![lathe, api, infra]
@@ -82,6 +85,7 @@ fn big(projects: usize, sessions: usize) -> Vec<ProjectData> {
             connection: Connection::Connected,
             branch: Some("main".into()),
             pulls_unavailable: None,
+        tasks_open: None,
             sessions: (0..sessions)
                 .map(|s| {
                     let status = match s % 9 {

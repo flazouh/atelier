@@ -41,6 +41,8 @@ enum Load {
 pub enum TasksEvent {
     /// The reader asked for a session for this task.
     Start(TaskId),
+    /// The tasks were read: this many are open (not Done, not Canceled).
+    Counted(usize),
 }
 
 pub struct TasksPane {
@@ -273,6 +275,8 @@ impl TasksPane {
                     .collect();
                 self.labels = labels.iter().map(|l| map::label_of(l)).collect();
                 self.load = Load::Ready;
+                let open = self.tasks.iter().filter(|t| !matches!(t.status, beui::task_model::TaskStatus::Done | beui::task_model::TaskStatus::Canceled)).count();
+                cx.emit(TasksEvent::Counted(open));
                 let (people, labels) = (self.people.clone(), self.labels.clone());
                 self.dialog.update(cx, |d, _| d.set_people(people, labels));
                 self.push_all(Source::None, cx);
