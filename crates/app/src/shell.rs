@@ -49,7 +49,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings]);
+actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -60,6 +60,7 @@ pub fn bind_keys(cx: &mut App) {
     crate::ship::pull_form::bind_keys(cx);
     cx.bind_keys([
         KeyBinding::new("secondary-o", OpenFolder, None),
+        KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("secondary-shift-o", OpenRemote, None),
         KeyBinding::new("secondary-shift-O", OpenRemote, None),
         KeyBinding::new("secondary-s", Save, None),
@@ -699,6 +700,32 @@ impl Shell {
     }
 
     /// Tabs with unsaved edits, across every project in the window.
+    /// ⌘Q (Control-Q elsewhere): the app ends, after asking when a tab holds unsaved edits.
+    fn quit(&mut self, _: &Quit, window: &mut Window, cx: &mut Context<Self>) {
+        let unsaved = self.unsaved(cx);
+        if unsaved == 0 {
+            crate::exit_log::quit();
+            return cx.quit();
+        }
+        let tabs = if unsaved == 1 { "1 tab has".to_string() } else { format!("{unsaved} tabs have") };
+        let answer = window.prompt(
+            gpui_kit::PromptLevel::Warning,
+            &format!("{tabs} unsaved changes."),
+            Some("They are lost if you quit."),
+            &["Quit Anyway", "Cancel"],
+            cx,
+        );
+        cx.spawn(async move |_, cx| {
+            if answer.await == Ok(0) {
+                cx.update(|cx| {
+                    crate::exit_log::quit();
+                    cx.quit();
+                });
+            }
+        })
+        .detach();
+    }
+
     pub fn unsaved(&self, cx: &App) -> usize {
         self.projects.iter().map(|p| p.read(cx).unsaved()).sum()
     }
@@ -1283,6 +1310,7 @@ impl Shell {
             .key_context("Shell")
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::open_folder))
+            .on_action(cx.listener(Self::quit))
             .on_action(cx.listener(Self::open_ssh_form))
             .on_action(cx.listener(Self::open_settings))
             .on_action(cx.listener(Self::new_session_key))
@@ -1366,3 +1394,4 @@ enum Edge {
 
 #[cfg(test)]
 mod tests;
+

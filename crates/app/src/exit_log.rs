@@ -31,6 +31,11 @@ pub fn closed() {
     eprintln!("exit: the window closed");
 }
 
+/// The reader quit.
+pub fn quit() {
+    eprintln!("exit: Quit");
+}
+
 /// The last window is gone: the app ends.
 pub fn last_window_closed() {
     eprintln!("exit: last window closed");
