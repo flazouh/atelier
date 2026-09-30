@@ -136,3 +136,11 @@ pub fn fake_agent(name: &'static str) -> lathe_agents::registry::Agent {
     agent.name = name;
     agent
 }
+/// An agent named `name` on a fake backend that plays `turns`, one for each message, and that backend.
+pub fn scripted_agent(name: &'static str, turns: Vec<Vec<Event>>) -> (lathe_agents::registry::Agent, Arc<Fake>) {
+    let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(false), work: Mutex::default() });
+    let mut agent = lathe_agents::registry::agents().remove(0);
+    agent.backend = Arc::new(FakeBackend(fake.clone()));
+    agent.name = name;
+    (agent, fake)
+}

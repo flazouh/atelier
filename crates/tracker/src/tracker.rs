@@ -1,5 +1,12 @@
 //! The interface to a tracker. Every call blocks and may be slow, so none is made on the UI thread.
-use std::sync::mpsc::Receiver;
+use std::{
+    ops::Deref,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::Receiver,
+    },
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +38,46 @@ impl std::fmt::Display for TrackerError {
 impl std::error::Error for TrackerError {}
 
 pub type TrackerResult<T> = Result<T, TrackerError>;
+
+/// The changes a [`Tracker`] tells, until this is dropped. It reads as the receiver it holds
+/// (`recv`, `recv_timeout`, `try_recv`). Dropping it tells the tracker to stop: a backend that polls a
+/// service stops the poll at its next tick, and reads nothing after it.
+pub struct Subscription {
+    events: Receiver<Event>,
+    stop: Arc<AtomicBool>,
+}
+
+/// What the tracker keeps of a [`Subscription`]: it says whether the reader is gone.
+#[derive(Clone, Debug)]
+pub struct StopFlag(Arc<AtomicBool>);
+
+impl StopFlag {
+    /// The subscription was dropped: send nothing more and read nothing more for it.
+    pub fn is_stopped(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
+}
+
+impl Subscription {
+    /// The reader's end, and the flag for the backend that sends to `events`.
+    pub fn new(events: Receiver<Event>) -> (Self, StopFlag) {
+        let stop = Arc::new(AtomicBool::new(false));
+        (Self { events, stop: stop.clone() }, StopFlag(stop))
+    }
+}
+
+impl Deref for Subscription {
+    type Target = Receiver<Event>;
+    fn deref(&self) -> &Receiver<Event> {
+        &self.events
+    }
+}
+
+impl Drop for Subscription {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+    }
+}
 
 /// The tasks of one project. `by` is who acts, for the activity log: a person's name, an agent's name, or
 /// `rule:<id>` for the automation.
@@ -71,5 +118,5 @@ pub trait Tracker: Send + Sync {
     /// Changes made through this tracker from now on. Each call gives its own receiver; drop it to stop.
     /// A change made by another process, or on the service a backend syncs with, arrives here too when the
     /// backend can tell.
-    fn subscribe(&self) -> Receiver<Event>;
+    fn subscribe(&self) -> Subscription;
 }

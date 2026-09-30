@@ -45,6 +45,8 @@ pub enum TasksEvent {
 
 pub struct TasksPane {
     tracker: Result<Arc<dyn Tracker>, SharedString>,
+    /// Hears of changes made elsewhere while the pane lives.
+    _watch: Option<gpui_kit::Task<()>>,
     me: SharedString,
     agents: Vec<(SharedString, AgentLook)>,
     people: Vec<Assignee>,
@@ -86,10 +88,9 @@ enum Source {
 }
 
 impl TasksPane {
-    /// `tracker` is the project's, or the words that say why it has none. `agents` are the agents that can
-    /// be assigned, with their looks.
+    /// The pane, before its tracker: see [`Self::open_from`]. `agents` are the agents that can be
+    /// assigned, with their looks.
     pub fn new(
-        tracker: Result<Arc<dyn Tracker>, SharedString>,
         me: impl Into<SharedString>,
         agents: Vec<(SharedString, AgentLook)>,
         window: &mut Window,
@@ -129,8 +130,9 @@ impl TasksPane {
             NewTaskEvent::Cancel => this.close_dialog(window, cx),
             NewTaskEvent::Create { draft, start_session } => this.create(draft, *start_session, window, cx),
         }));
-        let mut pane = Self {
-            tracker,
+        Self {
+            tracker: Err(SharedString::default()),
+            _watch: None,
             me,
             agents,
             people,
@@ -148,12 +150,73 @@ impl TasksPane {
             dialog,
             focus: cx.focus_handle(),
             _subscriptions: subscriptions,
-        };
-        match &pane.tracker {
-            Ok(_) => pane.reload(cx),
-            Err(why) => pane.load = Load::Failed(why.clone()),
         }
-        pane
+    }
+
+    /// Opens the project's tracker, off the UI thread (a project over SSH asks its host), and shows the
+    /// tasks when it is open.
+    pub fn open_from(&mut self, project: Arc<dyn lathe_project::Project>, cx: &mut Context<Self>) {
+        let opening = cx.background_spawn(async move { project.tracker() });
+        cx.spawn(async move |this, cx| {
+            let opened = opening.await.map_err(|error| SharedString::from(error.to_string()));
+            this.update(cx, |pane, cx| pane.attach(opened, cx)).ok();
+        })
+        .detach();
+    }
+
+    /// Gives the pane its tracker, or the words that say why it has none.
+    pub fn attach(&mut self, tracker: Result<Arc<dyn Tracker>, SharedString>, cx: &mut Context<Self>) {
+        match &tracker {
+            Ok(tracker) => {
+                // The watch wakes the pane from its own thread, which the test scheduler rejects; the
+                // subscription itself is tested in lathe-tracker and lathe-remote.
+                if !cfg!(test) {
+                    self._watch = Some(Self::watch(tracker.clone(), cx));
+                }
+                self.tracker = Ok(tracker.clone());
+                self.reload(cx);
+            }
+            Err(why) => {
+                self.load = Load::Failed(why.clone());
+                self.tracker = Err(why.clone());
+                cx.notify();
+            }
+        }
+    }
+
+    /// Reads the tasks again when a change is made elsewhere, for as long as the pane lives. The
+    /// subscription is dropped with the pane, and that stops a remote poll.
+    fn watch(tracker: Arc<dyn Tracker>, cx: &mut Context<Self>) -> gpui_kit::Task<()> {
+        use futures_util::StreamExt as _;
+        let subscription = tracker.subscribe();
+        let (told, mut heard) = futures_channel::mpsc::unbounded::<()>();
+        std::thread::spawn(move || {
+            while !told.is_closed() {
+                match subscription.recv_timeout(std::time::Duration::from_millis(500)) {
+                    Ok(_) => {
+                        if told.unbounded_send(()).is_err() {
+                            break;
+                        }
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+            }
+        });
+        cx.spawn(async move |this, cx| {
+            while heard.next().await.is_some() {
+                // A burst of changes is one reading.
+                while heard.try_recv().is_ok() {}
+                if this.update(cx, |pane, cx| pane.reload(cx)).is_err() {
+                    break;
+                }
+            }
+        })
+    }
+
+    /// The tracker the pane reads and writes, when the project has one.
+    pub fn tracker(&self) -> Option<Arc<dyn Tracker>> {
+        self.tracker.as_ref().ok().cloned()
     }
 
     #[cfg(test)]

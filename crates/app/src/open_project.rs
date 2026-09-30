@@ -116,6 +116,8 @@ pub enum ProjectEvent {
     Open(String),
     /// The pull requests came on screen: the shell shows the right pane.
     PullsShown,
+    /// A session the project opened for a task: the shell puts it in front.
+    ShowSession(Entity<AgentSession>),
     /// The tasks came on screen: the shell shows the right pane.
     TasksShown,
     /// The review closed: the editor is back.
@@ -167,6 +169,8 @@ pub struct OpenProject {
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
     chip_forge: Option<std::sync::Arc<dyn lathe_forge::Forge>>,
     opening_pulls: Task<()>,
+    /// The tasks hearing of sessions, one at a time and in order.
+    task_signals: Task<()>,
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
     reading_dirty: Task<()>,
@@ -220,6 +224,7 @@ impl OpenProject {
             asked: HashMap::new(),
             chip_forge: None,
             opening_pulls: Task::ready(()),
+            task_signals: Task::ready(()),
             dirty: None,
             reading_dirty: Task::ready(()),
             opening: HashSet::new(),
@@ -304,6 +309,13 @@ impl OpenProject {
                 SessionEvent::Changed => {}
                 SessionEvent::OpenPull(chip) => return this.open_pull(chip, window, cx),
                 SessionEvent::ShowPull(reference) => return this.show_pull(reference.clone(), window, cx),
+                SessionEvent::Task(event) => return this.task_event(session, *event, cx),
+                SessionEvent::OpenTask => {
+                    if let Some(task) = session.read(cx).task.clone() {
+                        this.show_task(task.id, window, cx);
+                    }
+                    return;
+                }
                 SessionEvent::TextSettled => {
                     let texts = session.read(cx).agent_texts();
                     return this.look_up_chips(texts, cx);
@@ -576,10 +588,107 @@ impl OpenProject {
             }
             return cx.notify();
         }
-        let tracker = crate::tasks::store::open(&self.location, self.project.as_ref(), &self.name());
-        self.tasks = Some(crate::tasks::Slot::new(tracker, window, cx));
+        self.tasks = Some(crate::tasks::Slot::new(self.project.clone(), window, cx));
         self.right_asked = front::Front::Tasks;
         cx.emit(ProjectEvent::TasksShown);
+        cx.notify();
+    }
+
+    /// Tells the tasks a session is linked to what happened in it, and lets the rules move them.
+    fn task_event(&mut self, session: &Entity<AgentSession>, event: crate::tasks::signal::TaskEvent, cx: &mut Context<Self>) {
+        let s = session.read(cx);
+        let Some(id) = s.id.as_ref().map(|id| id.as_str().to_string()) else { return };
+        let (title, agent) = (s.shown_title().to_string(), s.agent.name);
+        let signal = crate::tasks::signal::of(event, s.task.as_ref(), &crate::tasks::signal::SessionRef { id: &id, title: &title, agent });
+        let Some(signal) = signal else { return };
+        // The tracker of the pane if it is open. Else the project has one only if it kept a file: a session of
+        // a project that never used tasks makes none.
+        let (open, project) = (self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()), self.project.clone());
+        // One signal after the other: a turn that ends must find the link the start wrote.
+        let previous = std::mem::replace(&mut self.task_signals, Task::ready(()));
+        self.task_signals = cx.spawn(async move |this, cx| {
+            previous.await;
+            let handled = cx
+                .background_spawn(async move {
+                    let tracker = match open {
+                        Some(tracker) => tracker,
+                        None => {
+                            let kept = project.data_path().is_some_and(|dir| dir.join(lathe_project::TRACKER_FILE).exists());
+                            if !kept {
+                                return Ok(Vec::new());
+                            }
+                            project.tracker()?
+                        }
+                    };
+                    lathe_tracker::handle(tracker.as_ref(), &crate::tasks::rules(), &signal)
+                })
+                .await;
+            this.update(cx, |this, cx| {
+                if let Err(error) = handled {
+                    cx.emit(ProjectEvent::Said(format!("Could not update the task: {error}").into()));
+                }
+                if let Some(slot) = &this.tasks {
+                    slot.pane.update(cx, |pane, cx| pane.reload(cx));
+                }
+            })
+            .ok();
+        });
+    }
+
+    /// Starts a session for a task: the task gets the project's agent if it has no assignee, the session
+    /// opens with the task as its first message, and the two are linked when the agent says its id.
+    pub fn start_from_task(&mut self, id: lathe_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(tracker) = self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()) else { return };
+        let agent = self.agent.name.to_string();
+        let reading = cx.background_spawn(async move {
+            let task = tracker.get(&id)?.ok_or_else(|| lathe_tracker::TrackerError::NotFound(id.clone()))?;
+            if task.assignee.is_some() {
+                return lathe_tracker::TrackerResult::Ok(task);
+            }
+            let patch = lathe_tracker::Patch { assignee: Some(Some(lathe_tracker::Assignee::Agent(agent))), ..Default::default() };
+            tracker.update(&id, &patch, "lathe")
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let result = reading.await;
+            this.update_in(cx, |this, window, cx| match result {
+                Ok(task) => this.begin_session_for(task, window, cx),
+                Err(error) => cx.emit(ProjectEvent::Said(format!("Could not start a session: {error}").into())),
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn begin_session_for(&mut self, task: lathe_tracker::Task, window: &mut Window, cx: &mut Context<Self>) {
+        let session = self.open_session(None, window, cx);
+        let text = crate::tasks::map::first_message(&task);
+        let reference = crate::tasks::TaskRef { id: task.id.clone(), key: task.key.clone().into() };
+        session.update(cx, |s, cx| {
+            s.task = Some(reference);
+            s.send(text, cx);
+        });
+        if let Some(slot) = &self.tasks {
+            slot.pane.update(cx, |pane, cx| pane.reload(cx));
+        }
+        cx.emit(ProjectEvent::ShowSession(session));
+    }
+
+    /// Shows one task in the Tasks pane, opening the pane first when it is not there.
+    pub fn show_task(&mut self, id: lathe_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
+        if self.tasks.as_ref().is_none_or(|t| !t.shown) || self.front() != front::Front::Tasks {
+            if self.tasks.is_some() {
+                self.right_asked = front::Front::Tasks;
+                if let Some(slot) = &mut self.tasks {
+                    slot.shown = true;
+                }
+                cx.emit(ProjectEvent::TasksShown);
+            } else {
+                self.toggle_tasks(window, cx);
+            }
+        }
+        if let Some(slot) = &self.tasks {
+            slot.pane.update(cx, |pane, cx| pane.show(id.0.into(), window, cx));
+        }
         cx.notify();
     }
 

@@ -214,6 +214,8 @@ pub enum Entry {
     SessionStarted(SessionLink),
     PrOpened(PrLink),
     PrMerged(PrLink),
+    /// A commit the session made. It links nothing.
+    Commit { sha: String, subject: String },
 }
 
 /// One line of the append-only log. `by` is a name, or `rule:<id>` for the automation.
@@ -237,6 +239,7 @@ pub enum ActivityKind {
     SessionStarted { session: SessionLink },
     PrOpened { pr: PrLink },
     PrMerged { pr: PrLink },
+    Commit { sha: String, subject: String },
 }
 
 /// A change, told to whoever subscribed.

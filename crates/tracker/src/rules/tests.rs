@@ -218,3 +218,34 @@ mod flow {
         assert!(handle(&t, &RuleSet::default(), &signal).is_err());
     }
 }
+#[test]
+fn a_reply_in_the_session_moves_a_task_in_review_back_to_in_progress() {
+    let rules = RuleSet::default();
+    let reply = Signal::SessionResumed { session_id: "s1".into() };
+    assert_eq!(to(&rules, Status::InReview, &reply), Some(Status::InProgress));
+    for status in [Status::Backlog, Status::Todo, Status::InProgress, Status::Done, Status::Canceled] {
+        assert_eq!(to(&rules, status, &reply), None, "{status:?} stays");
+    }
+    let mut off = RuleSet::default();
+    off.set(Rule::SessionResumeMovesToInProgress, false);
+    assert_eq!(to(&off, Status::InReview, &reply), None, "the switch turns it off");
+    assert_eq!(Rule::from_id("session-resume"), Some(Rule::SessionResumeMovesToInProgress));
+    assert_eq!(off.disabled(), ["session-resume"]);
+}
+#[test]
+fn a_commit_moves_no_task_and_is_logged_on_the_tasks_of_the_session() {
+    use crate::{ActivityKind, LocalTracker, NewTask, Tracker};
+    let rules = RuleSet::default();
+    let commit = Signal::Committed { session_id: "s1".into(), sha: "abc1234".into(), subject: "Fix it".into(), by: "me".into() };
+    for status in Status::ALL {
+        assert_eq!(to(&rules, status, &commit), None, "{status:?}");
+    }
+    let t = LocalTracker::in_memory("LAT").unwrap();
+    let task = t.create(&NewTask::titled("A"), "me").unwrap();
+    let link = SessionLink { session_id: "s1".into(), title: "x".into(), agent: "Claude".into() };
+    super::handle(&t, &rules, &Signal::SessionStarted { task: task.id.clone(), session: link }).unwrap();
+    super::handle(&t, &rules, &commit).unwrap();
+    let log = t.activity(&task.id).unwrap();
+    assert!(log.iter().any(|a| a.kind == ActivityKind::Commit { sha: "abc1234".into(), subject: "Fix it".into() }));
+    assert_eq!(t.get(&task.id).unwrap().unwrap().status, Status::InProgress, "the start moved it, the commit did not");
+}

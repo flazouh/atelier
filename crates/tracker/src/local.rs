@@ -6,7 +6,7 @@ use std::{
     path::Path,
     sync::{
         Mutex,
-        mpsc::{Receiver, Sender, channel},
+        mpsc::{Sender, channel},
     },
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -15,7 +15,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params, params_from_i
 
 use crate::{
     Activity, ActivityKind, Assignee, Entry, Event, NewTask, Patch, PrLink, Priority, ProjectKey, Query, SessionLink, Status,
-    Task, TaskId, Tracker, TrackerError, TrackerResult, prefix_for,
+    StopFlag, Subscription, Task, TaskId, Tracker, TrackerError, TrackerResult, prefix_for,
 };
 
 mod migrations;
@@ -36,7 +36,7 @@ pub struct LocalTracker {
     conn: Mutex<Connection>,
     prefix: String,
     clock: Box<dyn Fn() -> i64 + Send + Sync>,
-    subscribers: Mutex<Vec<Sender<Event>>>,
+    subscribers: Mutex<Vec<(Sender<Event>, StopFlag)>>,
 }
 
 impl LocalTracker {
@@ -107,7 +107,7 @@ impl LocalTracker {
     fn emit(&self, events: Vec<Event>) {
         if let Ok(mut subscribers) = self.subscribers.lock() {
             for event in events {
-                subscribers.retain(|s| s.send(event.clone()).is_ok());
+                subscribers.retain(|(send, stop)| !stop.is_stopped() && send.send(event.clone()).is_ok());
             }
         }
     }
@@ -465,6 +465,7 @@ impl Tracker for LocalTracker {
             Entry::SessionStarted(session) => ActivityKind::SessionStarted { session: session.clone() },
             Entry::PrOpened(pr) => ActivityKind::PrOpened { pr: pr.clone() },
             Entry::PrMerged(pr) => ActivityKind::PrMerged { pr: pr.clone() },
+            Entry::Commit { sha, subject } => ActivityKind::Commit { sha: sha.clone(), subject: subject.clone() },
         };
         let mut conn = self.conn()?;
         let exists: bool = conn.query_row("SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1)", [row], |r| r.get(0))?;
@@ -481,7 +482,7 @@ impl Tracker for LocalTracker {
                 tx.prepare_cached("INSERT OR IGNORE INTO pr_links (task, number, repo) VALUES (?1, ?2, ?3)")?
                     .execute(params![row, pr.number as i64, pr.repo])?;
             }
-            Entry::Comment(_) => {}
+            Entry::Comment(_) | Entry::Commit { .. } => {}
         }
         tx.prepare_cached("UPDATE tasks SET updated_at = ?2 WHERE id = ?1")?.execute(params![row, at])?;
         let activity = log(&tx, row, at, by, &kind)?;
@@ -526,12 +527,14 @@ impl Tracker for LocalTracker {
         Ok(stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?)
     }
 
-    fn subscribe(&self) -> Receiver<Event> {
+    fn subscribe(&self) -> Subscription {
         let (send, receive) = channel();
+        let (subscription, stop) = Subscription::new(receive);
         if let Ok(mut subscribers) = self.subscribers.lock() {
-            subscribers.push(send);
+            subscribers.retain(|(_, stop)| !stop.is_stopped());
+            subscribers.push((send, stop));
         }
-        receive
+        subscription
     }
 }
 

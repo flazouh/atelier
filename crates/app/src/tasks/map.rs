@@ -97,6 +97,12 @@ fn activity_of(line: &tracker::Activity) -> Option<Activity> {
         tracker::ActivityKind::SessionStarted { session } => Activity::SessionStarted { agent: session.agent.clone().into(), at },
         tracker::ActivityKind::PrOpened { pr } => Activity::PrOpened { number: pr.number, at },
         tracker::ActivityKind::PrMerged { pr } => Activity::PrMerged { number: pr.number, at },
+        tracker::ActivityKind::Commit { sha, subject } => Activity::Committed {
+            by,
+            sha: sha.chars().take(7).collect::<String>().into(),
+            subject: subject.clone().into(),
+            at,
+        },
         // Assignments and other edits have no line in the task view yet.
         tracker::ActivityKind::Assigned { .. } | tracker::ActivityKind::Edited { .. } => return None,
     })
@@ -173,7 +179,6 @@ pub fn new_task_of(draft: &beui::new_task_model::Draft) -> tracker::NewTask {
 
 /// The first message of a session started from `task`: the key and title, the description, and the
 /// name of the task, so the agent can say which task it works on.
-#[cfg_attr(not(test), allow(dead_code))] // used by the session start (M6a T2)
 pub fn first_message(task: &tracker::Task) -> String {
     let mut text = format!("{}: {}", task.key, task.title);
     if !task.description.trim().is_empty() {

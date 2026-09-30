@@ -42,6 +42,12 @@ impl Project for Quiet {
     fn git(&self, args: &[&str]) -> io::Result<GitOutput> {
         self.disk.git(args)
     }
+    fn data_path(&self) -> Option<std::path::PathBuf> {
+        self.disk.data_path()
+    }
+    fn tracker(&self) -> lathe_tracker::TrackerResult<Arc<dyn lathe_tracker::Tracker>> {
+        self.disk.tracker()
+    }
 }
 
 /// Tells the project `paths` changed, as its watch would.
@@ -80,7 +86,8 @@ fn open_with<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)], before: imp
     before(dir.path());
     let root = dir.path().to_path_buf();
     let sink = Arc::new(Mutex::new(None));
-    let quiet = Arc::new(Quiet { disk: LocalProject::open(&root).unwrap(), sink: sink.clone() });
+    let data = tempfile::tempdir().unwrap().keep();
+    let quiet = Arc::new(Quiet { disk: LocalProject::open(&root).unwrap().with_data_dir(&data), sink: sink.clone() });
     let mut project = None;
     let (_pane, cx) = cx.add_window_view(|window, cx| {
         let p = cx.new(|cx| OpenProject::new(Location::Local { path: root.clone() }, quiet, window, cx));
@@ -431,4 +438,42 @@ fn the_tasks_take_the_right_pane_and_give_it_back(cx: &mut TestAppContext) {
     assert_eq!(project.read_with(cx, |p, _| p.front()), front::Front::Tasks);
     cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
     assert_eq!(project.read_with(cx, |p, _| p.front()), front::Front::Editor);
+}
+
+/// A session started from a task: it opens with the task as its first message, the task takes the agent, and
+/// the rules move it as the session goes: In Progress at the start, In Review when a turn ends well, and back
+/// to In Progress on a reply.
+#[gpui_kit::test]
+fn a_session_started_from_a_task_moves_it_along(cx: &mut TestAppContext) {
+    use lathe_tracker::{NewTask, Status};
+    let (_dir, project, _, cx) = open(cx, &[]);
+    let (agent, fake) = crate::fake_agent::scripted_agent("Fake", vec![vec![crate::fake_agent::ended()], vec![]]);
+    cx.update(|_, cx| project.update(cx, |p, _| p.agent = agent));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    cx.run_until_parked();
+    let tracker = cx.update(|_, cx| project.read(cx).tasks.as_ref().unwrap().pane.read(cx).tracker().expect("a local project has a tracker"));
+    let mut new = NewTask::titled("Add a line to the README");
+    new.description = "Say hello.".into();
+    let task = tracker.create(&new, "me").unwrap();
+    cx.update(|window, cx| project.update(cx, |p, cx| p.start_from_task(task.id.clone(), window, cx)));
+    cx.run_until_parked();
+    let now = tracker.get(&task.id).unwrap().unwrap();
+    assert_eq!(now.assignee, Some(lathe_tracker::Assignee::Agent("Fake".into())), "the agent of the project takes it");
+    assert_eq!(now.sessions.len(), 1, "the session is linked");
+    assert_eq!(now.status, Status::InReview, "started, then a turn ended well");
+    let first = fake.received.lock().unwrap().iter().find_map(|c| match c {
+        lathe_agents::session::Command::Send { text, .. } => Some(text.clone()),
+        _ => None,
+    });
+    let want = format!("{}: Add a line to the README\n\nSay hello.\n\nWork on this task. The task is {}.", task.key, task.key);
+    assert_eq!(first.as_deref(), Some(want.as_str()));
+    let log = tracker.activity(&task.id).unwrap();
+    let by = |who: &str| log.iter().any(|a| a.by == who);
+    assert!(by("rule:session-start") && by("rule:agent-finish"), "both moves are the rules: {log:?}");
+    // The reader replies: the task is back in progress. The next turn is scripted empty, so none ends it.
+    let session = cx.update(|_, cx| project.read(cx).sessions[0].clone());
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("and one more".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(tracker.get(&task.id).unwrap().unwrap().status, Status::InProgress);
+    assert!(tracker.activity(&task.id).unwrap().iter().any(|a| a.by == "rule:session-resume"));
 }

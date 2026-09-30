@@ -18,7 +18,9 @@ fn open(width: f32, cx: &mut TestAppContext) -> (Entity<TasksPane>, Arc<LocalTra
     tracker.create(&NewTask::titled("Write the docs"), "me").unwrap();
     let handle: Arc<dyn Tracker> = tracker.clone();
     let (pane, cx) = cx.add_window_view(move |window, cx| {
-        TasksPane::new(Ok(handle), "me", vec![("Claude".into(), lathe_agents::claude::look())], window, cx)
+        let mut pane = TasksPane::new("me", vec![("Claude".into(), lathe_agents::claude::look())], window, cx);
+        pane.attach(Ok(handle), cx);
+        pane
     });
     cx.simulate_resize(size(px(width), px(700.)));
     settle(&pane, cx);
@@ -82,7 +84,11 @@ fn a_project_with_no_tracker_says_why(cx: &mut TestAppContext) {
         gpui_kit::init(cx);
         beui::init(cx);
     });
-    let (pane, cx) = cx.add_window_view(|window, cx| TasksPane::new(Err("Tasks for a remote project come with the next helper.".into()), "me", Vec::new(), window, cx));
+    let (pane, cx) = cx.add_window_view(|window, cx| {
+        let mut pane = TasksPane::new("me", Vec::new(), window, cx);
+        pane.attach(Err("Tasks for a remote project come with the next helper.".into()), cx);
+        pane
+    });
     cx.simulate_resize(size(px(600.), px(400.)));
     settle(&pane, cx);
     assert!(pane.read_with(cx, |p, _| matches!(p.load, Load::Failed(_))));

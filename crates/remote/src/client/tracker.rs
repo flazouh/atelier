@@ -6,14 +6,14 @@ use std::{
     collections::HashMap,
     sync::{
         Arc, Mutex, Weak,
-        mpsc::{Receiver, Sender, channel},
+        mpsc::{Sender, channel},
     },
     thread,
     time::Duration,
 };
 
 use lathe_tracker::{
-    Activity, Entry, Event, NewTask, Patch, Query, Task, TaskId, Tracker, TrackerError, TrackerResult,
+    Activity, Entry, Event, NewTask, Patch, Query, StopFlag, Subscription, Task, TaskId, Tracker, TrackerError, TrackerResult,
 };
 
 use super::{Shared, lock};
@@ -28,6 +28,7 @@ pub const POLL: Duration = Duration::from_secs(3);
 /// One receiver, and what it knows: each task's last change. `None` until its first listing.
 struct Listener {
     send: Sender<Event>,
+    stop: StopFlag,
     seen: Option<HashMap<TaskId, i64>>,
 }
 
@@ -65,7 +66,7 @@ impl RemoteTracker {
                 }
             }
         }
-        listeners.all.retain(|l| l.send.send(event.clone()).is_ok());
+        listeners.all.retain(|l| !l.stop.is_stopped() && l.send.send(event.clone()).is_ok());
     }
 }
 
@@ -98,6 +99,15 @@ fn changes(seen: &mut HashMap<TaskId, i64>, tasks: &[Task]) -> Vec<Event> {
 /// or the connection is gone. A receiver that was dropped is found at the next change it is told of.
 fn poll(shared: Weak<Shared>, listeners: Arc<Mutex<Listeners>>, every: Duration) {
     loop {
+        // Nobody listens any more: the poll ends before it reads again.
+        {
+            let mut listeners = lock(&listeners);
+            listeners.all.retain(|l| !l.stop.is_stopped());
+            if listeners.all.is_empty() {
+                listeners.polling = false;
+                return;
+            }
+        }
         let Some(shared) = shared.upgrade() else { break };
         let listed = ask(&shared, TrackerCall::List { query: Query::default() });
         drop(shared);
@@ -215,8 +225,9 @@ impl Tracker for RemoteTracker {
     /// Changes made through this tracker at once, and changes made elsewhere by a poll of the host every
     /// [`POLL`]. It blocks for one listing, the start the poll compares with. The poll runs while a
     /// receiver is kept: drop it when the tasks are out of sight.
-    fn subscribe(&self) -> Receiver<Event> {
+    fn subscribe(&self) -> Subscription {
         let (send, receive) = channel();
+        let (subscription, stop) = Subscription::new(receive);
         // What the host has now, before this returns: a change made after it is told, never taken as the
         // start. A failed listing leaves it to the first poll.
         let seen = match self.list(&Query::default()) {
@@ -224,13 +235,14 @@ impl Tracker for RemoteTracker {
             Err(_) => None,
         };
         let mut listeners = lock(&self.listeners);
-        listeners.all.push(Listener { send, seen });
+        listeners.all.retain(|l| !l.stop.is_stopped());
+        listeners.all.push(Listener { send, stop, seen });
         if !listeners.polling {
             listeners.polling = true;
             let (shared, list, every) = (Arc::downgrade(&self.shared), self.listeners.clone(), self.poll);
             thread::spawn(move || poll(shared, list, every));
         }
-        receive
+        subscription
     }
 }
 

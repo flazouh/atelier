@@ -61,6 +61,10 @@ pub enum SessionEvent {
     ShowPull(lathe_forge::PullRef),
     /// A turn ended, or the history loaded: the agent's text is whole, and its #N can be looked up.
     TextSettled,
+    /// Something the tasks linked to this session should hear.
+    Task(crate::tasks::signal::TaskEvent),
+    /// The reader pressed the task chip in the header.
+    OpenTask,
 }
 
 impl EventEmitter<SessionEvent> for AgentSession {}
@@ -100,6 +104,10 @@ pub struct AgentSession {
     pub seen: bool,
     pub model: Option<String>,
     pub mode: Option<PermissionMode>,
+    /// The task the session began from, for the header's chip and the first signal.
+    pub task: Option<crate::tasks::TaskRef>,
+    /// The task heard that the session started.
+    task_told: bool,
     /// Why it could not start, or a message that did not go.
     pub problem: Option<SharedString>,
     /// What the agent wrote to stderr as it failed: the tail behind "Show details".
@@ -216,6 +224,8 @@ impl AgentSession {
             seen: false,
             model: None,
             mode: None,
+            task: None,
+            task_told: false,
             problem: None,
             stderr: None,
             starting: true,
@@ -344,6 +354,14 @@ impl AgentSession {
                     self.id = Some(started.session.clone());
                     self.model = started.model.clone().or(self.model.take());
                     self.mode = started.mode.or(self.mode);
+                    if self.task.is_some() && !self.task_told {
+                        self.task_told = true;
+                        cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::Started));
+                    }
+                }
+                Event::TurnEnded(end) => {
+                    let ok = matches!(end.outcome, lathe_agents::session::TurnOutcome::Completed);
+                    cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::TurnEnded { ok }));
                 }
                 Event::Ended(end) => {
                     self.session = None;
@@ -413,6 +431,9 @@ impl AgentSession {
     pub fn send(&mut self, text: String, cx: &mut Context<Self>) {
         if text.trim().is_empty() {
             return;
+        }
+        if !self.conversation.items().is_empty() && self.id.is_some() {
+            cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::Replied));
         }
         // The first message of an empty conversation names it; a resumed one keeps its title.
         if self.conversation.items().is_empty() {
