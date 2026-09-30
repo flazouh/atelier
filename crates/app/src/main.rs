@@ -72,6 +72,11 @@ fn main() {
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
             window.focus(&shell.read(cx).focus_handle(), cx);
+            // With no folder named, the sessions open at the last quit open again.
+            if folders.is_empty() && !saved.open.is_empty() {
+                let (open, front) = (saved.open.clone(), saved.front.clone());
+                shell.update(cx, |s, cx| s.restore(open, front, window, cx));
+            }
             for folder in folders {
                 shell.update(cx, |s, cx| match folder {
                     Opening::Local(path) => s.open_local(path, window, cx),

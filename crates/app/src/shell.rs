@@ -29,6 +29,7 @@ use lathe_settings::Location;
 
 use std::collections::BTreeMap;
 mod fit;
+mod restore;
 use fit::{Fit, Pane};
 
 use beui::{
@@ -109,6 +110,12 @@ pub struct Shell {
     narrow: Pane,
     /// The right pane's width before a review widened it, to give back when the review closes.
     before_review: Option<f32>,
+    /// Sessions open at the last quit, waiting for their project to open.
+    restoring: Vec<lathe_settings::OpenSession>,
+    /// The session in front at the last quit, by the agent's id.
+    front: Option<String>,
+    /// The open sessions and the one in front as the settings file has them, to write only a change.
+    saved_open: (Vec<lathe_settings::OpenSession>, Option<String>),
     _subscriptions: Vec<Subscription>,
 }
 
@@ -148,6 +155,9 @@ impl Shell {
             right_width: fit::RIGHT_DEFAULT,
             sidebar_in_medium: false,
             narrow: Pane::Session,
+            restoring: Vec::new(),
+            front: None,
+            saved_open: (saved.open.clone(), saved.front.clone()),
             before_review: None,
             _subscriptions: Vec::new(),
         }
@@ -169,7 +179,79 @@ impl Shell {
         self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
         self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));
         self.mark_open_session(cx);
+        self.save_open(cx);
         cx.notify();
+    }
+
+    /// Keeps the open sessions and the one in front in the settings, off the UI thread, for the next
+    /// launch. Nothing is written while sessions from the last quit still wait to open.
+    fn save_open(&mut self, cx: &mut Context<Self>) {
+        if !self.restoring.is_empty() {
+            return;
+        }
+        let mut open = Vec::new();
+        for project in &self.projects {
+            let p = project.read(cx);
+            for session in &p.sessions {
+                let s = session.read(cx);
+                if let Some(id) = &s.id {
+                    open.push(lathe_settings::OpenSession { location: p.location.clone(), id: id.as_str().to_string(), title: s.shown_title().to_string() });
+                }
+            }
+        }
+        let front = self.panels.read(cx).active().and_then(|key| self.session_by_key(key, cx)).and_then(|(_, s)| s.read(cx).id.clone()).map(|id| id.as_str().to_string());
+        let now = (open, front);
+        if now == self.saved_open {
+            return;
+        }
+        self.saved_open = now.clone();
+        if let Some(path) = lathe_settings::path() {
+            cx.background_spawn(async move {
+                if let Err(error) = lathe_settings::update(&path, |s| (s.open, s.front) = now) {
+                    eprintln!("could not keep the open sessions: {error}");
+                }
+            })
+            .detach();
+        }
+    }
+
+    /// Opens the projects of the sessions open at the last quit; each one's sessions open as it arrives.
+    pub fn restore(&mut self, open: Vec<lathe_settings::OpenSession>, front: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        let places = restore::locations(&open);
+        (self.restoring, self.front) = (open, front);
+        for place in places {
+            match place {
+                Location::Local { path } => self.open_local(path, window, cx),
+                Location::Ssh { host, path } => self.open_remote(host, path.display().to_string(), window, cx),
+            }
+        }
+    }
+
+    /// The sessions of project `at` that were open at the last quit, opened again; the one that was in
+    /// front shows.
+    fn reopen(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.projects.get(at).cloned() else { return };
+        let location = project.read(cx).location.clone();
+        let mine: Vec<lathe_settings::OpenSession> = restore::of(&self.restoring, &location).into_iter().cloned().collect();
+        if mine.is_empty() {
+            return;
+        }
+        self.restoring.retain(|s| s.location != location);
+        let mut shown = None;
+        for saved in mine {
+            let id = lathe_agents::session::SessionId::new(saved.id.clone());
+            let title = self.names.get(&saved.id).cloned().unwrap_or(saved.title.clone());
+            let session = project.update(cx, |p, cx| p.open_session(Some((id, title.into())), window, cx));
+            if let Some(name) = self.names.get(&saved.id) {
+                session.update(cx, |s, _| s.name = Some(name.clone().into()));
+            }
+            if shown.is_none() || self.front.as_deref() == Some(saved.id.as_str()) {
+                shown = Some(session);
+            }
+        }
+        if let Some(session) = shown {
+            self.show_session(at, &session, window, cx);
+        }
     }
 
     /// Marks the row of the session in the active panel, in the sidebar.
@@ -534,6 +616,7 @@ impl Shell {
         self.active = self.projects.len() - 1;
         self.remember(location, cx);
         self.sync(cx);
+        self.reopen(self.projects.len() - 1, window, cx);
     }
 
     /// Puts `location` first in the recent list, here and in the settings file.
