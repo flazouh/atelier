@@ -317,3 +317,128 @@ fn after_create_the_board_cursor_is_on_the_new_card(cx: &mut TestAppContext) {
     let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new card").unwrap();
     assert_eq!(new.status, lathe_tracker::Status::Done, "the key acted on the new card");
 }
+
+fn picker_rows(cx: &mut VisualTestContext) -> usize {
+    const ROWS: [&str; 8] = ["picker-row-0", "picker-row-1", "picker-row-2", "picker-row-3", "picker-row-4", "picker-row-5", "picker-row-6", "picker-row-7"];
+    ROWS.iter().take_while(|name| cx.debug_bounds(name).is_some()).count()
+}
+
+/// Every picker of the new task dialog grows out of its field's chip: the surface starts on the chip's corner, its
+/// header row is the filter, and its rows sit under the header.
+#[gpui_kit::test]
+fn each_picker_of_the_dialog_grows_out_of_its_chip(cx: &mut TestAppContext) {
+    for (chip, field) in [("new-task-status", "Status"), ("new-task-priority", "Priority"), ("new-task-assignee", "Assignee"), ("new-task-labels", "Labels")] {
+        let (pane, _, cx) = open(900., cx);
+        cx.update(|window, cx| pane.update(cx, |p, cx| p.new_task(window, cx)));
+        settle(&pane, cx);
+        let button = cx.debug_bounds(chip).unwrap_or_else(|| panic!("{chip} is drawn"));
+        cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+        settle(&pane, cx);
+        let surface = cx.debug_bounds("picker-surface").unwrap_or_else(|| panic!("{field}: the surface is drawn"));
+        assert!((f32::from(surface.left() - button.left())).abs() <= 1. && (f32::from(surface.top() - button.top())).abs() <= 1., "{field}: it starts on its chip: {surface:?} from {button:?}");
+        let header = cx.debug_bounds("picker-header").expect("the header is drawn");
+        assert_eq!(header.size.height, button.size.height, "{field}: the header is the chip's height");
+        assert!(cx.debug_bounds("picker-filter").is_some(), "{field}: the header is the filter");
+        // The test tracker has no labels, so that picker shows its empty words and no rows.
+        if field == "Labels" {
+            assert!(surface.size.height > header.size.height, "{field}: it grew");
+            continue;
+        }
+        let first = cx.debug_bounds("picker-row-0").unwrap_or_else(|| panic!("{field}: the rows are drawn"));
+        assert!(first.top() >= header.bottom(), "{field}: the rows are under the header");
+        assert!(surface.size.height > header.size.height, "{field}: it grew");
+    }
+}
+
+/// Typing filters the open picker, in the header row, and Enter chooses the first row left. A label picker stays open.
+#[gpui_kit::test]
+fn typing_filters_each_picker_and_enter_chooses(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.new_task(window, cx)));
+    settle(&pane, cx);
+    let assignee = cx.debug_bounds("new-task-assignee").unwrap().center();
+    cx.simulate_click(assignee, gpui_kit::Modifiers::default());
+    settle(&pane, cx);
+    let before = picker_rows(cx);
+    cx.simulate_keystrokes("c l");
+    settle(&pane, cx);
+    let after = picker_rows(cx);
+    assert!(after >= 1 && after < before, "typing narrowed {before} rows to {after}");
+    cx.simulate_keystrokes("enter");
+    settle(&pane, cx);
+    let who = pane.read_with(cx, |p, cx| p.dialog.read(cx).draft().assignee.as_ref().map(|a| a.name().to_string()));
+    assert_eq!(who.as_deref(), Some("Claude"), "Enter chose the row left");
+    assert!(cx.debug_bounds("picker-surface").is_none(), "the surface went back to its chip");
+
+    let status = cx.debug_bounds("new-task-status").unwrap().center();
+    cx.simulate_click(status, gpui_kit::Modifiers::default());
+    settle(&pane, cx);
+    let before = picker_rows(cx);
+    cx.simulate_keystrokes("d o n e");
+    settle(&pane, cx);
+    assert!(picker_rows(cx) < before);
+    cx.simulate_keystrokes("enter");
+    settle(&pane, cx);
+    let status = pane.read_with(cx, |p, cx| p.dialog.read(cx).draft().status);
+    assert_eq!(status.words(), "Done");
+}
+
+/// A filter chip of the list opens its picker as a surface grown out of the chip; typing filters it and Enter chooses.
+#[gpui_kit::test]
+fn a_filter_chip_grows_into_its_picker_and_typing_filters(cx: &mut TestAppContext) {
+    for chip in ["filter-assignee", "filter-label", "filter-priority"] {
+        let (pane, _, cx) = open(900., cx);
+        focus_body(&pane, cx);
+        let button = cx.debug_bounds(chip).unwrap_or_else(|| panic!("{chip} is drawn"));
+        cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+        settle(&pane, cx);
+        let surface = cx.debug_bounds("picker-surface").unwrap_or_else(|| panic!("{chip}: the surface is drawn"));
+        assert!((f32::from(surface.left() - button.left())).abs() <= 1. && (f32::from(surface.top() - button.top())).abs() <= 1., "{chip}: it starts on its chip: {surface:?} from {button:?}");
+        assert!(cx.debug_bounds("picker-filter").is_some(), "{chip}: the header is the filter");
+        assert!(surface.size.height > button.size.height, "{chip}: it grew");
+        assert_eq!(cx.debug_bounds("picker-header").unwrap().size.height, button.size.height);
+    }
+    let (pane, _, cx) = open(900., cx);
+    focus_body(&pane, cx);
+    let button = cx.debug_bounds("filter-priority").unwrap();
+    cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+    settle(&pane, cx);
+    let before = picker_rows(cx);
+    cx.simulate_keystrokes("u r");
+    settle(&pane, cx);
+    let after = picker_rows(cx);
+    assert!(after >= 1 && after < before, "typing narrowed {before} rows to {after}");
+    cx.simulate_keystrokes("enter");
+    settle(&pane, cx);
+    assert!(cx.debug_bounds("picker-surface").is_none(), "the surface went back to its chip");
+}
+
+/// A property of the task in full opens its picker as a surface grown out of its button, and typing filters it.
+#[gpui_kit::test]
+fn a_property_of_the_task_grows_into_its_picker_and_typing_filters(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(1100., cx);
+    focus_body(&pane, cx);
+    cx.simulate_keystrokes("j j enter");
+    settle(&pane, cx);
+    for (chip, field) in [("rail-status", "Status"), ("rail-priority", "Priority"), ("rail-assignee", "Assignee"), ("rail-labels", "Labels")] {
+        let button = cx.debug_bounds(chip).unwrap_or_else(|| panic!("{chip} is drawn"));
+        cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+        settle(&pane, cx);
+        let surface = cx.debug_bounds("picker-surface").unwrap_or_else(|| panic!("{field}: the surface is drawn"));
+        let right = (f32::from(surface.right() - button.right())).abs() <= 1.;
+        let left = (f32::from(surface.left() - button.left())).abs() <= 1.;
+        assert!(left || right, "{field}: it starts on its button's corner: {surface:?} from {button:?}");
+        assert!((f32::from(surface.top() - button.top())).abs() <= 1., "{field}: and its top");
+        assert!(cx.debug_bounds("picker-filter").is_some(), "{field}: the header is the filter");
+        cx.simulate_keystrokes("escape");
+        settle(&pane, cx);
+        assert!(cx.debug_bounds("picker-surface").is_none(), "{field}: Escape sent it back");
+    }
+    let button = cx.debug_bounds("rail-status").unwrap();
+    cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+    settle(&pane, cx);
+    let before = picker_rows(cx);
+    cx.simulate_keystrokes("d o");
+    settle(&pane, cx);
+    assert!(picker_rows(cx) < before, "typing filtered the status picker");
+}
