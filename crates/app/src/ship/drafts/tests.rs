@@ -19,7 +19,7 @@ fn a_drafted_message_loses_its_fences_and_quotes() {
 /// The prompt shows the kept change as a diff against HEAD, file by file.
 #[test]
 fn the_prompt_holds_the_kept_diff() {
-    let kept = Kept { path: "a.txt".into(), text: Some("1\nTWO\n".into()) };
+    let kept = Kept { path: "a.txt".into(), text: Some("1\nTWO\n".into()), before: None };
     let diff = kept_diff(&[(Some("1\n2\n".to_string()), kept)]);
     assert!(diff.contains("--- a.txt") && diff.contains("-2") && diff.contains("+TWO"), "{diff}");
     assert!(commit_prompt(&diff).contains(&diff));
