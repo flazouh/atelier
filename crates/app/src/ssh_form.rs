@@ -53,9 +53,6 @@ impl Focusable for SshForm {
 impl SshForm {
     pub fn new(hosts: Vec<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let host = cx.new(|cx| InputState::new(window, cx).placeholder("user@host, or a host from ~/.ssh/config"));
-        if let Some(first) = hosts.first() {
-            host.update(cx, |h, cx| h.set_value(first.clone(), window, cx));
-        }
         let enter = |this: &mut Self, _: &Entity<InputState>, event: &InputEvent, _: &mut Window, cx: &mut Context<Self>| {
             if matches!(event, InputEvent::PressEnter { .. }) {
                 this.connect(cx);
@@ -66,12 +63,7 @@ impl SshForm {
     }
 
     /// The config's hosts, once they have been read off the UI thread.
-    pub fn set_hosts(&mut self, hosts: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
-        if self.hosts.is_empty() && self.host.read(cx).value().is_empty()
-            && let Some(first) = hosts.first()
-        {
-            self.host.update(cx, |h, cx| h.set_value(first.clone(), window, cx));
-        }
+    pub fn set_hosts(&mut self, hosts: Vec<String>, _: &mut Window, cx: &mut Context<Self>) {
         self.hosts = hosts;
         cx.notify();
     }

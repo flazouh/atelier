@@ -40,3 +40,12 @@ fn a_host_chip_is_a_filled_button_and_a_press_puts_its_name_in_the_field(cx: &mu
     let value = form.read_with(cx, |f, cx| f.host.read(cx).value().to_string());
     assert_eq!(value, "hp-agent");
 }
+
+/// A14: the Host field starts empty. The first host of the ssh config is not a good guess.
+#[gpui_kit::test]
+fn the_host_field_starts_empty_though_the_config_has_hosts(cx: &mut TestAppContext) {
+    let (form, cx) = open(&["phone", "hp-agent"], cx);
+    assert_eq!(form.read_with(cx, |f, cx| f.host.read(cx).value().to_string()), "");
+    form.update_in(cx, |f, window, cx| f.set_hosts(vec!["air".into()], window, cx));
+    assert_eq!(form.read_with(cx, |f, cx| f.host.read(cx).value().to_string()), "", "late hosts do not fill it either");
+}
