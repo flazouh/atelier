@@ -5,7 +5,7 @@
 
 use beui::{
     TextInput,
-    button::{Button, ButtonSize, ButtonVariant},
+    button::{Button, ButtonVariant},
     spinner::Spinner,
     theme::ActiveTheme,
     typography::TextSize,
@@ -99,7 +99,7 @@ impl Render for SshForm {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let field = TextInput::new("ssh-host-field", &self.host).label("Host").surface(theme.background);
+        let field = TextInput::new("ssh-host-field", &self.host).debug_name("ssh-field").label("Host");
         let this = cx.entity().downgrade();
         // The config's hosts, as chips under the field: a press puts the name in it. They are filled chips that
         // change on hover, and the ones that do not fit the first line wrap under the first chip, not under the label.
@@ -159,13 +159,13 @@ impl Render for SshForm {
                     .flex()
                     .justify_end()
                     .gap(px(8.))
-                    .child(Button::new("ssh-cancel").label("Cancel").variant(ButtonVariant::Ghost).cap("Esc").on_click(move |_, _, cx| {
+                    .child(Button::new("ssh-cancel").debug_name("ssh-cancel").label("Cancel").variant(ButtonVariant::Ghost).cap("Esc").on_click(move |_, _, cx| {
                         cancel.update(cx, |_, cx| cx.emit(SshFormEvent::Cancel)).ok();
                     }))
                     .child(
                         Button::new("ssh-connect")
+                            .debug_name("ssh-connect")
                             .label("Connect")
-                            .size(ButtonSize::Md)
                             .variant(ButtonVariant::Primary)
                             .cap("↵")
                             .disabled(connecting)
