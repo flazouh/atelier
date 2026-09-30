@@ -190,3 +190,24 @@ fn a_process_that_says_why_on_stderr_and_exits_gives_that_text_in_its_end_events
         if matches!(&end.outcome, TurnOutcome::Failed(why) if why == "the agent exited with code 3: no such model"))));
     assert_eq!(events.last(), Some(&Event::Ended(EndReason::Exited { code: Some(3), stderr: "no such model".into() })));
 }
+
+/// A draft is one `claude --print` that saves no session: the prompt goes in on stdin, the text comes
+/// back from stdout, and a failing run says its last words.
+#[test]
+fn a_draft_is_one_print_run_with_no_session_kept() {
+    let stand = Stand::new();
+    let dir = stand.dir.path().display().to_string();
+    let program = stand.script(&format!("printf '%s\\n' \"$@\" > '{dir}/args'\ncat > '{dir}/prompt'\necho '  Fix the lease release  '"));
+    let text = ClaudeCode::with_program(program.to_string_lossy()).draft(stand.project().as_ref(), "Write a commit message.", Some("haiku")).unwrap();
+    assert_eq!(text, "Fix the lease release");
+    let args = std::fs::read_to_string(stand.dir.path().join("args")).unwrap();
+    for flag in ["--print", "--no-session-persistence", "--permission-mode\nplan", "--model\nhaiku"] {
+        assert!(args.contains(flag), "{flag} in {args}");
+    }
+    assert_eq!(std::fs::read_to_string(stand.dir.path().join("prompt")).unwrap(), "Write a commit message.");
+    let failing = stand.script("cat > /dev/null\necho 'Not logged in' >&2\nexit 1");
+    match ClaudeCode::with_program(failing.to_string_lossy()).draft(stand.project().as_ref(), "x", None) {
+        Err(SessionError::Start(why)) => assert_eq!(why, "Not logged in"),
+        other => panic!("wrong answer: {other:?}"),
+    }
+}

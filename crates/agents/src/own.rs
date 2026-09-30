@@ -214,6 +214,31 @@ impl Backend for OwnAgent {
         runner::open(self.model.clone(), self.options.clone(), project, request, sink)
     }
 
+    /// One request, with no tools and no record: the model's text as it answers.
+    fn draft(&self, _project: &dyn Project, prompt: &str, model: Option<&str>) -> Result<String, SessionError> {
+        if let Some(why) = &self.unavailable {
+            return Err(SessionError::Start(why.clone()));
+        }
+        let messages = [message::Message::user(prompt)];
+        let request = message::ModelRequest {
+            model: model.unwrap_or(&self.options.default_model),
+            system: "Answer with the text asked for, and nothing else.",
+            tools: &[],
+            messages: &messages,
+            max_tokens: 2048,
+            thinking: Thinking::Off,
+        };
+        let mut text = String::new();
+        self.model
+            .stream(&request, &mut |delta| {
+                if let message::Delta::Text(more) = delta {
+                    text.push_str(&more);
+                }
+            }, &message::Cancel::default())
+            .map_err(|e| SessionError::Start(format!("{e:?}")))?;
+        Ok(text.trim().to_string())
+    }
+
     fn sessions(&self, project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
         store::list(project)
     }
