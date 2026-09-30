@@ -1,4 +1,5 @@
-//! What lathe remembers across launches: the theme in force and the recent projects. One small JSON
+//! What lathe remembers across launches: the theme in force, whether it follows the system, the primary
+//! colour the reader picked, and the recent projects. One small JSON
 //! file in the app's data folder (`<data dir>/lathe/settings.json`), shared by the app and the gallery.
 //! It is read once before the first window opens, and changed on a background thread, so the UI
 //! thread never waits on the disk.
@@ -21,6 +22,10 @@ pub const RECENT_LIMIT: usize = 10;
 pub struct Settings {
     /// The theme's name, as the picker lists it.
     pub theme: Option<String>,
+    /// Light, dark, or the system's: `"light"`, `"dark"` or `"system"`. `None`: the theme as it stands.
+    pub mode: Option<String>,
+    /// The primary colour the reader picked, as red, green and blue bytes. `None`: the theme's own, its ink.
+    pub primary: Option<[u8; 3]>,
     /// Newest first.
     pub recent: Vec<Location>,
     /// Names the reader gave sessions, by the agent's id for the session.

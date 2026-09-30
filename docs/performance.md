@@ -424,3 +424,18 @@ from other builds on the HP.
   the UI thread in its first frame: accepting a file, which opens the next one in a new editor, took a
   30 to 65 ms frame (median 51 ms). With the queries compiled once per process, 5.7 ms. The first open of
   a language in a process still pays it once (the 111 ms above).
+
+## Motion components on the Mac
+The Motion story (`GALLERY_STORY=Motion MOTION_PART=color-selector`), a release gallery on the Mac (120 Hz), with
+`BEUI_TRACE_MOTION=1` and five real clicks on the colour selector, run by alex-9c on 2026-09-30. The switch prints a line
+for each input the component handles, for the render that starts its animation, and for each render while it runs
+(`crates/beui/src/trace.rs`).
+| What | Result |
+| --- | --- |
+| Click to the first render with the new choice | 0.2 to 5.8 ms |
+| First moving frame | in that same render |
+| Frame interval over 5 glides (57 to 72 frames each) | median 8.30 ms, p95 8.8 to 11.7 ms, max 17.3 ms |
+| Dropped frames | one in about 330 |
+On the HP the same story draws a frame every 65 to 180 ms: its gallery is debug and software rendered, and the load
+average was 46 to 53 on 12 cores. A control run of the Tasks scroll drew a frame every 288 ms in the same period. The HP
+number says nothing about the component; the Mac number is the one to read.

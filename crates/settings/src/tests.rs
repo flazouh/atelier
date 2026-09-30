@@ -61,3 +61,21 @@ fn session_names_and_panels_come_back() {
     assert!(back.panels.single && back.panels.grouped);
     assert_eq!(back.panels.widths, [("abc".to_string(), 520.)]);
 }
+
+#[test]
+fn the_mode_and_the_primary_colour_are_kept_and_an_old_file_without_them_still_loads() {
+    let path = scratch("mode");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, r#"{"theme": "lathe Dark", "recent": []}"#).unwrap();
+    let old = load(&path);
+    assert_eq!((old.mode, old.primary), (None, None));
+    update(&path, |s| {
+        s.mode = Some("system".into());
+        s.primary = Some([2, 133, 247]);
+    })
+    .unwrap();
+    let back = load(&path);
+    assert_eq!((back.mode.as_deref(), back.primary, back.theme.as_deref()), (Some("system"), Some([2, 133, 247]), Some("lathe Dark")));
+    update(&path, |s| s.primary = None).unwrap();
+    assert_eq!(load(&path).primary, None, "back to the default");
+}

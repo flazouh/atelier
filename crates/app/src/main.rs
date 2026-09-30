@@ -21,6 +21,7 @@ mod review_pane;
 mod review_state;
 mod review_text;
 mod session_view;
+mod settings_pane;
 mod ship;
 mod shell;
 mod ssh_form;
@@ -38,8 +39,14 @@ fn main() {
     gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
         beui::init(cx);
         shell::bind_keys(cx);
+        // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
+        // or the system's, which keeps the pick.
+        beui::theme::set_pick(saved.primary.map(settings_pane::colour), cx);
         if let Some(theme) = saved.theme.as_deref().and_then(beui::themes::named) {
             beui::theme::set_theme(theme.clone(), cx);
+        }
+        if let Some(mode) = saved.mode.as_deref().and_then(settings_pane::Mode::from_key) {
+            mode.apply(cx);
         }
         let (w, h) = std::env::var("LATHE_SIZE")
             .ok()
