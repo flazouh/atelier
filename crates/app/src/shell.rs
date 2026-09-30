@@ -162,9 +162,15 @@ impl Shell {
         let now = agent_session::now();
         self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
         self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));
+        self.mark_open_session(cx);
         cx.notify();
     }
 
+    /// Marks the row of the session in the active panel, in the sidebar.
+    fn mark_open_session(&mut self, cx: &mut Context<Self>) {
+        let active = self.panels.read(cx).active().cloned();
+        self.agents_sidebar.update(cx, |s, cx| s.set_open(active, cx));
+    }
     fn project_by_id(&self, id: &str, cx: &App) -> Option<usize> {
         self.projects.iter().position(|p| agents_view::project_id(p.read(cx)).as_ref() == id)
     }
@@ -264,6 +270,7 @@ impl Shell {
                     self.active = at;
                 }
                 self.seen(key, cx);
+                self.mark_open_session(cx);
             }
             PanelsEvent::Closed(key) => {
                 if let Some((at, _)) = self.session_by_key(key, cx) {
