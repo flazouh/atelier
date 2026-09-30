@@ -390,6 +390,12 @@ impl AgentSession {
             self.active_at = now();
             self.reviews.last_activity = Some(self.active_at);
             self.activity_known = true;
+            // Kept now, not only at a turn's end: a turn cut off (the app closed during a question)
+            // must still say when the agent last worked, or a resume takes the agent's list, which
+            // the resume touches, and the row says "now". The save waits for a pause.
+            if !ended_turns {
+                self.save_review(cx);
+            }
         }
         self.refresh_rows();
         let working = self.conversation.working();

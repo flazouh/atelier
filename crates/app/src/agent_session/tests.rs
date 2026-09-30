@@ -197,3 +197,29 @@ fn a_name_the_reader_gave_stays(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(cx.update(|_, cx| session.read(cx).shown_title().to_string()), "Mine");
 }
+
+/// A turn cut off (the app closed while the agent asked something) still leaves when the agent last
+/// worked: the record is kept on activity, not only at a turn's end. Resumed, the session takes that
+/// time, not the agent's list, which the resume touches and so says "now".
+#[gpui_kit::test]
+fn a_session_cut_off_mid_turn_keeps_its_last_activity(cx: &mut TestAppContext) {
+    let dir = git_project(&[("a.txt", "one\n")]);
+    let working = lathe_agents::session::Event::Text { block: lathe_agents::session::BlockId(0), delta: "working".into() };
+    let (session, _fake, cx) = start_in(cx, dir.clone(), vec![vec![working]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
+    cx.run_until_parked();
+    cx.executor().advance_clock(SAVE_AFTER * 2);
+    cx.run_until_parked();
+    let (project, agent, id, worked) = cx.update(|_, cx| {
+        let s = session.read(cx);
+        (s.project.clone(), s.agent.clone(), s.id.clone().unwrap(), s.active_at)
+    });
+    assert!(worked > 0, "the agent's text is activity");
+    let resumed = cx.update(|window, cx| cx.new(|cx| AgentSession::start("k2".into(), agent, project, Some((id, "edit".into())), window, cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let r = resumed.read(cx);
+        assert!(r.activity_known, "the resumed session knows when it last worked");
+        assert_eq!(r.active_at, worked, "and it is the time of the cut-off turn, not now");
+    });
+}
