@@ -3,7 +3,7 @@
 //! above the text, with Reload and Keep mine.
 
 use beui::{
-    Breadcrumb, CodeEditor, Crumb, Tab, Tabs, TabsVariant,
+    Breadcrumb, CodeEditor, Crumb, Tab, Tabs,
     button::{Button, ButtonVariant, dot},
     file_icon::FileIcon,
     icon::{Icon, IconName},
@@ -81,7 +81,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         )
     });
     let open = project.clone();
-    let strip = Tabs::new("editor-tabs", TabsVariant::Underline, tabs.chain(opening), selected).on_select(move |i, window, cx| {
+    let strip = Tabs::new("editor-tabs", beui::design_preview::tab_variant(beui::design_preview::tabs(cx)), tabs.chain(opening), selected).on_select(move |i, window, cx| {
         if let Some(path) = paths.get(i) {
             open.update(cx, |p, cx| p.open_file(path, window, cx));
         }
