@@ -32,6 +32,10 @@ pub struct Settings {
     pub session_names: std::collections::BTreeMap<String, String>,
     /// How the agent panels were laid out last.
     pub panels: Panels,
+    /// The sessions open at quit, in their panels' order, for the next launch to open again.
+    pub open: Vec<OpenSession>,
+    /// The session in front at quit, by the agent's id.
+    pub front: Option<String>,
     /// Keys a newer or older lathe wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
@@ -47,6 +51,14 @@ pub struct Panels {
     pub grouped: bool,
     /// Each panel's width, by its session.
     pub widths: Vec<(String, f32)>,
+}
+
+/// A session open at quit: its project, the agent's id for it, and its title as the panel showed it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OpenSession {
+    pub location: Location,
+    pub id: String,
+    pub title: String,
 }
 
 /// Where a project lives.

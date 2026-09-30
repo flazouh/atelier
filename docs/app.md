@@ -64,6 +64,8 @@ wake from the watcher's own thread; lathe-project tests the real watcher.
 - `t` (GitQuiet's Go to file, while nothing is being typed) opens beui's Finder over the project's
   files; Enter opens the one picked, Escape closes it.
 - `lathe [folder…]` opens each folder named as a project.
+- `lathe` with no folder named opens again the sessions open at the last quit, each with its
+  project, and shows the one that was in front. The layout (side by side or single) comes back too.
 
 ## Window widths
 Nothing clips, and nothing draws under the next pane, at any width from 640 px up. The window does

@@ -26,9 +26,14 @@ pub fn install() {
     }
 }
 
-/// The window closed: the app ends as asked.
+/// The reader asked the window to close, and nothing held it open.
 pub fn closed() {
     eprintln!("exit: the window closed");
+}
+
+/// The last window is gone: the app ends.
+pub fn last_window_closed() {
+    eprintln!("exit: last window closed");
 }
 
 /// The line a signal leaves in the log.

@@ -72,6 +72,12 @@ fn main() {
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
             window.focus(&shell.read(cx).focus_handle(), cx);
+            // The sessions open at the last quit open again with their projects: all of them when no
+            // folder is named, else those of the named folders.
+            if !saved.open.is_empty() {
+                let (open, front, all) = (saved.open.clone(), saved.front.clone(), folders.is_empty());
+                shell.update(cx, |s, cx| s.restore(open, front, all, window, cx));
+            }
             for folder in folders {
                 shell.update(cx, |s, cx| match folder {
                     Opening::Local(path) => s.open_local(path, window, cx),
@@ -110,6 +116,14 @@ fn main() {
             cx.new(|cx| gpui_kit::component::Root::new(shell, window, cx))
         })
         .expect("open the window");
+        // The last window closing ends the app, and says so: on Linux nothing else would end it.
+        cx.on_window_closed(|cx, _| {
+            if cx.windows().is_empty() {
+                exit_log::last_window_closed();
+                cx.quit();
+            }
+        })
+        .detach();
         cx.activate(true);
     });
 }
