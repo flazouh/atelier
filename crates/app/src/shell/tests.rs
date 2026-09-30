@@ -225,7 +225,7 @@ fn a_cached_sidebar_is_given_the_time_each_minute(cx: &mut TestAppContext) {
 
 /// View cache: the right pane is drawn from its last frame until its project changes. Changed at the project
 /// itself, not through the shell (which moves the focus and so draws everything again), the next frame shows
-/// the new front: Tasks, then the editor with the file just opened.
+/// the new front: Tasks, and then not. (The editor is the Files view's.)
 #[gpui_kit::test]
 fn a_cached_right_pane_follows_its_project(cx: &mut TestAppContext) {
     let dir = tempfile::tempdir().unwrap();
@@ -243,9 +243,6 @@ fn a_cached_right_pane_follows_its_project(cx: &mut TestAppContext) {
     cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
     settle(&shell, cx);
     assert!(cx.debug_bounds("tasks-mode-list").is_none(), "the cached right pane still shows Tasks");
-    cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("a.txt", window, cx)));
-    settle(&shell, cx);
-    assert!(cx.debug_bounds("editor-tab-0").is_some(), "the cached right pane shows no tab for a.txt");
 }
 
 /// View cache: each session's panel is drawn from its last frame until its session changes. A renamed
@@ -299,4 +296,58 @@ fn the_layout_lives_in_a_menu_and_the_bar_is_gone(cx: &mut TestAppContext) {
     settle(&shell, cx);
     let layout = shell.read_with(cx, |s, cx| s.panels.read(cx).layout());
     assert_eq!(layout, beui::panel_types::Layout::Single, "Single view is chosen");
+}
+
+/// A shell with a project and one session, at `width`.
+fn with_a_session(cx: &mut TestAppContext, width: f32) -> (Entity<Shell>, &mut gpui_kit::VisualTestContext, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(width), px(900.)));
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.new_session_key(&NewSession, window, cx));
+    settle(&shell, cx);
+    (shell, cx, dir)
+}
+
+/// Views and commands, part 2: the Sessions view and the Files view, one on screen at a time. The sidebar
+/// holds no tree; the Files view holds the tree and the editor, which shows nothing until a file is open.
+#[gpui_kit::test]
+fn one_view_shows_at_a_time_and_the_keys_switch_them(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    let files = if cfg!(target_os = "macos") { "cmd-2" } else { "ctrl-2" };
+    let sessions = if cfg!(target_os = "macos") { "cmd-1" } else { "ctrl-1" };
+    assert!(cx.debug_bounds("sessions-view").is_some(), "the Sessions view shows first");
+    assert!(cx.debug_bounds("files-view").is_none() && cx.debug_bounds("files-tree").is_none(), "no tree in it");
+    cx.simulate_keystrokes(files);
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("files-view").is_some() && cx.debug_bounds("files-tree").is_some(), "{files} shows the Files view");
+    assert!(cx.debug_bounds("sessions-view").is_none(), "and only it");
+    assert!(cx.debug_bounds("editor-tab-0").is_none(), "no editor before a file is open");
+    cx.simulate_keystrokes(sessions);
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("sessions-view").is_some() && cx.debug_bounds("files-view").is_none(), "{sessions} goes back");
+}
+
+/// Opening a file from a session (a row's file name) goes to the Files view with the file open.
+#[gpui_kit::test]
+fn opening_a_file_from_a_session_goes_to_the_files_view(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+    project.update(cx, |_, cx| cx.emit(crate::open_project::ProjectEvent::Open("a.txt".into())));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("files-view").is_some(), "the Files view shows");
+    assert!(cx.debug_bounds("editor-tab-0").is_some(), "with a.txt open");
+}
+
+/// In a narrow window the Files view shows the tree or the editor, one at a time, with a tab for each.
+#[gpui_kit::test]
+fn a_narrow_files_view_has_a_tab_for_the_tree_and_the_editor(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 700.);
+    shell.update_in(cx, |s, window, cx| s.show_view(ShellView::Files, window, cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("narrow-tab-Files").is_some() && cx.debug_bounds("narrow-tab-Editor").is_some(), "Files and Editor tabs");
+    assert!(cx.debug_bounds("files-tree").is_some(), "the tree shows first");
 }

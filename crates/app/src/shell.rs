@@ -31,6 +31,9 @@ use lathe_settings::Location;
 use std::collections::BTreeMap;
 mod fit;
 mod restore;
+mod view;
+
+pub use view::{FilesPane, ShellView};
 use fit::{Fit, Pane};
 
 use beui::{
@@ -49,7 +52,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(lathe, [ShowSessions, ShowFiles, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -63,6 +66,8 @@ pub fn bind_keys(cx: &mut App) {
     crate::ship::pull_form::bind_keys(cx);
     cx.bind_keys([
         KeyBinding::new("secondary-o", OpenFolder, None),
+        KeyBinding::new("secondary-1", ShowSessions, None),
+        KeyBinding::new("secondary-2", ShowFiles, None),
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("secondary-shift-o", OpenRemote, None),
         KeyBinding::new("secondary-shift-O", OpenRemote, None),
@@ -127,6 +132,10 @@ pub struct Shell {
     _subscriptions: Vec<Subscription>,
     /// Each open session's panel view, by the session's entity.
     panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
+    /// Which view shows: Sessions or Files.
+    view: ShellView,
+    /// In a narrow window, the Files view's tree or editor.
+    files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
     layout_menu: bool,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
@@ -180,6 +189,8 @@ impl Shell {
             before_review: None,
             _subscriptions: Vec::new(),
             panel_views: Default::default(),
+            view: ShellView::default(),
+            files_narrow: FilesPane::default(),
             layout_menu: false,
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
@@ -609,6 +620,7 @@ impl Shell {
     /// Shows or hides the active project's tasks in the right pane.
     fn show_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.active().cloned() else { return };
+        self.view = ShellView::Sessions;
         project.update(cx, |p, cx| p.toggle_tasks(window, cx));
         self.right = true;
         self.widen_for_review(window, cx);
@@ -622,6 +634,7 @@ impl Shell {
     /// Shows or hides the active project's pull requests in the right pane, as wide as a review.
     fn show_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.active().cloned() else { return };
+        self.view = ShellView::Sessions;
         project.update(cx, |p, cx| p.toggle_pulls(window, cx));
         self.right = true;
         self.widen_for_review(window, cx);
@@ -676,6 +689,23 @@ impl Shell {
             self.active = i;
         }
         project.update(cx, |p, cx| p.open_file(path, window, cx));
+        self.show_file(cx);
+    }
+
+    /// Shows `view`. Its keys are ⌘1 and ⌘2 (⌃ elsewhere). The focus comes to the shell: what had it (a
+    /// composer, the editor) is not drawn in the other view, and a key from it would reach nothing.
+    pub fn show_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
+        if self.view != view {
+            self.view = view;
+            self.focus.focus(window, cx);
+            cx.notify();
+        }
+    }
+
+    /// A file was opened: the Files view shows it, in a narrow window with the editor in front.
+    fn show_file(&mut self, cx: &mut Context<Self>) {
+        self.files_narrow = FilesPane::Editor;
+        self.view = ShellView::Files;
         cx.notify();
     }
 
@@ -694,6 +724,7 @@ impl Shell {
                     this.active = i;
                 }
                 let scope = turn.map_or(Scope::Whole, Scope::Turn);
+                this.view = ShellView::Sessions;
                 project.update(cx, |p, cx| p.open_review(session.clone(), scope, path.as_deref(), window, cx));
                 this.right = true;
                 this.widen_for_review(window, cx);
@@ -871,6 +902,7 @@ impl Shell {
             FinderEvent::Pick(i) => {
                 if let Some(path) = this.finder.as_ref().and_then(|(_, paths, _)| paths.get(*i).cloned()) {
                     project.update(cx, |p, cx| p.open_file(&path, window, cx));
+                    this.show_file(cx);
                 }
                 this.close_finder(false, window, cx);
             }
@@ -1081,11 +1113,26 @@ impl Shell {
             .text_size(TextSize::Sm.font_size())
             .child(div().font_weight(gpui_kit::FontWeight::MEDIUM).child(name.unwrap_or_else(|| "lathe".into())))
             .children(branch.map(|b| div().text_color(theme.muted_foreground).child(b)))
+            .children(self.active().is_some().then(|| self.view_switch(cx)))
             .relative()
             .children(self.layout_button(cx))
             .child(div().flex_1().flex().justify_center().child(beui::SessionsIsland::new("sessions-island", counts).on_press(
                 move |window, cx| drop(this.update(cx, |shell, cx| shell.open_most_urgent(window, cx))),
             )))
+    }
+
+    /// Sessions or Files, with their keys.
+    fn view_switch(&self, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity();
+        let views = [ShellView::Sessions, ShellView::Files];
+        Segmented::new(
+            "view-switch",
+            [Segment::new("Sessions").cap(keys::cap("⌘1")), Segment::new("Files").cap(keys::cap("⌘2"))],
+            views.iter().position(|v| *v == self.view).unwrap_or(0),
+        )
+        .debug_name("view-switch")
+        .on_change(move |i, window, cx| this.update(cx, |this, cx| this.show_view(views[i], window, cx)))
+        .into_any_element()
     }
 
     /// The ⋯ at the top right of the session area, and its layout menu: side by side or single, grouped by
@@ -1097,7 +1144,7 @@ impl Shell {
             panel_types::Layout,
             popover::{Hang, Popover},
         };
-        if !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
+        if self.view == ShellView::Files || !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
             return None;
         }
         let (layout, grouped) = {
@@ -1277,23 +1324,91 @@ impl Shell {
     }
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let heading = |words: SharedString| div().px(px(12.)).pt(px(12.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(words);
-        let tree = self.active().map(|p| tree_view(p, cx));
-        let tree_heading: SharedString = match self.active() {
-            Some(p) => format!("Files in {}", p.read(cx).name()).into(),
-            None => "Files".into(),
-        };
+        // The projects and their sessions; the files are the Files view's.
         div()
             .flex()
             .flex_col()
             .size_full()
-            // The projects and their sessions, then the front project's files, each half the height.
             .child(div().flex_1().min_h_0().child(crate::view_cache::draw(&self.agents_sidebar)))
-            .child(heading(tree_heading))
-            .child(div().flex_1().min_h_0().children(tree))
             .child(self.sidebar_foot(cx))
+    }
+
+    /// The Files view's tree: the front project's files, under their heading.
+    fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        let muted = cx.theme().muted_foreground;
+        div()
+            .debug_selector(|| "files-tree".into())
+            .flex()
+            .flex_col()
+            .size_full()
+            .child(
+                div()
+                    .px(px(12.))
+                    .pt(px(12.))
+                    .pb(px(4.))
+                    .text_size(TextSize::Xs.font_size())
+                    .text_color(muted)
+                    .child(format!("Files in {}", project.read(cx).name())),
+            )
+            .child(div().flex_1().min_h_0().child(tree_view(project, cx)))
+            .child(self.sidebar_foot(cx))
+            .into_any_element()
+    }
+
+    /// The Files view's editor, on its card; it says "No file open" until a file is.
+    fn files_editor(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        div()
+            .size_full()
+            .pr(px(8.))
+            .pb(px(4.))
+            .child(div().size_full().pt(px(8.)).rounded(radius::LG).bg(theme.card).child(crate::editor_pane::editor_pane(project, cx)))
+            .into_any_element()
+    }
+
+    /// The Files view in a wide window: the tree, then the editor.
+    fn files_panes(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        self.session_right = None;
+        div()
+            .debug_selector(|| "files-view".into())
+            .flex()
+            .size_full()
+            .min_h_0()
+            .child(div().flex_none().w(px(self.sidebar_width)).h_full().child(self.files_tree(project, cx)))
+            .child(div().flex_1().min_w_0().h_full().child(self.files_editor(project, cx)))
+            .into_any_element()
+    }
+
+    /// The Files view in a narrow window: the tree or the editor, with a tab for each.
+    fn narrow_files(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity();
+        let panes = [FilesPane::Tree, FilesPane::Editor];
+        let tabs = div().flex().flex_none().items_center().px(px(8.)).h(px(44.)).child(
+            Segmented::new(
+                "narrow-files",
+                [Segment::new("Files").debug_name("narrow-tab-Files"), Segment::new("Editor").debug_name("narrow-tab-Editor")],
+                panes.iter().position(|p| *p == self.files_narrow).unwrap_or(0),
+            )
+            .on_change(move |i, _, cx| {
+                this.update(cx, |this, cx| {
+                    this.files_narrow = panes[i];
+                    cx.notify();
+                })
+            }),
+        );
+        let body = match self.files_narrow {
+            FilesPane::Tree => self.files_tree(project, cx),
+            FilesPane::Editor => self.files_editor(project, cx),
+        };
+        div()
+            .debug_selector(|| "files-view".into())
+            .flex()
+            .flex_col()
+            .size_full()
+            .min_h_0()
+            .child(tabs)
+            .child(div().flex_1().min_h_0().child(body))
+            .into_any_element()
     }
 
     /// The open sessions' panels, or, with none open, a way to start one.
@@ -1331,11 +1446,20 @@ impl Shell {
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
             self.session_right = None;
-            return self.narrow_panes(project, window, cx);
+            return match self.view {
+                ShellView::Files => self.narrow_files(project, cx),
+                ShellView::Sessions => self.narrow_panes(project, window, cx),
+            };
         }
+        if self.view == ShellView::Files {
+            return self.files_panes(project, cx);
+        }
+        // In the Sessions view the right pane holds the review, the pull requests or the tasks; the editor
+        // is the Files view's.
+        let asked = project.read(cx).front() != crate::open_project::front::Front::Editor;
         let wants = fit::Wants {
             sidebar: self.sidebar_shown(fit).then_some(self.sidebar_width),
-            right: self.right.then_some(self.right_width),
+            right: (self.right && asked).then_some(self.right_width),
         };
         let widths = fit::widths(total, wants);
         self.session_right = Some(widths.sidebar.unwrap_or(0.) + widths.agent);
@@ -1361,6 +1485,7 @@ impl Shell {
         };
         div()
             .id("shell-panes")
+            .debug_selector(|| "sessions-view".into())
             .flex()
             .size_full()
             .min_h_0()
@@ -1418,7 +1543,15 @@ impl Shell {
             }
             Pane::Right => self.right_pane(project, cx),
         };
-        div().flex().flex_col().size_full().min_h_0().child(tabs).child(div().flex_1().min_h_0().child(body)).into_any_element()
+        div()
+            .debug_selector(|| "sessions-view".into())
+            .flex()
+            .flex_col()
+            .size_full()
+            .min_h_0()
+            .child(tabs)
+            .child(div().flex_1().min_h_0().child(body))
+            .into_any_element()
     }
 
     /// The right pane: the review, the pull requests, or the editor.
@@ -1535,6 +1668,8 @@ impl Shell {
             .on_action(cx.listener(Self::toggle_sidebar))
             .on_action(cx.listener(Self::toggle_right))
             .on_action(cx.listener(Self::pull_requests_key))
+            .on_action(cx.listener(|this, _: &ShowSessions, window, cx| this.show_view(ShellView::Sessions, window, cx)))
+            .on_action(cx.listener(|this, _: &ShowFiles, window, cx| this.show_view(ShellView::Files, window, cx)))
             .on_action(cx.listener(Self::open_tasks_key))
             .on_key_down(cx.listener(Self::key_down))
             .flex()
