@@ -817,13 +817,15 @@ impl Shell {
         let total = f32::from(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
-            return self.narrow_panes(project, cx);
+            return self.narrow_panes(project, window, cx);
         }
         let wants = fit::Wants {
             sidebar: self.sidebar_shown(fit).then_some(self.sidebar_width),
             right: self.right.then_some(self.right_width),
         };
         let widths = fit::widths(total, wants);
+        // The strip lays its columns out from this width in this frame; the strip keeps 8 px each side.
+        self.panels.update(cx, |p, cx| p.fit_to(widths.agent - 16., cx));
         let wash = cx.theme().muted_hover();
         let handle = move |edge: Edge| {
             let d = div().id(match edge {
@@ -863,7 +865,7 @@ impl Shell {
 
     /// One pane at a time, with a tab for each: the sidebar, the sessions, and the editor or what
     /// stands in its place.
-    fn narrow_panes(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    fn narrow_panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let right = {
             let p = project.read(cx);
             if p.review.is_some() {
@@ -900,7 +902,11 @@ impl Shell {
             .child(tab(Pane::Right, right, Some("⌘⇧b"), cx));
         let body = match self.narrow {
             Pane::Projects => self.sidebar(cx).into_any_element(),
-            Pane::Session => self.agent_panel(cx),
+            Pane::Session => {
+                let total = f32::from(window.viewport_size().width);
+                self.panels.update(cx, |p, cx| p.fit_to(total - 16., cx));
+                self.agent_panel(cx)
+            }
             Pane::Right => self.right_pane(project, cx),
         };
         div().flex().flex_col().size_full().min_h_0().child(tabs).child(div().flex_1().min_h_0().child(body)).into_any_element()
