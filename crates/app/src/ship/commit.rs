@@ -54,7 +54,7 @@ impl std::fmt::Display for CommitError {
 
 /// Runs `git args` in the project's root, on `index` when it is given, with `stdin` written on a thread
 /// of its own while stdout is read, so neither pipe can stall the other; stdout, or git's own words.
-fn git(project: &dyn Project, args: &[&str], index: Option<&str>, stdin: Option<Vec<u8>>) -> Result<String, String> {
+pub(crate) fn git(project: &dyn Project, args: &[&str], index: Option<&str>, stdin: Option<Vec<u8>>) -> Result<String, String> {
     let mut command = Command::new("git").args(args.iter().copied());
     if let Some(index) = index {
         command.env.push(("GIT_INDEX_FILE".into(), index.into()));

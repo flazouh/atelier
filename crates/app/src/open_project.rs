@@ -47,6 +47,29 @@ pub enum Git {
     /// The folder is not in a git repository.
     None,
     Branch(SharedString),
+    /// A repository with no commit yet, on this branch.
+    Unborn(SharedString),
+}
+impl Git {
+    /// The branch, born or not.
+    pub fn branch(&self) -> Option<&SharedString> {
+        match self {
+            Git::Branch(b) | Git::Unborn(b) => Some(b),
+            Git::Unknown | Git::None => None,
+        }
+    }
+    /// What the status line says, given the count of changed files.
+    pub fn words(&self, dirty: Option<usize>) -> SharedString {
+        match (self, dirty) {
+            (Git::Unknown, _) => "…".into(),
+            (Git::None, _) => "No git repository".into(),
+            (Git::Unborn(b), _) => format!("{b}, no commits yet").into(),
+            (Git::Branch(b), Some(0)) => format!("{b}, clean").into(),
+            (Git::Branch(b), Some(1)) => format!("{b}, 1 file changed").into(),
+            (Git::Branch(b), Some(n)) => format!("{b}, {n} files changed").into(),
+            (Git::Branch(b), None) => b.clone(),
+        }
+    }
 }
 
 /// The tree as the last listing left it.
@@ -302,6 +325,11 @@ impl OpenProject {
         });
     }
 
+    /// Reads the branch, the changed files and the remote again, as after a commit.
+    pub fn refresh_git(&mut self, cx: &mut Context<Self>) {
+        self.read_git(cx);
+    }
+
     fn read_git(&mut self, cx: &mut Context<Self>) {
         self.read_dirty(cx);
         let project = self.project.clone();
@@ -312,12 +340,18 @@ impl OpenProject {
         })
         .detach();
         let project = self.project.clone();
-        let asked = cx.background_spawn(async move { project.git(&["rev-parse", "--abbrev-ref", "HEAD"]) });
-        cx.spawn(async move |this, cx| {
-            let git = match asked.await {
+        // A repository with no commit has no HEAD to name, but its HEAD still points at a branch.
+        let asked = cx.background_spawn(async move {
+            match project.git(&["rev-parse", "--abbrev-ref", "HEAD"]) {
                 Ok(out) if out.ok() => Git::Branch(out.stdout.trim().to_string().into()),
-                _ => Git::None,
-            };
+                _ => match project.git(&["symbolic-ref", "--short", "-q", "HEAD"]) {
+                    Ok(out) if out.ok() => Git::Unborn(out.stdout.trim().to_string().into()),
+                    _ => Git::None,
+                },
+            }
+        });
+        cx.spawn(async move |this, cx| {
+            let git = asked.await;
             _ = this.update(cx, |this, cx| {
                 this.git = git;
                 cx.notify();
@@ -460,6 +494,7 @@ impl OpenProject {
                 cx.notify();
             }
             PaneEvent::Said(line) => cx.emit(ProjectEvent::Said(line.clone())),
+            PaneEvent::Committed => this.refresh_git(cx),
         });
         pane.focus_handle(cx).focus(window, cx);
         self.review = Some((pane, sub));

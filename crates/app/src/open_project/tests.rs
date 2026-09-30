@@ -62,6 +62,10 @@ impl Render for Pane {
 type Opened<'a> = (tempfile::TempDir, Entity<OpenProject>, Arc<Mutex<Option<ChangeSink>>>, &'a mut VisualTestContext);
 
 fn open<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)]) -> Opened<'a> {
+    open_with(cx, files, |_| {})
+}
+/// As `open`, with `before` run on the folder before the project opens it.
+fn open_with<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)], before: impl FnOnce(&Path)) -> Opened<'a> {
     cx.update(|cx| {
         gpui_kit::init(cx);
         beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
@@ -73,6 +77,7 @@ fn open<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)]) -> Opened<'a> {
         std::fs::create_dir_all(at.parent().unwrap()).unwrap();
         std::fs::write(at, text).unwrap();
     }
+    before(dir.path());
     let root = dir.path().to_path_buf();
     let sink = Arc::new(Mutex::new(None));
     let quiet = Arc::new(Quiet { disk: LocalProject::open(&root).unwrap(), sink: sink.clone() });
@@ -164,6 +169,47 @@ fn an_empty_folder_with_no_git_says_both(cx: &mut TestAppContext) {
     });
 }
 
+fn run_git(dir: &Path, args: &[&str]) {
+    let out = std::process::Command::new("git")
+        .args(["-c", "user.name=q", "-c", "user.email=q@q", "-c", "commit.gpgsign=false"])
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+}
+/// A repository with no commit yet is a repository: the line names its branch and says it has no
+/// commits, and a commit made meanwhile shows once the project reads git again.
+#[gpui_kit::test]
+fn a_repository_with_no_commits_says_so(cx: &mut TestAppContext) {
+    let (dir, project, _, cx) = open_with(cx, &[("a.txt", "a\n")], |dir| run_git(dir, &["init", "-q", "-b", "main"]));
+    cx.update(|_, cx| {
+        let p = project.read(cx);
+        assert_eq!(p.git, Git::Unborn("main".into()));
+        assert_eq!(p.git.words(p.dirty).as_ref(), "main, no commits yet");
+    });
+    run_git(dir.path(), &["add", "-A"]);
+    run_git(dir.path(), &["commit", "-q", "-m", "first"]);
+    cx.update(|_, cx| project.update(cx, |p, cx| p.refresh_git(cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let p = project.read(cx);
+        assert_eq!(p.git, Git::Branch("main".into()));
+        assert_eq!(p.git.words(p.dirty).as_ref(), "main, clean");
+    });
+}
+/// The line's words for each state.
+#[test]
+fn the_git_words() {
+    let main = || Git::Branch("main".into());
+    assert_eq!(Git::Unknown.words(None).as_ref(), "…");
+    assert_eq!(Git::None.words(None).as_ref(), "No git repository");
+    assert_eq!(main().words(Some(0)).as_ref(), "main, clean");
+    assert_eq!(main().words(Some(1)).as_ref(), "main, 1 file changed");
+    assert_eq!(main().words(Some(3)).as_ref(), "main, 3 files changed");
+    assert_eq!(main().words(None).as_ref(), "main");
+    assert_eq!(Git::Unborn("main".into()).words(Some(2)).as_ref(), "main, no commits yet");
+}
 /// Closing a tab with unsaved edits asks; Cancel keeps it, Don't Save drops it, and a clean tab
 /// closes without asking.
 #[gpui_kit::test]

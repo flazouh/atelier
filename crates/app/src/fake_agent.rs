@@ -62,6 +62,11 @@ impl Backend for FakeBackend {
         sink(Event::Started(Started { session: id, model: None, mode: None }));
         Ok(Box::new(FakeSession { backend: self.0.clone(), sink }))
     }
+
+    /// A branch name for a branch prompt, a message for any other.
+    fn draft(&self, _: &dyn Project, prompt: &str, _: Option<&str>) -> Result<String, SessionError> {
+        Ok(if prompt.contains("Name a git branch") { "fix/keep-two".into() } else { "Keep TWO\n\nFrom the review.".into() })
+    }
 }
 
 pub fn ended() -> Event {

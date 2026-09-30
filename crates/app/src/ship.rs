@@ -5,4 +5,6 @@
 pub mod branch;
 pub mod commit;
 pub mod drafts;
+pub mod head;
 pub mod kept;
+pub mod strip;

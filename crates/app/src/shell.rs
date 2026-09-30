@@ -40,7 +40,7 @@ use crate::{
     agents_view,
     ssh_form::{Phase, SshForm, SshFormEvent},
     editor_pane::editor_pane,
-    open_project::{Git, Listing, OpenProject, ProjectEvent},
+    open_project::{Listing, OpenProject, ProjectEvent},
     review_pane::Scope,
     tree_view::tree_view,
 };
@@ -52,6 +52,7 @@ pub const TITLE_BAR: f32 = 38.;
 const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else { 12. };
 
 pub fn bind_keys(cx: &mut App) {
+    crate::ship::strip::bind_keys(cx);
     cx.bind_keys([
         KeyBinding::new("secondary-o", OpenFolder, None),
         KeyBinding::new("secondary-shift-o", OpenRemote, None),
@@ -625,10 +626,7 @@ impl Shell {
         let (name, branch) = match self.active() {
             Some(p) => {
                 let p = p.read(cx);
-                (Some(p.name()), match &p.git {
-                    Git::Branch(b) => Some(b.to_string()),
-                    _ => None,
-                })
+                (Some(p.name()), p.git.branch().map(ToString::to_string))
             }
             None => (None, None),
         };
@@ -790,16 +788,7 @@ impl Shell {
         if let Some(p) = self.active() {
             let p = p.read(cx);
             parts.push(p.location.place().into());
-            parts.push(match &p.git {
-                Git::Unknown => "…".into(),
-                Git::None => "No git repository".into(),
-                Git::Branch(b) => match p.dirty {
-                    Some(0) => format!("{b}, clean").into(),
-                    Some(1) => format!("{b}, 1 file changed").into(),
-                    Some(n) => format!("{b}, {n} files changed").into(),
-                    None => b.clone(),
-                },
-            });
+            parts.push(p.git.words(p.dirty));
             if let (Listing::Ready(tree), Some(took)) = (&p.listing, p.listed_in) {
                 let files = match tree.files() {
                     1 => "1 file".to_string(),
