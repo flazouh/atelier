@@ -248,6 +248,11 @@ impl Shell {
             return;
         }
         self.restoring.retain(|s| s.location != location);
+        if crate::timings::enabled() {
+            window.on_next_frame(|_, _| {
+                eprintln!("restored after {:.1} ms", crate::timings::since_start().as_secs_f64() * 1000.)
+            });
+        }
         let mut shown = None;
         for saved in mine {
             let id = lathe_agents::session::SessionId::new(saved.id.clone());
@@ -661,6 +666,8 @@ impl Shell {
                 cx.notify();
             }
             ProjectEvent::ReviewClosed => {
+                // The review's texts and hunks are freed now: give their pages back.
+                crate::memory::give_back();
                 if let Some(width) = this.before_review.take() {
                     this.right_width = width;
                 }

@@ -420,3 +420,52 @@ fn command_z_undoes_typing_and_undo_decision_waits_for_it(cx: &mut TestAppContex
     cx.run_until_parked();
     assert_eq!(hunk_ids(&pane, cx).len(), 2, "now Undo decision brings the hunk back");
 }
+
+/// A closed review lets go of its pane, and with it its editors and texts: each open and close of a 200-file
+/// review kept about 14 MB.
+#[gpui_kit::test]
+fn a_closed_review_pane_is_freed(cx: &mut TestAppContext) {
+    let (pane, _session, _fake, _dir, cx) = reviewing(cx);
+    let weak = pane.downgrade();
+    drop(pane);
+    cx.run_until_parked();
+    assert!(weak.upgrade().is_none(), "the review pane outlived its last handle");
+}
+
+/// A page that shows a review pane while it holds one, as the project's right pane does.
+struct Holder(Option<Entity<ReviewPane>>);
+
+impl gpui_kit::Render for Holder {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl gpui_kit::IntoElement {
+        gpui_kit::div().size_full().children(self.0.clone())
+    }
+}
+
+/// The same once it has been drawn and focused, as in the app, and then taken off the page.
+#[gpui_kit::test]
+fn a_review_pane_drawn_then_closed_is_freed(cx: &mut TestAppContext) {
+    let (pane, _session, _fake, _dir, cx) = reviewing(cx);
+    let weak = pane.downgrade();
+    let window = cx.update(|_, cx| {
+        cx.open_window(gpui_kit::WindowOptions::default(), |_, cx| cx.new(|_| Holder(Some(pane)))).unwrap()
+    });
+    cx.run_until_parked();
+    window
+        .update(cx, |holder, window, cx| {
+            if let Some(pane) = &holder.0 {
+                pane.read(cx).focus_handle(cx).focus(window, cx);
+            }
+        })
+        .unwrap();
+    cx.run_until_parked();
+    window
+        .update(cx, |holder, _, cx| {
+            holder.0 = None;
+            cx.notify();
+        })
+        .unwrap();
+    cx.run_until_parked();
+    window.update(cx, |_, window, _| window.refresh()).unwrap();
+    cx.run_until_parked();
+    assert!(weak.upgrade().is_none(), "a review pane that was drawn outlived its close");
+}

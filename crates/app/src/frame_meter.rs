@@ -1,6 +1,8 @@
 //! `LATHE_FRAMES=1`: how long each frame's layout and paint take on the CPU, over the whole window,
 //! reported every 300 frames as a median, a p95, a worst and a count over 8 ms (120 Hz). The window's
 //! root is wrapped in [`Timed`]; paint here is building the scene, which the GPU draws later.
+//! `LATHE_FRAMES=each` also prints one line per frame, `frame <unix ms> <cpu ms>`, to count the frames of an
+//! idle screen or to take one animation's median and p95.
 
 use std::{
     cell::RefCell,
@@ -27,7 +29,30 @@ pub fn last_frame() -> Duration {
 }
 
 pub fn enabled() -> bool {
-    std::env::var("LATHE_FRAMES").is_ok_and(|v| v == "1")
+    mode(std::env::var("LATHE_FRAMES").ok().as_deref()) != Mode::Off
+}
+
+/// What `LATHE_FRAMES` asks for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    Off,
+    /// A report every 300 frames.
+    Reports,
+    /// The reports, and a line per frame.
+    Each,
+}
+
+pub fn mode(value: Option<&str>) -> Mode {
+    match value {
+        Some("1") => Mode::Reports,
+        Some("each") => Mode::Each,
+        _ => Mode::Off,
+    }
+}
+
+fn each() -> bool {
+    static EACH: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *EACH.get_or_init(|| mode(std::env::var("LATHE_FRAMES").ok().as_deref()) == Mode::Each)
 }
 
 #[derive(Default)]
@@ -42,6 +67,10 @@ pub struct Meter {
 impl Meter {
     fn frame_done(&mut self) {
         LAST.with(|last| last.set(self.current));
+        if each() {
+            let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+            eprintln!("frame {} {:.2}", at.as_millis(), self.current.as_secs_f64() * 1000.);
+        }
         self.frames.push(std::mem::take(&mut self.current));
         self.layouts.push(std::mem::take(&mut self.layout));
         if self.frames.len() >= FRAMES {
@@ -114,3 +143,6 @@ impl Element for Timed {
         meter.frame_done();
     }
 }
+
+#[cfg(test)]
+mod tests;

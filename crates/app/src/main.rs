@@ -3,7 +3,7 @@
 //!
 //! `LATHE_TIMINGS=1` prints when the first frame showed, counted from the start of the process.
 
-use std::{path::PathBuf, time::Instant};
+use std::path::PathBuf;
 
 use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
 
@@ -20,6 +20,7 @@ mod frame_meter;
 mod key_table;
 mod list_diff;
 mod look_rules;
+mod memory;
 mod open_project;
 mod pull_card;
 mod pulls;
@@ -34,13 +35,14 @@ mod shell;
 mod ssh_form;
 mod status;
 mod tabs;
+mod timings;
 mod tasks;
 mod tree;
 mod tree_view;
 
 fn main() {
     exit_log::install();
-    let started = Instant::now();
+    let started = timings::mark_start();
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
     let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
