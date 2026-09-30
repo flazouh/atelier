@@ -4,12 +4,13 @@
 //! A session open in the window is keyed by its panel's key. A past one, which the agent lists but no
 //! panel holds, is keyed `past:<the agent's id>`, so opening it resumes it.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use beui::{
     panel_types::{PanelData, ProjectLabel},
     session_status::SessionStatus,
-    sidebar_model::{Connection, Location as RowLocation, ProjectData, SessionData},
+    project_badge,
+    sidebar_model::{Badge, Connection, Location as RowLocation, ProjectData, SessionData},
 };
 use gpui_kit::{App, Entity, SharedString};
 use lathe_agents::session::SessionId;
@@ -50,8 +51,32 @@ fn row_location(location: &Location) -> RowLocation {
     }
 }
 
+/// What the reader chose for projects' badges, by place: a colour, an image file.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Badges {
+    pub colors: BTreeMap<String, u8>,
+    pub icons: BTreeMap<String, String>,
+}
+impl Badges {
+    pub fn saved(settings: &lathe_settings::Settings) -> Self {
+        Self { colors: settings.project_colors.clone(), icons: settings.project_icons.clone() }
+    }
+}
+/// The badge of the project at `place`: the label the set gave it, the colour the reader picked or its place gives,
+/// and its image when the file is still there.
+pub fn badge_of(place: &str, label: &str, badges: &Badges) -> Badge {
+    Badge {
+        label: label.to_string().into(),
+        color: project_badge::color_of(badges.colors.get(place).map(|c| usize::from(*c)), place),
+        icon: badges.icons.get(place).map(PathBuf::from).filter(|path| path.exists()),
+    }
+}
+
 /// Every project with its sessions, open ones first as the agent names them, then past ones.
-pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String>, cx: &App) -> Vec<ProjectData> {
+pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String>, badges: &Badges, cx: &App) -> Vec<ProjectData> {
+    let places: Vec<(String, String)> = projects.iter().map(|p| (project_id(p.read(cx)).to_string(), p.read(cx).name())).collect();
+    let pairs: Vec<(&str, &str)> = places.iter().map(|(place, name)| (place.as_str(), name.as_str())).collect();
+    let labels = project_badge::labels(&pairs);
     projects
         .iter()
         .map(|p| {
@@ -85,6 +110,10 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                 sessions: open.chain(past).collect(),
                 pulls_unavailable: p.pulls_unavailable().map(SharedString::from),
                 tasks_open: p.tasks_open(),
+                badge: {
+                    let place = project_id(p);
+                    badge_of(&place, labels.get(place.as_ref()).map_or("", String::as_str), badges)
+                },
             }
         })
         .collect()
@@ -118,3 +147,6 @@ pub fn panels(
         .collect();
     (panels, order)
 }
+
+#[cfg(test)]
+mod tests;

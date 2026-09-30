@@ -139,3 +139,15 @@ fn the_elevation_strength_is_kept_and_an_old_file_has_none() {
     let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
     assert_eq!(round.design_strength, Some(70));
 }
+
+#[test]
+fn a_project_keeps_its_badge_colour_and_icon_and_an_old_file_has_none() {
+    let old: Settings = serde_json::from_str("{}").unwrap();
+    assert!(old.project_colors.is_empty() && old.project_icons.is_empty());
+    let mut kept = Settings::default();
+    kept.project_colors.insert("~/code/x".into(), 7);
+    kept.project_icons.insert("~/code/x".into(), "/data/project-icons/ab.svg".into());
+    let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
+    assert_eq!(round.project_colors["~/code/x"], 7);
+    assert_eq!(round.project_icons["~/code/x"], "/data/project-icons/ab.svg");
+}
