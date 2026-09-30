@@ -716,7 +716,9 @@ impl Shell {
                     .flex_col()
                     .gap(px(20.))
                     .w(px(420.))
+                    .child(div().flex().child(beui::LatheMark::new(40.)))
                     .child(div().text_size(TextSize::Lg.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open a project"))
+                    .child(div().debug_selector(|| "first-launch-line".into()).mt(px(-12.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(WHAT_LATHE_IS))
                     .child(
                         div()
                             .flex()
@@ -961,6 +963,9 @@ impl Shell {
     }
 }
 
+/// What the first launch says lathe is, in one line.
+const WHAT_LATHE_IS: &str = "Run coding agents on your code, review every change they make, and commit what you keep.";
+
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let root = self.root(window, cx);
@@ -1056,3 +1061,6 @@ enum Edge {
     Sidebar,
     Right,
 }
+
+#[cfg(test)]
+mod tests;
