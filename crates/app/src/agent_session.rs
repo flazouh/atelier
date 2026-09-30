@@ -59,6 +59,8 @@ pub enum SessionEvent {
     Renamed,
     /// The reader pressed the session's pull request card.
     ShowPull(lathe_forge::PullRef),
+    /// A turn ended, or the history loaded: the agent's text is whole, and its #N can be looked up.
+    TextSettled,
 }
 
 impl EventEmitter<SessionEvent> for AgentSession {}
@@ -88,6 +90,9 @@ pub struct AgentSession {
     pub name: Option<SharedString>,
     pub status: SessionStatus,
     pub active_at: u64,
+    /// Whether `active_at` is the agent's own time, from its work or the record: the agent's list then
+    /// has no say.
+    pub activity_known: bool,
     /// The reader is looking at it: a turn that ends is seen.
     pub seen: bool,
     pub model: Option<String>,
@@ -202,6 +207,7 @@ impl AgentSession {
             status: SessionStatus::Idle,
             // A resumed session's last activity comes from the agent's list; a new one starts now.
             active_at: if resume.is_some() { 0 } else { now() },
+            activity_known: resume.is_none(),
             seen: false,
             model: None,
             mode: None,
@@ -258,8 +264,18 @@ impl AgentSession {
                 for event in &history {
                     s.conversation.apply(event);
                 }
+                if !history.is_empty() {
+                    cx.emit(SessionEvent::TextSettled);
+                }
                 if let Some(record) = record {
                     s.reviews = ReviewState::from_record(record);
+                    // The record knows when the agent last worked; the agent's list, which a resume
+                    // touches, does not.
+                    if let (Some(at), false) = (s.reviews.last_activity, s.activity_known) {
+                        s.active_at = at;
+                        s.activity_known = true;
+                        cx.emit(SessionEvent::Changed);
+                    }
                     if let Some(reference) = s.reviews.pull.clone() {
                         s.show_card(reference, cx);
                     }
@@ -342,9 +358,12 @@ impl AgentSession {
         }
         if ended_turns {
             self.save_review(cx);
+            cx.emit(SessionEvent::TextSettled);
         }
         if events.iter().any(is_activity) {
             self.active_at = now();
+            self.reviews.last_activity = Some(self.active_at);
+            self.activity_known = true;
         }
         self.refresh_rows();
         let working = self.conversation.working();
@@ -524,6 +543,14 @@ impl AgentSession {
         }));
         self.pull_card = Some(card);
         cx.notify();
+    }
+
+    /// The agent's text, message by message.
+    pub fn agent_texts(&self) -> Vec<String> {
+        self.conversation.items().iter().filter_map(|item| match item {
+            Item::Text { text, .. } => Some(text.clone()),
+            _ => None,
+        }).collect()
     }
 
     /// Writes the review to the project's data folder, a moment after its last change, off the UI thread.

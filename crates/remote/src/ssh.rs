@@ -13,9 +13,10 @@
 //!    no `scp` on either side.
 //! 3. Dial: `ssh <host> <that path> --stdio`, whose stdin and stdout carry the frames.
 //!
-//! The copy to upload comes from `$LATHE_REMOTE_DIR/<system>-<architecture>/lathe-remote`, or, for a
-//! host like this machine, the `lathe-remote` beside the app. In development, build it on a machine
-//! of the host's kind (the HP builds linux-x86_64) and point `LATHE_REMOTE_DIR` at a folder of them.
+//! The copy to upload is found with no setup ([`candidates`]): next to the app, by the host's platform
+//! (`remote/<system>-<architecture>/lathe-remote`); in a Mac app's resources; the plain `lathe-remote`
+//! beside the app for a host of its own kind; and the folder `tools/build-remote.sh` fills. A developer
+//! may name another folder with `LATHE_REMOTE_DIR`, looked at first.
 
 use std::{
     io::{self, Read, Write},
@@ -62,6 +63,16 @@ impl Platform {
 
     pub fn name(&self) -> String {
         format!("{}-{}", self.system, self.arch)
+    }
+
+    /// For a person: "Linux x86_64", "macOS aarch64".
+    pub fn describe(&self) -> String {
+        let system = match self.system.as_str() {
+            "linux" => "Linux".to_string(),
+            "darwin" => "macOS".to_string(),
+            other => other.to_string(),
+        };
+        format!("{system} {}", self.arch)
     }
 }
 
@@ -152,16 +163,66 @@ pub fn probe(host: &str) -> io::Result<(Platform, String)> {
     Ok((platform, home))
 }
 
-/// The copy of lathe-remote to upload to a host of `platform`, if there is one.
-pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
-    if let Some(dir) = std::env::var_os("LATHE_REMOTE_DIR") {
-        let path = PathBuf::from(dir).join(platform.name()).join("lathe-remote");
-        if path.is_file() {
-            return Some(path);
+/// Where a copy of lathe-remote for `platform` may be, in the order to look: the folder a developer
+/// names (`env_dir`), next to the app `exe` by platform, in a Mac bundle's resources, the plain copy
+/// beside the app when the host is of the app's own kind (`same`), and the folder
+/// `tools/build-remote.sh` fills under `home`.
+pub fn candidates(exe: &std::path::Path, platform: &Platform, env_dir: Option<&std::path::Path>, home: Option<&std::path::Path>, same: bool) -> Vec<PathBuf> {
+    let by_platform = |dir: PathBuf| dir.join(platform.name()).join("lathe-remote");
+    let mut found = Vec::new();
+    found.extend(env_dir.map(|d| by_platform(d.to_path_buf())));
+    if let Some(dir) = exe.parent() {
+        found.push(by_platform(dir.join("remote")));
+        // A Mac app runs from Contents/MacOS, and keeps what it ships in Contents/Resources.
+        if dir.file_name().is_some_and(|n| n == "MacOS") {
+            found.extend(dir.parent().map(|contents| by_platform(contents.join("Resources").join("remote"))));
+        }
+        if same {
+            found.push(dir.join("lathe-remote"));
         }
     }
-    let beside = std::env::current_exe().ok()?.parent()?.join("lathe-remote");
-    (*platform == Platform::here() && beside.is_file()).then_some(beside)
+    found.extend(home.map(|h| by_platform(h.join(".cache/lathe/remote-builds"))));
+    found
+}
+
+/// The copy of lathe-remote to upload to a host of `platform`, if there is one.
+pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let env_dir = std::env::var_os("LATHE_REMOTE_DIR").map(PathBuf::from);
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    first_matching(&candidates(&exe, platform, env_dir.as_deref(), home.as_deref(), *platform == Platform::here()))
+}
+
+/// The protocol a helper binary's bytes say it speaks, from its stamp; `None` for a copy with none, as
+/// helpers built before the stamp are.
+pub fn speaks(bytes: &[u8]) -> Option<u32> {
+    const MARK: &[u8] = b"lathe-remote-protocol:";
+    let at = bytes.windows(MARK.len()).position(|w| w == MARK)? + MARK.len();
+    let digits: Vec<u8> = bytes[at..].iter().take_while(|b| b.is_ascii_digit()).copied().collect();
+    let end = bytes.get(at + digits.len())?;
+    (*end == b';').then(|| std::str::from_utf8(&digits).ok()?.parse().ok()).flatten()
+}
+
+/// The first of `candidates` that is a file and speaks this protocol: an old copy is passed over.
+pub fn first_matching(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates.iter().find(|p| std::fs::read(p).is_ok_and(|bytes| speaks(&bytes) == Some(crate::protocol::VERSION))).cloned()
+}
+
+/// What a helper answers to `--version`: its build and its protocol. The copy on a host is used only
+/// when it answers this, else the matching one goes up in its place.
+pub fn version_line() -> String {
+    format!("{VERSION} protocol {}", crate::protocol::VERSION)
+}
+
+/// What the reader reads when no copy for the host is found: what is missing, and what to do.
+pub fn missing_words(host: &str, platform: &Platform) -> String {
+    format!(
+        "{host} is a {} machine, and this copy of lathe has no helper built for it, so it cannot open folders there. \
+         Install a lathe build that includes the {} helper, or, from a lathe checkout, build one with tools/build-remote.sh on a {} machine.",
+        platform.describe(),
+        platform.name(),
+        platform.describe()
+    )
 }
 
 /// Makes sure the host has this version's lathe-remote, uploading it when not, and returns its path
@@ -170,12 +231,13 @@ pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Resu
     let local = local_binary(platform).ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
-            format!("no lathe-remote {VERSION} built for {} to put on {host}; set LATHE_REMOTE_DIR", platform.name()),
+            missing_words(host, platform),
         )
     })?;
     let bytes = std::fs::read(&local)?;
     let path = remote_binary(VERSION, &short_hash(&bytes));
-    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| v.trim() == VERSION).unwrap_or(false);
+    // A copy that answers another protocol is replaced by the one that matches, with nothing to see.
+    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| v.trim() == version_line()).unwrap_or(false);
     if has {
         return Ok(path);
     }
@@ -183,8 +245,8 @@ pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Resu
     let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
     run(host, &format!("mkdir -p {dir} && cat > {path}.part && chmod +x {path}.part && mv {path}.part {path}"), Some(&bytes))?;
     let version = run(host, &format!("{path} --version"), None)?;
-    if version.trim() != VERSION {
-        return Err(io::Error::other(format!("{host}: the uploaded lathe-remote says {:?}", version.trim())));
+    if version.trim() != version_line() {
+        return Err(io::Error::other(format!("{host}: the helper lathe put there does not start as it should")));
     }
     Ok(path)
 }
