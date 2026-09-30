@@ -117,7 +117,7 @@ fn the_tasks_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
     let tasks = Some(crate::open_project::front::Front::Tasks);
     let mut lost = Vec::new();
     for (name, place) in places {
-        shell.update_in(cx, |s, window, cx| place(s, window, cx));
+        shell.update_in(cx, place);
         settle(&shell, cx);
         assert_ne!(front(&shell, cx), tasks, "Tasks starts hidden ({name})");
         cx.simulate_keystrokes(chord);
@@ -166,7 +166,7 @@ fn every_global_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext)
     ];
     let mut lost = Vec::new();
     for (name, place) in places {
-        shell.update_in(cx, |s, window, cx| place(s, window, cx));
+        shell.update_in(cx, place);
         settle(&shell, cx);
         let missing: Vec<String> = cx.update(|window, cx| {
             global.iter().filter(|(_, action)| !window.is_action_available(action.as_ref(), cx)).map(|(keys, _)| keys.clone()).collect()
