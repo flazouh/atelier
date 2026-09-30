@@ -17,7 +17,7 @@ use lathe_project::Link;
 use lathe_settings::Location;
 
 use crate::{
-    open_project::{Git, OpenProject},
+    open_project::OpenProject,
     session_view::session_view,
 };
 
@@ -84,10 +84,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                     Link::Up => Connection::Connected,
                     Link::Down(_) => Connection::Reconnecting,
                 },
-                branch: match &p.git {
-                    Git::Branch(b) => Some(b.clone()),
-                    _ => None,
-                },
+                branch: p.git.branch().cloned(),
                 sessions: open.chain(past).collect(),
                 pulls_unavailable: p.pulls_unavailable().map(SharedString::from),
             }

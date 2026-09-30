@@ -36,6 +36,10 @@ use lathe_review::{Content, FileReview, Merged};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
+    ship::{
+        kept::{Kept, kept},
+        strip::{ShipStrip, StripEvent},
+    },
     review_state::Decided,
     review_text::{moved_caret, row_of, splice},
 };
@@ -136,6 +140,8 @@ pub enum PaneEvent {
     Close,
     /// A line for the status line, such as a write that failed.
     Said(SharedString),
+    /// The strip made a commit, so the branch and its changes are to be read again.
+    Committed,
 }
 
 impl EventEmitter<PaneEvent> for ReviewPane {}
@@ -157,6 +163,8 @@ pub struct ReviewPane {
     /// merged text, which the server reads without the removed rows.
     language: Option<SessionFor>,
     lsp: Option<Entity<EditorSession>>,
+    /// Ships what the review kept: the commit, then the push and the pull request.
+    pub ship: Entity<ShipStrip>,
     focus: FocusHandle,
     pub review_mode: bool,
     resolving: Vec<beui::Resolve>,
@@ -172,6 +180,7 @@ pub struct ReviewPane {
     opening_at: Option<String>,
     _edits: Subscription,
     _session: Subscription,
+    _ship: Subscription,
 }
 
 impl ReviewPane {
@@ -205,6 +214,12 @@ impl ReviewPane {
             Scope::Turn(turn) => turn,
             Scope::Whole => turns.saturating_sub(1),
         };
+        let (backend, model) = (session.read(cx).agent.backend.clone(), session.read(cx).model.clone());
+        let ship = cx.new(|cx| ShipStrip::new(project.clone(), backend, model, window, cx));
+        let _ship = cx.subscribe_in(&ship, window, |this, _, event: &StripEvent, window, cx| match event {
+            StripEvent::WantsOpen => this.open_ship(window, cx),
+            StripEvent::Committed => cx.emit(PaneEvent::Committed),
+        });
         // Typing not yet written when the pane goes is written as it goes.
         cx.on_release(|pane: &mut Self, cx| pane.flush(cx)).detach();
         let mut pane = Self {
@@ -219,6 +234,8 @@ impl ReviewPane {
             editor,
             language: None,
             lsp: None,
+            ship,
+            _ship,
             focus: cx.focus_handle(),
             review_mode: false,
             resolving: Vec::new(),
@@ -270,6 +287,20 @@ impl ReviewPane {
             (Some(language), Some(file)) if file.merged.is_some() => Some(language(&file.review.path, self.editor.clone(), RowMap::new(file.hunks()), cx)),
             _ => None,
         };
+    }
+
+    /// What the review kept, file by file: the accepted hunks and the reader's edits in them.
+    pub fn kept(&self) -> Vec<Kept> {
+        self.files.iter().filter_map(|f| kept(&f.review, f.merged.as_ref())).collect()
+    }
+
+    /// Opens the Ship strip on what the review kept. Typing not yet written is written first.
+    fn open_ship(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.writing.take().is_some() {
+            self.write(&[self.current], cx);
+        }
+        let kept = self.kept();
+        self.ship.update(cx, |strip, cx| strip.open(kept, window, cx));
     }
 
     /// The server's words for the status line, when the open file has one.
@@ -491,7 +522,7 @@ impl ReviewPane {
 
     /// Decides hunk `id` of the open file, writes the file, and gives the rows that closed; `None` when
     /// the file has no such hunk.
-    fn decide_hunk(&mut self, id: &str, decision: Decision, window: &mut Window, cx: &mut Context<Self>) -> Option<std::ops::Range<usize>> {
+    pub(crate) fn decide_hunk(&mut self, id: &str, decision: Decision, window: &mut Window, cx: &mut Context<Self>) -> Option<std::ops::Range<usize>> {
         let at = self.current;
         let hunk = self.files.get(at)?.hunks().iter().find(|h| h.id == id).cloned()?;
         let closed = hunk.closing(decision);
@@ -630,6 +661,7 @@ impl ReviewPane {
             .on_accept_all(with(|s, w, cx| s.decide_every_file(Decision::Accept, w, cx)))
             .on_reject_all(with(|s, w, cx| s.decide_every_file(Decision::Reject, w, cx)))
             .on_switch_scope(with(|s, w, cx| s.switch_scope(w, cx)))
+            .on_commit(with(|s, w, cx| s.open_ship(w, cx)))
             .on_mark(with(|s, _, cx| s.toggle_mark(cx)))
             .on_review_mode(with(|s, _, cx| {
                 s.review_mode = !s.review_mode;
@@ -878,6 +910,7 @@ impl Render for ReviewPane {
             .overflow_hidden()
             .child(measure)
             .child(bar)
+            .child(self.ship.clone())
             .child(div().flex().flex_1().min_h_0().gap(px(8.)).children(tree).child(file_card));
         let pane = handlers.keys(pane, &self.focus);
         if !self.review_mode {
