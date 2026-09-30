@@ -1,7 +1,7 @@
 //! The "Motion" story: the components ported from beui.dev's `motion/` and `blocks/`, each in every state it
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
-use beui::{ActiveTheme, Checkbox, ColorSelector, Swatch};
+use beui::{ActiveTheme, Checkbox, ColorSelector, RangeSlider, Swatch};
 use gpui_kit::{
     AnyElement, Context, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -38,11 +38,13 @@ pub struct MotionStory {
     terms: bool,
     updates: bool,
     all: bool,
+    level: f32,
+    fine: f32,
 }
 
 impl MotionStory {
     pub fn new(_: &mut Window, _: &mut Context<Self>) -> Self {
-        Self { part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false }
+        Self { part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
     }
 
     fn shows(&self, name: &str) -> bool {
@@ -166,6 +168,56 @@ impl Render for MotionStory {
                                 .ok();
                             }
                         })),
+                ));
+            }
+        }
+        if self.shows("range-slider") {
+            let this = cx.entity().downgrade();
+            let set = |field: fn(&mut MotionStory) -> &mut f32| {
+                let this = this.clone();
+                move |v: f32, _: &mut Window, cx: &mut gpui_kit::App| {
+                    this.update(cx, |s, cx| {
+                        *field(s) = v;
+                        cx.notify();
+                    })
+                    .ok();
+                }
+            };
+            let demo = div()
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .w_full()
+                .max_w(px(384.))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .text_size(px(14.))
+                        .line_height(px(20.))
+                        .text_color(theme.muted_foreground)
+                        .child("Drag the handle")
+                        .child(div().text_color(theme.foreground).child(format!("{}", self.level))),
+                )
+                .child(RangeSlider::new("range", self.level).step(5.).on_change(set(|s| &mut s.level)));
+            if alone {
+                parts.push(demo.into_any_element());
+            } else {
+                parts.push(section("Range slider: the demo", &theme, demo));
+                parts.push(section(
+                    "Range slider: no dots, the whole range, a fine step, disabled, and a step that does not divide the range",
+                    &theme,
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(12.))
+                        .w(px(384.))
+                        .child(RangeSlider::new("r1", self.level).ticks(false).on_change(set(|s| &mut s.level)))
+                        .child(RangeSlider::new("r2", self.fine).range(0., 5.).step(0.5).on_change(set(|s| &mut s.fine)))
+                        .child(RangeSlider::new("r3", 70.).step(10.).disabled(true))
+                        .child(RangeSlider::new("r4", 10.).range(0., 10.).step(4.).on_change(|_, _, _| {}))
+                        .child(RangeSlider::new("r5", 0.).step(10.).on_change(|_, _, _| {})),
                 ));
             }
         }
