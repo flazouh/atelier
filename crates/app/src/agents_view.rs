@@ -89,6 +89,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                     _ => None,
                 },
                 sessions: open.chain(past).collect(),
+                pulls_unavailable: p.pulls_unavailable().map(SharedString::from),
             }
         })
         .collect()

@@ -39,6 +39,12 @@ pub trait Forge: Send + Sync {
     /// The pull requests the reader is involved in, each on the shelf that holds it.
     fn involved(&self) -> ForgeResult<Vec<Involved>>;
 
+    /// The part of the working set in one repository, for a project's own pane. A forge that cannot ask
+    /// for less takes the whole set and keeps the repository's part.
+    fn involved_in(&self, repo: &RepoRef) -> ForgeResult<Vec<Involved>> {
+        Ok(self.involved()?.into_iter().filter(|row| row.summary.brief.reference.repo == *repo).collect())
+    }
+
     /// Many pull numbers of one repository in one request. The answer has one entry per number, in
     /// order; a number that is not a pull request is `None`.
     fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>>;

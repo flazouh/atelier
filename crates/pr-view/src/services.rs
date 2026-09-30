@@ -35,6 +35,9 @@ pub struct PrConfig {
     pub refresh: Duration,
     /// How often the list is refreshed.
     pub list_refresh: Duration,
+    /// The one repository the list holds, for a project's own pane; `None` for the reader's whole
+    /// working set, on its Courts.
+    pub repo: Option<lathe_forge::RepoRef>,
     /// Where to fetch pull requests from, when it is not the project's own remote for the repository.
     /// For a mirror, or a test.
     pub fetch_url: Option<String>,
@@ -51,7 +54,14 @@ impl PrConfig {
             refresh: Duration::from_secs(30),
             list_refresh: Duration::from_secs(60),
             fetch_url: None,
+            repo: None,
         }
+    }
+
+    /// Only `repo`'s pull requests in the list.
+    pub fn repo(mut self, repo: lathe_forge::RepoRef) -> Self {
+        self.repo = Some(repo);
+        self
     }
 
     pub fn read_only(mut self, read_only: bool) -> Self {
@@ -102,7 +112,7 @@ impl Services {
                 None => PrGit::new(project, &config.remote_data),
             }),
             snapshots: Snapshots::new(dir.join("snapshots")),
-            list_snapshot: ListSnapshot::new(&dir),
+            list_snapshot: ListSnapshot::scoped(&dir, config.repo.as_ref()),
             reviewed: Arc::new(reviewed),
             config,
         }))

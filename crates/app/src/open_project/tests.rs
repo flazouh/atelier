@@ -322,6 +322,17 @@ fn the_chips_follow_the_repository_and_stay_quiet_when_the_list_does(cx: &mut Te
     let before = told.get();
     cx.update(|_, cx| project.update(cx, |p, cx| p.set_list_rows(rows.clone(), cx)));
     assert_eq!(told.get(), before, "the same chips tell no session");
-    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some("b/two".into()), cx)));
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some(lathe_forge::RepoRef { host: "github.com".into(), owner: "b".into(), name: "two".into() }), cx)));
     assert_eq!(numbers(cx), [4], "the repository landed: only its own");
+}
+
+/// A project with no GitHub remote opens no pull requests: the pane does nothing, and says why.
+#[gpui_kit::test]
+fn a_project_with_no_forge_remote_opens_no_pull_requests(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[]);
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(None, cx)));
+    assert_eq!(cx.update(|_, cx| project.read(cx).pulls_unavailable()), Some("No GitHub remote for this project"));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_pulls(window, cx)));
+    cx.run_until_parked();
+    assert!(cx.update(|_, cx| project.read(cx).pulls.is_none()), "nothing opened");
 }

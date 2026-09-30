@@ -88,3 +88,20 @@ fn the_list_comes_back_from_disk() {
     std::fs::write(dir.path().join("pr/involved.json"), "{broken").unwrap();
     assert!(snapshot.load().is_none(), "a damaged file is a miss");
 }
+
+/// A project's list holds only its own repository's pull requests, and keeps its own cache, so the
+/// reader's whole working set never shows in it, not even from the cache.
+#[test]
+fn a_scoped_list_holds_only_its_repository() {
+    use lathe_forge::{Forge, RepoRef};
+    let ours = sample::reference(1).repo;
+    let mut theirs = involved(2, PullState::Open, Some(Shelf::NeedsAction), 900);
+    theirs.summary.brief.reference.repo = RepoRef { host: "github.com".into(), owner: "other".into(), name: "repo".into() };
+    let forge = crate::fixture::FixtureForge::new().with_involved(vec![involved(1, PullState::Open, Some(Shelf::NeedsAction), 900), theirs]);
+    let numbers = |rows: Vec<Involved>| rows.into_iter().map(|r| r.summary.brief.reference.number).collect::<Vec<_>>();
+    assert_eq!(numbers(forge.involved_in(&ours).unwrap()), [1]);
+    assert_eq!(numbers(forge.involved().unwrap()), [1, 2], "unscoped, all of them");
+    let dir = tempfile::tempdir().unwrap();
+    let (scoped, whole) = (ListSnapshot::scoped(dir.path(), Some(&ours)), ListSnapshot::scoped(dir.path(), None));
+    assert_ne!(scoped.file(), whole.file(), "each has a cache of its own");
+}

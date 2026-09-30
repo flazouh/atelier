@@ -177,7 +177,11 @@ impl Forge for GitHub {
     }
 
     fn involved(&self) -> ForgeResult<Vec<Involved>> {
-        involved::involved(&self.client)
+        involved::involved(&self.client, None)
+    }
+
+    fn involved_in(&self, repo: &RepoRef) -> ForgeResult<Vec<Involved>> {
+        involved::involved(&self.client, Some(repo))
     }
 
     fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {

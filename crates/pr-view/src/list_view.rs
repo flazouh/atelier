@@ -106,9 +106,9 @@ impl PullList {
             return;
         }
         self.reading = true;
-        let (forge, tx) = (self.services.forge.clone(), self.tx.clone());
+        let (forge, tx, scope) = (self.services.forge.clone(), self.tx.clone(), self.services.config.repo.clone());
         cx.background_spawn(async move {
-            let _ = tx.unbounded_send(Msg::Read(read_involved(forge.as_ref())));
+            let _ = tx.unbounded_send(Msg::Read(read_involved(forge.as_ref(), scope.as_ref())));
         })
         .detach();
         cx.notify();
@@ -163,8 +163,11 @@ impl PullList {
     }
 }
 
-fn read_involved(forge: &dyn Forge) -> Result<Vec<Involved>, ForgeError> {
-    forge.involved()
+fn read_involved(forge: &dyn Forge, scope: Option<&lathe_forge::RepoRef>) -> Result<Vec<Involved>, ForgeError> {
+    match scope {
+        Some(repo) => forge.involved_in(repo),
+        None => forge.involved(),
+    }
 }
 
 impl Render for PullList {

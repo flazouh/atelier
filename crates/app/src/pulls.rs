@@ -1,4 +1,4 @@
-//! A project's pull requests: alex-31's `PrHub` (`crates/pr-view`, `docs/pr-view.md`), in the right pane
+//! A project's pull requests, of its own repository only: alex-31's `PrHub` (`crates/pr-view`, `docs/pr-view.md`), in the right pane
 //! in place of the editor while it shows. It opens from the project's ⋯ menu ("Pull requests") or
 //! ⌘⇧P, and from a PR chip in an agent's text. Read-only until Alex approves a scratch repository:
 //! nothing it does is sent to GitHub. Its services (a small database and caches) open off the UI
@@ -31,9 +31,10 @@ pub fn login(project: &dyn Project) -> Option<String> {
 
 /// The view's services for `project`, read-only, with the project's language servers. Blocking: it
 /// opens the reader's database and the caches in `local_data`.
-pub fn open_services(project: Arc<dyn Project>, me: String, local_data: PathBuf, workers: Arc<Workers>) -> Result<Arc<Services>, String> {
+/// The list holds only `repo`'s pull requests: the project's own.
+pub fn open_services(project: Arc<dyn Project>, me: String, local_data: PathBuf, workers: Arc<Workers>, repo: lathe_forge::RepoRef) -> Result<Arc<Services>, String> {
     let forge = Arc::new(lathe_forge::github::GitHub::new(project.clone()));
-    let config = PrConfig::new(me, local_data).read_only(true).workers(workers);
+    let config = PrConfig::new(me, local_data).read_only(true).workers(workers).repo(repo);
     Services::open(project, forge, config)
 }
 

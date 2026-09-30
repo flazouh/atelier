@@ -123,8 +123,8 @@ pub struct OpenProject {
     pub review: Option<(Entity<ReviewPane>, Subscription)>,
     /// The project's pull requests, once asked for (`pulls.rs`).
     pub pulls: Option<Pulls>,
-    /// The project's own repository on its forge (`owner/name`), from the origin remote.
-    repo: Option<String>,
+    /// The project's own repository on its forge, from the origin remote; `None` when it has none.
+    repo: Option<lathe_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
     list_rows: Vec<beui::PrChipData>,
@@ -144,6 +144,9 @@ pub struct OpenProject {
     linking: Task<()>,
     listing_task: Task<()>,
 }
+
+/// Why a project's pull requests do not open.
+const NO_FORGE_REMOTE: &str = "No GitHub remote for this project";
 
 impl OpenProject {
     pub fn new(location: Location, project: Arc<dyn Project>, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -304,7 +307,7 @@ impl OpenProject {
         let project = self.project.clone();
         let remote = cx.background_spawn(async move { project.git(&["remote", "get-url", "origin"]) });
         cx.spawn(async move |this, cx| {
-            let repo = remote.await.ok().filter(|out| out.ok()).and_then(|out| lathe_forge::RepoRef::from_remote(out.stdout.trim())).map(|r| r.slug());
+            let repo = remote.await.ok().filter(|out| out.ok()).and_then(|out| lathe_forge::RepoRef::from_remote(out.stdout.trim()));
             _ = this.update(cx, |this, cx| this.set_repo(repo, cx));
         })
         .detach();
@@ -348,6 +351,10 @@ impl OpenProject {
             pulls.shown = !pulls.shown;
             return cx.notify();
         }
+        // The pane holds the project's own repository only, so a project without one opens nothing.
+        let Some(repo) = self.repo.clone() else {
+            return cx.emit(ProjectEvent::Said(NO_FORGE_REMOTE.into()));
+        };
         let (project, workers) = (self.project.clone(), self.workers.clone());
         let Some(local) = lathe_settings::path().and_then(|p| p.parent().map(std::path::Path::to_path_buf)) else {
             return cx.emit(ProjectEvent::Said("Pull requests need a data folder on this machine".into()));
@@ -355,7 +362,7 @@ impl OpenProject {
         cx.emit(ProjectEvent::Said("Reading pull requests…".into()));
         let opening = cx.background_spawn(async move {
             let me = pulls::login(project.as_ref()).unwrap_or_default();
-            pulls::open_services(project, me, local, workers)
+            pulls::open_services(project, me, local, workers, repo)
         });
         self.opening_pulls = cx.spawn_in(window, async move |this, cx| {
             let services = opening.await;
@@ -366,6 +373,11 @@ impl OpenProject {
         });
     }
 
+    /// Why the project's pull requests cannot open, for its menu: it has no GitHub remote.
+    pub fn pulls_unavailable(&self) -> Option<&'static str> {
+        self.repo.is_none().then_some(NO_FORGE_REMOTE)
+    }
+
     /// The pull requests the list holds now.
     pub fn set_list_rows(&mut self, rows: Vec<beui::PrChipData>, cx: &mut Context<Self>) {
         self.list_rows = rows;
@@ -373,7 +385,7 @@ impl OpenProject {
     }
 
     /// The project's own repository, once the origin remote is read.
-    pub fn set_repo(&mut self, repo: Option<String>, cx: &mut Context<Self>) {
+    pub fn set_repo(&mut self, repo: Option<lathe_forge::RepoRef>, cx: &mut Context<Self>) {
         self.repo = repo;
         self.refresh_chips(cx);
     }
@@ -381,7 +393,8 @@ impl OpenProject {
     /// The chips from the list and the repository. The list notifies on a hover or a tick, so the
     /// sessions hear only of chips that changed.
     fn refresh_chips(&mut self, cx: &mut Context<Self>) {
-        let chips = pulls::chips_of(self.list_rows.iter().cloned(), self.repo.as_deref());
+        let slug = self.repo.as_ref().map(lathe_forge::RepoRef::slug);
+        let chips = pulls::chips_of(self.list_rows.iter().cloned(), slug.as_deref());
         if *self.pr_chips == chips {
             return;
         }

@@ -326,7 +326,7 @@ Bugs found in QA, each with a regression test in `crates/app/src/review_pane/tes
 
 ## Pull requests in the app (M5)
 
-alex-31's pull request view (`crates/pr-view`, `docs/pr-view.md`) is mounted per project
+alex-31's pull request view (`crates/pr-view`, `docs/pr-view.md`) is mounted per project, for the project's own repository only (the origin remote; its searches carry `repo:owner/name`, and its cache is its own). A project with no GitHub remote shows the menu entry off, with "No GitHub remote for this project". The reader's whole working set, on its Courts, waits for a top-level place outside any project.
 (`crates/app/src/pulls.rs`), in the right pane in place of the editor, as wide as a review.
 
 - **Opening it.** "Pull requests" in the project's ⋯ menu in the sidebar, or ⌘⇧P, shows or hides it. The

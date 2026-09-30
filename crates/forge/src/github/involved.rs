@@ -8,7 +8,7 @@ use super::{
     queries, read,
     wire::{Page, SearchHit},
 };
-use crate::{ForgeError, ForgeResult, Involved, PullRef, Shelf};
+use crate::{ForgeError, ForgeResult, Involved, PullRef, RepoRef, Shelf};
 
 /// The GitHub searches behind each shelf. `None` is a pull request the reader is only assigned to or
 /// mentioned in: it belongs to no shelf.
@@ -26,9 +26,22 @@ const SEARCHES: &[(Option<Shelf>, &str)] = &[
 ];
 
 /// Every search at once, since each is a round trip and the reader waits for the slowest.
-pub(super) fn involved(client: &Client) -> ForgeResult<Vec<Involved>> {
+/// The searches for the whole working set, or with `repo:owner/name` on each for one repository.
+fn searches(scope: Option<&RepoRef>) -> Vec<(Option<Shelf>, String)> {
+    SEARCHES
+        .iter()
+        .map(|(shelf, search)| match scope {
+            Some(repo) => (*shelf, format!("{search} repo:{}", repo.slug())),
+            None => (*shelf, search.to_string()),
+        })
+        .collect()
+}
+
+/// The reader's working set; with `scope`, only that repository's part of it.
+pub(super) fn involved(client: &Client, scope: Option<&RepoRef>) -> ForgeResult<Vec<Involved>> {
+    let searches = searches(scope);
     let searched: Vec<ForgeResult<Vec<Involved>>> = thread::scope(|scope| {
-        let running: Vec<_> = SEARCHES
+        let running: Vec<_> = searches
             .iter()
             .map(|(shelf, search)| scope.spawn(move || search_one(client, *shelf, search)))
             .collect();
@@ -57,3 +70,6 @@ fn search_one(client: &Client, shelf: Option<Shelf>, search: &str) -> ForgeResul
         Ok((rows, next))
     })
 }
+
+#[cfg(test)]
+mod tests;

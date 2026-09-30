@@ -75,7 +75,20 @@ struct ListEnvelope {
 
 impl ListSnapshot {
     pub fn new(dir: impl Into<PathBuf>) -> Self {
-        Self { file: dir.into().join("involved.json") }
+        Self::scoped(dir, None)
+    }
+
+    /// The cache of the whole working set, or of one repository's part, each in a file of its own.
+    pub fn scoped(dir: impl Into<PathBuf>, repo: Option<&lathe_forge::RepoRef>) -> Self {
+        let name = match repo {
+            Some(repo) => format!("involved-{}-{}-{}.json", repo.host, repo.owner, repo.name),
+            None => "involved.json".into(),
+        };
+        Self { file: dir.into().join(name) }
+    }
+
+    pub fn file(&self) -> &std::path::Path {
+        &self.file
     }
 
     /// The items and when they were read, or `None`.
