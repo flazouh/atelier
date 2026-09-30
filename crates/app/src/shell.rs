@@ -642,17 +642,36 @@ impl Shell {
                 });
                 let picker = picker.downgrade();
                 cx.spawn_in(window, async move |_, cx| {
-                    let answer = listing.await.map(|all| all.into_iter().map(|e| (SharedString::from(e.name), e.dir)).collect()).map_err(|e| SharedString::from(e.to_string()));
+                    let answer = listing.await.map(|all| all.into_iter().map(|e| (SharedString::from(e.name), e.dir)).collect()).map_err(|e| folder_error(&e));
                     _ = picker.update(cx, |p, cx| p.show(&dir, answer, cx));
                 })
                 .detach();
             }
             beui::FolderPickerEvent::Choose(path) => {
-                let chosen = lathe_project::expand_home(path);
-                this.close_folder_picker(window, cx);
-                match chosen {
-                    Some(path) => this.open_local(path, window, cx),
-                    None => this.say(format!("{path} is not a folder path"), cx),
+                // The picker stays until the folder opens: a folder that will not open is said in the picker, with
+                // the path as the reader typed it.
+                match lathe_project::expand_home(path) {
+                    Some(target) => {
+                        let opening = cx.background_spawn(async move { LocalProject::open(target) });
+                        let picker = picker.downgrade();
+                        cx.spawn_in(window, async move |this, cx| {
+                            let opened = opening.await;
+                            _ = this.update_in(cx, |this, window, cx| match opened {
+                                Ok(project) => {
+                                    this.close_folder_picker(window, cx);
+                                    let location = Location::Local { path: lathe_project::Project::root(&project).to_path_buf() };
+                                    this.add(location, Arc::new(project), window, cx);
+                                }
+                                Err(error) => {
+                                    picker.update(cx, |p, cx| p.refuse(folder_error(&error), cx)).ok();
+                                }
+                            });
+                        })
+                        .detach();
+                    }
+                    None => {
+                        picker.update(cx, |p, cx| p.refuse(beui::FolderError::Missing, cx));
+                    }
                 }
             }
             beui::FolderPickerEvent::Cancel => this.close_folder_picker(window, cx),
@@ -745,7 +764,10 @@ impl Shell {
                     Location::Local { path } => this.open_local(path.clone(), window, cx),
                     Location::Ssh { host, path } => this.open_remote(host.clone(), path.display().to_string(), window, cx),
                 }))
-                .child(FileIcon::folder(&location.name(), false).size(px(16.)))
+                .child(match location {
+                    Location::Ssh { .. } => beui::Icon::new(beui::IconName::Dns).size(px(16.)).color(muted).into_any_element(),
+                    Location::Local { .. } => FileIcon::folder(&location.name(), false).size(px(16.)).into_any_element(),
+                })
                 .child(
                     div()
                         .flex()
@@ -1119,6 +1141,16 @@ impl Shell {
                     .child(finder.clone())
             }))
             .into_any_element()
+    }
+}
+
+/// A failure to read or open a folder, as the picker tells it.
+fn folder_error(error: &std::io::Error) -> beui::FolderError {
+    match error.kind() {
+        std::io::ErrorKind::NotFound => beui::FolderError::Missing,
+        std::io::ErrorKind::PermissionDenied => beui::FolderError::Denied,
+        std::io::ErrorKind::NotADirectory => beui::FolderError::NotAFolder,
+        _ => beui::FolderError::Other(error.to_string().into()),
     }
 }
 
