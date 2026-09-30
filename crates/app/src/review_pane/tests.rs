@@ -304,3 +304,19 @@ fn a_review_with_a_language_server_opens_its_file_once(cx: &mut TestAppContext) 
     assert_eq!(after, before, "the same editor");
     assert_eq!(*given.borrow(), [before], "one session, on that editor");
 }
+
+#[gpui_kit::test]
+fn the_comment_key_opens_the_composer_on_the_row_of_the_caret(cx: &mut TestAppContext) {
+    use gpui_kit::component::input::Position;
+    let (pane, _, _, _, cx) = reviewing(cx);
+    let handler = cx.update(|_, cx| pane.update(cx, |p, cx| p.handlers(cx))).for_command(beui::keys::Command::Comment).cloned().expect("the pane answers the comment key");
+    assert!(cx.update(|_, cx| pane.read(cx).composer.is_none()));
+    cx.update(|window, cx| {
+        let editor = pane.read(cx).editor.clone();
+        editor.update(cx, |e, cx| e.set_cursor_position(Position { line: 2, character: 0 }, window, cx));
+        handler(window, cx);
+    });
+    cx.run_until_parked();
+    let row = cx.update(|_, cx| pane.read(cx).composer.as_ref().map(|(_, composer, _)| composer.read(cx).row()));
+    assert_eq!(row, Some(2), "the composer is on the caret's row");
+}

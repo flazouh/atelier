@@ -162,9 +162,15 @@ impl Shell {
         let now = agent_session::now();
         self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
         self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));
+        self.mark_open_session(cx);
         cx.notify();
     }
 
+    /// Marks the row of the session in the active panel, in the sidebar.
+    fn mark_open_session(&mut self, cx: &mut Context<Self>) {
+        let active = self.panels.read(cx).active().cloned();
+        self.agents_sidebar.update(cx, |s, cx| s.set_open(active, cx));
+    }
     fn project_by_id(&self, id: &str, cx: &App) -> Option<usize> {
         self.projects.iter().position(|p| agents_view::project_id(p.read(cx)).as_ref() == id)
     }
@@ -264,6 +270,7 @@ impl Shell {
                     self.active = at;
                 }
                 self.seen(key, cx);
+                self.mark_open_session(cx);
             }
             PanelsEvent::Closed(key) => {
                 if let Some((at, _)) = self.session_by_key(key, cx) {
@@ -716,7 +723,9 @@ impl Shell {
                     .flex_col()
                     .gap(px(20.))
                     .w(px(420.))
+                    .child(div().flex().child(beui::LatheMark::new(40.)))
                     .child(div().text_size(TextSize::Lg.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open a project"))
+                    .child(div().debug_selector(|| "first-launch-line".into()).mt(px(-12.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(WHAT_LATHE_IS))
                     .child(
                         div()
                             .flex()
@@ -967,6 +976,9 @@ impl Shell {
     }
 }
 
+/// What the first launch says lathe is, in one line.
+const WHAT_LATHE_IS: &str = "Run coding agents on your code, review every change they make, and commit what you keep.";
+
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let root = self.root(window, cx);
@@ -1062,3 +1074,6 @@ enum Edge {
     Sidebar,
     Right,
 }
+
+#[cfg(test)]
+mod tests;
