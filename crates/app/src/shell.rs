@@ -1043,18 +1043,36 @@ impl Shell {
                                     .on_click(cx.listener(|this, _, window, cx| this.open_ssh_form(&OpenRemote, window, cx))),
                             ),
                     )
+                    .children(self.said.clone().map(|words| {
+                        // A long error wraps here, above Recent, and does not run off the status line.
+                        div().debug_selector(|| "start-error".into()).text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(words)
+                    }))
                     .child(
                         div()
                             .flex()
                             .flex_col()
                             .gap(px(4.))
-                            .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).pb(px(4.)).child("Recent"))
+                            .child(div().debug_selector(|| "recent-heading".into()).text_size(TextSize::Xs.font_size()).text_color(muted).pb(px(4.)).child("Recent"))
                             .when(!has_recent, |d| {
                                 d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("Folders you open show here."))
                             })
                             .children(recent),
                     ),
             )
+    }
+
+    /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
+    fn sidebar_foot(&self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+        div().flex_none().p(px(8.)).child(
+            Button::new("settings-entry")
+                .debug_name("settings-entry")
+                .icon(beui::IconName::Settings)
+                .label("Settings")
+                .variant(ButtonVariant::Ghost)
+                .cap(keys::cap("⌘,"))
+                .on_click(cx.listener(|this, _, window, cx| this.open_settings(&OpenSettings, window, cx))),
+        )
+        .into_any_element()
     }
 
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1066,7 +1084,6 @@ impl Shell {
             Some(p) => format!("Files in {}", p.read(cx).name()).into(),
             None => "Files".into(),
         };
-        let current = theme.clone();
         div()
             .flex()
             .flex_col()
@@ -1075,17 +1092,7 @@ impl Shell {
             .child(div().flex_1().min_h_0().child(self.agents_sidebar.clone()))
             .child(heading(tree_heading))
             .child(div().flex_1().min_h_0().children(tree))
-            .child(div().flex_none().p(px(8.)).child(beui::theme_picker::theme_picker("theme", &current, |picked, cx| {
-                let name = picked.name.to_string();
-                if let Some(path) = lathe_settings::path() {
-                    cx.background_spawn(async move {
-                        if let Err(error) = lathe_settings::update(&path, |s| s.theme = Some(name)) {
-                            eprintln!("could not save the theme: {error}");
-                        }
-                    })
-                    .detach();
-                }
-            })))
+            .child(self.sidebar_foot(cx))
     }
 
     /// The open sessions' panels, or, with none open, a way to start one.
@@ -1248,7 +1255,10 @@ impl Shell {
                 (None, None) => {}
             }
         }
-        parts.extend(self.said.clone());
+        // With no project open the start screen shows the line itself.
+        if self.active().is_some() {
+            parts.extend(self.said.clone());
+        }
         div()
             .flex()
             .flex_none()

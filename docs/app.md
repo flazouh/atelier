@@ -86,6 +86,15 @@ them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
   status line, the place and the branch keep their width; the parts after them truncate with an
   ellipsis.
 
+## Testing notes
+
+- A focused button, row or chip activates on Enter or Space when the key goes up, not when it goes down.
+  gpui fires the click on key-up. A test that presses a key must send the key-up too. Focus the element,
+  draw one frame, then call
+  `cx.simulate_event(gpui_kit::KeyUpEvent { keystroke: gpui_kit::Keystroke::parse("enter").unwrap() })`.
+- `Animated` values clamp each step to 64 ms. Advance the clock in a loop of small steps.
+- A test host that shows one part needs `.flex().items_start()`. Without it the part stretches to the window.
+
 ## Projects
 
 - Open Folder (⌘O) uses the native folder picker. The start screen and the sidebar list recent
