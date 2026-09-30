@@ -128,6 +128,7 @@ fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Reply> {
         Call::DataRead { path } => Ok(Reply::Bytes(project(state)?.data_read(&path)?)),
         Call::DataWrite { path, bytes } => project(state)?.data_write(&path, &bytes).map(|()| Reply::Done),
         Call::DataList { prefix } => Ok(Reply::DataEntries(project(state)?.data_list(&prefix)?)),
+        Call::ReadDir { dir } => Ok(Reply::DirEntries(project(state)?.read_dir(&dir)?)),
         Call::DataPath => match project(state)?.data_path() {
             Some(path) => Ok(Reply::Text(path.display().to_string())),
             None => Err(io::Error::new(io::ErrorKind::NotFound, "this host has no data folder")),

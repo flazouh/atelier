@@ -85,6 +85,8 @@ pub struct Shell {
     /// The Settings pane, while it is open.
     settings: Option<(Entity<crate::settings_pane::SettingsPane>, Subscription)>,
     ssh: Option<(Entity<SshForm>, Subscription)>,
+    /// The in-app folder picker, when the system has none.
+    folder: Option<(Entity<beui::FolderPicker>, Subscription)>,
     focus: FocusHandle,
     /// The projects and their sessions.
     agents_sidebar: Entity<Sidebar>,
@@ -132,6 +134,7 @@ impl Shell {
             said: None,
             finder: None,
             ssh: None,
+            folder: None,
             settings: None,
             focus: cx.focus_handle(),
             agents_sidebar,
@@ -556,8 +559,9 @@ impl Shell {
             let path = match picked.await {
                 Ok(Ok(Some(mut paths))) if !paths.is_empty() => paths.remove(0),
                 Ok(Ok(_)) => return,
-                Ok(Err(error)) => {
-                    _ = this.update(cx, |this, cx| this.say(format!("The folder picker did not open: {error}"), cx));
+                Ok(Err(_)) => {
+                    // No system picker (no desktop portal): the app's own, which browses the same folders.
+                    _ = this.update_in(cx, |this, window, cx| this.open_folder_picker(window, cx));
                     return;
                 }
                 Err(_) => return,
@@ -623,6 +627,46 @@ impl Shell {
         });
         finder.read(cx).focus_handle(cx).focus(window, cx);
         self.finder = Some((finder, paths, events));
+        cx.notify();
+    }
+
+    /// The app's own folder picker, over this machine's folders. It starts in the home folder.
+    fn open_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let picker = cx.new(|cx| beui::FolderPicker::new("~/", window, cx));
+        let events = cx.subscribe_in(&picker, window, |this, picker, event: &beui::FolderPickerEvent, window, cx| match event {
+            beui::FolderPickerEvent::Want(dir) => {
+                let dir = dir.to_string();
+                let listing = cx.background_spawn({
+                    let dir = dir.clone();
+                    async move { lathe_project::read_local_dir(&dir) }
+                });
+                let picker = picker.downgrade();
+                cx.spawn_in(window, async move |_, cx| {
+                    let answer = listing.await.map(|all| all.into_iter().map(|e| (SharedString::from(e.name), e.dir)).collect()).map_err(|e| SharedString::from(e.to_string()));
+                    _ = picker.update(cx, |p, cx| p.show(&dir, answer, cx));
+                })
+                .detach();
+            }
+            beui::FolderPickerEvent::Choose(path) => {
+                let chosen = lathe_project::expand_home(path);
+                this.close_folder_picker(window, cx);
+                match chosen {
+                    Some(path) => this.open_local(path, window, cx),
+                    None => this.say(format!("{path} is not a folder path"), cx),
+                }
+            }
+            beui::FolderPickerEvent::Cancel => this.close_folder_picker(window, cx),
+        });
+        picker.update(cx, |p, cx| p.ask(cx));
+        picker.read(cx).focus_handle(cx).focus(window, cx);
+        self.folder = Some((picker, events));
+        cx.notify();
+    }
+
+    fn close_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.folder.take().is_some() {
+            self.focus.focus(window, cx);
+        }
         cx.notify();
     }
 
@@ -1052,6 +1096,16 @@ impl Shell {
                     .panel_focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_ssh(window, cx))))
                     .child(form.clone())
+            }))
+            .children(self.folder.as_ref().map(|(picker, _)| {
+                let this = cx.entity().downgrade();
+                let focus = picker.read(cx).focus_handle(cx);
+                Popover::new("open-folder-picker")
+                    .open(true)
+                    .hang(Hang::Centre(TITLE_BAR + 60.))
+                    .panel_focus(&focus)
+                    .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_folder_picker(window, cx))))
+                    .child(picker.clone())
             }))
             .children(self.finder.as_ref().map(|(finder, _, _)| {
                 let this = cx.entity().downgrade();

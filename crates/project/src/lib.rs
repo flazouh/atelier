@@ -29,6 +29,41 @@ pub struct Entry {
     pub dir: bool,
 }
 
+/// One thing in a folder that is listed by its path on the host, for a folder picker.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DirEntry {
+    pub name: String,
+    pub dir: bool,
+}
+
+/// The entries of the host folder `dir` (an absolute path, or one that starts with `~/`), folders first and each
+/// group by name without regard to case. A link to a folder counts as a folder. What cannot be read is left out.
+pub fn read_local_dir(dir: &str) -> io::Result<Vec<DirEntry>> {
+    let path = expand_home(dir).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("{dir} is not an absolute path")))?;
+    let mut entries: Vec<DirEntry> = std::fs::read_dir(&path)?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let name = entry.file_name().into_string().ok()?;
+            let dir = std::fs::metadata(entry.path()).map(|m| m.is_dir()).unwrap_or(false);
+            Some(DirEntry { name, dir })
+        })
+        .collect();
+    entries.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())).then_with(|| a.name.cmp(&b.name)));
+    Ok(entries)
+}
+
+/// `path` with a leading `~` made the home folder; `None` for a path that is not absolute after that.
+pub fn expand_home(path: &str) -> Option<PathBuf> {
+    let expanded = match path.strip_prefix('~') {
+        Some(rest) if rest.is_empty() || rest.starts_with('/') => {
+            let home = std::env::var_os("HOME")?;
+            PathBuf::from(home).join(rest.trim_start_matches('/'))
+        }
+        _ => PathBuf::from(path),
+    };
+    expanded.is_absolute().then_some(expanded)
+}
+
 /// What happened to a path, as a watch reports it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChangeKind {
@@ -137,6 +172,11 @@ pub trait Project: Send + Sync {
     /// The data folder's files under `prefix` (a folder, or `""` for all), newest first.
     fn data_list(&self, prefix: &str) -> io::Result<Vec<DataEntry>> {
         Err(unsupported("data_list", prefix))
+    }
+    /// The entries of the folder `dir` on the project's host: an absolute path, or one that starts with `~/`. It
+    /// need not be inside the project, so a picker can browse to a folder that is not a project yet.
+    fn read_dir(&self, dir: &str) -> io::Result<Vec<DirEntry>> {
+        Err(unsupported("read_dir", dir))
     }
     /// The data folder itself, as its host names it, for a tool that needs a real path there (git, tar): a
     /// bare repository is not a file to `data_write`. `None` when the project has no data folder, or its host

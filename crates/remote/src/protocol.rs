@@ -8,12 +8,12 @@
 
 use std::io::{self, Read, Write};
 
-use lathe_project::{Change, Command, DataEntry, Entry, GitOutput, Match, Query};
+use lathe_project::{Change, Command, DataEntry, DirEntry, Entry, GitOutput, Match, Query};
 use serde::{Deserialize, Serialize};
 
 /// The protocol's version: both ends must agree, or the hello fails.
-/// 2: `Remove` and the data folder's calls. 3: `DataPath`.
-pub const VERSION: u32 = 3;
+/// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`.
+pub const VERSION: u32 = 4;
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -47,6 +47,8 @@ pub enum Call {
     DataList { prefix: String },
     /// Where the project's data folder is on the host: [`Reply::Text`], or `NotFound` when it has none.
     DataPath,
+    /// The entries of a folder on the host, inside the project or not.
+    ReadDir { dir: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -61,6 +63,7 @@ pub enum Reply {
     Text(String),
     Git(GitOutput),
     DataEntries(Vec<DataEntry>),
+    DirEntries(Vec<DirEntry>),
 }
 
 /// Why a call failed on the host: an `io::ErrorKind` by name, and the message.

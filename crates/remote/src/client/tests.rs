@@ -256,3 +256,21 @@ fn ended_processes_give_back_their_pipes() {
     let after = open_files();
     assert!(after <= before + 10, "{before} open files before 60 commands, {after} after");
 }
+
+/// A remote project lists a folder of its host, inside the project or above it, as the host's own project does.
+#[test]
+fn a_remote_project_lists_a_folder_of_its_host_even_outside_the_project() {
+    let dir = folder(&[("src/a.rs", "a"), ("notes.txt", "n")]);
+    let (_host, dial) = host_with_data(None);
+    let remote = connect(&dir, dial);
+    let local = lathe_project::LocalProject::open(dir.path()).unwrap();
+    let parent = dir.path().parent().unwrap().to_str().unwrap();
+    let at = dir.path().to_str().unwrap();
+    assert_eq!(remote.read_dir(at).unwrap(), local.read_dir(at).unwrap(), "the same answer as on the host");
+    let name = dir.path().file_name().unwrap().to_str().unwrap();
+    assert!(remote.read_dir(parent).unwrap().iter().any(|e| e.dir && e.name == name), "the folder above the project lists it");
+    let names: Vec<_> = remote.read_dir(dir.path().to_str().unwrap()).unwrap().into_iter().map(|e| (e.name, e.dir)).collect();
+    assert_eq!(names, [("src".to_string(), true), ("notes.txt".to_string(), false)], "folders first");
+    assert_eq!(remote.read_dir("relative/path").unwrap_err().kind(), io::ErrorKind::InvalidInput);
+    assert_eq!(remote.read_dir("/no/such/folder/anywhere").unwrap_err().kind(), io::ErrorKind::NotFound);
+}
