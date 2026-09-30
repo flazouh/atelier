@@ -213,11 +213,18 @@ impl Tracker for RemoteTracker {
     }
 
     /// Changes made through this tracker at once, and changes made elsewhere by a poll of the host every
-    /// [`POLL`]. The poll runs while a receiver is kept: drop it when the tasks are out of sight.
+    /// [`POLL`]. It blocks for one listing, the start the poll compares with. The poll runs while a
+    /// receiver is kept: drop it when the tasks are out of sight.
     fn subscribe(&self) -> Receiver<Event> {
         let (send, receive) = channel();
+        // What the host has now, before this returns: a change made after it is told, never taken as the
+        // start. A failed listing leaves it to the first poll.
+        let seen = match self.list(&Query::default()) {
+            Ok(tasks) => Some(tasks.iter().map(|t| (t.id.clone(), t.updated_at)).collect()),
+            Err(_) => None,
+        };
         let mut listeners = lock(&self.listeners);
-        listeners.all.push(Listener { send, seen: None });
+        listeners.all.push(Listener { send, seen });
         if !listeners.polling {
             listeners.polling = true;
             let (shared, list, every) = (Arc::downgrade(&self.shared), self.listeners.clone(), self.poll);
