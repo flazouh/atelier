@@ -52,6 +52,14 @@ pub enum StripEvent {
     BranchMade,
     /// The branch went to origin.
     Pushed,
+    /// A rebase gave the branch's own commits new ids: each old id with its new one.
+    Rewrote(Vec<(String, String)>),
+}
+
+/// Why a pull and rebase stopped, for the strip.
+enum Stop {
+    OtherEdits,
+    Words(String),
 }
 
 impl EventEmitter<StripEvent> for ShipStrip {}
@@ -73,6 +81,11 @@ pub enum Stage {
     Pushed(SharedString),
     /// The remote has commits the branch lacks; Pull and rebase is offered.
     Rejected,
+    /// Pull and rebase stopped before it started, for the reader's other edits; setting them aside is
+    /// offered.
+    EditsInTheWay,
+    /// Pushed, but the edits set aside clash with the new commits: the words say where they are.
+    Clashed(SharedString),
 }
 
 /// One file as the commit takes it: its path and its rows added and removed against HEAD.
@@ -194,8 +207,9 @@ impl ShipStrip {
     pub fn push(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match self.stage {
             Stage::Rejected => return self.pull_and_rebase(window, cx),
+            Stage::EditsInTheWay => return self.set_aside_and_rebase(window, cx),
             Stage::Reading | Stage::Open | Stage::Committing | Stage::Pushing(_) => return,
-            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) => {}
+            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) => {}
         }
         self.stage = Stage::Pushing("Pushing…".into());
         let project = self.project.clone();
@@ -221,29 +235,65 @@ impl ShipStrip {
         cx.notify();
     }
 
-    /// After a rejection: pulls origin's branch, puts the commits on top, and pushes. A conflict or the
-    /// reader's other edits stop it with nothing changed.
+    /// After a rejection: pulls origin's branch, puts the commits on top, and pushes. A conflict stops
+    /// it with nothing changed; the reader's other edits stop it before it starts, and the strip offers
+    /// to set them aside.
     pub fn pull_and_rebase(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.stage != Stage::Rejected {
-            return;
+        if self.stage == Stage::Rejected {
+            self.rebase_and_push(false, window, cx);
         }
-        self.stage = Stage::Pushing("Pulling, rebasing and pushing…".into());
+    }
+
+    /// On the reader's word, after other edits stopped Pull and rebase: sets them aside, rebases,
+    /// pushes, and puts them back.
+    pub fn set_aside_and_rebase(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.stage == Stage::EditsInTheWay {
+            self.rebase_and_push(true, window, cx);
+        }
+    }
+
+    fn rebase_and_push(&mut self, set_aside: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.stage = Stage::Pushing(if set_aside { "Setting your edits aside, rebasing and pushing…" } else { "Pulling, rebasing and pushing…" }.into());
         let project = self.project.clone();
         let running = cx.background_spawn(async move {
-            let branch = branch::current(project.as_ref()).ok_or_else(|| "HEAD is not on a branch".to_string())?;
-            push::pull_rebase(project.as_ref(), &branch).map_err(|e| e.to_string())?;
-            push::push(project.as_ref(), &branch).map_err(|e| e.to_string())?;
-            Ok::<_, String>(branch)
+            let branch = branch::current(project.as_ref()).ok_or(Stop::Words("HEAD is not on a branch".into()))?;
+            let rebased = if set_aside {
+                push::pull_rebase_setting_aside(project.as_ref(), &branch)
+            } else {
+                push::pull_rebase(project.as_ref(), &branch)
+            };
+            let rebased = match rebased {
+                Ok(rebased) => rebased,
+                Err(push::RebaseError::OtherEdits) => return Err(Stop::OtherEdits),
+                Err(error) => return Err(Stop::Words(error.to_string())),
+            };
+            // The rebase stands whatever the push says, so the owner hears of the new ids either way.
+            let pushed = push::push(project.as_ref(), &branch).map_err(|e| e.to_string());
+            Ok((branch, rebased, pushed))
         });
         self.work = cx.spawn_in(window, async move |this, cx| {
             let result = running.await;
             _ = this.update(cx, |strip, cx| {
                 strip.stage = match result {
-                    Ok(branch) => {
-                        cx.emit(StripEvent::Pushed);
-                        Stage::Pushed(format!("Pulled, rebased and pushed {branch}").into())
+                    Ok((branch, rebased, pushed)) => {
+                        if !rebased.moved.is_empty() {
+                            cx.emit(StripEvent::Rewrote(rebased.moved.clone()));
+                        }
+                        match (pushed, rebased.edits) {
+                            (Err(words), _) => Stage::Failed(words.into()),
+                            (Ok(()), edits) => {
+                                cx.emit(StripEvent::Pushed);
+                                let done = format!("Pulled, rebased and pushed {branch}");
+                                match edits {
+                                    None => Stage::Pushed(done.into()),
+                                    Some(back @ push::PutBack::Back) => Stage::Pushed(format!("{done}. {back}").into()),
+                                    Some(kept) => Stage::Clashed(format!("{done}. {kept}").into()),
+                                }
+                            }
+                        }
                     }
-                    Err(words) => Stage::Failed(words.into()),
+                    Err(Stop::OtherEdits) => Stage::EditsInTheWay,
+                    Err(Stop::Words(words)) => Stage::Failed(words.into()),
                 };
                 cx.notify();
             });
@@ -343,12 +393,27 @@ impl Render for ShipStrip {
                     ))
                     .into_any_element()
             }
-            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) => {
+            Stage::EditsInTheWay => {
+                let (aside, cancel) = (this.clone(), this.clone());
+                row.child(div().flex_1().min_w_0().text_size(TextSize::Xs.font_size()).text_color(muted).child(push::RebaseError::OtherEdits.to_string()))
+                    .child(Button::new("ship-cancel-aside").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                        _ = cancel.update(cx, |strip, cx| strip.cancel(cx));
+                    }))
+                    .child(
+                        Button::new("ship-set-aside")
+                            .label("Set my edits aside, rebase, and put them back")
+                            .variant(ButtonVariant::Secondary)
+                            .command(Key::Push)
+                            .on_click(move |_, window, cx| drop(aside.update(cx, |strip, cx| strip.set_aside_and_rebase(window, cx)))),
+                    )
+                    .into_any_element()
+            }
+            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) => {
                 let said = match &self.stage {
-                    Stage::Committed(w) | Stage::Failed(w) | Stage::Pushed(w) => Some(w.clone()),
+                    Stage::Committed(w) | Stage::Failed(w) | Stage::Pushed(w) | Stage::Clashed(w) => Some(w.clone()),
                     _ => None,
                 };
-                let failed = matches!(self.stage, Stage::Failed(_));
+                let failed = matches!(self.stage, Stage::Failed(_) | Stage::Clashed(_));
                 let pushable = matches!(self.stage, Stage::Committed(_) | Stage::Failed(_));
                 let asks = this.clone();
                 let pushes = this.clone();

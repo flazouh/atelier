@@ -232,7 +232,7 @@ fn after_the_commit_push_sends_the_branch(cx: &mut TestAppContext) {
 /// pushes; the push is never forced.
 #[gpui_kit::test]
 fn a_rejected_push_offers_pull_and_rebase(cx: &mut TestAppContext) {
-    let (dir, _pane, strip, cx) = opened_strip(cx, |dir| {
+    let (dir, pane, strip, cx) = opened_strip(cx, |dir| {
         let bare = with_origin(dir);
         // Someone else pushed a branch of the same name first.
         let other = tempfile::tempdir().unwrap().keep();
@@ -256,6 +256,43 @@ fn a_rejected_push_offers_pull_and_rebase(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::Pushed("Pulled, rebased and pushed fix/keep-two".into()));
     let git = |args: &[&str]| String::from_utf8(Git::new("git").args(args).current_dir(&dir).output().unwrap().stdout).unwrap();
     assert_eq!(git(&["log", "--format=%s", "origin/fix/keep-two"]).lines().take(2).collect::<Vec<_>>(), ["Keep TWO", "Theirs"]);
+    let short = git(&["rev-parse", "--short=7", "HEAD"]).trim().to_string();
+    cx.update(|_, cx| {
+        assert_eq!(pane.read(cx).files[0].committed.as_deref(), Some(short.as_str()), "the mark names the rebased commit");
+        let kept = pane.read(cx).session_committed(cx);
+        assert!(kept.values().all(|sha| *sha == short), "and so does the record: {kept:?}");
+    });
+}
+/// With other edits in the working tree, Pull and rebase says why it stops and offers to set them
+/// aside; on that word it rebases, pushes, and puts the edits back.
+#[gpui_kit::test]
+fn edits_in_the_way_are_set_aside_on_the_readers_word(cx: &mut TestAppContext) {
+    let (dir, _pane, strip, cx) = opened_strip(cx, |dir| {
+        let bare = with_origin(dir);
+        let other = tempfile::tempdir().unwrap().keep();
+        let run = |at: &std::path::Path, args: &[&str]| {
+            let out = Git::new("git").args(["-c", "user.name=o", "-c", "user.email=o@o", "-c", "commit.gpgsign=false"]).args(args).current_dir(at).output().unwrap();
+            assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        };
+        run(&other, &["clone", "-q", bare.to_str().unwrap(), "."]);
+        std::fs::write(other.join("b.txt"), "theirs\n").unwrap();
+        run(&other, &["add", "-A"]);
+        run(&other, &["commit", "-qm", "Theirs"]);
+        run(&other, &["push", "-q", "origin", "HEAD:fix/keep-two"]);
+    });
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
+    cx.run_until_parked();
+    // The reader's own edit, which the commit did not take.
+    std::fs::write(dir.join("a.txt"), "1\nTWO\nmine\n").unwrap();
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.push(window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.pull_and_rebase(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::EditsInTheWay);
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.set_aside_and_rebase(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::Pushed("Pulled, rebased and pushed fix/keep-two. Your edits are back".into()));
+    assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "1\nTWO\nmine\n");
 }
 /// With no remote, Push says so.
 #[gpui_kit::test]

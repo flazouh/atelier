@@ -222,6 +222,7 @@ impl ReviewPane {
             StripEvent::WantsOpen => this.open_ship(window, cx),
             StripEvent::Committed { sha, paths } => this.committed(sha, paths, cx),
             StripEvent::BranchMade | StripEvent::Pushed => cx.emit(PaneEvent::GitChanged),
+            StripEvent::Rewrote(moved) => this.rewrote(moved, cx),
         });
         // Typing not yet written when the pane goes is written as it goes.
         cx.on_release(|pane: &mut Self, cx| pane.flush(cx)).detach();
@@ -314,6 +315,34 @@ impl ReviewPane {
         });
         cx.emit(PaneEvent::GitChanged);
         cx.notify();
+    }
+
+    /// A rebase gave commits new ids: each mark and the session's record name the new one.
+    fn rewrote(&mut self, moved: &[(String, String)], cx: &mut Context<Self>) {
+        let short = |sha: &str| sha.chars().take(7).collect::<String>();
+        let map: Vec<(String, String)> = moved.iter().map(|(old, new)| (short(old), short(new))).collect();
+        let renamed = |sha: &mut String| {
+            if let Some((_, new)) = map.iter().find(|(old, _)| old == sha) {
+                *sha = new.clone();
+            }
+        };
+        for file in &mut self.files {
+            if let Some(sha) = file.committed.as_mut() {
+                renamed(sha);
+            }
+        }
+        self.session.update(cx, |s, cx| {
+            s.reviews.committed.values_mut().for_each(renamed);
+            s.save_review(cx);
+        });
+        cx.emit(PaneEvent::GitChanged);
+        cx.notify();
+    }
+
+    /// The commits the session's record names, by scope and path.
+    #[cfg(test)]
+    pub fn session_committed(&self, cx: &gpui_kit::App) -> HashMap<(Scope, String), String> {
+        self.session.read(cx).reviews.committed.clone()
     }
 
     /// "Committed in <id>" for file `at` once its decisions are committed and none is left to make.
