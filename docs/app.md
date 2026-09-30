@@ -113,7 +113,7 @@ recordings and stills are in `~/shots/m1/` on the HP.
 | What | Seen |
 | --- | --- |
 | Open a local folder, browse the tree | `qa-1-open.png`: 1008 files, listed in 10 to 57 ms |
-| Open a Rust file | rust-analyzer ready; "nothing wrong" |
+| Open a Rust file | rust-analyzer ready; "No problems" |
 | Hover | `qa-2-hover.png`: `std::time::Instant`'s card |
 | Go to definition | `qa-3-underline.png`, `qa-3-definition.png`: `bind_keys` opens `shell.rs` at line 39 |
 | Edit and save | `qa-4-dirty.png` (the dot), `qa-5-saved.png` ("Saved crates/app/src/shell.rs"); `git diff` in the clone shows the line |

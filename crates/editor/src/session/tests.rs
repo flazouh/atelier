@@ -16,3 +16,9 @@ fn the_rows_follow_a_new_map() {
     assert_eq!(held.to_head(at(1)), Some(at(1)));
     assert_eq!(held.doc("a\nnew\nb").text, "a\nnew\nb");
 }
+
+/// A15: a server with no diagnostics says "No problems".
+#[test]
+fn no_diagnostics_read_no_problems() {
+    assert_eq!(summary(&[]).as_ref(), "No problems");
+}

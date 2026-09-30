@@ -397,7 +397,7 @@ impl EditorSession {
 fn summary(diagnostics: &[Diagnostic]) -> SharedString {
     let first = diagnostics.first().map(|d| d.message.as_str()).unwrap_or_default();
     match diagnostics.len() {
-        0 => "nothing wrong".into(),
+        0 => "No problems".into(),
         1 => format!("1 problem: {first}").into(),
         n => format!("{n} problems, first: {first}").into(),
     }
