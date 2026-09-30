@@ -15,6 +15,7 @@ use beui::{
     theme::radius,
     typography::{MONO_FONT_FAMILY, TextSize},
 };
+use super::whole_words::whole_words;
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, Focusable, IntoElement, InteractiveElement, ParentElement, Render, SharedString, Styled, Task,
     Window, actions,
@@ -441,7 +442,7 @@ impl Render for ShipStrip {
         let (branch_focus, message_focus) = (self.new_branch.focus_handle(cx), self.message.focus_handle(cx));
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let words = |text: SharedString| div().text_size(TextSize::Xs.font_size()).text_color(muted).child(text);
+        let words = |text: SharedString| div().text_size(TextSize::Xs.font_size()).text_color(muted).child(whole_words(&text));
         let this = cx.entity().downgrade();
         let commit_button = |label: &'static str| {
             let this = this.clone();
@@ -503,7 +504,7 @@ impl Render for ShipStrip {
                 let asks = this.clone();
                 let pushes = this.clone();
                 row.child(div().flex_1().min_w_0().children(said.map(|w| {
-                    div().text_size(TextSize::Xs.font_size()).text_color(if failed { theme.danger } else { muted }).child(w)
+                    div().text_size(TextSize::Xs.font_size()).text_color(if failed { theme.danger } else { muted }).child(whole_words(&w))
                 })))
                 .when_some(self.opened.clone().filter(|_| matches!(self.stage, Stage::PullOpened(_))), |row, reference| {
                     let shows = this.clone();
@@ -556,7 +557,7 @@ impl Render for ShipStrip {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
-                    .child(div().text_size(TextSize::Sm.font_size()).child(format!("Commit what you kept, on {on}")))
+                    .child(div().text_size(TextSize::Sm.font_size()).child(whole_words(&format!("Commit what you kept, on {on}"))))
                     .child(div().flex().flex_col().gap(px(2.)).children(lines))
                     .when(self.on_default, |d| {
                         d.child(words(format!("{on} is the default branch: this commit goes on a new one").into()))
