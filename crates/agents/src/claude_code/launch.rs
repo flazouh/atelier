@@ -4,6 +4,20 @@ use lathe_project::Command;
 use super::control::mode_name;
 use crate::session::{OpenRequest, PermissionMode};
 
+/// The command line for one piece of text: `claude --print` with the prompt on stdin, the answer as
+/// plain text on stdout, in Plan mode (it changes nothing) and with no session saved, so it never shows
+/// among the project's sessions.
+pub(super) fn draft_command(program: &str, model: Option<&str>) -> Command {
+    let mut args: Vec<String> = ["--print", "--no-session-persistence", "--output-format", "text", "--permission-mode", "plan"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    if let Some(model) = model {
+        args.extend(["--model".into(), model.to_string()]);
+    }
+    Command::new(program).args(args)
+}
+
 pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
     let mut args = vec![
         "--print",

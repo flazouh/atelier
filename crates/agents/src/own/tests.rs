@@ -2,6 +2,7 @@
 //! `server`), so nothing here calls a real API or needs a key.
 mod anthropic;
 mod context;
+mod draft;
 mod http;
 mod openai;
 mod permission;

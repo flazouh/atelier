@@ -93,6 +93,22 @@ impl Backend for ClaudeCode {
     ) -> Result<Vec<crate::session::Event>, SessionError> {
         store::read_history(project, session)
     }
+
+    fn draft(&self, project: &dyn Project, prompt: &str, model: Option<&str>) -> Result<String, SessionError> {
+        use std::io::{Read, Write};
+        let mut process = subprocess::start(project, &launch::draft_command(&self.program, model))?;
+        let written = process.stdin.write_all(prompt.as_bytes());
+        drop(process.stdin);
+        let mut text = String::new();
+        let read = process.stdout.read_to_string(&mut text);
+        let code = process.control.wait().map_err(|e| SessionError::Start(e.to_string()))?;
+        if code != Some(0) || written.is_err() || read.is_err() {
+            let stderr = process.control.stderr();
+            let why = stderr.lines().rev().find(|l| !l.trim().is_empty()).map(str::to_string);
+            return Err(SessionError::Start(why.unwrap_or_else(|| format!("the draft ended with {code:?}"))));
+        }
+        Ok(text.trim().to_string())
+    }
 }
 
 #[cfg(test)]

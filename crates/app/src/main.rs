@@ -22,6 +22,7 @@ mod review_state;
 mod review_text;
 mod session_view;
 mod settings_pane;
+mod ship;
 mod shell;
 mod ssh_form;
 mod status;

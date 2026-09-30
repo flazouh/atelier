@@ -101,6 +101,13 @@ pub trait Backend: Send + Sync {
     fn history(&self, _project: &dyn Project, _session: &SessionId) -> Result<Vec<Event>, SessionError> {
         Err(SessionError::Unsupported("history"))
     }
+
+    /// One-shot text for `prompt`, on `model` or the agent's default, with no session kept anywhere and
+    /// nothing changed: a commit message, a branch name, a pull request's title. Blocks, and may take
+    /// seconds: never call it on the UI thread.
+    fn draft(&self, _project: &dyn Project, _prompt: &str, _model: Option<&str>) -> Result<String, SessionError> {
+        Err(SessionError::Unsupported("drafts"))
+    }
 }
 
 pub trait Session: Send {
