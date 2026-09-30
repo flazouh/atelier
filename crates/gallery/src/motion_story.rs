@@ -2,7 +2,7 @@
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use gpui_kit::AppContext as _;
-use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
+use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
 use gpui_kit::{
     AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -49,6 +49,7 @@ pub struct MotionStory {
     part: Option<String>,
     teams: Entity<MultiSelect>,
     toasts: Entity<ToastStack>,
+    notes: Entity<NotificationStack>,
     position: ToastPosition,
     accent: SharedString,
     /// Owned by the "every state" rows below.
@@ -72,7 +73,21 @@ impl MotionStory {
         }
         let teams = cx.new(|cx| MultiSelect::new("teams", teams(), window, cx).placeholder("Choose teams").empty("No teams found.").with_values(["design", "engineering"]));
         let toasts = cx.new(|_| ToastStack::new("story-toasts").limit(5).default_duration(std::time::Duration::from_millis(3600)));
-        Self { teams, toasts, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
+        let notes = cx.new(|cx| {
+            NotificationStack::new(
+                "notes",
+                vec![
+                    NotificationItem::new("import-failed", "Orders import failed")
+                        .description("42s · TimeoutError at Step 2")
+                        .trailing(Some(beui::IconName::RotateRight), "2", beui::TrailingTone::Warning),
+                    NotificationItem::new("sla-breach", "SLA breach").description("2m 11s · Data enrichment"),
+                    NotificationItem::new("sync-fixed", "Product sync auto-fixed").description("5m · 404 on GET /products"),
+                ],
+                window,
+                cx,
+            )
+        });
+        Self { teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
     }
 
     fn shows(&self, name: &str) -> bool {
@@ -335,6 +350,10 @@ impl Render for MotionStory {
                 )
                 .child(div().flex().flex_wrap().justify_center().gap(px(6.)).children(pills));
             parts.push(if alone { demo.into_any_element() } else { section("Toast stack: the demo (toasts open in the corner of the window)", &theme, demo) });
+        }
+        if self.shows("notification-stack") {
+            let demo = div().flex().w_full().justify_center().pt(px(208.)).pb(px(24.)).child(self.notes.clone());
+            parts.push(if alone { demo.into_any_element() } else { section("Notification stack: the demo", &theme, demo) });
         }
         if self.shows("multi-select") {
             let demo = div().w(px(384.)).child(self.teams.clone());
