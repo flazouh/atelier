@@ -29,6 +29,13 @@ pub fn bases(project: &dyn Project, head: &str) -> Vec<String> {
     names
 }
 
+/// How many commits HEAD has that no branch of origin has: commits the pull request would lack
+/// unless they are pushed first.
+pub fn ahead(project: &dyn Project) -> usize {
+    let counted = git(project, &["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], None, None).unwrap_or_default();
+    counted.trim().parse().unwrap_or(0)
+}
+
 /// The prompt for the pull request's title and body: the commits from `base` to HEAD, and their diff.
 pub fn prompt(project: &dyn Project, base: &str) -> String {
     let range = format!("origin/{base}..HEAD");

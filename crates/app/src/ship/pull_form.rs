@@ -11,7 +11,7 @@ use beui::{
     typography::TextSize,
 };
 use gpui_kit::{
-    AppContext, Context, Entity, EventEmitter, Focusable, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
     Styled, Task, Window, actions,
     component::input::{Input, InputState, Textarea, TextareaState},
     div, prelude::FluentBuilder, px,
@@ -19,7 +19,7 @@ use gpui_kit::{
 use lathe_agents::session::Backend;
 use lathe_forge::{Forge, NewPull, PullRef, RepoRef};
 use lathe_project::Project;
-use crate::ship::{branch, commit::git, pull};
+use crate::ship::{branch, commit::git, pull, push};
 
 actions!(pull_form, [
     /// Opens the pull request the form holds.
@@ -33,6 +33,8 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
 
 pub enum FormEvent {
     Opened(PullRef),
+    /// The branch already has this open pull request; the form offers no create.
+    Existing(PullRef),
     Cancelled,
 }
 impl EventEmitter<FormEvent> for PullForm {}
@@ -44,6 +46,8 @@ pub enum FormStage {
     Open,
     Opening,
     Opened(PullRef),
+    /// The branch already has this open pull request, with its title.
+    Existing(PullRef, SharedString),
     /// The form cannot open a pull request here: the words say why.
     Failed(SharedString),
 }
@@ -59,12 +63,20 @@ pub struct PullForm {
     pub bases: Vec<String>,
     pub base: usize,
     pub draft: bool,
+    /// Commits HEAD has that origin lacks: Open pushes them first.
+    pub ahead: usize,
+    /// The bases are being fetched; the list shown is the one from before.
+    pub checking: bool,
     pub drafting: bool,
     /// Why the last Open did not open, in the forge's words.
     pub refused: Option<SharedString>,
     pub title: Entity<InputState>,
     pub body: Entity<TextareaState>,
+    base_focus: FocusHandle,
+    draft_focus: FocusHandle,
+    open_focus: FocusHandle,
     work: Task<()>,
+    checks: Task<()>,
 }
 
 /// What the form reads before it opens.
@@ -72,6 +84,9 @@ struct Read {
     head: Option<String>,
     repo: Option<RepoRef>,
     bases: Vec<String>,
+    ahead: usize,
+    /// The open pull request the branch has, as the forge says.
+    existing: Result<Option<lathe_forge::PullBrief>, String>,
 }
 
 impl PullForm {
@@ -89,11 +104,17 @@ impl PullForm {
             bases: Vec::new(),
             base: 0,
             draft: false,
+            ahead: 0,
+            checking: false,
             drafting: false,
             refused: None,
             title,
             body,
+            base_focus: cx.focus_handle(),
+            draft_focus: cx.focus_handle(),
+            open_focus: cx.focus_handle(),
             work: Task::ready(()),
+            checks: Task::ready(()),
         }
     }
 
@@ -101,13 +122,19 @@ impl PullForm {
     pub fn open(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.stage = FormStage::Reading;
         self.refused = None;
-        let project = self.project.clone();
+        let (project, forge) = (self.project.clone(), self.forge.clone());
         let reading = cx.background_spawn(async move {
             let head = branch::current(project.as_ref());
-            let url = git(project.as_ref(), &["remote", "get-url", "origin"], None, None).ok();
+            // The address as written names the repository, whatever an insteadOf rule sends git to.
+            let url = git(project.as_ref(), &["config", "--get", "remote.origin.url"], None, None).ok();
             let repo = url.as_deref().and_then(|u| RepoRef::from_remote(u.trim()));
             let bases = head.as_deref().map(|h| pull::bases(project.as_ref(), h)).unwrap_or_default();
-            Read { head, repo, bases }
+            let ahead = pull::ahead(project.as_ref());
+            let existing = match (&repo, &head) {
+                (Some(repo), Some(head)) => forge.open_pull_for(repo, head).map_err(|e| e.to_string()),
+                _ => Ok(None),
+            };
+            Read { head, repo, bases, ahead, existing }
         });
         self.work = cx.spawn_in(window, async move |this, cx| {
             let read = reading.await;
@@ -121,14 +148,61 @@ impl PullForm {
             self.stage = FormStage::Failed(crate::open_project::NO_FORGE_REMOTE.into());
             return cx.notify();
         };
+        match read.existing {
+            Ok(Some(brief)) => {
+                self.stage = FormStage::Existing(brief.reference.clone(), brief.title.into());
+                cx.emit(FormEvent::Existing(brief.reference));
+                return cx.notify();
+            }
+            Err(words) => {
+                self.stage = FormStage::Failed(words.into());
+                return cx.notify();
+            }
+            Ok(None) => {}
+        }
         if read.bases.is_empty() {
             self.stage = FormStage::Failed("origin has no other branch to open a pull request into".into());
             return cx.notify();
         }
-        (self.head, self.repo, self.bases, self.base) = (head, Some(repo), read.bases, 0);
+        (self.head, self.repo, self.bases, self.base, self.ahead) = (head, Some(repo), read.bases, 0, read.ahead);
         self.stage = FormStage::Open;
         self.title.update(cx, |t, cx| t.focus(window, cx));
+        self.check(window, cx);
         self.redraft(window, cx);
+    }
+
+    /// Fetches origin once, pruning gone branches, and reads the bases and what HEAD has ahead again.
+    /// The list shown stays until it lands, and the base picked stays picked while it still exists.
+    fn check(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.checking = true;
+        let (project, head) = (self.project.clone(), self.head.clone());
+        let checking = cx.background_spawn(async move {
+            let fetched = push::remote_git(project.as_ref(), &["fetch", "--prune", "--quiet", "origin"]);
+            (fetched.is_ok(), pull::bases(project.as_ref(), &head), pull::ahead(project.as_ref()))
+        });
+        self.checks = cx.spawn_in(window, async move |this, cx| {
+            let (fetched, bases, ahead) = checking.await;
+            _ = this.update(cx, |form, cx| {
+                form.checking = false;
+                if fetched && !bases.is_empty() {
+                    let picked = form.bases.get(form.base).cloned();
+                    form.base = picked.and_then(|p| bases.iter().position(|b| *b == p)).unwrap_or(0);
+                    (form.bases, form.ahead) = (bases, ahead);
+                }
+                cx.notify();
+            });
+        });
+    }
+
+    /// The Open button's words: it pushes first when HEAD has commits origin lacks.
+    pub fn open_label(&self) -> &'static str {
+        if self.ahead > 0 { "Push and open pull request" } else { "Open pull request" }
+    }
+
+    /// The form's Tab stops, in order: the title, the body, the base, the draft switch, and Open.
+    #[cfg(test)]
+    pub fn tab_stops(&self, cx: &gpui_kit::App) -> Vec<FocusHandle> {
+        vec![self.title.focus_handle(cx), self.body.focus_handle(cx), self.base_focus.clone(), self.draft_focus.clone(), self.open_focus.clone()]
     }
 
     /// Asks the agent for a title and a body against the base picked; a draft fills only an empty field.
@@ -190,8 +264,14 @@ impl PullForm {
         };
         self.stage = FormStage::Opening;
         self.refused = None;
-        let forge = self.forge.clone();
-        let opening = cx.background_spawn(async move { forge.create_pull(&repo, &new) });
+        let (forge, project, ahead) = (self.forge.clone(), self.project.clone(), self.ahead);
+        let opening = cx.background_spawn(async move {
+            // Commits made after the last push go first, or the pull request lacks them.
+            if ahead > 0 {
+                push::push(project.as_ref(), &new.head).map_err(|e| e.to_string())?;
+            }
+            forge.create_pull(&repo, &new).map_err(|e| e.to_string())
+        });
         self.work = cx.spawn_in(window, async move |this, cx| {
             let result = opening.await;
             _ = this.update(cx, |form, cx| {
@@ -200,9 +280,9 @@ impl PullForm {
                         form.stage = FormStage::Opened(reference.clone());
                         cx.emit(FormEvent::Opened(reference));
                     }
-                    Err(error) => {
+                    Err(words) => {
                         form.stage = FormStage::Open;
-                        form.refused = Some(error.to_string().into());
+                        form.refused = Some(words.into());
                     }
                 }
                 cx.notify();
@@ -223,6 +303,9 @@ impl Render for PullForm {
             FormStage::Reading => card.child(words("Reading the branch and its bases…".into())).into_any_element(),
             FormStage::Failed(why) => card.child(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(why.clone())).into_any_element(),
             FormStage::Opened(reference) => card.child(words(format!("Opened #{}", reference.number).into())).into_any_element(),
+            FormStage::Existing(reference, title) => {
+                card.child(words(format!("This branch already has pull request #{}: {title}", reference.number).into())).into_any_element()
+            }
             FormStage::Open | FormStage::Opening => {
                 let opening = self.stage == FormStage::Opening;
                 let (title_focus, body_focus) = (self.title.focus_handle(cx), self.body.focus_handle(cx));
@@ -237,16 +320,17 @@ impl Render for PullForm {
                     .child(Field::new(title_focus, Input::new(&self.title).appearance(false)).radius(radius::MD))
                     .child(Field::new(body_focus, Textarea::new(&self.body).appearance(false)).radius(radius::MD).padding(px(6.)))
                     .when(self.drafting, |d| d.child(words("The agent is drafting…".into())))
+                    .when(self.checking, |d| d.child(words("Checking branches…".into())))
                     .child(
                         div()
                             .flex()
                             .items_center()
                             .gap(px(12.))
                             .child(words("Into".into()))
-                            .child(Select::new("pull-base", options).selected(Some(self.base)).compact(true).on_change(move |at, _, cx| {
+                            .child(Select::new("pull-base", options).selected(Some(self.base)).compact(true).focus_handle(&self.base_focus).on_change(move |at, _, cx| {
                                 _ = pick.update(cx, |form, cx| form.set_base(at, cx));
                             }))
-                            .child(Checkbox::new("pull-draft", self.draft).label("Open as a draft").on_change(move |on, _, cx| {
+                            .child(Checkbox::new("pull-draft", self.draft).label("Open as a draft").focus_handle(&self.draft_focus).on_change(move |on, _, cx| {
                                 _ = drafts.update(cx, |form, cx| form.set_draft(on, cx));
                             })),
                     )
@@ -261,7 +345,8 @@ impl Render for PullForm {
                             }))
                             .child(
                                 Button::new("pull-open")
-                                    .label(if opening { "Opening…" } else { "Open pull request" })
+                                    .label(if opening { "Opening…" } else { self.open_label() })
+                                    .focus_handle(self.open_focus.clone())
                                     .variant(ButtonVariant::Primary)
                                     .cap(beui::keys::cap("⌘↵"))
                                     .disabled(opening)

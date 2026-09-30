@@ -50,6 +50,11 @@ pub trait Forge: Send + Sync {
     fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>>;
 
     fn create_pull(&self, repo: &RepoRef, new: &NewPull) -> ForgeResult<PullRef>;
+    /// The open pull request whose head is `head` in `repo`, if there is one. A forge that cannot say
+    /// fails rather than answer "none", so no one opens a second pull request by mistake.
+    fn open_pull_for(&self, _repo: &RepoRef, _head: &str) -> ForgeResult<Option<PullBrief>> {
+        Err(ForgeError::Unexpected("this forge cannot look up a branch's pull request".into()))
+    }
 
     fn update_pull(&self, reference: &PullRef, update: &PullUpdate) -> ForgeResult<()>;
 

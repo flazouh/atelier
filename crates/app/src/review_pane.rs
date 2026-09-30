@@ -144,6 +144,8 @@ pub enum PaneEvent {
     Said(SharedString),
     /// The strip made a commit or a branch, so the branch and its changes are to be read again.
     GitChanged,
+    /// The reader asked to see this pull request.
+    ShowPull(lathe_forge::PullRef),
 }
 
 impl EventEmitter<PaneEvent> for ReviewPane {}
@@ -227,6 +229,7 @@ impl ReviewPane {
             }
             StripEvent::BranchMade | StripEvent::Pushed => cx.emit(PaneEvent::GitChanged),
             StripEvent::Rewrote(moved) => this.rewrote(moved, cx),
+            StripEvent::ShowPull(reference) => cx.emit(PaneEvent::ShowPull(reference.clone())),
             StripEvent::PullOpened(reference) => {
                 let reference = reference.clone();
                 this.session.update(cx, |s, cx| {

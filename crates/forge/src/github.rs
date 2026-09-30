@@ -191,6 +191,9 @@ impl Forge for GitHub {
     fn create_pull(&self, repo: &RepoRef, new: &NewPull) -> ForgeResult<PullRef> {
         self.write_create_pull(repo, new)
     }
+    fn open_pull_for(&self, repo: &RepoRef, head: &str) -> ForgeResult<Option<PullBrief>> {
+        briefs::open_for(&self.client, repo, head)
+    }
 
     fn update_pull(&self, reference: &PullRef, update: &PullUpdate) -> ForgeResult<()> {
         self.write_update_pull(reference, update)

@@ -73,7 +73,7 @@ pub fn batch_ssh(env: Option<&str>, config: Option<&str>) -> String {
 
 /// `git args` for a call that reaches the remote, with no login prompt, in the project's root. The ssh command is read where git runs,
 /// which for a remote project is the host.
-fn remote_git(project: &dyn Project, args: &[&str]) -> Result<String, String> {
+pub(crate) fn remote_git(project: &dyn Project, args: &[&str]) -> Result<String, String> {
     let env = run(project, Command::new("sh").args(["-c", "printf %s \"${GIT_SSH_COMMAND-}\""]), None).ok();
     let config = plain(project, &["config", "core.sshCommand"]).ok();
     let mut command = Command::new("git").args(args.iter().copied());

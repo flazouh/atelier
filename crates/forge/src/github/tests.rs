@@ -370,3 +370,17 @@ fn a_branch_name_is_encoded_a_segment_at_a_time_and_its_slashes_stay() {
     assert_eq!(super::write::encode_ref("plain-name_1.x~"), "plain-name_1.x~");
     assert_eq!(super::write::encode_ref("é/ü"), "%C3%A9/%C3%BC");
 }
+
+#[test]
+fn the_open_pull_request_of_a_head_branch_is_found() {
+    let one = Fixtures::new().ok(
+        "OpenPullFor",
+        data(json!({"repository": {"pullRequests": {"nodes": [
+            {"number": 9, "title": "Add x", "state": "OPEN", "isDraft": false, "merged": false, "url": "https://github.com/o/r/pull/9"}
+        ]}}})),
+    );
+    let found = github(&one).open_pull_for(&pull().repo, "feat").unwrap().expect("the branch has one");
+    assert_eq!((found.reference.number, found.title.as_str()), (9, "Add x"));
+    let none = Fixtures::new().ok("OpenPullFor", data(json!({"repository": {"pullRequests": {"nodes": []}}})));
+    assert_eq!(github(&none).open_pull_for(&pull().repo, "feat").unwrap(), None);
+}

@@ -311,15 +311,20 @@ fn push_with_no_remote_says_so(cx: &mut TestAppContext) {
 /// keeps the pull request in its record.
 #[gpui_kit::test]
 fn after_the_push_the_strip_opens_the_pull_request(cx: &mut TestAppContext) {
-    let (dir, pane, strip, cx) = opened_strip(cx, |dir| drop(with_origin(dir)));
+    let bare = std::cell::RefCell::new(None);
+    let (dir, pane, strip, cx) = opened_strip(cx, |dir| *bare.borrow_mut() = Some(with_origin(dir)));
+    let bare = bare.into_inner().unwrap();
     let forge = Arc::new(crate::fake_forge::FakeForge::default());
     cx.update(|_, cx| strip.update(cx, |s, _| s.set_forge(forge.clone())));
     cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
     cx.run_until_parked();
     cx.update(|window, cx| strip.update(cx, |s, cx| s.push(window, cx)));
     cx.run_until_parked();
-    // The pushed repository now answers as the scratch repository on GitHub, which nothing reaches.
-    crate::fake_forge::git(&dir, &["remote", "set-url", "origin", "https://github.com/flazouh/lathe-qa-scratch.git"]);
+    // The pushed repository now names the scratch repository on GitHub, and an insteadOf rule sends
+    // every fetch and push back to the bare remote, so nothing reaches GitHub.
+    use crate::fake_forge::{SCRATCH_URL, git as run};
+    run(&dir, &["remote", "set-url", "origin", SCRATCH_URL]);
+    run(&dir, &["config", &format!("url.{}.insteadOf", bare.display()), SCRATCH_URL]);
     cx.update(|window, cx| strip.update(cx, |s, cx| s.open_pull(window, cx)));
     cx.run_until_parked();
     let form = cx.update(|_, cx| strip.read(cx).pull.clone()).expect("the form opened");

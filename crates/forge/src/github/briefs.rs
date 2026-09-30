@@ -39,6 +39,22 @@ pub(super) fn briefs(client: &Client, repo: &RepoRef, numbers: &[u64]) -> ForgeR
     Ok(numbers.iter().map(|n| found.get(n).cloned().flatten()).collect())
 }
 
+/// The open pull request whose head is `head`, if there is one.
+pub(super) fn open_for(client: &Client, repo: &RepoRef, head: &str) -> ForgeResult<Option<PullBrief>> {
+    let vars = json!({"owner": repo.owner, "name": repo.name, "head": head});
+    let graph = client.graphql(queries::OPEN_PULL_FOR, vars)?;
+    if let Some(error) = graph.errors.into_iter().next() {
+        return Err(error.into());
+    }
+    let repository = &graph.data["repository"];
+    if repository.is_null() {
+        return Err(ForgeError::NotFound(repo.slug()));
+    }
+    let Some(node) = repository["pullRequests"]["nodes"].as_array().and_then(|nodes| nodes.first()) else { return Ok(None) };
+    let number = node["number"].as_u64().ok_or_else(|| ForgeError::Unexpected("a pull request with no number".into()))?;
+    Ok(brief(repo, number, node))
+}
+
 fn brief(repo: &RepoRef, number: u64, node: &Value) -> Option<PullBrief> {
     let text = |key: &str| node.get(key)?.as_str().map(str::to_string);
     let flag = |key: &str| node.get(key).and_then(Value::as_bool).unwrap_or(false);

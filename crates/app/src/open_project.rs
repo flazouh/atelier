@@ -146,6 +146,8 @@ pub struct OpenProject {
     pub review: Option<(Entity<ReviewPane>, Subscription)>,
     /// The project's pull requests, once asked for (`pulls.rs`).
     pub pulls: Option<Pulls>,
+    /// A pull request to show once the pull request view has mounted.
+    pending_pull: Option<lathe_forge::PullRef>,
     /// The project's own repository on its forge, from the origin remote; `None` when it has none.
     repo: Option<lathe_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
@@ -196,6 +198,7 @@ impl OpenProject {
             _session_events: Vec::new(),
             review: None,
             pulls: None,
+            pending_pull: None,
             repo: None,
             list_rows: Vec::new(),
             pr_chips: std::rc::Rc::default(),
@@ -453,6 +456,19 @@ impl OpenProject {
         cx.notify();
     }
 
+    /// Shows `reference` in the pull request view, mounting the view first when it is not yet there.
+    pub fn show_pull(&mut self, reference: lathe_forge::PullRef, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(pulls) = &mut self.pulls {
+            pulls.shown = true;
+            let hub = pulls.hub.clone();
+            hub.update(cx, |hub, cx| hub.open(reference, window, cx));
+            cx.emit(ProjectEvent::PullsShown);
+            return cx.notify();
+        }
+        self.pending_pull = Some(reference);
+        self.toggle_pulls(window, cx);
+    }
+
     fn mount_pulls(&mut self, services: std::sync::Arc<lathe_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
         let hub = cx.new(|cx| PrHub::with_services(services, cx));
         let _events = cx.subscribe_in(&hub, window, |this, _, event: &PrEvent, window, cx| match event {
@@ -478,6 +494,9 @@ impl OpenProject {
             let rows = list.read(cx).model().rows(lathe_pr_view::services::now()).into_iter().map(|row| row.pr).collect();
             this.set_list_rows(rows, cx);
         });
+        if let Some(reference) = self.pending_pull.take() {
+            hub.update(cx, |hub, cx| hub.open(reference, window, cx));
+        }
         self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens, _chips] });
         cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
         cx.notify();
@@ -487,7 +506,7 @@ impl OpenProject {
     pub fn open_review(&mut self, session: Entity<AgentSession>, scope: Scope, path: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
         let (project, language) = (self.project.clone(), self.language_for(cx));
         let pane = cx.new(|cx| ReviewPane::new(session, project, scope, path, window, cx).with_language(language, window, cx));
-        let sub = cx.subscribe(&pane, |this, _, event: &PaneEvent, cx| match event {
+        let sub = cx.subscribe_in(&pane, window, |this, _, event: &PaneEvent, window, cx| match event {
             PaneEvent::Close => {
                 this.review = None;
                 cx.emit(ProjectEvent::ReviewClosed);
@@ -495,6 +514,7 @@ impl OpenProject {
             }
             PaneEvent::Said(line) => cx.emit(ProjectEvent::Said(line.clone())),
             PaneEvent::GitChanged => this.refresh_git(cx),
+            PaneEvent::ShowPull(reference) => this.show_pull(reference.clone(), window, cx),
         });
         pane.focus_handle(cx).focus(window, cx);
         self.review = Some((pane, sub));

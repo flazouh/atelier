@@ -56,8 +56,10 @@ pub enum StripEvent {
     Pushed,
     /// A rebase gave the branch's own commits new ids: each old id with its new one.
     Rewrote(Vec<(String, String)>),
-    /// The forge opened this pull request for the branch.
+    /// The forge opened this pull request for the branch, or the branch had it already.
     PullOpened(PullRef),
+    /// The reader asked to see this pull request.
+    ShowPull(PullRef),
 }
 
 /// Why a pull and rebase stopped, for the strip.
@@ -123,6 +125,8 @@ pub struct ShipStrip {
     forge: Arc<dyn Forge>,
     /// The pull request form, while it shows.
     pub pull: Option<Entity<PullForm>>,
+    /// The branch's pull request, once it has one: "Open #N" shows it.
+    pub opened: Option<PullRef>,
     _pull: Option<gpui_kit::Subscription>,
     work: Task<()>,
 }
@@ -147,6 +151,7 @@ impl ShipStrip {
             new_branch,
             forge,
             pull: None,
+            opened: None,
             _pull: None,
             work: Task::ready(()),
         }
@@ -324,8 +329,12 @@ impl ShipStrip {
         self.forge = forge;
     }
 
-    /// Shows the pull request form for the branch checked out (⌘⇧R).
+    /// Shows the pull request form for the branch checked out (⌘⇧R). Once the branch has its pull
+    /// request, the same key shows that one.
     pub fn open_pull(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let (Stage::PullOpened(_), Some(reference)) = (&self.stage, &self.opened) {
+            return cx.emit(StripEvent::ShowPull(reference.clone()));
+        }
         if matches!(self.stage, Stage::Reading | Stage::Open | Stage::Committing | Stage::Pushing(_) | Stage::Pull) {
             return;
         }
@@ -336,6 +345,13 @@ impl ShipStrip {
                 FormEvent::Opened(reference) => {
                     strip.stage = Stage::PullOpened(format!("Opened pull request #{}", reference.number).into());
                     strip.pull = None;
+                    strip.opened = Some(reference.clone());
+                    cx.emit(StripEvent::PullOpened(reference.clone()));
+                }
+                FormEvent::Existing(reference) => {
+                    strip.stage = Stage::PullOpened(format!("This branch already has pull request #{}", reference.number).into());
+                    strip.pull = None;
+                    strip.opened = Some(reference.clone());
                     cx.emit(StripEvent::PullOpened(reference.clone()));
                 }
                 FormEvent::Cancelled => {
@@ -474,6 +490,12 @@ impl Render for ShipStrip {
                 row.child(div().flex_1().min_w_0().children(said.map(|w| {
                     div().text_size(TextSize::Xs.font_size()).text_color(if failed { theme.danger } else { muted }).child(w)
                 })))
+                .when_some(self.opened.clone().filter(|_| matches!(self.stage, Stage::PullOpened(_))), |row, reference| {
+                    let shows = this.clone();
+                    row.child(Button::new("ship-show-pull").label(format!("Open #{}", reference.number)).variant(ButtonVariant::Ghost).command(Key::OpenPull).on_click(
+                        move |_, window, cx| drop(shows.update(cx, |strip, cx| strip.open_pull(window, cx))),
+                    ))
+                })
                 .when(matches!(self.stage, Stage::Pushed(_) | Stage::Clashed(_)), |row| {
                     let opens = this.clone();
                     row.child(Button::new("ship-open-pull").label("Open pull request").variant(ButtonVariant::Ghost).command(Key::OpenPull).on_click(

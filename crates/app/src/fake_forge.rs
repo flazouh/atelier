@@ -12,6 +12,8 @@ pub struct FakeForge {
     pub created: Mutex<Vec<(RepoRef, NewPull)>>,
     /// The error the next writes answer with, if any.
     pub fails: Mutex<Option<ForgeError>>,
+    /// The open pull request a branch already has, as `open_pull_for` answers.
+    pub open: Mutex<Option<PullBrief>>,
 }
 
 impl FakeForge {
@@ -28,6 +30,9 @@ impl Forge for FakeForge {
         let reference = self.answer(PullRef { repo: repo.clone(), number: 7 })?;
         self.created.lock().unwrap().push((repo.clone(), new.clone()));
         Ok(reference)
+    }
+    fn open_pull_for(&self, _: &RepoRef, _: &str) -> ForgeResult<Option<PullBrief>> {
+        Ok(self.open.lock().unwrap().clone())
     }
     fn repository(&self, _: &str) -> ForgeResult<Repository> { unimplemented!() }
     fn pull(&self, _: &PullRef) -> ForgeResult<Pull> { unimplemented!() }
@@ -63,7 +68,8 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
 }
 
 /// A clone of a bare remote with `main` and `release`, on `fix/two` with one commit, pushed. Then
-/// origin's address is made a GitHub one, which names the repository and is never reached.
+/// origin's address is made a GitHub one, which names the repository, and an `insteadOf` rule sends
+/// every fetch and push back to the bare remote, so GitHub is never reached.
 pub fn pushed_branch() -> PathBuf {
     let top = tempfile::tempdir().unwrap().keep();
     let (bare, work) = (top.join("remote.git"), top.join("work"));
@@ -78,6 +84,15 @@ pub fn pushed_branch() -> PathBuf {
     std::fs::write(work.join("a.txt"), "two\n").unwrap();
     git(&work, &["commit", "-qam", "Make a two"]);
     git(&work, &["push", "-q", "-u", "origin", "fix/two"]);
-    git(&work, &["remote", "set-url", "origin", "https://github.com/flazouh/lathe-qa-scratch.git"]);
+    git(&work, &["remote", "set-url", "origin", SCRATCH_URL]);
+    git(&work, &["config", &format!("url.{}.insteadOf", bare.display()), SCRATCH_URL]);
     work
+}
+
+/// The scratch repository's address, as the fixture's origin has it.
+pub const SCRATCH_URL: &str = "https://github.com/flazouh/lathe-qa-scratch.git";
+
+/// The bare remote behind `work`'s origin.
+pub fn bare_of(work: &Path) -> PathBuf {
+    work.parent().unwrap().join("remote.git")
 }
