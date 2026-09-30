@@ -488,6 +488,23 @@ impl Render for MotionStory {
                 .child(track(2, "seg-c", &["Side by side", "Single view"], true));
             parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
         }
+        if self.shows("animated-badge") {
+            use beui::BadgeStatus as S;
+            let one = |id: &'static str, status: S, label: &'static str| beui::AnimatedBadge::new(id, status).size(beui::BadgeSize::Small).label(label);
+            let demo = div()
+                .flex()
+                .flex_wrap()
+                .items_start()
+                .gap(px(8.))
+                .w(px(360.))
+                .child(one("ab-queued", S::Neutral, "Queued"))
+                .child(one("ab-live", S::Info, "Live"))
+                .child(one("ab-indexing", S::Loading, "Indexing"))
+                .child(one("ab-verified", S::Success, "Verified"))
+                .child(one("ab-pending", S::Warning, "Pending"))
+                .child(one("ab-blocked", S::Danger, "Blocked"));
+            parts.push(if alone { demo.into_any_element() } else { section("Animated badge", &theme, demo) });
+        }
         if self.shows("loader") {
             let demo = div().flex().items_center().gap(px(24.)).text_color(theme.foreground)
                 .child(beui::spinner::Spinner::new("loader-32").size(px(32.)))
