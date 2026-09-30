@@ -92,3 +92,88 @@ fn the_sidebar_foot_holds_settings_and_not_the_theme_picker(cx: &mut TestAppCont
     assert!(cx.debug_bounds("settings-entry").is_some(), "the Settings entry stands in the foot");
     assert!(cx.debug_bounds("theme").is_none(), "no theme picker in the foot");
 }
+
+/// K1: every global chord reaches its action from each place the focus can be. Tasks is the chord that
+/// was lost; each pane is given the focus in turn, and the chord must show Tasks from there.
+#[gpui_kit::test]
+fn the_tasks_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    let chord = if cfg!(target_os = "macos") { "cmd-shift-l" } else { "ctrl-shift-l" };
+    let front = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| {
+        shell.read_with(cx, |s, cx| s.active().map(|p| p.read(cx).front()))
+    };
+    type Place = fn(&mut Shell, &mut Window, &mut Context<Shell>);
+    let places: [(&str, Place); 4] = [
+        ("nothing", |_, window, cx| window.blur(cx)),
+        ("the shell", |s, window, cx| s.focus.focus(window, cx)),
+        ("the sidebar", |s, window, cx| s.agents_sidebar.read(cx).focus_handle(cx).focus(window, cx)),
+        ("a session's composer", |s, window, cx| s.new_session_key(&NewSession, window, cx)),
+    ];
+    let tasks = Some(crate::open_project::front::Front::Tasks);
+    let mut lost = Vec::new();
+    for (name, place) in places {
+        shell.update_in(cx, |s, window, cx| place(s, window, cx));
+        settle(&shell, cx);
+        assert_ne!(front(&shell, cx), tasks, "Tasks starts hidden ({name})");
+        cx.simulate_keystrokes(chord);
+        settle(&shell, cx);
+        if front(&shell, cx) != tasks {
+            lost.push(format!("from {name}"));
+            continue;
+        }
+        // From the Tasks pane itself the chord hides it again.
+        cx.simulate_keystrokes(chord);
+        settle(&shell, cx);
+        if front(&shell, cx) == tasks {
+            lost.push(format!("from the Tasks pane, after {name}"));
+            shell.update_in(cx, |s, window, cx| s.show_tasks(window, cx));
+        }
+    }
+    assert!(lost.is_empty(), "{chord} did not reach Tasks {lost:?}");
+}
+
+/// K1, for the whole table: every lathe chord bound with no context is on the dispatch path from each place
+/// the focus can be, so no pane and no lost focus eats it.
+#[gpui_kit::test]
+fn every_global_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    let global: Vec<(String, Box<dyn gpui_kit::Action>)> = cx.update(|_, cx| {
+        let map = cx.key_bindings();
+        let map = map.borrow();
+        map.bindings()
+            .filter(|b| b.predicate().is_none() && b.action().name().starts_with("lathe::"))
+            .map(|b| (b.keystrokes().iter().map(|k| k.inner().unparse()).collect::<Vec<_>>().join(" "), b.action().boxed_clone()))
+            .collect()
+    });
+    assert!(global.len() >= 10, "the shell's chords are bound: {}", global.len());
+    type Place = fn(&mut Shell, &mut Window, &mut Context<Shell>);
+    let places: [(&str, Place); 5] = [
+        ("nothing", |_, window, cx| window.blur(cx)),
+        ("the shell", |s, window, cx| s.focus.focus(window, cx)),
+        ("the sidebar", |s, window, cx| s.agents_sidebar.read(cx).focus_handle(cx).focus(window, cx)),
+        ("a session's composer", |s, window, cx| s.new_session_key(&NewSession, window, cx)),
+        ("the Tasks pane", |s, window, cx| s.show_tasks(window, cx)),
+    ];
+    let mut lost = Vec::new();
+    for (name, place) in places {
+        shell.update_in(cx, |s, window, cx| place(s, window, cx));
+        settle(&shell, cx);
+        let missing: Vec<String> = cx.update(|window, cx| {
+            global.iter().filter(|(_, action)| !window.is_action_available(action.as_ref(), cx)).map(|(keys, _)| keys.clone()).collect()
+        });
+        if !missing.is_empty() {
+            lost.push(format!("from {name}: {missing:?}"));
+        }
+    }
+    assert!(lost.is_empty(), "chords that do not reach their action {lost:#?}");
+}

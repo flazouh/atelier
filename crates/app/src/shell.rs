@@ -1331,6 +1331,11 @@ const WHAT_LATHE_IS: &str = "Run coding agents on your code, review every change
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // A key goes up from the focus, so with nothing focused (a closed form, a pane that went away) no
+        // chord would reach the shell: the shell takes the focus back.
+        if window.focused(cx).is_none() {
+            self.focus.focus(window, cx);
+        }
         let root = self.root(window, cx);
         match self.meter.clone() {
             Some(meter) => crate::frame_meter::Timed { child: root, meter }.into_any_element(),
