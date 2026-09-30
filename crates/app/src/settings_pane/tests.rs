@@ -173,3 +173,15 @@ fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestApp
     pane.update(cx, |p, _| p.rules.set(lathe_tracker::Rule::MergeMovesToDone, true));
     assert!(on(cx, lathe_tracker::Rule::MergeMovesToDone));
 }
+
+/// design preview: remove after Alex picks. A choice in Settings applies at once to the running app.
+#[gpui_kit::test]
+fn a_design_choice_applies_at_once(cx: &mut TestAppContext) {
+    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    assert_eq!(cx.update(|_, cx| (beui::design_preview::toggle(cx), beui::design_preview::tabs(cx))), (2, 0));
+    pane.update(cx, |p, cx| p.choose_toggle(3, cx));
+    pane.update(cx, |p, cx| p.choose_tabs(1, cx));
+    assert_eq!(cx.update(|_, cx| (beui::design_preview::toggle(cx), beui::design_preview::tabs(cx))), (3, 1));
+    assert!(cx.debug_bounds("design-toggle-3").is_some(), "the toggle designs are listed");
+    assert!(cx.debug_bounds("design-tabs-3").is_some(), "the tab designs are listed");
+}

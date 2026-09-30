@@ -112,3 +112,12 @@ fn the_task_rules_the_reader_turned_off_are_kept_and_an_old_file_has_none() {
     let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
     assert_eq!(round.task_rules_off, ["merge"]);
 }
+
+#[test]
+fn the_design_choices_are_kept_and_an_old_file_has_none() {
+    let old: Settings = serde_json::from_str("{}").unwrap();
+    assert_eq!((old.design_toggle, old.design_tabs), (None, None));
+    let kept = Settings { design_toggle: Some(3), design_tabs: Some(1), ..Settings::default() };
+    let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
+    assert_eq!((round.design_toggle, round.design_tabs), (Some(3), Some(1)));
+}

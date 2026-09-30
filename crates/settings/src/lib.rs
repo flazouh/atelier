@@ -28,6 +28,9 @@ pub struct Settings {
     pub primary: Option<[u8; 3]>,
     /// Newest first.
     pub recent: Vec<Location>,
+    /// design preview: remove after Alex picks. The designs in force for the grouping toggle and the editor tabs (0 to 3).
+    pub design_toggle: Option<u8>,
+    pub design_tabs: Option<u8>,
     /// The ids of the task rules the reader turned off (`lathe_tracker::Rule::id`).
     pub task_rules_off: Vec<String>,
     /// Names the reader gave sessions, by the agent's id for the session.

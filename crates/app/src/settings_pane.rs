@@ -94,6 +94,9 @@ pub struct SettingsPane {
     primary: SharedString,
     /// Which task rules move a task by themselves.
     rules: lathe_tracker::RuleSet,
+    // design preview: remove after Alex picks
+    toggle: usize,
+    tabs: usize,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -112,7 +115,15 @@ impl SettingsPane {
             .and_then(|bytes| PRIMARIES.iter().find(|(_, b, _)| *b == bytes))
             .map_or("default", |(name, _, _)| *name);
         let rules = lathe_tracker::RuleSet::from_disabled(saved.task_rules_off.iter().map(String::as_str));
-        Self { focus: cx.focus_handle(), agents, mode, primary: primary.into(), rules }
+        Self {
+            focus: cx.focus_handle(),
+            agents,
+            mode,
+            primary: primary.into(),
+            rules,
+            toggle: saved.design_toggle.map_or(2, usize::from).min(3),
+            tabs: saved.design_tabs.map_or(0, usize::from).min(3),
+        }
     }
 
     fn choose_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
@@ -122,6 +133,20 @@ impl SettingsPane {
         cx.notify();
     }
 
+    // design preview: remove after Alex picks
+    pub(crate) fn choose_toggle(&mut self, design: usize, cx: &mut Context<Self>) {
+        self.toggle = design;
+        beui::design_preview::set_toggle(design, cx);
+        save(cx, move |s| s.design_toggle = Some(design as u8));
+        cx.notify();
+    }
+    // design preview: remove after Alex picks
+    pub(crate) fn choose_tabs(&mut self, design: usize, cx: &mut Context<Self>) {
+        self.tabs = design;
+        beui::design_preview::set_tabs(design, cx);
+        save(cx, move |s| s.design_tabs = Some(design as u8));
+        cx.notify();
+    }
     fn set_rule(&mut self, rule: lathe_tracker::Rule, on: bool, cx: &mut Context<Self>) {
         self.rules.set(rule, on);
         let off: Vec<String> = self.rules.disabled().into_iter().map(String::from).collect();
@@ -137,6 +162,9 @@ impl SettingsPane {
     }
 }
 
+// design preview: remove after Alex picks
+const DESIGN_TOGGLE: [&str; 4] = ["design-toggle-0", "design-toggle-1", "design-toggle-2", "design-toggle-3"];
+const DESIGN_TABS: [&str; 4] = ["design-tabs-0", "design-tabs-1", "design-tabs-2", "design-tabs-3"];
 /// The name a test finds a rule's switch by.
 pub(crate) fn rule_switch(rule: lathe_tracker::Rule) -> &'static str {
     match rule {
@@ -289,6 +317,39 @@ impl Render for SettingsPane {
                                 .into_any_element(),
                         )
                     }))
+                    // design preview: remove after Alex picks
+                    .child(heading("Design preview"))
+                    .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Pick a design for each control. It applies at once, in the panels bar and in the editor tabs."))
+                    .child(row(
+                        "Group toggle",
+                        {
+                            let pane = this.clone();
+                            Segmented::new(
+                                "design-toggle",
+                                beui::design_preview::TOGGLE_DESIGNS.iter().enumerate().map(|(i, words)| Segment::new(*words).debug_name(DESIGN_TOGGLE[i])),
+                                self.toggle,
+                            )
+                            .on_change(move |i, _, cx| {
+                                pane.update(cx, |p, cx| p.choose_toggle(i, cx)).ok();
+                            })
+                            .into_any_element()
+                        },
+                    ))
+                    .child(row(
+                        "Editor tabs",
+                        {
+                            let pane = this.clone();
+                            Segmented::new(
+                                "design-tabs",
+                                beui::design_preview::TABS_DESIGNS.iter().enumerate().map(|(i, words)| Segment::new(*words).debug_name(DESIGN_TABS[i])),
+                                self.tabs,
+                            )
+                            .on_change(move |i, _, cx| {
+                                pane.update(cx, |p, cx| p.choose_tabs(i, cx)).ok();
+                            })
+                            .into_any_element()
+                        },
+                    ))
                     .child(heading("Agents"))
                     .child(div().flex().flex_col().children(agent_rows))
                     .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available."))),
