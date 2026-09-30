@@ -351,3 +351,30 @@ fn a_narrow_files_view_has_a_tab_for_the_tree_and_the_editor(cx: &mut TestAppCon
     assert!(cx.debug_bounds("narrow-tab-Files").is_some() && cx.debug_bounds("narrow-tab-Editor").is_some(), "Files and Editor tabs");
     assert!(cx.debug_bounds("files-tree").is_some(), "the tree shows first");
 }
+
+/// The view in front is kept: a window opens on the view it closed on.
+#[gpui_kit::test]
+fn a_window_opens_on_the_view_it_closed_on(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
+    });
+    let saved = lathe_settings::Settings { view: Some("files".into()), ..Default::default() };
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&saved, cx));
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Files);
+    assert_eq!(ShellView::from_words(Some("sessions")), ShellView::Sessions);
+    assert_eq!(ShellView::from_words(None), ShellView::Sessions, "a first launch opens on Sessions");
+    assert_eq!(ShellView::Files.words(), "files");
+}
+
+/// In a narrow Files view, a file picked in the tree opens in the editor, which comes to the front.
+#[gpui_kit::test]
+fn a_file_picked_in_a_narrow_tree_shows_in_the_editor(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 700.);
+    shell.update_in(cx, |s, window, cx| s.show_view(ShellView::Files, window, cx));
+    settle(&shell, cx);
+    let row = cx.debug_bounds("tree-row-a.txt").expect("the tree lists a.txt");
+    cx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("editor-tab-0").is_some(), "the editor shows a.txt");
+}

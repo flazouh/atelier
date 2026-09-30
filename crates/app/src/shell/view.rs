@@ -9,6 +9,24 @@ pub enum ShellView {
     Files,
 }
 
+impl ShellView {
+    /// The name the settings keep it by.
+    pub fn words(self) -> &'static str {
+        match self {
+            Self::Sessions => "sessions",
+            Self::Files => "files",
+        }
+    }
+
+    /// The view the settings name; Sessions for none or an unknown name.
+    pub fn from_words(words: Option<&str>) -> Self {
+        match words {
+            Some("files") => Self::Files,
+            _ => Self::Sessions,
+        }
+    }
+}
+
 /// In a narrow window, the Files view shows one of these at a time.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FilesPane {

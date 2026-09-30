@@ -58,6 +58,15 @@ actions!(lathe, [ShowSessions, ShowFiles, OpenTasks, OpenFolder, OpenRemote, New
 pub const TITLE_BAR: f32 = 38.;
 const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else { 12. };
 
+/// Where the shell keeps what it saves. A test writes only where `LATHE_SETTINGS` points, never the
+/// reader's own settings.
+fn settings_path() -> Option<std::path::PathBuf> {
+    if cfg!(test) && std::env::var_os("LATHE_SETTINGS").is_none() {
+        return None;
+    }
+    lathe_settings::path()
+}
+
 /// How often the sidebar's ages are brought up to date.
 const AGE_TICK: std::time::Duration = std::time::Duration::from_secs(60);
 
@@ -195,7 +204,7 @@ impl Shell {
             before_review: None,
             _subscriptions: Vec::new(),
             panel_views: Default::default(),
-            view: ShellView::default(),
+            view: ShellView::from_words(saved.view.as_deref()),
             files_narrow: FilesPane::default(),
             layout_menu: false,
             session_right: None,
@@ -272,7 +281,7 @@ impl Shell {
             return;
         }
         self.saved_open = now.clone();
-        if let Some(path) = lathe_settings::path() {
+        if let Some(path) = settings_path() {
             cx.background_spawn(async move {
                 if let Err(error) = lathe_settings::update(&path, |s| (s.open, s.front) = now) {
                     eprintln!("could not keep the open sessions: {error}");
@@ -457,7 +466,7 @@ impl Shell {
                     grouped: state.grouped,
                     widths: state.widths.iter().map(|(id, w)| (id.to_string(), *w)).collect(),
                 };
-                if let Some(path) = lathe_settings::path() {
+                if let Some(path) = settings_path() {
                     cx.background_spawn(async move {
                         if let Err(error) = lathe_settings::update(&path, |s| s.panels = panels) {
                             eprintln!("could not save the panels: {error}");
@@ -520,7 +529,7 @@ impl Shell {
             cx.notify();
             return;
         }
-        let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
+        let saved = settings_path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
         let agents = lathe_agents::registry::agents()
             .into_iter()
             .map(|agent| crate::settings_pane::AgentRow {
@@ -705,14 +714,31 @@ impl Shell {
         if self.view != view {
             self.view = view;
             self.focus.focus(window, cx);
+            self.save_view(cx);
             cx.notify();
+        }
+    }
+
+    /// Keeps the view for the next launch, off the UI thread.
+    fn save_view(&self, cx: &mut Context<Self>) {
+        let words = self.view.words().to_string();
+        if let Some(path) = settings_path() {
+            cx.background_spawn(async move {
+                if let Err(error) = lathe_settings::update(&path, |s| s.view = Some(words)) {
+                    eprintln!("could not keep the view: {error}");
+                }
+            })
+            .detach();
         }
     }
 
     /// A file was opened: the Files view shows it, in a narrow window with the editor in front.
     fn show_file(&mut self, cx: &mut Context<Self>) {
         self.files_narrow = FilesPane::Editor;
-        self.view = ShellView::Files;
+        if self.view != ShellView::Files {
+            self.view = ShellView::Files;
+            self.save_view(cx);
+        }
         cx.notify();
     }
 
@@ -769,7 +795,7 @@ impl Shell {
             ProjectEvent::Renamed { id, name } => {
                 this.names.insert(id.0.clone(), name.to_string());
                 let (id, name) = (id.0.clone(), name.to_string());
-                if let Some(path) = lathe_settings::path() {
+                if let Some(path) = settings_path() {
                     cx.background_spawn(async move {
                         if let Err(error) = lathe_settings::update(&path, |s| drop(s.session_names.insert(id, name))) {
                             eprintln!("could not save the name: {error}");
@@ -794,7 +820,7 @@ impl Shell {
         let mut settings = lathe_settings::Settings { recent: std::mem::take(&mut self.recent), ..Default::default() };
         settings.opened(location.clone());
         self.recent = settings.recent;
-        if let Some(path) = lathe_settings::path() {
+        if let Some(path) = settings_path() {
             cx.background_spawn(async move {
                 if let Err(error) = lathe_settings::update(&path, |s| s.opened(location)) {
                     eprintln!("could not remember the project: {error}");
@@ -1093,7 +1119,7 @@ impl Shell {
     /// on another host, and the copy's path is saved. `None` puts the letter back.
     fn save_icon(&mut self, place: SharedString, file: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         self.close_icon_picker(window, cx);
-        let Some(settings) = lathe_settings::path() else { return };
+        let Some(settings) = settings_path() else { return };
         let key = place.to_string();
         let Some(file) = file else {
             self.badges.icons.remove(&key);
