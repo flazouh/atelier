@@ -235,8 +235,8 @@ impl OpenProject {
                         for session in &this.sessions {
                             let when = session.read(cx).id.as_ref().and_then(|id| past::last_activity(&listed, id));
                             session.update(cx, |s, _| {
-                                if s.active_at == 0 {
-                                    s.active_at = when.unwrap_or(0);
+                                if !s.activity_known {
+                                    s.active_at = when.unwrap_or(s.active_at);
                                 }
                             });
                         }
@@ -262,7 +262,11 @@ impl OpenProject {
         let session = self.start_session(key, self.agent.clone(), resume, window, cx);
         // An opened past session keeps its place: its stamp is its last activity, not now.
         if let Some(when) = when {
-            session.update(cx, |s, _| s.active_at = when);
+            session.update(cx, |s, _| {
+                if !s.activity_known {
+                    s.active_at = when;
+                }
+            });
         }
         self.sessions.push(session.clone());
         cx.emit(ProjectEvent::Sessions);

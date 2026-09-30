@@ -24,6 +24,7 @@ fn a_review_comes_back_from_its_record() {
     state.comments.add(0, "a.txt", anchor, "and this?");
     state.committed.insert((Scope::Turn(0), "a.txt".into()), "b89cbbe".into());
     state.approvals.insert("toolu_1".into(), Approval::AlwaysAllowed);
+    state.last_activity = Some(1_790_700_000);
     let scratch = lathe_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe-qa-scratch".into() };
     state.pull = Some(lathe_forge::PullRef { repo: scratch, number: 7 });
 
@@ -38,6 +39,7 @@ fn a_review_comes_back_from_its_record() {
     assert!(back.is_reviewed(0, &a));
     assert_eq!(back.committed[&(Scope::Turn(0), "a.txt".to_string())], "b89cbbe");
     assert_eq!(back.approvals["toolu_1"], Approval::AlwaysAllowed);
+    assert_eq!(back.last_activity, Some(1_790_700_000), "a resume knows when the agent last worked");
     assert_eq!(back.pull.as_ref().map(|p| p.number), Some(7));
     assert_eq!(back.comments.all().len(), 1);
     assert_eq!(back.sent.iter().map(|(c, answered)| (c.body.as_str(), *answered)).collect::<Vec<_>>(), [("why?", false)]);

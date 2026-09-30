@@ -59,6 +59,9 @@ pub struct ReviewState {
     pub pull: Option<lathe_forge::PullRef>,
     /// The reader's answer to each call's approval, by the call's id.
     pub approvals: HashMap<String, Approval>,
+    /// When the agent last worked in the session, in seconds since the epoch: a resume writes to the
+    /// agent's own file, so its time is no guide.
+    pub last_activity: Option<u64>,
     reviewed: Reviewed,
     /// The marks as `reviewed` holds them, which it does not list: by scope key, path and version.
     marks: Vec<(usize, String, u64)>,
@@ -122,6 +125,7 @@ impl ReviewState {
                 committed
             },
             pull: self.pull.clone(),
+            last_activity: self.last_activity,
             approvals: {
                 let mut kept: Vec<_> = self.approvals.iter().map(|(id, a)| (id.clone(), *a)).collect();
                 kept.sort_by(|a, b| a.0.cmp(&b.0));
@@ -145,6 +149,7 @@ impl ReviewState {
             .map(|d| ((d.scope.rebuild(), d.path), (d.texts.map(|(baseline, current)| Merged::diff(&baseline, &current)), d.on_disk)))
             .collect();
         state.pull = record.pull;
+        state.last_activity = record.last_activity;
         state.approvals = record.approvals.into_iter().collect();
         state.committed = record.committed.into_iter().map(|(scope, path, sha)| ((scope.rebuild(), path), sha)).collect();
         for (key, path, version) in record.marks {
@@ -182,6 +187,8 @@ pub struct Record {
     /// Missing from records written before approvals were kept.
     #[serde(default)]
     approvals: Vec<(String, Approval)>,
+    #[serde(default)]
+    last_activity: Option<u64>,
     marks: Vec<(usize, String, u64)>,
     comments: Vec<CommentRecord>,
     sent: Vec<(CommentRecord, bool)>,
