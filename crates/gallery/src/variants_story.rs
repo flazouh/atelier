@@ -259,6 +259,8 @@ fn sweep(theme: &beui::Theme) -> AnyElement {
         .into_any_element()
 }
 
+type Pick = Rc<dyn Fn(usize, &mut Window, &mut App)>;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Marker {
     Pill,
@@ -282,7 +284,7 @@ struct TabBar {
     marker: Marker,
     names: Vec<&'static str>,
     selected: usize,
-    on_pick: Rc<dyn Fn(usize, &mut Window, &mut App)>,
+    on_pick: Pick,
 }
 
 impl RenderOnce for TabBar {
