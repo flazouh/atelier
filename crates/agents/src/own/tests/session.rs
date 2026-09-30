@@ -513,7 +513,7 @@ fn the_backend_says_what_it_can_do() {
     let caps = rig.agent.capabilities();
     assert!(caps.resume && caps.interrupt && caps.thinking);
     assert!(!caps.subagents && !caps.todos, "no subagents yet");
-    assert_eq!(caps.models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-4-5"]);
+    assert_eq!(caps.models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-4-5"]);
     assert!(caps.permission_modes.contains(&PermissionMode::Plan) && caps.permission_modes.contains(&PermissionMode::Bypass));
     assert_eq!(rig.agent.name(), "lathe");
     let _ = (&rig as &Rig, RequestId::new("x"), FakeServer::start(vec![]));

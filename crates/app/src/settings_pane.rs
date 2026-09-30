@@ -8,7 +8,7 @@ use beui::{
     keys,
     theme::{Appearance, can_be_primary, follow_system, set_appearance, set_pick},
     theme_picker::theme_picker,
-    typography::{MONO_FONT_FAMILY, TextSize},
+    typography::TextSize,
 };
 use gpui_kit::{
     AppContext, Context, EventEmitter, FocusHandle, Focusable, FontWeight, Hsla, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
@@ -206,7 +206,7 @@ impl Render for SettingsPane {
                 .gap(px(12.))
                 .py(px(8.))
                 .child(div().w(px(160.)).flex_none().text_size(TextSize::Sm.font_size()).text_color(theme.foreground).child(agent.name.clone()))
-                .child(div().flex_1().min_w_0().font_family(MONO_FONT_FAMILY).text_size(TextSize::Xs.font_size()).text_color(muted).child(if agent.models.is_empty() {
+                .child(div().flex_1().min_w_0().text_size(TextSize::Xs.font_size()).text_color(muted).child(if agent.models.is_empty() {
                     SharedString::from("No model to pick")
                 } else {
                     SharedString::from(agent.models.iter().map(|m| m.as_ref()).collect::<Vec<_>>().join(", "))

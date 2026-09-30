@@ -97,7 +97,7 @@ fn choice(id: &str, label: &str) -> ModelChoice {
 
 /// The Claude models to offer before the account's own list is known (see [`Anthropic::models`]).
 pub fn anthropic_models() -> Vec<ModelChoice> {
-    vec![choice("claude-opus-5-5", "Opus 5.5"), choice("claude-sonnet-5-5", "Sonnet 5.5"), choice("claude-haiku-4-5", "Haiku 4.5")]
+    vec![choice("claude-opus-5-5", "Opus 5.5"), choice("claude-fable-5-1", "Fable 5.1"), choice("claude-sonnet-5-5", "Sonnet 5.5"), choice("claude-sonnet-5", "Sonnet 5"), choice("claude-haiku-4-5", "Haiku 4.5")]
 }
 
 /// The instructions every session starts with. It holds nothing that changes from call to call (no
