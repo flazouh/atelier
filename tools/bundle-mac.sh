@@ -39,11 +39,15 @@ target=aarch64-apple-darwin
 host=$(rustc -vV | awk '/^host:/ {print $2}')
 if [ "$host" = "$target" ]; then
   cargo build --release -p lathe-app
-  exe=target/release/lathe
+  profile=release
 else
   cargo build --release -p lathe-app --target "$target"
-  exe="target/$target/release/lathe"
+  profile="$target/release"
 fi
+# Cargo may keep its target folder elsewhere (CARGO_TARGET_DIR, or a global config), so ask it.
+built=$(cargo metadata --format-version 1 --no-deps | sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+exe="$built/$profile/lathe"
+[ -f "$exe" ] || { echo "cargo built no $exe." >&2; exit 1; }
 
 app=target/bundle/lathe.app
 rm -rf "$app"
