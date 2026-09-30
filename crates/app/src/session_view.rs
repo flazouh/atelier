@@ -38,10 +38,14 @@ fn row_status(status: ToolStatus) -> RowToolStatus {
     }
 }
 
-fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call) -> ToolRow {
+/// The row of `call`: its path relative to `root`, and the mark its answered approval left.
+fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
     let mut row = ToolRow::new(id, SharedString::from(call.call.name.clone())).status(row_status(call.call.status));
     if let Some(file) = &call.call.file {
-        row = row.file(file.clone());
+        row = row.file(beui::tool_preview::relative_path(file, root));
+    }
+    if let Some(mark) = mark {
+        row = row.meta(mark);
     }
     if let Some(output) = &call.output {
         let note = match (&output.full_at, output.truncated) {
@@ -85,6 +89,11 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     let theme = cx.theme().clone();
     let items = s.conversation.items();
     let Some(item) = items.get(ix) else { return div().into_any_element() };
+    // One row per call: the approval stands in for it while it waits, and its row carries the answer.
+    if !calls::shows(items, ix) {
+        return div().into_any_element();
+    }
+    let root = s.root();
     let working = s.conversation.working();
     let last = ix + 1 == items.len();
     let look = s.agent.look.clone();
@@ -117,12 +126,12 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
             let running = if last { s.conversation.running_subagents() } else { 0 };
             Thinking::new(id("think"), look, phase).subagents(running).into_any_element()
         }
-        Item::Tool(call) => tool_row(id("tool"), call).into_any_element(),
+        Item::Tool(call) => tool_row(id("tool"), call, &root, calls::mark(items, &call.call.id)).into_any_element(),
         Item::Subagent { subagent, status, activity, calls, summary } => {
             let name = subagent.kind.clone().unwrap_or_else(|| "Subagent".into());
             let mut card = SubagentCard::new(id("sub"), look, name, subagent.task.clone())
                 .tool_calls(calls.len() as u64)
-                .calls(calls.iter().enumerate().map(|(n, c)| tool_row(id(&format!("sub-call-{n}")), c)).collect());
+                .calls(calls.iter().enumerate().map(|(n, c)| tool_row(id(&format!("sub-call-{n}")), c, &root, None)).collect());
             if let Some(model) = &subagent.model {
                 card = card.model(model.clone());
                 if let Some(mark) = lathe_agents::registry::model_mark(model) {
@@ -147,9 +156,11 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
                 .into_any_element()
         }
         Item::Permission { request, answer } => {
+            let preview = preview::preview(&request.call, &root);
+            // With a preview, the raw input stays behind View details; with none, it is all there is.
             let mut approval = ToolApproval::new(id("ask"), request.call.name.clone())
                 .title(request.call.name.clone())
-                .default_open(true)
+                .default_open(preview.is_none())
                 .status(match answer {
                     Answer::Asking => ToolApprovalStatus::Pending,
                     Answer::Answered(ChoiceKind::Deny) | Answer::Withdrawn => ToolApprovalStatus::Denied,
@@ -158,8 +169,11 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
             if let Some(reason) = &request.reason {
                 approval = approval.description(reason.clone());
             }
+            if let Some(preview) = preview {
+                approval = approval.preview(preview);
+            }
             if let Some(file) = &request.call.file {
-                approval = approval.parameter("File", file.clone());
+                approval = approval.parameter("File", beui::tool_preview::relative_path(file, &root));
             }
             for (name, value) in request.call.input.as_object().into_iter().flatten() {
                 let shown = value.as_str().map_or_else(|| value.to_string(), str::to_string);
@@ -415,5 +429,7 @@ fn header(session: &Entity<AgentSession>, cx: &mut App) -> impl IntoElement {
         .children(stop)
 }
 
+mod calls;
+mod preview;
 #[cfg(test)]
 mod tests;
