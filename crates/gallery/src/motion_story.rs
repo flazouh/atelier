@@ -2,7 +2,7 @@
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use gpui_kit::AppContext as _;
-use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
+use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, FileUpload, FileUploadEvent, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
 use gpui_kit::{
     AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -35,6 +35,15 @@ fn teams() -> Vec<MultiOption> {
     ]
 }
 
+/// The web preview's queue: one arrived, one on its way, one that failed.
+fn initial_uploads() -> Vec<beui::UploadItem> {
+    vec![
+        beui::UploadItem::new("brand-assets", "brand-assets.zip", 18_400_000).mime("application/zip").progress(100.).status(beui::UploadStatus::Success),
+        beui::UploadItem::new("release-video", "release-cut.mov", 84_200_000).mime("video/quicktime").progress(58.).status(beui::UploadStatus::Uploading),
+        beui::UploadItem::new("contracts", "vendor-contract.pdf", 2_800_000).mime("application/pdf").progress(32.).status(beui::UploadStatus::Error).error("Connection lost"),
+    ]
+}
+
 fn accents() -> Vec<Swatch> {
     ACCENTS
         .iter()
@@ -50,6 +59,9 @@ pub struct MotionStory {
     teams: Entity<MultiSelect>,
     toasts: Entity<ToastStack>,
     notes: Entity<NotificationStack>,
+    uploads: Entity<FileUpload>,
+    upload_variant: beui::UploadVariant,
+    upload_ticks: Vec<gpui_kit::Task<()>>,
     position: ToastPosition,
     accent: SharedString,
     /// Owned by the "every state" rows below.
@@ -86,9 +98,49 @@ impl MotionStory {
                 cx,
             )
         });
-        Self { teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 }
+        let uploads = cx.new(|_| FileUpload::new("uploads").variant(beui::UploadVariant::Centered).words("Drop files to upload", "PDF, images, video or zipped assets").max_files(5));
+        let initial = initial_uploads();
+        uploads.update(cx, |u, cx| u.set_items(initial, cx));
+        cx.subscribe(&uploads, |this, _, event: &FileUploadEvent, cx| match event {
+            FileUploadEvent::Added(items) => items.iter().for_each(|i| this.tick_upload(i.id.to_string(), cx)),
+            FileUploadEvent::Retried(item) => this.tick_upload(item.id.to_string(), cx),
+            FileUploadEvent::Removed(_) => {}
+        })
+        .detach();
+        let mut story = Self { uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
+        story.tick_upload("release-video".to_string(), cx);
+        story
     }
 
+    /// Moves one file's progress on, as the web preview's timer does: 7 to 19 a step, every 520 ms, until it is done.
+    fn tick_upload(&mut self, id: String, cx: &mut Context<Self>) {
+        let uploads = self.uploads.downgrade();
+        let mut seed = beui::motion::now_millis() as u64 ^ (id.len() as u64) << 7;
+        self.upload_ticks.push(cx.spawn(async move |_, cx| {
+            loop {
+                cx.background_executor().timer(std::time::Duration::from_millis(520)).await;
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let jump = 7. + ((seed >> 33) % 1000) as f32 / 1000. * 12.;
+                let mut done = true;
+                let id = id.clone();
+                let ok = uploads.update(cx, |u, cx| {
+                    u.update(&id, |item| {
+                        if item.status == beui::UploadStatus::Uploading {
+                            item.progress = (item.progress + jump).min(100.);
+                            if item.progress >= 100. {
+                                item.status = beui::UploadStatus::Success;
+                            } else {
+                                done = false;
+                            }
+                        }
+                    }, cx)
+                });
+                if ok.is_err() || done {
+                    break;
+                }
+            }
+        }));
+    }
     fn shows(&self, name: &str) -> bool {
         self.part.as_deref().is_none_or(|p| p == name)
     }
@@ -353,6 +405,61 @@ impl Render for MotionStory {
         if self.shows("notification-stack") {
             let demo = div().flex().w_full().justify_center().pt(px(208.)).pb(px(24.)).child(self.notes.clone());
             parts.push(if alone { demo.into_any_element() } else { section("Notification stack: the demo", &theme, demo) });
+        }
+        if self.shows("file-upload") {
+            let uploads = self.uploads.clone();
+            let ready = uploads.read(cx).items().iter().filter(|i| i.status == beui::UploadStatus::Success).count();
+            let total = uploads.read(cx).items().len();
+            let variants = [(beui::UploadVariant::Centered, "Centered"), (beui::UploadVariant::Row, "Row")];
+            let switch = variants.into_iter().map(|(variant, label)| {
+                let (this, uploads) = (cx.entity().downgrade(), uploads.clone());
+                Button::new(label)
+                    .label(label)
+                    .size(ButtonSize::Sm)
+                    .pill(true)
+                    .variant(if self.upload_variant == variant { ButtonVariant::Invert } else { ButtonVariant::Ghost })
+                    .on_click(move |_, _, cx| {
+                        this.update(cx, |s, cx| {
+                            s.upload_variant = variant;
+                            cx.notify();
+                        })
+                        .ok();
+                        uploads.update(cx, |u, cx| {
+                            u.set_variant(variant, cx);
+                            u.set_words(if variant == beui::UploadVariant::Centered { "Drop files to upload" } else { "Drop release files" }, "PDF, images, video or zipped assets", cx);
+                        });
+                    })
+            });
+            let reset = {
+                let (this, uploads) = (cx.entity().downgrade(), uploads.clone());
+                Button::new("upload-reset").icon(beui::IconName::RotateLeft).size(ButtonSize::Icon).pill(true).variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                    let items = initial_uploads();
+                    uploads.update(cx, |u, cx| u.set_items(items, cx));
+                    this.update(cx, |s, cx| s.tick_upload("release-video".to_string(), cx)).ok();
+                })
+            };
+            let card = div()
+                .w(px(448.))
+                .rounded(px(32.))
+                .border_1()
+                .border_color(theme.foreground.opacity(0.08))
+                .bg(theme.background)
+                .p(px(12.))
+                .child(
+                    div()
+                        .mb(px(12.))
+                        .px(px(4.))
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .justify_between()
+                        .gap(px(8.))
+                        .child(div().child(div().text_size(px(14.)).line_height(px(20.)).font_weight(gpui_kit::FontWeight::SEMIBOLD).text_color(theme.foreground).child("Upload package")).child(div().text_size(px(12.)).line_height(px(16.)).text_color(theme.muted_foreground).child(format!("{ready} of {total} files ready"))))
+                        .child(div().flex().items_center().gap(px(6.)).child(div().flex().rounded_full().bg(theme.card_strong).p(px(4.)).children(switch)).child(reset)),
+                )
+                .child(uploads);
+            let demo = div().flex().w_full().justify_center().pt(px(24.)).child(card);
+            parts.push(if alone { demo.into_any_element() } else { section("File upload: the demo (drop files on it, or press Browse)", &theme, demo) });
         }
         if self.shows("multi-select") {
             let demo = div().w(px(384.)).child(self.teams.clone());

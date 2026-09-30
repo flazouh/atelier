@@ -177,6 +177,8 @@ fn preview_actions() -> Vec<PromptAction> {
 }
 
 struct Gallery {
+    /// Where Tab starts: with nothing focused, the window's Tab action has no path to walk from.
+    focus: gpui_kit::FocusHandle,
     story: Story,
     choice: Option<usize>,
     /// The Inline review story's buffer: both sides of every hunk, as real text.
@@ -315,11 +317,12 @@ impl Gallery {
             motion: None,
             agent_panels: None,
             agent_replay: None,
-            prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
+            focus: cx.focus_handle(), prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
             gallery.editors.open(cx);
         }
         gallery.open_load(window, cx);
+        window.focus(&gallery.focus, cx);
         if std::env::var("GALLERY_REPLAY").is_ok_and(|v| v == "1") {
             gallery.start_replay(cx);
         }
@@ -493,6 +496,7 @@ impl Render for Gallery {
         // These draw edge to edge, as a real pane does, with no title or padding around them.
         let panel = matches!(self.story, Story::AgentPanel | Story::PullRequest | Story::PullRequests);
         div()
+            .track_focus(&self.focus)
             .flex()
             .size_full()
             .bg(theme.background)
