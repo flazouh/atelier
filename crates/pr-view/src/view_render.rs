@@ -1,6 +1,7 @@
 //! How the pull request view draws: a rail on the left, and on the right the seen bar, the tree and the
 //! diff. The layout is the pull request story's (see [`crate::layout`]); the data is the model's.
 use beui::{
+    Segment, Segmented,
     ActiveTheme, AgentText, Button, ButtonSize, ButtonVariant, ChangedFileTree, ChecksPanel, CommitsSummary, ConversationList, InlineReview, ReviewBar,
     ReviewFileHeader, UnsentComments,
     theme::radius,
@@ -15,7 +16,7 @@ use lathe_forge::{ForgeError, PullState};
 use crate::{
     data::PartKind,
     diff::Content,
-    layout::{RAIL_GAP, PADDING, RAIL_MAX, TREE},
+    layout::{PADDING, Part, RAIL_GAP, RAIL_MAX, TREE},
     place::place,
     services::now,
     view::PullView,
@@ -30,6 +31,9 @@ pub(crate) fn body_needs_fold(body: &str) -> bool {
     let lines: usize = body.lines().map(|l| l.chars().count().div_ceil(48).max(1)).sum();
     lines > 6
 }
+
+/// The height of the switch between the two parts in a narrow pane.
+const PARTS_HEIGHT: f32 = 46.;
 
 /// The line under the diff.
 const STATUS_HEIGHT: f32 = 26.;
@@ -132,6 +136,7 @@ impl PullView {
         let header = self.header(cx);
         div()
             .id("pr-rail")
+            .debug_selector(|| "pr-rail".into())
             .track_scroll(&self.rail_scroll)
             .flex()
             .flex_col()
@@ -354,6 +359,7 @@ impl Render for PullView {
         let card = self.file_card(body, cx);
         let picker = self.picker_popover(cx);
         let right = div()
+            .debug_selector(|| "pr-diff".into())
             .relative()
             .flex()
             .flex_col()
@@ -363,8 +369,29 @@ impl Render for PullView {
             .child(ReviewBar::new("pr-bar", progress, handlers.clone()).reviewed_word("seen").mark_label("Seen").next_primary(true).review_mode(self.review_mode))
             .child(div().flex().flex_1().min_w_0().gap(px(8.)).when(layout.tree, |d| d.child(tree)).child(card))
             .children(picker);
-        let rail = layout.rail.map(|width| self.rail(height - 16., width.min(RAIL_MAX), cx));
-        handlers.keys(root(div().flex().flex_1().min_w_0().gap(px(RAIL_GAP)).children(rail).child(right).into_any_element()), &self.focus)
+        // Under 700 px one part shows at a time, with a switch over it.
+        let single = layout.single;
+        let rail_height = height - 16. - if single.is_some() { PARTS_HEIGHT } else { 0. };
+        let rail = layout.rail.map(|width| self.rail(rail_height, if single.is_some() { width } else { width.min(RAIL_MAX) }, cx));
+        let parts = single.map(|part| {
+            let this = cx.entity().downgrade();
+            div().flex_none().h(px(PARTS_HEIGHT)).flex().items_center().child(
+                Segmented::new("pr-parts", [Segment::new("Details").debug_name("pr-part-details"), Segment::new("Files").debug_name("pr-part-files")], usize::from(part == Part::Files))
+                    .on_change(move |i, _, cx| {
+                        this.update(cx, |view, cx| {
+                            view.part = if i == 0 { Part::Details } else { Part::Files };
+                            cx.notify();
+                        })
+                        .ok();
+                    }),
+            )
+        });
+        let content = match single {
+            Some(Part::Details) => div().flex().flex_1().min_w_0().children(rail).into_any_element(),
+            Some(Part::Files) => div().flex().flex_1().min_w_0().child(right).into_any_element(),
+            None => div().flex().flex_1().min_w_0().gap(px(RAIL_GAP)).children(rail).child(right).into_any_element(),
+        };
+        handlers.keys(root(div().flex().flex_col().flex_1().min_w_0().children(parts).child(content).into_any_element()), &self.focus)
     }
 }
 

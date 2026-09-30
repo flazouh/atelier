@@ -168,6 +168,8 @@ pub struct PullView {
     stopped: bool,
     pub(crate) focus: FocusHandle,
     pub(crate) details: bool,
+    /// In a narrow pane, the one part that shows.
+    pub(crate) part: crate::layout::Part,
     pub(crate) tree: Option<bool>,
     pub(crate) width: f32,
     pub(crate) height: f32,
@@ -261,6 +263,7 @@ impl PullView {
             stopped: false,
             focus: cx.focus_handle(),
             details: true,
+            part: crate::layout::Part::Details,
             tree: None,
             width: f32::MAX,
             height: 0.,
@@ -1242,12 +1245,20 @@ impl PullView {
                 }
             }))
             .on_toggle_details(with(|s, _, cx| {
-                s.details = !s.details;
+                if s.layout().single.is_some() {
+                    s.part = crate::layout::Part::Details;
+                } else {
+                    s.details = !s.details;
+                }
                 cx.notify();
             }))
             .on_toggle_files(with(|s, _, cx| {
-                let shown = s.layout().tree;
-                s.tree = Some(!shown);
+                if s.layout().single.is_some() {
+                    s.part = crate::layout::Part::Files;
+                } else {
+                    let shown = s.layout().tree;
+                    s.tree = Some(!shown);
+                }
                 cx.notify();
             }))
             .on_put_back(with(|s, _, cx| s.put_back(cx)))
@@ -1259,7 +1270,7 @@ impl PullView {
     }
 
     pub(crate) fn layout(&self) -> Fit {
-        fit(self.width, self.details && !self.review_mode, self.tree)
+        fit(self.width, self.details && !self.review_mode, self.tree, self.part)
     }
 
     /// Asks the owner to open the file on screen in its editor.

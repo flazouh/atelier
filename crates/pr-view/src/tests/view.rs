@@ -389,3 +389,46 @@ fn the_comment_key_starts_a_draft_on_the_row_of_the_caret(cx: &mut TestAppContex
     let row = view.read_with(cx, |v, _| v.draft.as_ref().map(|d| d.row));
     assert_eq!(row, Some(1), "a draft is open on the caret's row");
 }
+
+/// Under 700 px one part shows at a time, with a switch over it; from 700 up both show.
+#[gpui_kit::test]
+fn a_narrow_pane_shows_details_or_files_and_the_switch_and_the_keys_change_it(cx: &mut TestAppContext) {
+    use crate::layout::Part;
+    use gpui_kit::{Modifiers, px, size};
+    setup(cx);
+    let h = harness();
+    let (view, cx) = open(&h, cx);
+    settle(&view, cx, |v| v.current_view().is_some());
+    for width in [450., 550.] {
+        cx.simulate_resize(size(px(width), px(800.)));
+        for _ in 0..4 {
+            cx.run_until_parked();
+            view.update(cx, |_, cx| cx.notify());
+        }
+        assert!(cx.debug_bounds("pr-part-details").is_some(), "{width}: the switch shows");
+        assert!(cx.debug_bounds("pr-rail").is_some_and(|b| f32::from(b.size.width) <= width), "{width}: the rail fits the pane");
+        assert!(cx.debug_bounds("pr-diff").is_none(), "{width}: the diff is the other part");
+    }
+    // The switch chooses Files.
+    let files = cx.debug_bounds("pr-part-files").unwrap().center();
+    cx.simulate_click(files, Modifiers::default());
+    for _ in 0..4 {
+        cx.run_until_parked();
+        view.update(cx, |_, cx| cx.notify());
+    }
+    assert_eq!(view.read_with(cx, |v, _| v.part), Part::Files);
+    assert!(cx.debug_bounds("pr-rail").is_none() && cx.debug_bounds("pr-diff").is_some());
+    // The Details key comes back to the rail.
+    let handler = view.update(cx, |v, cx| v.handlers(cx)).for_command(beui::keys::Command::ToggleDetails).cloned().expect("the view answers the details key");
+    cx.update(|window, cx| handler(window, cx));
+    cx.run_until_parked();
+    assert_eq!(view.read_with(cx, |v, _| v.part), Part::Details);
+    // From 700 up both parts show.
+    cx.simulate_resize(size(px(1000.), px(800.)));
+    for _ in 0..4 {
+        cx.run_until_parked();
+        view.update(cx, |_, cx| cx.notify());
+    }
+    assert!(cx.debug_bounds("pr-part-details").is_none(), "no switch when both show");
+    assert!(cx.debug_bounds("pr-rail").is_some() && cx.debug_bounds("pr-diff").is_some());
+}
