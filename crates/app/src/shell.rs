@@ -8,6 +8,7 @@
 use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 use beui::{
+    PressStop,
     button::{Button, ButtonSize, ButtonVariant},
     file_icon::FileIcon,
     finder::{Filter, Finder, FinderEvent, FinderItem},
@@ -838,7 +839,7 @@ impl Shell {
             )))
     }
 
-    fn start_screen(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn start_screen(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let recent = self.recent.iter().enumerate().map(|(i, location)| {
@@ -853,6 +854,7 @@ impl Shell {
                 .rounded(radius::LG)
                 .cursor_pointer()
                 .hover(|s| s.bg(theme.muted_hover()))
+                .press_stop(gpui_kit::ElementId::Name(format!("recent-focus-{i}").into()), radius::LG, window, cx)
                 .on_click(cx.listener(move |this, _, window, cx| match &open {
                     Location::Local { path } => this.open_local(path.clone(), window, cx),
                     Location::Ssh { host, path } => this.open_remote(host.clone(), path.display().to_string(), window, cx),
@@ -869,7 +871,7 @@ impl Shell {
                         .child(div().text_size(TextSize::Sm.font_size()).truncate().child(location.name()))
                         .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).truncate().child(location.place())),
                 )
-        });
+        }).collect::<Vec<_>>();
         let has_recent = !self.recent.is_empty();
         div()
             .flex()
@@ -1148,7 +1150,7 @@ impl Shell {
         let theme = cx.theme().clone();
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
-            None => self.start_screen(cx).into_any_element(),
+            None => self.start_screen(window, cx).into_any_element(),
             Some(project) => self.panes(&project, window, cx),
         };
         let link_down = self.active().and_then(|p| match &p.read(cx).link {
