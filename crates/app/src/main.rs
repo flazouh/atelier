@@ -56,6 +56,7 @@ fn main() {
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
         // or the system's, which keeps the pick.
+        beui::design_preview::init_strength(saved.design_strength); // design preview: remove after Alex picks
         beui::design_preview::init_elevation(saved.design_elevation); // design preview: remove after Alex picks
         beui::design_preview::init(saved.design_toggle, saved.design_tabs, cx); // design preview: remove after Alex picks
         beui::theme::set_pick(saved.primary.map(settings_pane::colour), cx);

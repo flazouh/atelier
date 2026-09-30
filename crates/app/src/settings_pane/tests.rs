@@ -196,3 +196,14 @@ fn an_elevation_choice_applies_at_once(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("design-elevation-3").is_some(), "the elevation designs are listed");
     pane.update(cx, |p, cx| p.choose_elevation(2, cx));
 }
+
+/// design preview: remove after Alex picks. The strength applies at once, and its number shows beside the slider.
+#[gpui_kit::test]
+fn a_strength_choice_applies_at_once_and_shows_its_number(cx: &mut TestAppContext) {
+    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    assert_eq!(beui::design_preview::strength(), 50);
+    assert!(cx.debug_bounds("design-strength-value").is_some(), "the number is shown");
+    pane.update(cx, |p, cx| p.choose_strength(80, cx));
+    assert_eq!(beui::design_preview::strength(), 80);
+    pane.update(cx, |p, cx| p.choose_strength(50, cx));
+}

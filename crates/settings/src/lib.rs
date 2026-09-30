@@ -33,6 +33,8 @@ pub struct Settings {
     pub design_tabs: Option<u8>,
     /// design preview: remove after Alex picks. The elevation of floating panels (0 to 3).
     pub design_elevation: Option<u8>,
+    /// design preview: remove after Alex picks. How strong the elevation is, 0 to 100.
+    pub design_strength: Option<u8>,
     /// The ids of the task rules the reader turned off (`lathe_tracker::Rule::id`).
     pub task_rules_off: Vec<String>,
     /// Names the reader gave sessions, by the agent's id for the session.

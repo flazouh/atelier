@@ -98,6 +98,7 @@ pub struct SettingsPane {
     toggle: usize,
     tabs: usize,
     elevation: usize,
+    strength: usize,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -125,6 +126,7 @@ impl SettingsPane {
             toggle: saved.design_toggle.map_or(2, usize::from).min(3),
             tabs: saved.design_tabs.map_or(0, usize::from).min(3),
             elevation: saved.design_elevation.map_or(2, usize::from).min(3),
+            strength: saved.design_strength.map_or(50, usize::from).min(100),
         }
     }
 
@@ -140,6 +142,14 @@ impl SettingsPane {
         self.toggle = design;
         beui::design_preview::set_toggle(design, cx);
         save(cx, move |s| s.design_toggle = Some(design as u8));
+        cx.notify();
+    }
+    // design preview: remove after Alex picks
+    pub(crate) fn choose_strength(&mut self, value: usize, cx: &mut Context<Self>) {
+        self.strength = value.min(100);
+        beui::design_preview::set_strength(self.strength);
+        let kept = self.strength as u8;
+        save(cx, move |s| s.design_strength = Some(kept));
         cx.notify();
     }
     // design preview: remove after Alex picks
@@ -373,6 +383,33 @@ impl Render for SettingsPane {
                                 pane.update(cx, |p, cx| p.choose_elevation(i, cx)).ok();
                             })
                             .into_any_element()
+                        },
+                    ))
+                    .child(row(
+                        "Elevation strength",
+                        {
+                            let pane = this.clone();
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(12.))
+                                .child(div().w(px(200.)).child(
+                                    beui::RangeSlider::new("design-strength", self.strength as f32)
+                                        .range(0., 100.)
+                                        .step(1.)
+                                        .on_change(move |v, _, cx| {
+                                            pane.update(cx, |p, cx| p.choose_strength(v.round() as usize, cx)).ok();
+                                        }),
+                                ))
+                                .child(
+                                    div()
+                                        .w(px(32.))
+                                        .debug_selector(|| "design-strength-value".to_string())
+                                        .text_size(TextSize::Sm.font_size())
+                                        .text_color(muted)
+                                        .child(format!("{}", self.strength)),
+                                )
+                                .into_any_element()
                         },
                     ))
                     .child(heading("Agents"))
