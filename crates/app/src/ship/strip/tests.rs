@@ -131,6 +131,8 @@ fn a_commit_from_the_pane_marks_its_files_committed(cx: &mut TestAppContext) {
         assert_eq!(p.committed_words(0).as_deref(), Some(format!("Committed in {short}").as_str()));
         assert!(!p.can_undo(0), "an undo would change the file under the commit");
     });
+    let focused = cx.update(|window, cx| pane.read(cx).focus_handle(cx).is_focused(window));
+    assert!(focused, "the review takes the keys back, so the push key reaches it");
     let again = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     cx.update(|_, cx| assert_eq!(again.read(cx).files[0].committed.as_deref(), Some(short.as_str()), "kept with the session"));

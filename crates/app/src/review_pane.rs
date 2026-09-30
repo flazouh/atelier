@@ -220,7 +220,11 @@ impl ReviewPane {
         let ship = cx.new(|cx| ShipStrip::new(project.clone(), backend, model, window, cx));
         let _ship = cx.subscribe_in(&ship, window, |this, _, event: &StripEvent, window, cx| match event {
             StripEvent::WantsOpen => this.open_ship(window, cx),
-            StripEvent::Committed { sha, paths } => this.committed(sha, paths, cx),
+            StripEvent::Committed { sha, paths } => {
+                this.committed(sha, paths, cx);
+                // The strip's fields close, so the review takes the keys back: the push key reaches it.
+                this.focus.focus(window, cx);
+            }
             StripEvent::BranchMade | StripEvent::Pushed => cx.emit(PaneEvent::GitChanged),
             StripEvent::Rewrote(moved) => this.rewrote(moved, cx),
         });
