@@ -8,14 +8,14 @@
 use std::sync::Arc;
 
 use beui::{
-    ActiveTheme,
+    ActiveTheme, Field,
     button::{Button, ButtonVariant},
     keys::Command as Key,
     theme::radius,
     typography::{MONO_FONT_FAMILY, TextSize},
 };
 use gpui_kit::{
-    AppContext, Context, Entity, EventEmitter, IntoElement, InteractiveElement, ParentElement, Render, SharedString, Styled, Task,
+    AppContext, Context, Entity, EventEmitter, Focusable, IntoElement, InteractiveElement, ParentElement, Render, SharedString, Styled, Task,
     Window, actions,
     component::input::{Input, InputState, Textarea, TextareaState},
     div, prelude::FluentBuilder, px,
@@ -247,6 +247,7 @@ impl ShipStrip {
 
 impl Render for ShipStrip {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (branch_focus, message_focus) = (self.new_branch.focus_handle(cx), self.message.focus_handle(cx));
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let words = |text: SharedString| div().text_size(TextSize::Xs.font_size()).text_color(muted).child(text);
@@ -306,9 +307,9 @@ impl Render for ShipStrip {
                     .child(div().flex().flex_col().gap(px(2.)).children(lines))
                     .when(self.on_default, |d| {
                         d.child(words(format!("{on} is the default branch: this commit goes on a new one").into()))
-                            .child(div().rounded(radius::MD).bg(theme.card_strong).child(Input::new(&self.new_branch).appearance(false)))
+                            .child(Field::new(branch_focus.clone(), Input::new(&self.new_branch).appearance(false)).radius(radius::MD))
                     })
-                    .child(div().rounded(radius::MD).bg(theme.card_strong).p(px(6.)).child(Textarea::new(&self.message)))
+                    .child(Field::new(message_focus.clone(), Textarea::new(&self.message).appearance(false)).radius(radius::MD).padding(px(6.)))
                     .when(self.drafting, |d| d.child(words("The agent is drafting…".into())))
                     .when_some(self.refused.clone(), |d, refused| {
                         d.child(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(refused))

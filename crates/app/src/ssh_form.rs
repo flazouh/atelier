@@ -4,6 +4,7 @@
 //! on hp-agent…"); a failure shows ssh's own words and leaves the form open to try again.
 
 use beui::{
+    Field,
     button::{Button, ButtonSize, ButtonVariant},
     spinner::Spinner,
     theme::{ActiveTheme, popover_shadow, radius},
@@ -99,13 +100,14 @@ impl Render for SshForm {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let field = |label: &'static str, input: &Entity<InputState>| {
+        let (host_focus, path_focus) = (self.host.focus_handle(cx), self.path.focus_handle(cx));
+        let field = |label: &'static str, input: &Entity<InputState>, focus: FocusHandle| {
             div()
                 .flex()
                 .flex_col()
                 .gap(px(4.))
                 .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(label))
-                .child(div().rounded(radius::LG).bg(theme.card_strong).child(Input::new(input).appearance(false).px(px(10.)).text_size(TextSize::Sm.font_size())))
+                .child(Field::new(focus, Input::new(input).appearance(false).px(px(10.)).text_size(TextSize::Sm.font_size())).radius(radius::LG).surface(theme.card_strong))
         };
         let this = cx.entity().downgrade();
         // The config's hosts, as chips under the field: a press puts the name in it.
@@ -158,9 +160,9 @@ impl Render for SshForm {
             .bg(theme.popover)
             .shadow(popover_shadow(&theme))
             .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open over SSH"))
-            .child(field("Host", &self.host))
+            .child(field("Host", &self.host, host_focus))
             .children(hosts)
-            .child(field("Folder on the host", &self.path))
+            .child(field("Folder on the host", &self.path, path_focus))
             .children(status)
             .child(
                 div()
