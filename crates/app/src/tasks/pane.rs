@@ -67,8 +67,13 @@ pub struct TasksPane {
 impl EventEmitter<TasksEvent> for TasksPane {}
 
 impl Focusable for TasksPane {
-    fn focus_handle(&self, _: &gpui_kit::App) -> FocusHandle {
-        self.focus.clone()
+    /// The part the keys go to: the task in full, the board, or the list.
+    fn focus_handle(&self, cx: &gpui_kit::App) -> FocusHandle {
+        match (&self.open, self.shown_mode()) {
+            (Some(_), _) => self.view.focus_handle(cx),
+            (None, Mode::List) => self.list.focus_handle(cx),
+            (None, Mode::Board) => self.board.focus_handle(cx),
+        }
     }
 }
 
@@ -151,17 +156,9 @@ impl TasksPane {
         pane
     }
 
-    /// The tracker the pane reads and writes, when the project has one.
-    pub fn tracker(&self) -> Option<Arc<dyn Tracker>> {
-        self.tracker.as_ref().ok().cloned()
-    }
-
+    #[cfg(test)]
     pub fn tasks(&self) -> &[TaskData] {
         &self.tasks
-    }
-
-    pub fn mode(&self) -> Mode {
-        self.mode
     }
 
     /// The board needs room; a narrow pane shows the list whatever was asked.

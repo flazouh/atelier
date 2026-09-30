@@ -116,6 +116,8 @@ pub enum ProjectEvent {
     Open(String),
     /// The pull requests came on screen: the shell shows the right pane.
     PullsShown,
+    /// The tasks came on screen: the shell shows the right pane.
+    TasksShown,
     /// The review closed: the editor is back.
     ReviewClosed,
 }
@@ -146,6 +148,8 @@ pub struct OpenProject {
     pub review: Option<(Entity<ReviewPane>, Subscription)>,
     /// The project's pull requests, once asked for (`pulls.rs`).
     pub pulls: Option<Pulls>,
+    /// The project's tasks, once asked for (`tasks.rs`).
+    pub tasks: Option<crate::tasks::Slot>,
     /// What the reader asked the right pane for last.
     right_asked: front::Front,
     /// A pull request to show once the pull request view has mounted.
@@ -206,6 +210,7 @@ impl OpenProject {
             _session_events: Vec::new(),
             review: None,
             pulls: None,
+            tasks: None,
             pending_pull: None,
             right_asked: front::Front::Editor,
             repo: None,
@@ -559,9 +564,28 @@ impl OpenProject {
         cx.notify();
     }
 
+    /// Shows the project's tasks in the right pane, or hides them. The tracker opens on the first ask.
+    pub fn toggle_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let behind = self.front() != front::Front::Tasks;
+        if let Some(tasks) = &mut self.tasks {
+            // Shown behind a review, they come to the front; in front, they hide.
+            tasks.shown = !tasks.shown || behind;
+            self.right_asked = if tasks.shown { front::Front::Tasks } else { front::Front::Review };
+            if tasks.shown {
+                cx.emit(ProjectEvent::TasksShown);
+            }
+            return cx.notify();
+        }
+        let tracker = crate::tasks::store::open(&self.location, self.project.as_ref(), &self.name());
+        self.tasks = Some(crate::tasks::Slot::new(tracker, window, cx));
+        self.right_asked = front::Front::Tasks;
+        cx.emit(ProjectEvent::TasksShown);
+        cx.notify();
+    }
+
     /// What the right pane shows now.
     pub fn front(&self) -> front::Front {
-        front::front(self.right_asked, self.review.is_some(), self.pulls.as_ref().is_some_and(|p| p.shown))
+        front::front(self.right_asked, self.review.is_some(), self.pulls.as_ref().is_some_and(|p| p.shown), self.tasks.as_ref().is_some_and(|t| t.shown))
     }
 
     /// Shows `reference` in the pull request view, mounting the view first when it is not yet there.

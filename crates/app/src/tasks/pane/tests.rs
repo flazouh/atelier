@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use beui::task_model::TaskStatus;
-use gpui_kit::{AppContext, Entity, TestAppContext, VisualTestContext, px, size};
+use gpui_kit::{Entity, TestAppContext, VisualTestContext, px, size};
 use lathe_tracker::{LocalTracker, NewTask, Query, Tracker};
 
 use super::*;
@@ -87,4 +87,27 @@ fn a_project_with_no_tracker_says_why(cx: &mut TestAppContext) {
     settle(&pane, cx);
     assert!(pane.read_with(cx, |p, _| matches!(p.load, Load::Failed(_))));
     let _ = Query::default();
+}
+
+/// The keys of the list work as soon as the pane has the focus: the pane hands the focus to its list.
+#[gpui_kit::test]
+fn the_pane_hands_the_focus_to_the_part_that_reads_the_keys(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    let handle = cx.update(|_, cx| pane.focus_handle(cx));
+    cx.update(|window, cx| handle.focus(window, cx));
+    settle(&pane, cx);
+    let list = pane.read_with(cx, |p, _| p.list.clone());
+    assert!(cx.update(|window, cx| list.focus_handle(cx).is_focused(window)), "the list holds the focus");
+}
+
+/// A new task takes what the reader types at once: the caret is in the title when the dialog opens.
+#[gpui_kit::test]
+fn the_new_task_dialog_puts_the_caret_in_the_title(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.new_task(window, cx)));
+    settle(&pane, cx);
+    cx.simulate_input("Ship it");
+    settle(&pane, cx);
+    let title = pane.read_with(cx, |p, cx| p.dialog.read(cx).draft().title.clone());
+    assert_eq!(title, "Ship it");
 }

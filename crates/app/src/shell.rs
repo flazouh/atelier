@@ -50,7 +50,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(lathe, [OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -73,6 +73,8 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("secondary-shift-B", ToggleRight, None),
         KeyBinding::new("secondary-,", OpenSettings, None),
         KeyBinding::new("secondary-shift-p", PullRequests, None),
+        KeyBinding::new("secondary-shift-l", OpenTasks, None),
+        KeyBinding::new("secondary-shift-L", OpenTasks, None),
         KeyBinding::new("secondary-shift-P", PullRequests, None),
     ]);
 }
@@ -341,6 +343,12 @@ impl Shell {
                     cx.notify();
                 }
             }
+            SidebarEvent::Tasks { project } => {
+                if let Some(at) = self.project_by_id(project, cx) {
+                    self.active = at;
+                    self.show_tasks(window, cx);
+                }
+            }
             SidebarEvent::PullRequests { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
                     self.active = at;
@@ -539,6 +547,18 @@ impl Shell {
         }
     }
 
+    fn open_tasks_key(&mut self, _: &OpenTasks, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_tasks(window, cx);
+    }
+    /// Shows or hides the active project's tasks in the right pane.
+    fn show_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.active().cloned() else { return };
+        project.update(cx, |p, cx| p.toggle_tasks(window, cx));
+        self.right = true;
+        self.widen_for_review(window, cx);
+        self.focus_front(&project, window, cx);
+        cx.notify();
+    }
     fn pull_requests_key(&mut self, _: &PullRequests, window: &mut Window, cx: &mut Context<Self>) {
         self.show_pulls(window, cx);
     }
@@ -559,6 +579,10 @@ impl Shell {
         let p = project.read(cx);
         match (p.front(), p.review.as_ref()) {
             (crate::open_project::front::Front::Review, Some((pane, _))) => pane.focus_handle(cx).focus(window, cx),
+            (crate::open_project::front::Front::Tasks, _) => match &p.tasks {
+                Some(tasks) => tasks.pane.focus_handle(cx).focus(window, cx),
+                None => self.focus.focus(window, cx),
+            },
             _ => self.focus.focus(window, cx),
         }
     }
@@ -617,6 +641,12 @@ impl Shell {
                 project.update(cx, |p, cx| p.open_review(session.clone(), scope, path.as_deref(), window, cx));
                 this.right = true;
                 this.widen_for_review(window, cx);
+                cx.notify();
+            }
+            ProjectEvent::TasksShown => {
+                this.right = true;
+                this.widen_for_review(window, cx);
+                this.focus_front(project, window, cx);
                 cx.notify();
             }
             ProjectEvent::PullsShown => {
@@ -1195,6 +1225,7 @@ impl Shell {
             match p.front() {
                 crate::open_project::front::Front::Review => "Review",
                 crate::open_project::front::Front::Pulls => "Pull requests",
+                crate::open_project::front::Front::Tasks => "Tasks",
                 crate::open_project::front::Front::Editor => "Editor",
             }
         };
@@ -1238,6 +1269,9 @@ impl Shell {
         let inner = match (p.front(), p.review.as_ref(), pulls) {
             (crate::open_project::front::Front::Review, Some((pane, _)), _) => div().size_full().pt(px(6.)).child(pane.clone()),
             (crate::open_project::front::Front::Pulls, _, Some(hub)) => div().size_full().pt(px(6.)).child(hub),
+            (crate::open_project::front::Front::Tasks, _, _) if p.tasks.is_some() => {
+                div().size_full().pt(px(6.)).children(p.tasks.as_ref().map(|t| t.pane.clone()))
+            }
             _ => div().size_full().pt(px(6.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
         };
         div().size_full().pr(px(8.)).pb(px(2.)).child(inner).into_any_element()
@@ -1341,6 +1375,7 @@ impl Shell {
             .on_action(cx.listener(Self::toggle_sidebar))
             .on_action(cx.listener(Self::toggle_right))
             .on_action(cx.listener(Self::pull_requests_key))
+            .on_action(cx.listener(Self::open_tasks_key))
             .on_key_down(cx.listener(Self::key_down))
             .flex()
             .flex_col()

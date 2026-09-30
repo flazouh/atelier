@@ -423,3 +423,12 @@ fn a_failed_lookup_gives_no_chip(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(cx.update(|_, cx| project.read(cx).chips().is_empty()));
 }
+/// The tasks take the right pane when asked for, and give it back when asked again.
+#[gpui_kit::test]
+fn the_tasks_take_the_right_pane_and_give_it_back(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    assert_eq!(project.read_with(cx, |p, _| p.front()), front::Front::Tasks);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    assert_eq!(project.read_with(cx, |p, _| p.front()), front::Front::Editor);
+}

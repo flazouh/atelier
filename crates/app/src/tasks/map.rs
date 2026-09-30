@@ -173,6 +173,7 @@ pub fn new_task_of(draft: &beui::new_task_model::Draft) -> tracker::NewTask {
 
 /// The first message of a session started from `task`: the key and title, the description, and the
 /// name of the task, so the agent can say which task it works on.
+#[cfg_attr(not(test), allow(dead_code))] // used by the session start (M6a T2)
 pub fn first_message(task: &tracker::Task) -> String {
     let mut text = format!("{}: {}", task.key, task.title);
     if !task.description.trim().is_empty() {

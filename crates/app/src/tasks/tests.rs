@@ -91,3 +91,31 @@ fn the_first_message_names_the_task_and_carries_its_words() {
     let bare = t.create(&tracker::NewTask::titled("Bare"), "me").unwrap();
     assert_eq!(first_message(&bare), "LAT-2: Bare\n\nWork on this task. The task is LAT-2.");
 }
+
+#[test]
+fn a_local_projects_tasks_stay_in_its_data_folder_across_opens() {
+    use lathe_project::LocalProject;
+    let root = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let project = LocalProject::open(root.path()).unwrap().with_data_dir(data.path());
+    let location = lathe_settings::Location::Local { path: root.path().to_path_buf() };
+    let first = super::store::open(&location, &project, "lathe").expect("a local project has a tracker");
+    first.create(&tracker::NewTask::titled("Keep me"), "me").unwrap();
+    drop(first);
+    let again = super::store::open(&location, &project, "lathe").unwrap();
+    let titles: Vec<_> = again.list(&tracker::Query::default()).unwrap().into_iter().map(|t| t.title).collect();
+    assert_eq!(titles, ["Keep me"]);
+    assert!(!root.path().join(super::store::FILE).exists(), "nothing in the repository");
+    let key = again.list(&tracker::Query::default()).unwrap()[0].key.clone();
+    assert!(key.starts_with("LAT-"), "the prefix comes from the project name: {key}");
+}
+
+#[test]
+fn a_project_over_ssh_says_its_tasks_come_later() {
+    use lathe_project::LocalProject;
+    let root = tempfile::tempdir().unwrap();
+    let project = LocalProject::open(root.path()).unwrap();
+    let location = lathe_settings::Location::Ssh { host: "hp".into(), path: "/srv/x".into() };
+    let why = super::store::open(&location, &project, "x").err().expect("no tracker yet");
+    assert!(why.contains("SSH"), "{why}");
+}
