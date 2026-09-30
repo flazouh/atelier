@@ -643,6 +643,11 @@ impl Shell {
                 this.widen_for_review(window, cx);
                 cx.notify();
             }
+            ProjectEvent::ShowSession(session) => {
+                if let Some(at) = this.projects.iter().position(|p| p == project) {
+                    this.show_session(at, session, window, cx);
+                }
+            }
             ProjectEvent::TasksShown => {
                 this.right = true;
                 this.widen_for_review(window, cx);

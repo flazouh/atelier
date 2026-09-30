@@ -390,9 +390,9 @@ fn shows_stop(running: bool, status: &SessionStatus) -> bool {
 
 fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, status_words) = {
+    let (key, renaming, shown_title, running, status_words, task) = {
         let s = session.read(cx);
-        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words())
+        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words(), s.task.clone())
     };
     let title = match &renaming {
         Some(input) => div()
@@ -427,6 +427,16 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
             .tooltip("Stop the agent. The session stays in the list and can be resumed.")
             .on_click(move |_, _, cx| stop.update(cx, |s, cx| s.stop(cx)))
     });
+    // The task the session began from: a press opens it in the Tasks pane.
+    let chip = task.map(|task| {
+        let open = session.clone();
+        Button::new(gpui_kit::ElementId::Name(format!("{key}-task").into()))
+            .label(task.key)
+            .variant(ButtonVariant::Ghost)
+            .size(beui::ButtonSize::Sm)
+            .tooltip("Open the task")
+            .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenTask)))
+    });
     div()
         .flex()
         .flex_none()
@@ -435,6 +445,7 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
         .h(px(40.))
         .px(px(16.))
         .child(title)
+        .children(chip)
         .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(status_words))
         .children(stop)
 }

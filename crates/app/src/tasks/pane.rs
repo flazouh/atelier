@@ -156,6 +156,11 @@ impl TasksPane {
         pane
     }
 
+    /// The tracker the pane reads and writes, when the project has one.
+    pub fn tracker(&self) -> Option<Arc<dyn Tracker>> {
+        self.tracker.as_ref().ok().cloned()
+    }
+
     #[cfg(test)]
     pub fn tasks(&self) -> &[TaskData] {
         &self.tasks

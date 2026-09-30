@@ -28,6 +28,8 @@ pub struct Settings {
     pub primary: Option<[u8; 3]>,
     /// Newest first.
     pub recent: Vec<Location>,
+    /// The ids of the task rules the reader turned off (`lathe_tracker::Rule::id`).
+    pub task_rules_off: Vec<String>,
     /// Names the reader gave sessions, by the agent's id for the session.
     pub session_names: std::collections::BTreeMap<String, String>,
     /// How the agent panels were laid out last.

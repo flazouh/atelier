@@ -119,3 +119,14 @@ fn a_project_over_ssh_says_its_tasks_come_later() {
     let why = super::store::open(&location, &project, "x").err().expect("no tracker yet");
     assert!(why.contains("SSH"), "{why}");
 }
+
+#[test]
+fn a_session_tells_its_task_what_happened() {
+    use super::signal::{SessionRef, TaskEvent, of};
+    let task = super::TaskRef { id: tracker::TaskId::from("1"), key: "LAT-1".into() };
+    let session = SessionRef { id: "s1", title: "Do it", agent: "Claude" };
+    assert!(matches!(of(TaskEvent::Started, Some(&task), &session), Some(tracker::Signal::SessionStarted { .. })));
+    assert_eq!(of(TaskEvent::Started, None, &session), None, "a session that began elsewhere links nothing");
+    assert_eq!(of(TaskEvent::TurnEnded { ok: false }, None, &session), Some(tracker::Signal::SessionFinished { session_id: "s1".into(), ok: false }));
+    assert_eq!(of(TaskEvent::Replied, None, &session), Some(tracker::Signal::SessionResumed { session_id: "s1".into() }));
+}
