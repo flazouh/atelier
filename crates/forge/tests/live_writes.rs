@@ -2,14 +2,14 @@
 //! real `gh`. Ignored by default, and it does nothing unless `LATHE_REQUIRE_FORGE=1`:
 //!   LATHE_REQUIRE_FORGE=1 cargo test -p lathe-forge --test live_writes -- --ignored --nocapture
 //! It writes to no other repository. Each step is reported on stderr as `ok`, `refused as expected` or `not
-//! tested: why`. It makes a branch and a pull request, marks it ready, brings a newer base into it, tries to cancel a merge
-//! when ready that is not on, leaves the queue when the repository has one, refuses to delete the branch of an open pull request,
-//! closes it (it never merges), deletes its branch, and then cleans up: the pull requests are closed, the branches
+//! tested: why`. It makes a branch and a pull request, marks it ready, brings a newer base into it, turns merge when ready
+//! on and off where the repository allows it, leaves the queue when it has one, refuses to delete the branch of an open
+//! pull request, merges it, deletes its branch, reverts it, closes the revert, and then cleans up: the pull requests are closed, the branches
 //! deleted and the files it put on `main` removed. A drop guard does the cleanup even when a step fails.
 use std::{path::Path, process::Command, sync::Arc, time::Duration};
 
 use lathe_forge::{
-    Forge, ForgeError, NewPull, PullRef, PullState, PullUpdate, RepoRef, UpdateMethod,
+    Forge, ForgeError, MergeMethod, MergeRequest, NewPull, PullRef, PullState, PullUpdate, RepoRef, UpdateMethod,
     github::GitHub,
 };
 use lathe_project::LocalProject;
@@ -154,11 +154,21 @@ fn the_write_calls_run_once_on_the_scratch_repository() {
     assert_ne!(after, before, "the branch took main in");
     eprintln!("ok                    the head moved {} -> {}", &before[..7], &after[..7]);
 
-    // Merge when ready is not switched on here: with no required checks it could merge the pull request at once.
-    // Cancelling is tried on a pull request that has none, to see what GitHub answers.
-    let alone = forge.cancel_auto_merge(&pull);
-    eprintln!("recorded              cancel_auto_merge with no merge when ready to cancel: {}", alone.err().map_or("ok".to_string(), |e| e.to_string()));
-    eprintln!("not tested            cancel_auto_merge of a real merge when ready: switching it on could merge the pull request, and no merge was allowed");
+    // Merge when ready, and cancelling it, where the repository allows it (the reader allowed a merge in this repository).
+    if repository.merge.auto_merge_allowed {
+        let request = MergeRequest { method: MergeMethod::Merge, title: None, message: None, expected_head: Some(after.clone()), when_ready: true, delete_branch: false };
+        if let Some(outcome) = step("merge when ready", || forge.merge(&pull, &request)) {
+            eprintln!("                      -> {outcome:?}");
+            if forge.pull(&pull).unwrap().state == PullState::Open {
+                step("cancel_auto_merge", || forge.cancel_auto_merge(&pull));
+                assert!(!forge.pull(&pull).unwrap().auto_merge, "merge when ready is off");
+            }
+        }
+    } else {
+        eprintln!("not tested            merge when ready, because the repository does not allow auto-merge");
+        let alone = forge.cancel_auto_merge(&pull);
+        eprintln!("recorded              cancel_auto_merge with none to cancel: {}", alone.err().map_or("ok".to_string(), |e| e.to_string()));
+    }
 
     // The queue.
     if repository.merge.has_queue {
@@ -167,15 +177,39 @@ fn the_write_calls_run_once_on_the_scratch_repository() {
         eprintln!("not tested            dequeue, because the repository has no merge queue");
     }
 
-    // Close it without merging, then delete its branch: a closed pull request may lose its branch.
-    step("update_pull closed", || forge.update_pull(&pull, &PullUpdate { closed: Some(true), ..Default::default() }));
-    assert_eq!(forge.pull(&pull).unwrap().state, PullState::Closed);
-    step("delete_branch after the pull request closed", || forge.delete_branch(&pull));
+    // Merge (the reader allowed it in this repository only), then delete its branch and revert it.
+    if forge.pull(&pull).unwrap().state != PullState::Merged {
+        let request = MergeRequest { method: MergeMethod::Merge, title: None, message: None, expected_head: Some(after.clone()), when_ready: false, delete_branch: false };
+        assert!(step("merge", || forge.merge(&pull, &request)).is_some(), "the pull request merges");
+    }
+    assert_eq!(forge.pull(&pull).unwrap().state, PullState::Merged);
+    step("delete_branch after the merge", || forge.delete_branch(&pull));
     let gone = Command::new("gh").args(["api", &format!("repos/{}/{}/git/ref/heads/{branch}", REPO.0, REPO.1)]).output().unwrap();
     assert!(!gone.status.success(), "the branch is gone from GitHub");
     cleanup.branches.retain(|b| b != &branch);
-    // Not run here: merge and revert. A merge lands a change with no review, and a revert needs a merged
-    // pull request, so both wait for the reader to allow a merge in the scratch repository.
-    eprintln!("not tested            merge and revert live: they need a merged pull request, and no merge was allowed");
+    if let Some(revert) = step("revert", || forge.revert(&pull)) {
+        cleanup.pulls.push(revert.clone());
+        let made = forge.pull(&revert).unwrap();
+        eprintln!("                      the revert is #{} {:?} \"{}\" from {}", revert.number, made.state, made.title, made.head);
+        cleanup.branches.push(made.head.clone());
+        assert!(made.title.to_lowercase().contains("revert"));
+        step("update_pull closed (the revert)", || forge.update_pull(&revert, &PullUpdate { closed: Some(true), ..Default::default() }));
+    }
+
+    // A pull request closed without a merge may lose its branch too.
+    let other = format!("qa-{id}-b");
+    git(&dir, &["checkout", "-q", "-b", &other]);
+    std::fs::write(dir.join(format!("qa/{id}-b.txt")), "b\n").unwrap();
+    git(&dir, &["add", "-A"]);
+    git(&dir, &["commit", "-q", "-m", "QA: another file"]);
+    git(&dir, &["push", "-q", "-u", "origin", &other]);
+    cleanup.branches.push(other.clone());
+    git(&dir, &["checkout", "-q", "main"]);
+    let second = forge.create_pull(&repo, &NewPull { title: format!("QA {id}: closed"), body: "Made by lathe's live QA.".into(), base: "main".into(), head: other.clone(), draft: false }).unwrap();
+    cleanup.pulls.push(second.clone());
+    step("update_pull closed", || forge.update_pull(&second, &PullUpdate { closed: Some(true), ..Default::default() }));
+    assert_eq!(forge.pull(&second).unwrap().state, PullState::Closed);
+    step("delete_branch after the pull request closed", || forge.delete_branch(&second));
+    cleanup.branches.retain(|b| b != &other);
     drop(cleanup);
 }
