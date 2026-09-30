@@ -35,6 +35,8 @@ mod shell;
 mod ssh_form;
 mod status;
 mod tabs;
+#[cfg(test)]
+mod test_dirs;
 mod timings;
 mod tasks;
 mod tree;

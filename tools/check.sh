@@ -11,7 +11,21 @@ for dir in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
   if [ -d "$dir" ]; then PATH="$dir:$PATH"; fi
 done
 export PATH
+# The tests make their temporary folders in a folder of this run, not in the shared /tmp, and must remove them:
+# a run that leaves any behind fails. (A leak once filled the inodes of /tmp on hp-agent.) The folder is outside
+# the checkout, because a test that expects "no git repository" would find this one above it. The gallery keeps
+# fixtures under fixed names on purpose, and the claude program and rust-analyzer keep their own folders; none of these count.
+run_tmp=$(mktemp -d /tmp/lathe-check.XXXXXX)
+trap 'rm -rf "$run_tmp"' EXIT
+export TMPDIR="$run_tmp"
 LATHE_REQUIRE_LSP=rust,typescript,python,go cargo test -q --workspace
+left=$(find "$run_tmp" -mindepth 1 -maxdepth 1 ! -name 'lathe-gallery-*' ! -name 'claude-*' ! -name 'proc-macro-srv*' | wc -l)
+if [ "$left" -ne 0 ]; then
+  echo "the tests left $left temporary folders in $run_tmp:" >&2
+  find "$run_tmp" -mindepth 1 -maxdepth 1 ! -name 'lathe-gallery-*' ! -name 'claude-*' ! -name 'proc-macro-srv*' | head -10 >&2
+  exit 1
+fi
+unset TMPDIR
 cargo clippy -q --workspace --all-targets -- -D warnings
 cargo build -q -p beui-gallery
 # vendor/gpui-base is excluded from the workspace, so its tests, the patch tests among them, only

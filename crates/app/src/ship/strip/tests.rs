@@ -60,7 +60,7 @@ fn the_strip_commits_the_accepted_hunk_on_a_drafted_branch(cx: &mut TestAppConte
 /// text against nothing and makes the first commit, on the drafted branch.
 #[gpui_kit::test]
 fn the_strip_makes_the_first_commit_of_a_new_repository(cx: &mut TestAppContext) {
-    let dir = tempfile::tempdir().unwrap().keep();
+    let dir = crate::test_dirs::path();
     assert!(Git::new("git").args(["init", "-q", "-b", "main"]).current_dir(&dir).status().unwrap().success());
     let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![ended()]], false);
     let root = dir.clone();
@@ -200,7 +200,7 @@ fn a_refused_commit_leaves_the_reader_on_their_branch(cx: &mut TestAppContext) {
 }
 /// Gives `dir` a bare remote as origin, with its main pushed; the remote's path.
 fn with_origin(dir: &std::path::Path) -> std::path::PathBuf {
-    let bare = tempfile::tempdir().unwrap().keep().join("remote.git");
+    let bare = crate::test_dirs::path().join("remote.git");
     let run = |at: &std::path::Path, args: &[&str]| {
         let out = Git::new("git").args(["-c", "user.name=q", "-c", "user.email=q@q", "-c", "commit.gpgsign=false"]).args(args).current_dir(at).output().unwrap();
         assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
@@ -231,7 +231,7 @@ fn a_rejected_push_offers_pull_and_rebase(cx: &mut TestAppContext) {
     let (dir, pane, strip, cx) = opened_strip(cx, |dir| {
         let bare = with_origin(dir);
         // Someone else pushed a branch of the same name first.
-        let other = tempfile::tempdir().unwrap().keep();
+        let other = crate::test_dirs::path();
         let run = |at: &std::path::Path, args: &[&str]| {
             let out = Git::new("git").args(["-c", "user.name=o", "-c", "user.email=o@o", "-c", "commit.gpgsign=false"]).args(args).current_dir(at).output().unwrap();
             assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
@@ -265,7 +265,7 @@ fn a_rejected_push_offers_pull_and_rebase(cx: &mut TestAppContext) {
 fn edits_in_the_way_are_set_aside_on_the_readers_word(cx: &mut TestAppContext) {
     let (dir, _pane, strip, cx) = opened_strip(cx, |dir| {
         let bare = with_origin(dir);
-        let other = tempfile::tempdir().unwrap().keep();
+        let other = crate::test_dirs::path();
         let run = |at: &std::path::Path, args: &[&str]| {
             let out = Git::new("git").args(["-c", "user.name=o", "-c", "user.email=o@o", "-c", "commit.gpgsign=false"]).args(args).current_dir(at).output().unwrap();
             assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));

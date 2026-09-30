@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dev-dependencies]
 lsp-types = "0.97"
+tempfile = "3"
 
 [dependencies]
 lathe-project.workspace = true

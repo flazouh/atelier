@@ -72,9 +72,7 @@ fn wait_for(path: &std::path::Path, ok: impl Fn(&lathe_settings::Settings) -> bo
 /// One test, since the settings file is named by an environment variable the whole process shares.
 #[gpui_kit::test]
 fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
-    let dir = std::env::temp_dir().join(format!("lathe-settings-pane-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
+    let dir = crate::test_dirs::path();
     let file = dir.join("settings.json");
     // SAFETY: nothing else in this test binary reads or writes the variable while this test runs.
     unsafe { std::env::set_var("LATHE_SETTINGS", &file) };

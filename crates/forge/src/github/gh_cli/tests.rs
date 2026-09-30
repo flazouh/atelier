@@ -103,14 +103,10 @@ fn ghs_real_messages_tell_signed_out_offline_and_the_rest_apart() {
 }
 
 fn stand_in_saying(stderr: &str, code: i32) -> (tempfile::TempDir, GhCli) {
-    let file = tempfile::NamedTempFile::new().unwrap();
-    std::fs::write(file.path(), stderr).unwrap();
-    let path = file.path().display().to_string();
-    let (dir, cli) = stand_in(&format!("cat '{path}' >&2\nexit {code}"));
-    std::mem::forget(file);
-    (dir, cli)
+    // The words ride in the script itself, so no second file is left behind.
+    let words = if stderr.ends_with('\n') || stderr.is_empty() { stderr.to_string() } else { format!("{stderr}\n") };
+    stand_in(&format!("cat >&2 <<'LATHE_STDERR_END'\n{words}LATHE_STDERR_END\nexit {code}"))
 }
-
 #[test]
 fn exit_four_and_a_sign_in_message_mean_signed_out() {
     let (_dir, cli) = stand_in_saying(&stderr_of("signed_out.txt"), 4);
