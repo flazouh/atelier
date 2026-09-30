@@ -457,3 +457,79 @@ average of 39 to 48 from other builds; over ssh to the HP itself through lathe-r
 - Over ssh each git call is a round trip, so the count of calls is what costs.
 - The first version over ssh also ran the host out of open files: each ended process kept its pipes
   for 30 s. lathe-remote now closes them at once (cebc3d8).
+
+## Pass after the UX work (2026-09-30)
+
+Release build at 0234352, under Xvfb at 1440×900 on the HP, drawn by Mesa's llvmpipe (software). Other
+builds ran at the same time: the load average was 45 to 80 on 12 cores. CPU is read from `/proc/<pid>/stat`
+over the stated span; frames from `LATHE_FRAMES=each`, one line per frame with its layout and paint.
+
+    LATHE_TIMINGS=1 LATHE_FRAMES=each target/release/lathe ~/qa/d1
+
+### Idle: nothing changes, the pointer is still
+
+| State | Frames | CPU | Before the fix | Result |
+| --- | --- | --- | --- | --- |
+| Start screen | 1 in 10 s | 0% | | Pass |
+| 3 sessions, the PR card (#7, checks settled), Tasks | 0 in 60 s | 0% | | Pass |
+| SSH project with Tasks (the tracker's 3 s poll) | 0 in 60 s | 0% | | Pass |
+| The Island up, an approval waiting | 0 in 10 s | 0% | | Pass |
+| A turn ended (the spinner gone) | 0 in 10 s | 0% | | Pass |
+| The SSH form open, no caret | 0 in 10 s | 0% | 57% and more than 300 frames in 30 s | Fixed (345835b) |
+| The SSH form after a failed connect, no caret | 0 in 10 s | 0% | 84 to 108% | Fixed (345835b) |
+| Any screen with a focused text field (the caret blinks) | 20 in 10 s | 60 to 77% | | See below |
+
+- The Modal bug: `Animated::is_settled` wanted the value within 0.0005 of its target. Near 237 px a 1 ms f32
+  step no longer moves the value that little, so the SSH form's panel height sat at 236.99945 for ever and the
+  Modal asked for a frame each time. The limit now scales with the target. Every `Animated` with a pixel-sized
+  target could hit it.
+- The caret is the only thing that draws on an idle screen, 2 frames a second, which is right. But each blink
+  lays out and paints the whole window: 11.6 ms median, 20.5 ms p95 on the CPU for one caret. The rest of
+  the 60 to 77% is llvmpipe rasterising the whole window twice a second. A GPU makes the raster cheap. The
+  layout cost stays: see "Open" below.
+
+### Startup, with the project and its 2 sessions restored
+
+| Case | Runs | Values | Median |
+| --- | --- | --- | --- |
+| Launch to the first frame | 6 | 365, 399, 488, 504, 566, 613 ms | 496 ms |
+| Launch to the first frame with the restored sessions (`restored after`) | 3 | 506, 663, 813 ms | 663 ms |
+
+### Frames while the new parts move (layout and paint on the CPU)
+
+| Part | Frames | Rate here | Median | p95 | Worst |
+| --- | --- | --- | --- | --- | --- |
+| Modal: opens | 10 in 1.6 s | 6 fps | 0.76 ms | 8.70 ms | 8.70 ms |
+| Modal: morphs to the error | 10 in 2.0 s | 5 fps | 0.75 ms | 8.85 ms | 8.85 ms |
+| Menu: opens and glides over 5 rows | 16 in 3.4 s | 5 fps | 12.51 ms | 44.73 ms | 44.73 ms |
+| Digits: 0/1 to 1/1 on Accept file | 8 in 1.6 s | 5 fps | 17.41 ms | 27.98 ms | 27.98 ms |
+| A whole turn: the Island, the spinner, the panel | 220 in 60 s | 2 to 11 fps | 15.07 ms | 49.36 ms | 68.96 ms |
+| Toast stack | | | | | Not in the app; not measured |
+
+- The rate is llvmpipe's under this load, not the app's: it cannot judge smoothness. Take the frame rates on
+  the Mac.
+- The Modal's own frames are light. The Menu, Digits and a turn cost 12 to 17 ms at the median, over the 8.3 ms
+  of a 120 Hz frame, because every frame lays out the whole window.
+
+### Memory: a 200-file review (`~/qa/big`), five opens and closes
+
+| Step | Before (RSS) | After 0234352 (RSS) |
+| --- | --- | --- |
+| Launch, the project and the 200-file session restored | 225,680 kB | 225,944 kB |
+| Round 1: open, then closed | 277,420, then 277,488 kB | 275,708, then 264,884 kB |
+| Round 2 | 297,060, then 296,932 kB | 289,840, then 270,620 kB |
+| Round 3 | 311,496, then 311,480 kB | 292,320, then 273,800 kB |
+| Round 4 | 324,540, then 324,524 kB | 294,312, then 275,648 kB |
+| Round 5 | 339,144, then 339,128 kB | 295,196, then 277,020 kB |
+
+- Before, RSS never fell and each round kept about 14 MB. The review pane itself is freed (two tests). With
+  `MALLOC_ARENA_MAX=2` most of the growth went away: glibc kept the freed pages in its per-thread arenas. Now
+  `memory::give_back` runs `malloc_trim(0)` off the UI thread when a review closes, and each close gives back
+  11 to 20 MB. 1.5 to 6 MB a round still stays (caches such as glyphs; not traced further).
+
+### Open
+
+- Every frame lays out and paints the whole window, so one caret or one menu row costs 12 to 17 ms. gpui can
+  keep a view's last layout (`AnyView::cached`) until the view itself changes. Caching the sidebar, the session
+  panels and the right pane would make a caret blink cost the input alone. It changes how each pane learns that
+  its inputs changed, so it is a change of its own, measured on the Mac first.
