@@ -25,6 +25,7 @@ mod sidebar_story;
 mod pr_view_story;
 mod motion_story;
 mod tasks_story;
+mod variants_story;
 mod replay_story;
 mod merge_story;
 mod pr_fixture;
@@ -71,12 +72,13 @@ enum Story {
     AgentPanels,
     AgentReplay,
     Tasks,
+    Variants,
     Motion,
     PullRequestView,
 }
 
 impl Story {
-    const ALL: [Story; 32] = [
+    const ALL: [Story; 33] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -107,6 +109,7 @@ impl Story {
         Story::AgentPanels,
         Story::AgentReplay,
         Story::Tasks,
+        Story::Variants,
         Story::PullRequestView,
         Story::Motion,
     ];
@@ -144,6 +147,7 @@ impl Story {
             Story::AgentReplay => "Agent replay",
             Story::PullRequestView => "Pull request view",
             Story::Tasks => "Tasks",
+            Story::Variants => "Variants",
             Story::Motion => "Motion",
         }
     }
@@ -208,6 +212,7 @@ struct Gallery {
     agent_replay: Option<Entity<replay_story::ReplayStory>>,
     pr_view: Option<Entity<pr_view_story::PrViewStory>>,
     tasks: Option<Entity<tasks_story::TasksStory>>,
+    variants: Option<Entity<variants_story::VariantsStory>>,
     motion: Option<Entity<motion_story::MotionStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
@@ -314,6 +319,7 @@ impl Gallery {
             agent_sidebar: None,
             pr_view: None,
             tasks: None,
+            variants: None,
             motion: None,
             agent_panels: None,
             agent_replay: None,
@@ -342,6 +348,9 @@ impl Gallery {
         }
         if self.story == Story::Motion && self.motion.is_none() {
             self.motion = Some(cx.new(|cx| motion_story::MotionStory::new(window, cx)));
+        }
+        if self.story == Story::Variants && self.variants.is_none() {
+            self.variants = Some(cx.new(|cx| variants_story::VariantsStory::new(window, cx)));
         }
         if self.story == Story::Tasks && self.tasks.is_none() {
             self.tasks = Some(cx.new(|cx| tasks_story::TasksStory::new(window, cx)));
@@ -467,6 +476,7 @@ impl Gallery {
             Story::AgentSidebar => self.agent_sidebar.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentPanels => self.agent_panels.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Tasks => self.tasks.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::Variants => self.variants.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Motion => self.motion.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequestView => self.pr_view.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
