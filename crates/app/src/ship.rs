@@ -11,3 +11,4 @@ pub mod pull;
 pub mod pull_form;
 pub mod push;
 pub mod strip;
+pub mod whole_words;
