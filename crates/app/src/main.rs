@@ -32,6 +32,7 @@ mod shell;
 mod ssh_form;
 mod status;
 mod tabs;
+mod tasks;
 mod tree;
 mod tree_view;
 
