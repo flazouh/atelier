@@ -126,6 +126,41 @@ The icon is `tools/mac/lathe-1024.png`, drawn from beui's `LatheMark` by `tools/
 (ImageMagick, run only when the mark changes). Ad hoc signing opens the app on the Mac that built it.
 Another Mac shows the Gatekeeper warning until you allow the app.
 
+## Tasks in the app (M6)
+
+The plan is `plans/m6-tasks.md`. The parts are in `docs/tasks.md`, the back end in `docs/tracker.md`.
+
+- **The pane.** ⌘⇧L, `g t` (while nothing is being typed) or the project's ⋯ menu ("Tasks") puts the Tasks pane in
+  the right pane, as the pull requests do. It has a List | Board switch, the filter chips and "New task" (`c`). A
+  press on a task shows it in full; "All tasks" (Esc) goes back. Under 560 px of pane width the board would clip,
+  so the switch hides and the pane shows the list. Below 900 px of window width the third tab says "Tasks".
+- **Storage.** `Project::tracker()` opens `tracker.sqlite` in the project data folder: on this machine for a local
+  project, on the host (through lathe-remote) for a project over SSH. A change made on another machine reaches the
+  pane through `Tracker::subscribe`. The subscription lives as long as the pane.
+- **Start a session.** "Start a session" on a task, "Create and start a session" in the new task dialog, and
+  ⌘Enter on a row start a session with the task as its first message (`KEY: title`, the description, and "Work
+  on this task. The task is KEY."). A task with no assignee takes the project's agent. The session header shows a
+  chip with the task's key; a press opens the task. After a restart the session finds its task again from the
+  tracker's link.
+- **What moves a task.** Four rules, each with a switch in Settings, "Tasks" (`docs/tracker.md`):
+  a session starting moves Backlog or Todo to In Progress; a turn that ends well moves In Progress to In Review;
+  a reply in the session moves In Review back to In Progress; a merged pull request moves an open task to Done.
+  Every move shows in the activity as `rule:<id>`. The reader moves the rest (Backlog, Todo, Canceled, Done by
+  hand) with `s`, `[` and `]`. A failed or interrupted turn moves nothing. Opening a pull request moves nothing.
+- **What the session tells its task.** The commit made from the session's review is a line of the activity
+  ("abc1234 Fix the scroll"); its draft message ends with `Refs KEY`, which the reader sees and can remove. A pull
+  request the strip opens becomes a link of the task. A pull request that reads as merged tells its tasks once.
+- **Tests.** `tasks/tests.rs` (mapping, patches, first message, signals), `tasks/pane/tests.rs` (the pane: reading,
+  saving, narrow width, focus, the dialog's caret), `open_project/tests.rs` (the whole flow with a fake agent: start,
+  link, In Progress, In Review, reply, merge, restart), `ship/strip/tests.rs` (the `Refs` line and the commit
+  signal), `key_table/tests.rs` (no two live commands share a chord), and the tracker, remote and settings crates.
+- **Live check.** A real Claude turn on the HP, started from a task in a scratch clone: the task took Claude, the
+  session opened with the task as its first message, and the task moved to In Review when the turn ended. Stills
+  are in `~/shots/tasks-live/` on the HP.
+- **Known gaps.** The sidebar has no "Tasks" row with a count yet. A mouse press on a row of the picker
+  (`s` `p` `a` `l`) does nothing: the picker works from the keyboard only, and in the live check a press on the new
+  task dialog's description did not put the caret there. A remote project's sessions tell their tasks only while the Tasks pane is open.
+
 ## Projects
 
 - Open Folder (⌘O) uses the native folder picker. The start screen and the sidebar list recent
