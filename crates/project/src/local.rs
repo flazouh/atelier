@@ -128,6 +128,10 @@ impl Project for LocalProject {
     fn data_list(&self, prefix: &str) -> io::Result<Vec<DataEntry>> {
         self.data()?.list(prefix)
     }
+    fn read_dir(&self, dir: &str) -> io::Result<Vec<crate::DirEntry>> {
+        crate::read_local_dir(dir)
+    }
+
     fn data_path(&self) -> Option<PathBuf> {
         self.data.as_ref().map(|d| d.path().to_path_buf())
     }

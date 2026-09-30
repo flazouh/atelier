@@ -209,3 +209,34 @@ fn the_data_folders_path_is_where_data_write_puts_its_files() {
     let q = LocalProject::open(other.path()).unwrap().with_data_dir(data.path());
     assert_ne!(q.data_path(), p.data_path(), "each project has its own");
 }
+
+#[test]
+fn a_folder_lists_folders_first_by_name_and_a_link_to_a_folder_is_a_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    for name in ["beta", "Alpha", ".hidden"] {
+        std::fs::create_dir(dir.path().join(name)).unwrap();
+    }
+    for name in ["zeta.txt", "a.txt"] {
+        std::fs::write(dir.path().join(name), "x").unwrap();
+    }
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(dir.path().join("beta"), dir.path().join("link-to-beta")).unwrap();
+    let listed: Vec<_> = crate::read_local_dir(dir.path().to_str().unwrap()).unwrap().into_iter().map(|e| (e.name, e.dir)).collect();
+    let mut want = vec![(".hidden", true), ("Alpha", true), ("beta", true)];
+    #[cfg(unix)]
+    want.push(("link-to-beta", true));
+    want.extend([("a.txt", false), ("zeta.txt", false)]);
+    let want: Vec<_> = want.into_iter().map(|(n, d)| (n.to_string(), d)).collect();
+    assert_eq!(listed, want);
+}
+
+#[test]
+fn a_tilde_is_the_home_folder_and_a_relative_path_is_refused() {
+    let home = std::env::var("HOME").unwrap();
+    assert_eq!(crate::expand_home("~").unwrap(), std::path::PathBuf::from(&home));
+    assert_eq!(crate::expand_home("~/src").unwrap(), std::path::Path::new(&home).join("src"));
+    assert_eq!(crate::expand_home("/etc").unwrap(), std::path::PathBuf::from("/etc"));
+    assert!(crate::expand_home("~other/x").is_none(), "another user's home is not guessed");
+    assert!(crate::expand_home("src/x").is_none());
+    assert_eq!(crate::read_local_dir("src").unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+}

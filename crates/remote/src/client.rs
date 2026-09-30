@@ -379,6 +379,13 @@ impl Project for RemoteProject {
         }
     }
 
+    fn read_dir(&self, dir: &str) -> io::Result<Vec<lathe_project::DirEntry>> {
+        match self.call(Call::ReadDir { dir: dir.into() })? {
+            Reply::DirEntries(entries) => Ok(entries),
+            other => Err(unexpected(other)),
+        }
+    }
+
     fn data_path(&self) -> Option<PathBuf> {
         if let Some(known) = lock(&self.data_path).clone() {
             return known;
