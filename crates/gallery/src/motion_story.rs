@@ -488,6 +488,13 @@ impl Render for MotionStory {
                 .child(track(2, "seg-c", &["Side by side", "Single view"], true));
             parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
         }
+        if self.shows("loader") {
+            let demo = div().flex().items_center().gap(px(24.)).text_color(theme.foreground)
+                .child(beui::spinner::Spinner::new("loader-32").size(px(32.)))
+                .child(beui::spinner::Spinner::new("loader-20").size(px(20.)))
+                .child(beui::spinner::Spinner::new("loader-12").size(px(12.)));
+            parts.push(if alone { demo.into_any_element() } else { section("Loader (spinner)", &theme, demo) });
+        }
         if self.shows("switch") {
             let this = cx.entity().downgrade();
             let one = |slot: usize, id: &'static str, label: &'static str| {
