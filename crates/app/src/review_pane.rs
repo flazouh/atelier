@@ -227,6 +227,14 @@ impl ReviewPane {
             }
             StripEvent::BranchMade | StripEvent::Pushed => cx.emit(PaneEvent::GitChanged),
             StripEvent::Rewrote(moved) => this.rewrote(moved, cx),
+            StripEvent::PullOpened(reference) => {
+                let reference = reference.clone();
+                this.session.update(cx, |s, cx| {
+                    s.reviews.pull = Some(reference);
+                    s.save_review(cx);
+                });
+                cx.emit(PaneEvent::GitChanged);
+            }
         });
         // Typing not yet written when the pane goes is written as it goes.
         cx.on_release(|pane: &mut Self, cx| pane.flush(cx)).detach();
@@ -341,6 +349,12 @@ impl ReviewPane {
         });
         cx.emit(PaneEvent::GitChanged);
         cx.notify();
+    }
+
+    /// The pull request the session's record keeps.
+    #[cfg(test)]
+    pub fn session_pull(&self, cx: &gpui_kit::App) -> Option<lathe_forge::PullRef> {
+        self.session.read(cx).reviews.pull.clone()
     }
 
     /// The commits the session's record names, by scope and path.
@@ -735,6 +749,7 @@ impl ReviewPane {
             }))
             .on_commit(with(|s, w, cx| s.open_ship(w, cx)))
             .on_push(with(|s, w, cx| s.ship.update(cx, |strip, cx| strip.push(w, cx))))
+            .on_open_pull(with(|s, w, cx| s.ship.update(cx, |strip, cx| strip.open_pull(w, cx))))
             .on_mark(with(|s, _, cx| s.toggle_mark(cx)))
             .on_review_mode(with(|s, _, cx| {
                 s.review_mode = !s.review_mode;

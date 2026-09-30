@@ -169,7 +169,7 @@ pub struct OpenProject {
 }
 
 /// Why a project's pull requests do not open.
-const NO_FORGE_REMOTE: &str = "No GitHub remote for this project";
+pub(crate) const NO_FORGE_REMOTE: &str = "No GitHub remote for this project";
 
 impl OpenProject {
     pub fn new(location: Location, project: Arc<dyn Project>, window: &mut Window, cx: &mut Context<Self>) -> Self {

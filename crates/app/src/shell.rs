@@ -54,6 +54,7 @@ const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else { 12. };
 
 pub fn bind_keys(cx: &mut App) {
     crate::ship::strip::bind_keys(cx);
+    crate::ship::pull_form::bind_keys(cx);
     cx.bind_keys([
         KeyBinding::new("secondary-o", OpenFolder, None),
         KeyBinding::new("secondary-shift-o", OpenRemote, None),

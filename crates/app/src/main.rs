@@ -13,6 +13,8 @@ mod dirty;
 mod editor_pane;
 #[cfg(test)]
 mod fake_agent;
+#[cfg(test)]
+mod fake_forge;
 mod frame_meter;
 mod list_diff;
 mod open_project;
