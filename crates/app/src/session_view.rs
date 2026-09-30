@@ -320,6 +320,7 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
         div().flex_1().min_h_0().pt(px(12.)).child(rows).into_any_element()
     };
     let composer = s.composer.clone();
+    let pull_card = session.read(cx).pull_card.clone();
     let header = header(session, cx);
     let interrupt = session.clone();
     div()
@@ -339,7 +340,7 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
         .child(header)
         .child(body)
         .children(failure)
-        .child(div().flex().flex_col().gap(px(8.)).px(px(12.)).pb(px(12.)).children(todos).child(strip).child(composer))
+        .child(div().flex().flex_col().gap(px(8.)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).child(composer))
         .into_any_element()
 }
 

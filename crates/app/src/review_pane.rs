@@ -232,10 +232,7 @@ impl ReviewPane {
             StripEvent::ShowPull(reference) => cx.emit(PaneEvent::ShowPull(reference.clone())),
             StripEvent::PullOpened(reference) => {
                 let reference = reference.clone();
-                this.session.update(cx, |s, cx| {
-                    s.reviews.pull = Some(reference);
-                    s.save_review(cx);
-                });
+                this.session.update(cx, |s, cx| s.set_pull(reference, cx));
                 cx.emit(PaneEvent::GitChanged);
             }
         });
@@ -352,6 +349,12 @@ impl ReviewPane {
         });
         cx.emit(PaneEvent::GitChanged);
         cx.notify();
+    }
+
+    /// The card of the session's pull request.
+    #[cfg(test)]
+    pub fn session_card(&self, cx: &gpui_kit::App) -> Option<Entity<crate::pull_card::PullCard>> {
+        self.session.read(cx).pull_card.clone()
     }
 
     /// The pull request the session's record keeps.

@@ -335,4 +335,6 @@ fn after_the_push_the_strip_opens_the_pull_request(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::PullOpened("Opened pull request #7".into()));
     let kept = cx.update(|_, cx| pane.read(cx).session_pull(cx));
     assert_eq!(kept.map(|p| p.number), Some(7), "the session keeps the pull request");
+    let card = cx.update(|_, cx| pane.read(cx).session_card(cx)).expect("its card shows above the composer");
+    assert_eq!(cx.update(|_, cx| card.read(cx).reference().number), 7);
 }

@@ -18,6 +18,7 @@ mod fake_forge;
 mod frame_meter;
 mod list_diff;
 mod open_project;
+mod pull_card;
 mod pulls;
 mod review_pane;
 mod review_state;

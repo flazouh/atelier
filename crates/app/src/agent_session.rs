@@ -57,6 +57,8 @@ pub enum SessionEvent {
     OpenPull(beui::PrChipData),
     /// The reader named it: the name is kept across launches.
     Renamed,
+    /// The reader pressed the session's pull request card.
+    ShowPull(lathe_forge::PullRef),
 }
 
 impl EventEmitter<SessionEvent> for AgentSession {}
@@ -110,6 +112,9 @@ pub struct AgentSession {
     pub pr_chips: std::rc::Rc<Vec<beui::PrChipData>>,
     /// The session's review: its turns, decisions, marks and comments, kept in the data folder.
     pub reviews: ReviewState,
+    /// The card of the pull request the session opened, above the composer.
+    pub pull_card: Option<Entity<crate::pull_card::PullCard>>,
+    _pull_card: Option<Subscription>,
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
@@ -209,6 +214,8 @@ impl AgentSession {
             finished,
             pr_chips: std::rc::Rc::default(),
             reviews: ReviewState::default(),
+            pull_card: None,
+            _pull_card: None,
             _saving: Task::ready(()),
             composer,
             renaming: None,
@@ -247,6 +254,9 @@ impl AgentSession {
                 }
                 if let Some(record) = record {
                     s.reviews = ReviewState::from_record(record);
+                    if let Some(reference) = s.reviews.pull.clone() {
+                        s.show_card(reference, cx);
+                    }
                 }
                 match opened {
                     Ok(session) => {
@@ -472,6 +482,30 @@ impl AgentSession {
     /// Stops the agent: dropping its session ends it.
     pub fn stop(&mut self, cx: &mut Context<Self>) {
         self.session = None;
+        cx.notify();
+    }
+
+    /// The session opened `reference`, or its branch had it: it is kept, and its card shows.
+    pub fn set_pull(&mut self, reference: lathe_forge::PullRef, cx: &mut Context<Self>) {
+        self.reviews.pull = Some(reference.clone());
+        self.save_review(cx);
+        self.show_card(reference, cx);
+    }
+
+    fn show_card(&mut self, reference: lathe_forge::PullRef, cx: &mut Context<Self>) {
+        if self.pull_card.as_ref().is_some_and(|c| *c.read(cx).reference() == reference) {
+            return;
+        }
+        // Tests never reach a forge: their cards read an empty one.
+        #[cfg(test)]
+        let forge: Arc<dyn lathe_forge::Forge> = Arc::new(lathe_pr_view::fixture::FixtureForge::new());
+        #[cfg(not(test))]
+        let forge: Arc<dyn lathe_forge::Forge> = Arc::new(lathe_forge::github::GitHub::new(self.project.clone()));
+        let card = cx.new(|cx| crate::pull_card::PullCard::new(reference, forge, cx));
+        self._pull_card = Some(cx.subscribe(&card, |_, _, event: &crate::pull_card::CardEvent, cx| match event {
+            crate::pull_card::CardEvent::Show(reference) => cx.emit(SessionEvent::ShowPull(reference.clone())),
+        }));
+        self.pull_card = Some(card);
         cx.notify();
     }
 

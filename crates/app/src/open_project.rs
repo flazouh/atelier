@@ -264,6 +264,7 @@ impl OpenProject {
             match event {
                 SessionEvent::Changed => {}
                 SessionEvent::OpenPull(chip) => return this.open_pull(chip, window, cx),
+                SessionEvent::ShowPull(reference) => return this.show_pull(reference.clone(), window, cx),
                 SessionEvent::ChooseAgent(backend) => {
                     if let Some(agent) = lathe_agents::registry::by_backend(backend) {
                         this.choose_agent(&session.read(cx).key.clone(), agent, window, cx);
