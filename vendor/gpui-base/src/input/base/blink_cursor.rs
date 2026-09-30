@@ -19,6 +19,8 @@ pub(super) const CURSOR_WIDTH: Pixels = px(1.5);
 pub(crate) struct BlinkCursor {
     visible: bool,
     paused: bool,
+    /// Started and not stopped: the input has the focus. Only then does a pause lead back to blinking.
+    on: bool,
     epoch: usize,
 
     _task: Task<()>,
@@ -29,6 +31,7 @@ impl BlinkCursor {
         Self {
             visible: false,
             paused: false,
+            on: false,
             epoch: 0,
             _task: Task::ready(()),
         }
@@ -36,10 +39,12 @@ impl BlinkCursor {
 
     /// Start the blinking
     pub(crate) fn start(&mut self, cx: &mut Context<Self>) {
+        self.on = true;
         self.blink(self.epoch, cx);
     }
 
     pub(crate) fn stop(&mut self, cx: &mut Context<Self>) {
+        self.on = false;
         self.epoch = 0;
         cx.notify();
     }
@@ -75,8 +80,13 @@ impl BlinkCursor {
 
     /// Show the cursor immediately and restart the idle delay before blinking resumes.
     pub(crate) fn pause(&mut self, cx: &mut Context<Self>) {
-        self.paused = true;
         self.visible = true;
+        // A stopped cursor shows, but a text change must not start it blinking again: no timer.
+        if !self.on {
+            cx.notify();
+            return;
+        }
+        self.paused = true;
         cx.notify();
 
         // Every pause replaces the pending timer, keeping repeated input visible.
@@ -103,6 +113,8 @@ mod tests {
     fn repeated_pauses_keep_cursor_visible_until_idle(cx: &mut TestAppContext) {
         let cursor = cx.new(|_| BlinkCursor::new());
         assert!(!cursor.read_with(cx, |cursor, _| cursor.visible()));
+        // A key pauses only a focused input's cursor, which has started.
+        cursor.update(cx, |cursor, cx| cursor.start(cx));
         for _ in 0..5 {
             cursor.update(cx, |cursor, cx| cursor.pause(cx));
             cx.run_until_parked();
@@ -116,5 +128,26 @@ mod tests {
         cx.executor().advance_clock(INTERVAL);
         cx.run_until_parked();
         assert!(cursor.read_with(cx, |cursor, _| cursor.visible()));
+    }
+
+    /// A cursor that is stopped (its input lost the focus) stays still when its text changes: a pause then
+    /// must not start the blink again, or an unfocused editor asks for two frames a second for ever.
+    #[gpui::test]
+    fn a_pause_does_not_start_a_stopped_cursor(cx: &mut TestAppContext) {
+        let cursor = cx.new(|_| BlinkCursor::new());
+        cursor.update(cx, |cursor, cx| cursor.start(cx));
+        cursor.update(cx, |cursor, cx| cursor.stop(cx));
+        cx.run_until_parked();
+        let told = std::rc::Rc::new(std::cell::Cell::new(0));
+        let count = told.clone();
+        let _watch = cx.update(|cx| cx.observe(&cursor, move |_, _| count.set(count.get() + 1)));
+        cursor.update(cx, |cursor, cx| cursor.pause(cx));
+        cx.run_until_parked();
+        let after_pause = told.get();
+        for _ in 0..4 {
+            cx.executor().advance_clock(INTERVAL);
+            cx.run_until_parked();
+        }
+        assert_eq!(told.get(), after_pause, "a stopped cursor blinked after a pause");
     }
 }
