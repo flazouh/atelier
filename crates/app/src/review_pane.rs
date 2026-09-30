@@ -224,6 +224,10 @@ impl ReviewPane {
         let ship = cx.new(|cx| ShipStrip::new(project.clone(), backend, model, window, cx));
         let _ship = cx.subscribe_in(&ship, window, |this, _, event: &StripEvent, window, cx| match event {
             StripEvent::WantsOpen => this.open_ship(window, cx),
+            StripEvent::AcceptAllAndCommit => {
+                this.decide_every_file(Decision::Accept, window, cx);
+                this.open_ship(window, cx);
+            }
             StripEvent::Committed { sha, paths } => {
                 this.committed(sha, paths, cx);
                 // The strip's fields close, so the review takes the keys back: the push key reaches it.
@@ -423,6 +427,10 @@ impl ReviewPane {
             self.write(&[self.current], cx);
         }
         let kept = self.kept();
+        // Asked again with nothing accepted, the key accepts all and commits, as the strip offers.
+        if kept.is_empty() && self.ship.read(cx).stage == crate::ship::strip::Stage::NothingKept {
+            return self.ship.update(cx, |strip, cx| strip.accept_all_and_commit(cx));
+        }
         self.ship.update(cx, |strip, cx| strip.open(kept, window, cx));
     }
 

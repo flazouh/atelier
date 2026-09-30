@@ -27,7 +27,7 @@ use lathe_project::Project;
 
 use crate::ship::{
     branch,
-    commit::{self, CommitError},
+    commit,
     push,
     pull_form::{FormEvent, PullForm},
     drafts, head,
@@ -49,6 +49,8 @@ pub fn bind_keys(cx: &mut gpui_kit::App) {
 pub enum StripEvent {
     /// The reader asked to commit: the owner opens the strip with what the review kept.
     WantsOpen,
+    /// The reader asked to accept every file and commit it.
+    AcceptAllAndCommit,
     /// A commit of these paths, with its full id.
     Committed { sha: String, paths: Vec<String> },
     /// A new branch is checked out, though the commit on it was refused.
@@ -75,6 +77,8 @@ impl EventEmitter<StripEvent> for ShipStrip {}
 #[derive(Clone, Debug, PartialEq)]
 pub enum Stage {
     Closed,
+    /// Commit was asked with nothing accepted: Accept all and commit is offered.
+    NothingKept,
     /// Reading HEAD and the branch.
     Reading,
     Open,
@@ -162,7 +166,7 @@ impl ShipStrip {
     /// for the drafts.
     pub fn open(&mut self, kept: Vec<Kept>, window: &mut Window, cx: &mut Context<Self>) {
         if kept.is_empty() {
-            self.stage = Stage::Failed(CommitError::Nothing.to_string().into());
+            self.stage = Stage::NothingKept;
             return cx.notify();
         }
         self.stage = Stage::Reading;
@@ -232,7 +236,7 @@ impl ShipStrip {
             Stage::Rejected => return self.pull_and_rebase(window, cx),
             Stage::EditsInTheWay => return self.set_aside_and_rebase(window, cx),
             Stage::Reading | Stage::Open | Stage::Committing | Stage::Pushing(_) | Stage::Pull => return,
-            Stage::Closed | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) | Stage::PullOpened(_) => {}
+            Stage::Closed | Stage::NothingKept | Stage::Committed(_) | Stage::Failed(_) | Stage::Pushed(_) | Stage::Clashed(_) | Stage::PullOpened(_) => {}
         }
         self.stage = Stage::Pushing("Pushing…".into());
         let project = self.project.clone();
@@ -368,6 +372,11 @@ impl ShipStrip {
         cx.notify();
     }
 
+    /// Asks the owner to accept every file and commit it.
+    pub fn accept_all_and_commit(&mut self, cx: &mut Context<Self>) {
+        cx.emit(StripEvent::AcceptAllAndCommit);
+    }
+
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.stage = Stage::Closed;
         self.work = Task::ready(());
@@ -449,6 +458,17 @@ impl Render for ShipStrip {
         let row = div().flex().items_center().gap(px(8.)).px(px(12.)).min_h(px(36.));
         match &self.stage {
             Stage::Pushing(w) => row.child(words(w.clone())).into_any_element(),
+            Stage::NothingKept => {
+                let (all, cancel) = (this.clone(), this.clone());
+                row.child(div().flex_1().min_w_0().child(words("Nothing is accepted yet, so there is nothing to commit.".into())))
+                    .child(Button::new("ship-cancel-all").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                        _ = cancel.update(cx, |strip, cx| strip.cancel(cx));
+                    }))
+                    .child(Button::new("ship-accept-all").label("Accept all and commit").variant(ButtonVariant::Secondary).command(Key::Commit).on_click(
+                        move |_, _, cx| drop(all.update(cx, |strip, cx| strip.accept_all_and_commit(cx))),
+                    ))
+                    .into_any_element()
+            }
             Stage::Pull => match self.pull.clone() {
                 Some(form) => form.into_any_element(),
                 None => row.into_any_element(),
