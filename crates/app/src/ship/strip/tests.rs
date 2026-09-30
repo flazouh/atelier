@@ -338,3 +338,29 @@ fn after_the_push_the_strip_opens_the_pull_request(cx: &mut TestAppContext) {
     let card = cx.update(|_, cx| pane.read(cx).session_card(cx)).expect("its card shows above the composer");
     assert_eq!(cx.update(|_, cx| card.read(cx).reference().number), 7);
 }
+/// Commit with nothing accepted offers to accept all and commit; that accepts every file and opens the
+/// commit card on all of it.
+#[gpui_kit::test]
+fn commit_with_nothing_accepted_offers_accept_all(cx: &mut TestAppContext) {
+    let dir = git_project(&[("a.txt", "1\n2\n")]);
+    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![ended()]], false);
+    let root = dir.clone();
+    fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n").unwrap()));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
+    cx.run_until_parked();
+    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.open_ship(window, cx)));
+    cx.run_until_parked();
+    let strip = cx.update(|_, cx| pane.read(cx).ship.clone());
+    assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::NothingKept);
+    cx.update(|_, cx| strip.update(cx, |s, cx| s.accept_all_and_commit(cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        assert_eq!(pane.read(cx).decided_words(0).as_deref(), Some("Accepted"));
+        let s = strip.read(cx);
+        assert_eq!(s.stage, Stage::Open);
+        assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 1, removed: 1 }]);
+    });
+}
