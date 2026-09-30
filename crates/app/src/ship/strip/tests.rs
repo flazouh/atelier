@@ -358,3 +358,48 @@ fn commit_with_nothing_accepted_offers_accept_all(cx: &mut TestAppContext) {
         assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 1, removed: 1, own_edits: false }]);
     });
 }
+
+/// A session that began from a task drafts its commit message with a `Refs` line, which the reader sees and
+/// can remove. The commit lands with it, and the tasks of the session hear of the commit.
+#[gpui_kit::test]
+fn the_draft_names_the_task_and_the_commit_tells_it(cx: &mut TestAppContext) {
+    let dir = git_project(&[("a.txt", "1\n2\n")]);
+    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![ended()]], false);
+    let root = dir.clone();
+    fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n").unwrap()));
+    cx.update(|_, cx| {
+        session.update(cx, |s, cx| {
+            s.task = Some(crate::tasks::TaskRef { id: lathe_tracker::TaskId::from("1"), key: "LAT-42".into() });
+            s.send("edit".into(), cx)
+        })
+    });
+    cx.run_until_parked();
+    let told = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let heard = told.clone();
+    let _sub = cx.update(|_, cx| {
+        cx.subscribe(&session, move |_, event: &crate::agent_session::SessionEvent, _| {
+            if let crate::agent_session::SessionEvent::Task(task) = event {
+                heard.lock().unwrap().push(task.clone());
+            }
+        })
+    });
+    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
+    cx.run_until_parked();
+    let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, beui::Decision::Accept, window, cx)));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.open_ship(window, cx)));
+    cx.run_until_parked();
+    let strip = cx.update(|_, cx| pane.read(cx).ship.clone());
+    let draft = cx.update(|_, cx| strip.read(cx).message.read(cx).value().to_string());
+    assert!(draft.ends_with("\n\nRefs LAT-42"), "the reader sees the line: {draft:?}");
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
+    cx.run_until_parked();
+    let git = |args: &[&str]| String::from_utf8(Git::new("git").args(args).current_dir(&dir).output().unwrap().stdout).unwrap();
+    assert!(git(&["log", "-1", "--format=%B"]).contains("Refs LAT-42"), "the commit carries it");
+    let heard = told.lock().unwrap().clone();
+    assert!(
+        heard.iter().any(|t| matches!(t, crate::tasks::signal::TaskEvent::Committed { subject, .. } if subject == "Keep TWO")),
+        "the tasks hear of the commit: {heard:?}"
+    );
+}

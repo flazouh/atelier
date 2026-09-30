@@ -33,3 +33,13 @@ fn a_drafted_message_loses_its_trailers() {
     assert_eq!(message(draft), "Add a note\n\nOne line in NOTES.md.");
     assert_eq!(message("Add a note\n\nco-authored-by: x <x@x>"), "Add a note");
 }
+
+#[test]
+fn the_refs_line_names_the_task_once_and_the_cleaner_keeps_it() {
+    assert_eq!(with_refs("Fix the scroll\n\nIt jumped.", "LAT-42"), "Fix the scroll\n\nIt jumped.\n\nRefs LAT-42");
+    assert_eq!(with_refs("Fix the scroll", "LAT-42"), "Fix the scroll\n\nRefs LAT-42");
+    let already = "Fix the scroll\n\nRefs LAT-42";
+    assert_eq!(with_refs(already, "LAT-42"), already, "not added twice");
+    assert_eq!(with_refs(&message("Fix it\n\nCo-Authored-By: A <a@a>"), "LAT-42"), "Fix it\n\nRefs LAT-42", "the agent trailer goes, Refs is added");
+    assert_eq!(message("Fix it\n\nRefs LAT-42"), "Fix it\n\nRefs LAT-42", "the cleaner keeps a Refs line");
+}

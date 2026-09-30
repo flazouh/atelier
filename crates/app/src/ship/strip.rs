@@ -53,7 +53,7 @@ pub enum StripEvent {
     /// The reader asked to accept every file and commit it.
     AcceptAllAndCommit,
     /// A commit of these paths, with its full id.
-    Committed { sha: String, paths: Vec<String> },
+    Committed { sha: String, paths: Vec<String>, subject: String },
     /// The branch went to origin.
     Pushed,
     /// A rebase gave the branch's own commits new ids: each old id with its new one.
@@ -133,6 +133,8 @@ pub struct ShipStrip {
     pub pull: Option<Entity<PullForm>>,
     /// The branch's pull request, once it has one: "Open #N" shows it.
     pub opened: Option<PullRef>,
+    /// The key of the task the session works on: the draft names it in a `Refs` line.
+    refs: Option<SharedString>,
     _pull: Option<gpui_kit::Subscription>,
     work: Task<()>,
 }
@@ -158,6 +160,7 @@ impl ShipStrip {
             forge,
             pull: None,
             opened: None,
+            refs: None,
             _pull: None,
             work: Task::ready(()),
         }
@@ -217,6 +220,10 @@ impl ShipStrip {
                 if let Ok(message) = message
                     && strip.message.read(cx).value().is_empty()
                 {
+                    let message = match &strip.refs {
+                        Some(key) => drafts::with_refs(&message, key),
+                        None => message,
+                    };
                     strip.message.update(cx, |m, cx| m.set_value(message, window, cx));
                 }
                 if let Some(branch) = branch
@@ -230,6 +237,10 @@ impl ShipStrip {
         cx.notify();
     }
 
+    /// The task the session works on, by its key: the draft names it.
+    pub fn set_refs(&mut self, key: Option<SharedString>) {
+        self.refs = key;
+    }
     /// Pushes the branch checked out to origin, never forced. After a rejection, the push key pulls and
     /// rebases first.
     pub fn push(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -393,6 +404,7 @@ impl ShipStrip {
         if message.is_empty() {
             return;
         }
+        let subject = message.lines().next().unwrap_or_default().to_string();
         let new_branch = self.on_default.then(|| self.new_branch.read(cx).value().trim().to_string());
         if new_branch.as_ref().is_some_and(String::is_empty) {
             self.refused = Some("Name the new branch: this is the default branch".into());
@@ -423,7 +435,7 @@ impl ShipStrip {
                         strip.message.update(cx, |m, cx| m.set_value("", window, cx));
                         strip.new_branch.update(cx, |b, cx| b.set_value("", window, cx));
                         let paths = strip.kept.iter().map(|k| k.path.clone()).collect();
-                        cx.emit(StripEvent::Committed { sha: done.sha.clone(), paths });
+                        cx.emit(StripEvent::Committed { sha: done.sha.clone(), paths, subject: subject.clone() });
                     }
                     Err(words) => {
                         strip.stage = Stage::Open;

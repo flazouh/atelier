@@ -117,3 +117,21 @@ fn a_session_tells_its_task_what_happened() {
     assert_eq!(of(TaskEvent::TurnEnded { ok: false }, None, &session), Some(tracker::Signal::SessionFinished { session_id: "s1".into(), ok: false }));
     assert_eq!(of(TaskEvent::Replied, None, &session), Some(tracker::Signal::SessionResumed { session_id: "s1".into() }));
 }
+
+#[test]
+fn a_commit_and_a_pull_request_reach_the_tasks_of_the_session() {
+    use super::signal::{SessionRef, TaskEvent, of};
+    let task = super::TaskRef { id: tracker::TaskId::from("1"), key: "LAT-1".into() };
+    let session = SessionRef { id: "s1", title: "Do it", agent: "Claude" };
+    let commit = TaskEvent::Committed { sha: "abc1234def".into(), subject: "Fix it".into() };
+    assert_eq!(
+        of(commit, None, &session),
+        Some(tracker::Signal::Committed { session_id: "s1".into(), sha: "abc1234def".into(), subject: "Fix it".into(), by: "you".into() })
+    );
+    let opened = TaskEvent::PrOpened { number: 9, repo: "o/r".into() };
+    assert_eq!(
+        of(opened.clone(), Some(&task), &session),
+        Some(tracker::Signal::PrOpened { task: tracker::TaskId::from("1"), pr: tracker::PrLink { number: 9, repo: "o/r".into() }, by: "you".into() })
+    );
+    assert_eq!(of(opened, None, &session), None, "a session with no task opens no link");
+}

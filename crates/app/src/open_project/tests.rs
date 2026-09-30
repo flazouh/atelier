@@ -477,3 +477,44 @@ fn a_session_started_from_a_task_moves_it_along(cx: &mut TestAppContext) {
     assert_eq!(tracker.get(&task.id).unwrap().unwrap().status, Status::InProgress);
     assert!(tracker.activity(&task.id).unwrap().iter().any(|a| a.by == "rule:session-resume"));
 }
+
+/// A pull request that reads as merged moves the task it is linked to to Done, and a second reading of it
+/// adds nothing.
+#[gpui_kit::test]
+fn a_merged_pull_request_moves_its_task_to_done(cx: &mut TestAppContext) {
+    use lathe_tracker::{ActivityKind, Entry, NewTask, PrLink, Status};
+    let (_dir, project, _, cx) = open(cx, &[]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    cx.run_until_parked();
+    let tracker = cx.update(|_, cx| project.read(cx).tasks.as_ref().unwrap().pane.read(cx).tracker().unwrap());
+    let task = tracker.create(&NewTask::titled("Ship it"), "me").unwrap();
+    tracker.record(&task.id, &Entry::PrOpened(PrLink { number: 12, repo: "o/r".into() }), "me").unwrap();
+    let merged = beui::PrChipData { state: beui::pr::PrState::Merged, ..chip("o/r", 12) };
+    for _ in 0..2 {
+        cx.update(|_, cx| project.update(cx, |p, cx| p.set_list_rows(vec![merged.clone()], cx)));
+        cx.run_until_parked();
+    }
+    assert_eq!(tracker.get(&task.id).unwrap().unwrap().status, Status::Done);
+    let merges = tracker.activity(&task.id).unwrap().iter().filter(|a| matches!(a.kind, ActivityKind::PrMerged { .. })).count();
+    assert_eq!(merges, 1);
+}
+
+/// A session opened again after a restart gets its task from the tracker, so the chip shows.
+#[gpui_kit::test]
+fn a_session_opened_again_finds_its_task(cx: &mut TestAppContext) {
+    use lathe_tracker::{Entry, NewTask, SessionLink};
+    let (_dir, project, _, cx) = open(cx, &[]);
+    let (agent, _) = crate::fake_agent::scripted_agent("Fake", vec![]);
+    cx.update(|_, cx| project.update(cx, |p, _| p.agent = agent));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    cx.run_until_parked();
+    let tracker = cx.update(|_, cx| project.read(cx).tasks.as_ref().unwrap().pane.read(cx).tracker().unwrap());
+    let task = tracker.create(&NewTask::titled("Old work"), "me").unwrap();
+    let link = SessionLink { session_id: "fake-1".into(), title: "Old".into(), agent: "Fake".into() };
+    tracker.record(&task.id, &Entry::SessionStarted(link), "Fake").unwrap();
+    let resume = Some((lathe_agents::session::SessionId::new("fake-1"), "Old".into()));
+    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(resume, window, cx)));
+    cx.run_until_parked();
+    let found = cx.update(|_, cx| session.read(cx).task.clone());
+    assert_eq!(found.map(|t| t.key.to_string()), Some(task.key));
+}
