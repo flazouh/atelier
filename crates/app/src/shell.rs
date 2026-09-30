@@ -44,7 +44,6 @@ use crate::{
     agent_session::{self, AgentSession},
     agents_view,
     ssh_form::{Phase, SshForm, SshFormEvent},
-    editor_pane::editor_pane,
     open_project::{Listing, OpenProject, ProjectEvent},
     review_pane::Scope,
     tree_view::tree_view,
@@ -126,6 +125,8 @@ pub struct Shell {
     /// The open sessions and the one in front as the settings file has them, to write only a change.
     saved_open: (Vec<lathe_settings::OpenSession>, Option<String>),
     _subscriptions: Vec<Subscription>,
+    /// The right pane's own view (`right_pane.rs`), cached.
+    right_view: Entity<crate::right_pane::RightPane>,
     /// Gives the cached sidebar the time each minute, so a session's age moves on.
     _ages: gpui_kit::Task<()>,
 }
@@ -172,6 +173,7 @@ impl Shell {
             saved_open: (saved.open.clone(), saved.front.clone()),
             before_review: None,
             _subscriptions: Vec::new(),
+            right_view: cx.new(|_| crate::right_pane::RightPane::default()),
             _ages: cx.spawn(async move |this, cx| {
                 loop {
                     cx.background_executor().timer(AGE_TICK).await;
@@ -1311,20 +1313,10 @@ impl Shell {
     }
 
     /// The right pane: the review, the pull requests, or the editor.
+    /// The right pane for `project`, drawn from its last frame until the project changes.
     fn right_pane(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let p = project.read(cx);
-        let pulls = p.pulls.as_ref().filter(|pulls| pulls.shown).map(|pulls| pulls.hub.clone());
-        // The review and the pull requests draw their own cards on the page; the last one asked shows.
-        let inner = match (p.front(), p.review.as_ref(), pulls) {
-            (crate::open_project::front::Front::Review, Some((pane, _)), _) => div().size_full().pt(px(8.)).child(pane.clone()),
-            (crate::open_project::front::Front::Pulls, _, Some(hub)) => div().size_full().pt(px(8.)).child(hub),
-            (crate::open_project::front::Front::Tasks, _, _) if p.tasks.is_some() => {
-                div().size_full().children(p.tasks.as_ref().map(|t| t.pane.clone()))
-            }
-            _ => div().size_full().pt(px(8.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
-        };
-        div().size_full().pr(px(8.)).pb(px(4.)).child(inner).into_any_element()
+        self.right_view.update(cx, |pane, cx| pane.show(project, cx));
+        crate::view_cache::draw(&self.right_view)
     }
 
     fn status_line(&self, cx: &App) -> impl IntoElement {

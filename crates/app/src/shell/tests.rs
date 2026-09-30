@@ -222,3 +222,28 @@ fn a_cached_sidebar_is_given_the_time_each_minute(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(told.get() >= 1, "no new time reached the sidebar in a minute");
 }
+
+/// View cache: the right pane is drawn from its last frame until its project changes. Changed at the project
+/// itself, not through the shell (which moves the focus and so draws everything again), the next frame shows
+/// the new front: Tasks, then the editor with the file just opened.
+#[gpui_kit::test]
+fn a_cached_right_pane_follows_its_project(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1600.), px(900.)));
+    cx.update(|_, cx| bind_keys(cx));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+    assert!(cx.debug_bounds("tasks-mode-list").is_none(), "Tasks starts hidden");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("tasks-mode-list").is_some(), "the cached right pane still shows the editor");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("tasks-mode-list").is_none(), "the cached right pane still shows Tasks");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_file("a.txt", window, cx)));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("editor-tab-0").is_some(), "the cached right pane shows no tab for a.txt");
+}
