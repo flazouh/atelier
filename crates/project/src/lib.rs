@@ -9,17 +9,25 @@
 use std::{
     io,
     path::{Path, PathBuf},
+    sync::Arc,
 };
+
+use lathe_tracker::{Tracker, TrackerError, TrackerResult};
 
 use serde::{Deserialize, Serialize};
 
 mod data;
 mod local;
 mod process;
+mod tracker_slot;
 
 pub use data::DataEntry;
 pub use local::LocalProject;
 pub use process::{Command, Control, Process, STDERR_KEEP, Tail};
+pub use tracker_slot::TrackerSlot;
+
+/// The file of a project's tasks, in its data folder on its host.
+pub const TRACKER_FILE: &str = "tracker.sqlite";
 
 /// One file or folder in the tree.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,6 +191,13 @@ pub trait Project: Send + Sync {
     /// cannot say where it is. The folder may not exist yet.
     fn data_path(&self) -> Option<PathBuf> {
         None
+    }
+
+    /// The project's tasks, kept on its host in its data folder ([`TRACKER_FILE`]), so every machine that
+    /// opens the project sees the same ones. The first call opens the store and later calls get the same
+    /// one. It blocks, so it is never called on the UI thread.
+    fn tracker(&self) -> TrackerResult<Arc<dyn Tracker>> {
+        Err(TrackerError::Unsupported("keep tasks".into()))
     }
 }
 

@@ -240,3 +240,19 @@ fn a_tilde_is_the_home_folder_and_a_relative_path_is_refused() {
     assert!(crate::expand_home("src/x").is_none());
     assert_eq!(crate::read_local_dir("src").unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
 }
+
+#[test]
+fn a_project_keeps_its_tasks_in_its_data_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("lathe");
+    fs::create_dir(&root).unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let project = LocalProject::open(&root).unwrap().with_data_dir(data.path());
+    let tracker = project.tracker().unwrap();
+    let task = tracker.create(&lathe_tracker::NewTask::titled("Keep tasks"), "alex").unwrap();
+    assert!(task.key.starts_with("LAT-"), "{}", task.key);
+    assert!(project.data_path().unwrap().join(crate::TRACKER_FILE).exists());
+    assert!(std::sync::Arc::ptr_eq(&tracker, &project.tracker().unwrap()), "each ask gets the same store");
+    let again = LocalProject::open(&root).unwrap().with_data_dir(data.path());
+    assert_eq!(again.tracker().unwrap().get(&task.id).unwrap(), Some(task));
+}

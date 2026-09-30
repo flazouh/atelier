@@ -11,13 +11,17 @@ use std::io::{self, Read, Write};
 use lathe_project::{Change, Command, DataEntry, DirEntry, Entry, GitOutput, Match, Query};
 use serde::{Deserialize, Serialize};
 
+pub mod tracker;
+
+use tracker::{TrackerCall, TrackerReply};
+
 /// The protocol's version: both ends must agree, or the hello fails.
-/// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`.
-pub const VERSION: u32 = 4;
+/// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`. 5: `Tracker`.
+pub const VERSION: u32 = 5;
 
 /// The protocol, as bytes a helper binary carries, so the app reads a copy's protocol from the file
 /// with no need to run it (it may be built for another machine). Keep it in step with [`VERSION`].
-pub const STAMP: &[u8] = b"lathe-remote-protocol:4;";
+pub const STAMP: &[u8] = b"lathe-remote-protocol:5;";
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -53,6 +57,8 @@ pub enum Call {
     DataPath,
     /// The entries of a folder on the host, inside the project or not.
     ReadDir { dir: String },
+    /// A call of the project's tracker, which the host opens in its data folder.
+    Tracker(TrackerCall),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -68,6 +74,8 @@ pub enum Reply {
     Git(GitOutput),
     DataEntries(Vec<DataEntry>),
     DirEntries(Vec<DirEntry>),
+    /// The tracker's answer, with its own error, so a missing task stays a missing task.
+    Tracker(Box<Result<TrackerReply, lathe_tracker::TrackerError>>),
 }
 
 /// Why a call failed on the host: an `io::ErrorKind` by name, and the message.
