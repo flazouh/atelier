@@ -185,3 +185,14 @@ fn a_design_choice_applies_at_once(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("design-toggle-3").is_some(), "the toggle designs are listed");
     assert!(cx.debug_bounds("design-tabs-3").is_some(), "the tab designs are listed");
 }
+
+/// design preview: remove after Alex picks. The elevation choice applies at once and is listed.
+#[gpui_kit::test]
+fn an_elevation_choice_applies_at_once(cx: &mut TestAppContext) {
+    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    assert_eq!(beui::design_preview::elevation(), 2);
+    pane.update(cx, |p, cx| p.choose_elevation(0, cx));
+    assert_eq!(beui::design_preview::elevation(), 0);
+    assert!(cx.debug_bounds("design-elevation-3").is_some(), "the elevation designs are listed");
+    pane.update(cx, |p, cx| p.choose_elevation(2, cx));
+}

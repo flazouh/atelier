@@ -121,3 +121,12 @@ fn the_design_choices_are_kept_and_an_old_file_has_none() {
     let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
     assert_eq!((round.design_toggle, round.design_tabs), (Some(3), Some(1)));
 }
+
+#[test]
+fn the_elevation_choice_is_kept_and_an_old_file_has_none() {
+    let old: Settings = serde_json::from_str("{}").unwrap();
+    assert_eq!(old.design_elevation, None);
+    let kept = Settings { design_elevation: Some(3), ..Settings::default() };
+    let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
+    assert_eq!(round.design_elevation, Some(3));
+}

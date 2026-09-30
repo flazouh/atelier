@@ -97,6 +97,7 @@ pub struct SettingsPane {
     // design preview: remove after Alex picks
     toggle: usize,
     tabs: usize,
+    elevation: usize,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -123,6 +124,7 @@ impl SettingsPane {
             rules,
             toggle: saved.design_toggle.map_or(2, usize::from).min(3),
             tabs: saved.design_tabs.map_or(0, usize::from).min(3),
+            elevation: saved.design_elevation.map_or(2, usize::from).min(3),
         }
     }
 
@@ -138,6 +140,13 @@ impl SettingsPane {
         self.toggle = design;
         beui::design_preview::set_toggle(design, cx);
         save(cx, move |s| s.design_toggle = Some(design as u8));
+        cx.notify();
+    }
+    // design preview: remove after Alex picks
+    pub(crate) fn choose_elevation(&mut self, design: usize, cx: &mut Context<Self>) {
+        self.elevation = design;
+        beui::design_preview::set_elevation(design);
+        save(cx, move |s| s.design_elevation = Some(design as u8));
         cx.notify();
     }
     // design preview: remove after Alex picks
@@ -164,6 +173,7 @@ impl SettingsPane {
 
 // design preview: remove after Alex picks
 const DESIGN_TOGGLE: [&str; 4] = ["design-toggle-0", "design-toggle-1", "design-toggle-2", "design-toggle-3"];
+const DESIGN_ELEVATION: [&str; 4] = ["design-elevation-0", "design-elevation-1", "design-elevation-2", "design-elevation-3"];
 const DESIGN_TABS: [&str; 4] = ["design-tabs-0", "design-tabs-1", "design-tabs-2", "design-tabs-3"];
 /// The name a test finds a rule's switch by.
 pub(crate) fn rule_switch(rule: lathe_tracker::Rule) -> &'static str {
@@ -346,6 +356,21 @@ impl Render for SettingsPane {
                             )
                             .on_change(move |i, _, cx| {
                                 pane.update(cx, |p, cx| p.choose_tabs(i, cx)).ok();
+                            })
+                            .into_any_element()
+                        },
+                    ))
+                    .child(row(
+                        "Dropdown elevation",
+                        {
+                            let pane = this.clone();
+                            Segmented::new(
+                                "design-elevation",
+                                beui::design_preview::ELEVATION_DESIGNS.iter().enumerate().map(|(i, words)| Segment::new(*words).debug_name(DESIGN_ELEVATION[i])),
+                                self.elevation,
+                            )
+                            .on_change(move |i, _, cx| {
+                                pane.update(cx, |p, cx| p.choose_elevation(i, cx)).ok();
                             })
                             .into_any_element()
                         },
