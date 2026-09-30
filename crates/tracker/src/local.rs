@@ -465,6 +465,7 @@ impl Tracker for LocalTracker {
             Entry::SessionStarted(session) => ActivityKind::SessionStarted { session: session.clone() },
             Entry::PrOpened(pr) => ActivityKind::PrOpened { pr: pr.clone() },
             Entry::PrMerged(pr) => ActivityKind::PrMerged { pr: pr.clone() },
+            Entry::Commit { sha, subject } => ActivityKind::Commit { sha: sha.clone(), subject: subject.clone() },
         };
         let mut conn = self.conn()?;
         let exists: bool = conn.query_row("SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1)", [row], |r| r.get(0))?;
@@ -481,7 +482,7 @@ impl Tracker for LocalTracker {
                 tx.prepare_cached("INSERT OR IGNORE INTO pr_links (task, number, repo) VALUES (?1, ?2, ?3)")?
                     .execute(params![row, pr.number as i64, pr.repo])?;
             }
-            Entry::Comment(_) => {}
+            Entry::Comment(_) | Entry::Commit { .. } => {}
         }
         tx.prepare_cached("UPDATE tasks SET updated_at = ?2 WHERE id = ?1")?.execute(params![row, at])?;
         let activity = log(&tx, row, at, by, &kind)?;

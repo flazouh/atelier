@@ -97,6 +97,12 @@ fn activity_of(line: &tracker::Activity) -> Option<Activity> {
         tracker::ActivityKind::SessionStarted { session } => Activity::SessionStarted { agent: session.agent.clone().into(), at },
         tracker::ActivityKind::PrOpened { pr } => Activity::PrOpened { number: pr.number, at },
         tracker::ActivityKind::PrMerged { pr } => Activity::PrMerged { number: pr.number, at },
+        tracker::ActivityKind::Commit { sha, subject } => Activity::Committed {
+            by,
+            sha: sha.chars().take(7).collect::<String>().into(),
+            subject: subject.clone().into(),
+            at,
+        },
         // Assignments and other edits have no line in the task view yet.
         tracker::ActivityKind::Assigned { .. } | tracker::ActivityKind::Edited { .. } => return None,
     })

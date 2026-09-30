@@ -94,7 +94,7 @@ impl RuleSet {
                 Status::Done,
             ),
             Signal::SessionResumed { .. } => (Rule::SessionResumeMovesToInProgress, &[Status::InReview], Status::InProgress),
-            Signal::SessionFinished { ok: false, .. } | Signal::PrOpened { .. } => return None,
+            Signal::SessionFinished { ok: false, .. } | Signal::PrOpened { .. } | Signal::Committed { .. } => return None,
         };
         (self.is_on(rule) && from.contains(&status)).then_some(Decision { rule, to })
     }
@@ -116,6 +116,8 @@ pub enum Signal {
     SessionFinished { session_id: String, ok: bool },
     /// The reader sent a message in a session that is linked to tasks.
     SessionResumed { session_id: String },
+    /// A session made a commit. It moves nothing; it is logged on the tasks of the session.
+    Committed { session_id: String, sha: String, subject: String, by: String },
     /// A pull request was opened for this task, by `by`.
     PrOpened { task: TaskId, pr: PrLink, by: String },
     /// A pull request was merged, by `by`. Every task it is linked to hears of it.
@@ -138,6 +140,17 @@ pub fn handle(tracker: &dyn Tracker, rules: &RuleSet, signal: &Signal) -> Tracke
         Signal::SessionStarted { task, session } => {
             tracker.record(task, &Entry::SessionStarted(session.clone()), &session.agent)?;
             Ok(vec![decide_and_move(tracker, rules, task, signal)?])
+        }
+        Signal::Committed { session_id, sha, subject, by } => {
+            let entry = Entry::Commit { sha: sha.clone(), subject: subject.clone() };
+            tracker
+                .tasks_of_session(session_id)?
+                .iter()
+                .map(|task| {
+                    tracker.record(task, &entry, by)?;
+                    decide_and_move(tracker, rules, task, signal)
+                })
+                .collect()
         }
         Signal::PrOpened { task, pr, by } => {
             tracker.record(task, &Entry::PrOpened(pr.clone()), by)?;

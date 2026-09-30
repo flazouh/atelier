@@ -341,3 +341,15 @@ fn ten_thousand_tasks_load_and_filter_in_under_50_ms_and_a_write_takes_under_5()
     assert!(load.0.as_millis() < 50 && filter.0.as_millis() < 50, "load and filter under 50 ms");
     assert!(writes.0.as_millis() < 5, "a write under 5 ms");
 }
+
+#[test]
+fn a_commit_is_a_line_of_the_activity_and_links_nothing_new() {
+    let t = LocalTracker::in_memory("LAT").unwrap();
+    let task = t.create(&NewTask::titled("Fix it"), "me").unwrap();
+    let line = t.record(&task.id, &Entry::Commit { sha: "abc1234".into(), subject: "Fix the scroll".into() }, "me").unwrap();
+    assert_eq!(line.kind, ActivityKind::Commit { sha: "abc1234".into(), subject: "Fix the scroll".into() });
+    let log = t.activity(&task.id).unwrap();
+    assert_eq!(log.last().map(|a| &a.kind), Some(&ActivityKind::Commit { sha: "abc1234".into(), subject: "Fix the scroll".into() }));
+    let after = t.get(&task.id).unwrap().unwrap();
+    assert!(after.sessions.is_empty() && after.prs.is_empty(), "a commit adds no link");
+}
