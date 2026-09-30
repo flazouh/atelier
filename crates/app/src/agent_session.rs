@@ -93,6 +93,9 @@ pub struct AgentSession {
     /// Whether `active_at` is the agent's own time, from its work or the record: the agent's list then
     /// has no say.
     pub activity_known: bool,
+    /// Asked the agent for a short title already, so it is asked once.
+    titled: bool,
+    _titling: Task<()>,
     /// The reader is looking at it: a turn that ends is seen.
     pub seen: bool,
     pub model: Option<String>,
@@ -208,6 +211,8 @@ impl AgentSession {
             // A resumed session's last activity comes from the agent's list; a new one starts now.
             active_at: if resume.is_some() { 0 } else { now() },
             activity_known: resume.is_none(),
+            titled: false,
+            _titling: Task::ready(()),
             seen: false,
             model: None,
             mode: None,
@@ -359,6 +364,7 @@ impl AgentSession {
         if ended_turns {
             self.save_review(cx);
             cx.emit(SessionEvent::TextSettled);
+            self.draft_title(cx);
         }
         if events.iter().any(is_activity) {
             self.active_at = now();
@@ -543,6 +549,39 @@ impl AgentSession {
         }));
         self.pull_card = Some(card);
         cx.notify();
+    }
+
+    /// Asks the agent, once, for a short title from the first exchange, off the UI thread. A name the
+    /// reader gave, before or while it drafts, stays.
+    fn draft_title(&mut self, cx: &mut Context<Self>) {
+        if self.name.is_some() || self.titled {
+            return;
+        }
+        let items = self.conversation.items();
+        let asked = items.iter().find_map(|i| match i {
+            Item::User { text } => Some(text.clone()),
+            _ => None,
+        });
+        let answered = items.iter().find_map(|i| match i {
+            Item::Text { text, .. } => Some(text.clone()),
+            _ => None,
+        });
+        let Some(asked) = asked else { return };
+        self.titled = true;
+        let prompt = crate::session_title::prompt(&asked, answered.as_deref().unwrap_or(""));
+        let (backend, project, model) = (self.agent.backend.clone(), self.project.clone(), self.model.clone());
+        let drafting = cx.background_spawn(async move { backend.draft(project.as_ref(), &prompt, model.as_deref()) });
+        self._titling = cx.spawn(async move |this, cx| {
+            let Some(title) = drafting.await.ok().and_then(|d| crate::session_title::clean(&d)) else { return };
+            _ = this.update(cx, |s, cx| {
+                if s.name.is_none() {
+                    s.name = Some(title.into());
+                    cx.emit(SessionEvent::Renamed);
+                    cx.emit(SessionEvent::Changed);
+                    cx.notify();
+                }
+            });
+        });
     }
 
     /// The agent's text, message by message.
