@@ -74,12 +74,26 @@ pub fn batch_ssh(env: Option<&str>, config: Option<&str>) -> String {
 /// `git args` for a call that reaches the remote, with no login prompt, in the project's root. The ssh command is read where git runs,
 /// which for a remote project is the host.
 pub(crate) fn remote_git(project: &dyn Project, args: &[&str]) -> Result<String, String> {
+    #[cfg(test)]
+    local_only(project);
     let env = run(project, Command::new("sh").args(["-c", "printf %s \"${GIT_SSH_COMMAND-}\""]), None).ok();
     let config = plain(project, &["config", "core.sshCommand"]).ok();
     let mut command = Command::new("git").args(args.iter().copied());
     command.env.push(("GIT_TERMINAL_PROMPT".into(), "0".into()));
     command.env.push(("GIT_SSH_COMMAND".into(), batch_ssh(env.as_deref(), config.as_deref())));
     run(project, command, None)
+}
+
+/// In tests, stops a call that would reach a remote other than a folder on this machine or a
+/// `.invalid` host, which never resolves. The address is the one git uses, after any insteadOf rule.
+#[cfg(test)]
+fn local_only(project: &dyn Project) {
+    let Ok(url) = plain(project, &["remote", "get-url", "--push", "origin"]) else { return };
+    let url = url.trim();
+    let local = url.starts_with('/') || url.starts_with("file://");
+    let host = url.split_once("://").map_or(url, |(_, rest)| rest).split(['/', ':']).next().unwrap_or("");
+    let host = host.rsplit('@').next().unwrap_or(host);
+    assert!(local || host.ends_with(".invalid"), "a test reached for a network remote: {url}");
 }
 
 /// `git args` as they are, for what needs no remote.

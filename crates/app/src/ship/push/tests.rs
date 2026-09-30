@@ -209,3 +209,12 @@ fn a_stopped_rebase_keeps_its_reason_and_names_the_entry() {
     assert!(words.contains(why.as_str()) && words.contains(ENTRY_NAME), "{words}");
     assert!(git(&work, &["stash", "list"]).contains(ENTRY_NAME), "the edits stay in the entry");
 }
+/// In tests, a call that reaches a remote goes only to a folder on this machine or to a host that can
+/// never resolve: a test that points at GitHub stops before git runs.
+#[test]
+#[should_panic(expected = "a test reached for a network remote")]
+fn a_test_never_reaches_a_real_remote() {
+    let (_top, work, _other, project) = remote();
+    git(&work, &["remote", "set-url", "origin", "https://github.com/flazouh/lathe-qa-scratch.git"]);
+    let _ = push(project.as_ref(), "main");
+}
