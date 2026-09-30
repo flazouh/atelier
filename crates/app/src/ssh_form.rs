@@ -18,6 +18,9 @@ use gpui_kit::{
     div, px,
 };
 
+/// The chips' names for tests and screenshots, by their place in the list.
+const HOST_CHIPS: [&str; 8] = ["ssh-host-0", "ssh-host-1", "ssh-host-2", "ssh-host-3", "ssh-host-4", "ssh-host-5", "ssh-host-6", "ssh-host-7"];
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum SshFormEvent {
     Connect { host: String, path: String },
@@ -110,24 +113,29 @@ impl Render for SshForm {
                 .child(Field::new(focus, Input::new(input).appearance(false).px(px(10.)).text_size(TextSize::Sm.font_size())).radius(radius::LG).surface(theme.card_strong))
         };
         let this = cx.entity().downgrade();
-        // The config's hosts, as chips under the field: a press puts the name in it.
+        // The config's hosts, as chips under the field: a press puts the name in it. They are filled chips that
+        // change on hover, and the ones that do not fit the first line wrap under the first chip, not under the label.
         let chips = self.hosts.iter().enumerate().map(|(i, name)| {
             let (host, name) = (self.host.clone(), name.clone());
-            Button::new(("ssh-host", i)).label(name.clone()).variant(ButtonVariant::Ghost).on_click(move |_, window, cx| {
-                host.update(cx, |h, cx| {
-                    h.set_value(name.clone(), window, cx);
-                    h.focus(window, cx);
+            Button::new(("ssh-host", i))
+                .debug_name(HOST_CHIPS[i.min(HOST_CHIPS.len() - 1)])
+                .label(name.clone())
+                .variant(ButtonVariant::Secondary)
+                .pill(true)
+                .on_click(move |_, window, cx| {
+                    host.update(cx, |h, cx| {
+                        h.set_value(name.clone(), window, cx);
+                        h.focus(window, cx);
+                    })
                 })
-            })
         });
         let hosts = (!self.hosts.is_empty()).then(|| {
             div()
                 .flex()
-                .flex_wrap()
-                .items_center()
-                .gap(px(2.))
-                .child(div().pr(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("From ~/.ssh/config"))
-                .children(chips)
+                .items_start()
+                .gap(px(8.))
+                .child(div().flex_none().h(px(28.)).flex().items_center().text_size(TextSize::Xs.font_size()).text_color(muted).child("From ~/.ssh/config"))
+                .child(div().debug_selector(|| "ssh-hosts".into()).flex().flex_1().min_w_0().flex_wrap().gap(px(6.)).children(chips))
         });
         let status = match &self.phase {
             Phase::Idle => None,
@@ -186,3 +194,6 @@ impl Render for SshForm {
             )
     }
 }
+
+#[cfg(test)]
+mod tests;
