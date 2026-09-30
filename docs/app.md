@@ -95,6 +95,37 @@ them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
 - `Animated` values clamp each step to 64 ms. Advance the clock in a loop of small steps.
 - A test host that shows one part needs `.flex().items_start()`. Without it the part stretches to the window.
 
+## Build the Mac app
+
+The app is `target/bundle/lathe.app`. It holds the app, an icon, and the Linux helper that it puts on
+an SSH host (`Contents/Resources/remote/linux-x86_64/lathe-remote`). The app finds that helper with no
+setup (see `crates/remote/src/ssh.rs`, `candidates`).
+
+1. On a Linux x86_64 machine, build the helper and its hash:
+
+   ```
+   cargo build --release -p lathe-remote
+   cp target/release/lathe-remote lathe-remote-linux-x86_64
+   sha256sum lathe-remote-linux-x86_64 > lathe-remote-linux-x86_64.sha256
+   ```
+
+   On the HP the result stays in `~/shots/release/`.
+2. On the Mac, copy both files, then build the bundle from a checkout:
+
+   ```
+   scp 'alex@hp-agent:shots/release/lathe-remote-linux-x86_64*' /tmp/
+   tools/bundle-mac.sh /tmp/lathe-remote-linux-x86_64
+   ```
+
+   The script checks the hash, builds `lathe` in release for `aarch64-apple-darwin`, writes
+   `Info.plist` (id `dev.lathe.app`, version from `Cargo.toml`, macOS 13 or later) and the icon, and
+   signs the app ad hoc (`codesign -s -`). It needs no network beyond what cargo needs.
+3. Run it with `open target/bundle/lathe.app`, or copy it to `/Applications`.
+
+The icon is `tools/mac/lathe-1024.png`, drawn from beui's `LatheMark` by `tools/mac/make-icon.sh`
+(ImageMagick, run only when the mark changes). Ad hoc signing opens the app on the Mac that built it.
+Another Mac shows the Gatekeeper warning until you allow the app.
+
 ## Projects
 
 - Open Folder (⌘O) uses the native folder picker. The start screen and the sidebar list recent

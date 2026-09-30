@@ -73,3 +73,24 @@ fn the_search_skips_a_helper_of_another_protocol() {
 fn the_version_names_the_protocol() {
     assert_eq!(version_line(), format!("{VERSION} protocol {}", crate::protocol::VERSION));
 }
+
+/// A20: a helper in a real Mac bundle, at Contents/Resources/remote/<platform>/lathe-remote, is found from the
+/// app at Contents/MacOS/lathe, and a stale copy earlier in the order is passed over.
+#[test]
+fn a_helper_in_the_mac_bundle_is_found() {
+    let linux = Platform { system: "linux".into(), arch: "x86_64".into() };
+    let root = std::env::temp_dir().join(format!("lathe-bundle-{}", std::process::id()));
+    let contents = root.join("lathe.app/Contents");
+    let put = |path: std::path::PathBuf, bytes: &[u8]| {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
+    };
+    let current = format!("ELF lathe-remote-protocol:{};", crate::protocol::VERSION);
+    let bundled = contents.join("Resources/remote/linux-x86_64/lathe-remote");
+    put(bundled.clone(), current.as_bytes());
+    put(contents.join("MacOS/remote/linux-x86_64/lathe-remote"), b"ELF lathe-remote-protocol:0;");
+    let exe = contents.join("MacOS/lathe");
+    let found = first_matching(&candidates(&exe, &linux, None, None, false));
+    std::fs::remove_dir_all(&root).ok();
+    assert_eq!(found, Some(bundled));
+}
