@@ -1,7 +1,7 @@
-//! The session's pull request, one card above the composer. It reads the pull request and its checks
-//! off the UI thread, again and again at the pace `poll` sets, and stops after a merge or a close. Its
-//! merge actions write to the forge only after the reader confirms a merge or a branch delete, and the
-//! forge's refusals show in its own words.
+//! The session's pull request, one card above the composer. Its `watch`, shared with every card of the
+//! same pull request, reads it off the UI thread at the pace `poll` sets, while a card of it is on
+//! screen. The card's merge actions write to the forge only after the reader confirms a merge or a
+//! branch delete, and the forge's refusals show in its own words.
 use std::{sync::Arc, time::Duration};
 use beui::{
     ActiveTheme, PrCard, PrChipData,
@@ -10,12 +10,14 @@ use beui::{
     typography::TextSize,
 };
 use gpui_kit::{
-    AppContext, Context, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Task, Window, div, px,
+    App, AppContext, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Task,
+    Window, div, px,
 };
-use lathe_forge::{Check, CheckStatus, Forge, ForgeError, Pull, PullRef, PullState, PullUpdate, present};
+use lathe_forge::{Check, Forge, Pull, PullRef, PullUpdate, present};
 use lathe_pr_view::actions::{Ask, ask};
 mod poll;
-use poll::{Seen, next_delay};
+mod watch;
+use watch::PullWatch;
 
 pub enum CardEvent {
     /// The reader pressed the card: show the pull request.
@@ -26,100 +28,50 @@ impl EventEmitter<CardEvent> for PullCard {}
 pub struct PullCard {
     reference: PullRef,
     forge: Arc<dyn Forge>,
-    pub pull: Option<Pull>,
-    pub checks: Vec<Check>,
+    watch: Entity<PullWatch>,
     /// What the last write said: a refusal in the forge's words, or what was done.
     pub said: Option<SharedString>,
-    /// Why the last read failed, while it does.
-    pub unread: Option<SharedString>,
     /// The action waiting for the reader's yes.
     pub confirm: Option<Action>,
     choice: Option<Choice>,
-    /// The wait after the last failed read, while reads fail.
-    failure: Option<Duration>,
-    /// The wait before the next read; `None` when the card reads no more on its own.
-    pub next: Option<Duration>,
     pub busy: bool,
-    polling: Task<()>,
     writing: Task<()>,
+    _watch: Subscription,
 }
-
-/// What one read got.
-type Got = (Result<Pull, ForgeError>, Result<Vec<Check>, ForgeError>);
 
 impl PullCard {
     pub fn new(reference: PullRef, forge: Arc<dyn Forge>, cx: &mut Context<Self>) -> Self {
-        let mut card = Self {
-            reference,
-            forge,
-            pull: None,
-            checks: Vec::new(),
-            said: None,
-            unread: None,
-            confirm: None,
-            choice: None,
-            failure: None,
-            next: None,
-            busy: false,
-            polling: Task::ready(()),
-            writing: Task::ready(()),
-        };
-        card.read_now(cx);
-        card
+        let watch = watch::watch(reference.clone(), forge.clone(), cx);
+        let _watch = cx.observe(&watch, |_, _, cx| cx.notify());
+        Self { reference, forge, watch, said: None, confirm: None, choice: None, busy: false, writing: Task::ready(()), _watch }
     }
 
     pub fn reference(&self) -> &PullRef {
         &self.reference
     }
 
-    /// Reads now, and then at the pace the reads set, until one says to stop.
-    pub fn read_now(&mut self, cx: &mut Context<Self>) {
-        let (forge, reference) = (self.forge.clone(), self.reference.clone());
-        self.polling = cx.spawn(async move |this, cx| {
-            loop {
-                let (forge, reference) = (forge.clone(), reference.clone());
-                let got: Got = cx.background_spawn(async move { (forge.pull(&reference), forge.checks(&reference)) }).await;
-                let Ok(Some(wait)) = this.update(cx, |card, cx| card.got(got, cx)) else { break };
-                cx.background_executor().timer(wait).await;
-            }
-        });
+    pub fn pull<'a>(&self, cx: &'a App) -> Option<&'a Pull> {
+        self.watch.read(cx).pull.as_ref()
     }
 
-    fn got(&mut self, (pull, checks): Got, cx: &mut Context<Self>) -> Option<Duration> {
-        let seen = match pull {
-            Ok(pull) => {
-                if let Ok(checks) = checks {
-                    self.checks = checks;
-                }
-                let running = pull.checks.running > 0 || self.checks.iter().any(|c| c.status != CheckStatus::Done);
-                let seen = match pull.state {
-                    PullState::Merged | PullState::Closed => Seen::Settled,
-                    PullState::Open | PullState::Draft => Seen::Open { checks_running: running },
-                };
-                self.pull = Some(pull);
-                self.unread = None;
-                seen
-            }
-            Err(error) => {
-                self.unread = Some(error.to_string().into());
-                Seen::Failed(error)
-            }
-        };
-        let next = next_delay(self.failure, &seen);
-        self.failure = if matches!(seen, Seen::Failed(_)) { next } else { None };
-        self.next = next;
-        cx.notify();
-        next
+    pub fn checks<'a>(&self, cx: &'a App) -> &'a [Check] {
+        &self.watch.read(cx).checks
+    }
+
+    /// The wait before the next read; `None` when the card reads no more on its own.
+    #[cfg(test)]
+    pub fn next(&self, cx: &App) -> Option<Duration> {
+        self.watch.read(cx).next
     }
 
     /// The facts the merge button stands on.
-    pub fn facts(&self) -> Option<MergeFacts> {
-        self.pull.as_ref().map(|p| present::merge_facts(p, Some(&self.checks), &[]))
+    pub fn facts(&self, cx: &App) -> Option<MergeFacts> {
+        self.pull(cx).map(|p| present::merge_facts(p, Some(self.checks(cx)), &[]))
     }
 
     /// The reader's merge choice, else the repository's defaults.
-    fn choice(&self) -> Option<Choice> {
-        self.choice.or_else(|| self.facts().map(|f| Choice { method: f.default_method, auto: false, delete_branch: f.delete_branch }))
+    fn choice(&self, cx: &App) -> Option<Choice> {
+        self.choice.or_else(|| self.facts(cx).map(|f| Choice { method: f.default_method, auto: false, delete_branch: f.delete_branch }))
     }
 
     pub fn set_choice(&mut self, choice: Choice, cx: &mut Context<Self>) {
@@ -151,10 +103,10 @@ impl PullCard {
     }
 
     /// The question the confirmation asks, in the reader's terms.
-    pub fn confirm_words(&self) -> Option<String> {
-        let (action, pull) = (self.confirm?, self.pull.as_ref()?);
+    pub fn confirm_words(&self, cx: &App) -> Option<String> {
+        let (action, pull) = (self.confirm?, self.pull(cx)?);
         let number = pull.reference.number;
-        let deletes = self.choice().is_some_and(|c| c.delete_branch);
+        let deletes = self.choice(cx).is_some_and(|c| c.delete_branch);
         let and_delete = if deletes { format!(", and delete {}", pull.head) } else { String::new() };
         Some(match action {
             Action::Merge(m) | Action::BypassAndMerge(m) => format!("{} #{number} into {}{and_delete}?", verb(m), pull.base),
@@ -166,7 +118,7 @@ impl PullCard {
     }
 
     fn run(&mut self, action: Action, cx: &mut Context<Self>) {
-        let (Some(pull), Some(choice)) = (self.pull.clone(), self.choice()) else { return };
+        let (Some(pull), Some(choice)) = (self.pull(cx).cloned(), self.choice(cx)) else { return };
         let title = format!("{} (#{})", pull.title, pull.reference.number);
         let request = ask(action, choice, &title, &pull.body, &pull.head_sha);
         let done = match &request {
@@ -197,7 +149,7 @@ impl PullCard {
                     Ok(()) => (!done.is_empty()).then(|| done.into()),
                     Err(error) => Some(error.to_string().into()),
                 };
-                card.read_now(cx);
+                card.watch.update(cx, |w, cx| w.read_now(cx));
                 cx.notify();
             });
         });
@@ -214,14 +166,19 @@ fn verb(method: UiMethod) -> &'static str {
 }
 
 impl Render for PullCard {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Drawn: the watch reads on while the card is on screen in an active window.
+        let active = window.is_window_active();
+        self.watch.update(cx, |w, cx| w.drawn(active, cx));
         let theme = cx.theme().clone();
+        let unread = self.watch.read(cx).unread.clone();
         let words = |text: SharedString, danger: bool| {
             div().text_size(TextSize::Xs.font_size()).text_color(if danger { theme.danger } else { theme.muted_foreground }).child(text)
         };
-        let Some(pull) = self.pull.clone() else {
-            let text = self.unread.clone().unwrap_or_else(|| format!("Reading #{}…", self.reference.number).into());
-            return div().px(px(4.)).child(words(text, self.unread.is_some())).into_any_element();
+        let Some(pull) = self.pull(cx).cloned() else {
+            let failed = unread.is_some();
+            let text = unread.unwrap_or_else(|| format!("Reading #{}…", self.reference.number).into());
+            return div().px(px(4.)).child(words(text, failed)).into_any_element();
         };
         let chip = PrChipData {
             number: pull.reference.number,
@@ -240,10 +197,10 @@ impl Render for PullCard {
             .on_open(move |_, _, cx| {
                 _ = opens.update(cx, |c, cx| cx.emit(CardEvent::Show(c.reference.clone())));
             });
-        if let (Some(facts), Some(choice)) = (self.facts(), self.choice()) {
+        if let (Some(facts), Some(choice)) = (self.facts(cx), self.choice(cx)) {
             card = card.merge(facts, choice);
         }
-        let confirm = self.confirm_words().map(|question| {
+        let confirm = self.confirm_words(cx).map(|question| {
             let (no, yes) = (this.clone(), this.clone());
             let label = match self.confirm {
                 Some(Action::DeleteBranch) => "Delete branch",
@@ -271,7 +228,7 @@ impl Render for PullCard {
             .child(card)
             .children(confirm)
             .children(self.said.clone().map(|w| words(w, self.said_is_refusal())))
-            .children(self.unread.clone().map(|w| words(w, true)))
+            .children(unread.map(|w| words(w, true)))
             .into_any_element()
     }
 }
