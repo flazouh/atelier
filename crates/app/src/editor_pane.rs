@@ -3,7 +3,7 @@
 //! above the text, with Reload and Keep mine.
 
 use beui::{
-    CodeEditor, Tab, Tabs, TabsVariant,
+    Breadcrumb, CodeEditor, Crumb, Tab, Tabs, TabsVariant,
     button::{Button, ButtonVariant, dot},
     file_icon::FileIcon,
     icon::{Icon, IconName},
@@ -69,6 +69,16 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
     let opening = p.opening().enumerate().map(|(i, path)| {
         let name = path.rsplit('/').next().unwrap_or(path).to_string();
         Tab::new(name).pending(true).leading(beui::spinner::Spinner::new(("opening", i)).size(px(12.)).color(muted))
+    });
+    let crumbs = active.as_deref().map(|path| {
+        let parts: Vec<String> = path.split('/').map(str::to_string).collect();
+        let reveal = project.clone();
+        let folders = parts.clone();
+        div().flex().flex_none().px(px(14.)).child(
+            Breadcrumb::new("editor-crumbs", parts.iter().map(|p| Crumb::new(p.clone()))).debug_name("editor-crumb").on_press(move |i, _, cx| {
+                reveal.update(cx, |p, cx| p.reveal_folder(&folders[..=i].join("/"), cx));
+            }),
+        )
     });
     let open = project.clone();
     let strip = Tabs::new("editor-tabs", TabsVariant::Underline, tabs.chain(opening), selected).on_select(move |i, window, cx| {
@@ -136,6 +146,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         .flex_col()
         .size_full()
         .child(div().flex().flex_none().px(px(6.)).child(strip))
+        .children(crumbs)
         .child(body)
 }
 

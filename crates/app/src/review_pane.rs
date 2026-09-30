@@ -15,7 +15,7 @@
 use std::{collections::{HashMap, HashSet}, sync::Arc, time::{Duration, Instant}};
 
 use beui::{
-    ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer, LineComposerEvent, RowMap,
+    ActiveTheme, Breadcrumb, ChangedFile, Crumb, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer, LineComposerEvent, RowMap,
     ReviewBar, ReviewFileHeader, ReviewHandlers, ReviewProgress,
     file_tree::FileTree,
     inline_review,
@@ -175,6 +175,8 @@ pub struct ReviewPane {
     /// The comment being written: its file, the composer, and what the pane listens to on it.
     composer: Option<(usize, Entity<LineComposer>, [Subscription; 2])>,
     width: f32,
+    /// The folder a press on the breadcrumb asked the tree to open, and how many times it has asked.
+    reveal: (u64, SharedString),
     writing: Option<Task<()>>,
     /// The whole session's files, read off the UI thread; dropping it drops the read.
     loading: Task<()>,
@@ -261,6 +263,7 @@ impl ReviewPane {
             resolving: Vec::new(),
             composer: None,
             width: f32::MAX,
+            reveal: (0, SharedString::default()),
             writing: None,
             loading: Task::ready(()),
             reading: scope == Scope::Whole,
@@ -1002,6 +1005,21 @@ impl Render for ReviewPane {
             .on_decide(move |id, decision, window, cx| decide(&(id.clone(), decision), window, cx))
             .on_resolved(move |id, decision, window, cx| resolved(&(id.clone(), decision), window, cx));
         let header = ReviewFileHeader::new("review-file", path.clone(), added, removed, handlers.clone()).committed(self.committed_words(self.current)).decided(self.decided_words(self.current));
+        let crumbs = {
+            let parts: Vec<String> = path.split('/').map(str::to_string).collect();
+            let this = cx.entity().downgrade();
+            let folders = parts.clone();
+            div().flex().flex_none().px(px(4.)).child(
+                Breadcrumb::new("review-crumbs", parts.iter().map(|p| Crumb::new(p.clone()))).debug_name("review-crumb").on_press(move |i, _, cx| {
+                    let folder = folders[..=i].join("/");
+                    this.update(cx, |pane, cx| {
+                        pane.reveal = (pane.reveal.0 + 1, folder.into());
+                        cx.notify();
+                    })
+                    .ok();
+                }),
+            )
+        };
         let file_card = div()
             .flex()
             .flex_col()
@@ -1011,13 +1029,14 @@ impl Render for ReviewPane {
             .bg(theme.card)
             .rounded(radius::LG)
             .p(px(6.))
+            .child(crumbs)
             .child(header)
             .children(what.map(|w| div().px(px(10.)).pb(px(6.)).text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(w)))
             .child(div().flex_1().min_h_0().child(review));
         let show_tree = self.review_mode || self.width >= TREE_FROM;
         let tree = show_tree.then(|| {
             div().flex_none().w(px(220.)).h_full().bg(theme.card).rounded(radius::LG).p(px(6.)).child(
-                ChangedFileTree::new("review-tree", self.changed.clone()).reviewed(reviewed).current(path).on_open(move |path, window, cx| open(path, window, cx)),
+                ChangedFileTree::new("review-tree", self.changed.clone()).reveal(self.reveal.0, self.reveal.1.clone()).reviewed(reviewed).current(path).on_open(move |path, window, cx| open(path, window, cx)),
             )
         });
         let this = cx.entity().downgrade();

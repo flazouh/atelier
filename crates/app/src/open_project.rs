@@ -663,6 +663,13 @@ impl OpenProject {
         }
     }
 
+    /// Opens `folder` in the file tree, and the folders it sits in.
+    pub fn reveal_folder(&mut self, folder: &str, cx: &mut Context<Self>) {
+        self.open_folders.insert(folder.to_string());
+        self.open_folders.extend(ancestors(folder));
+        cx.notify();
+    }
+
     pub fn toggle_folder(&mut self, path: &str, cx: &mut Context<Self>) {
         if !self.open_folders.remove(path) {
             self.open_folders.insert(path.to_string());
