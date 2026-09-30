@@ -181,8 +181,15 @@ servers all go through the same calls. The servers run on the host, started thro
   sends `Event`s: a watch's `Changes`, a process's `Output`, its `Exited`. The first call is
   `Hello { version, root }`; a version the host does not speak fails the hello. Version 2 added
   `Remove` and the data folder's calls, version 3 `DataPath` (the folder's path on the host, asked once and
-  kept); the deploy path holds the binary's hash, so a new app puts its
-  own `lathe-remote` on the host.
+  kept), version 4 `ReadDir`, and version 5 `Tracker` (below). A helper of another version answers
+  "update lathe on this host", with no protocol numbers. The deploy path holds the binary's hash, so a
+  new app puts its own `lathe-remote` on the host.
+- Tasks over SSH (protocol 5): `Project::tracker()` gives the project's `Arc<dyn Tracker>`. The store is
+  `tracker.sqlite` in the project's data folder on its host, so every machine that opens the project sees
+  the same tasks. `Call::Tracker(TrackerCall)` and `Reply::Tracker` carry each call of the trait, and a
+  tracker error crosses as itself. The app's end (`client/tracker.rs`) tells its own writes to its
+  receivers at once. It polls `list` every 3 s for changes made elsewhere while a receiver is kept, and
+  it tells no `Activity` made elsewhere.
 - The host runs each request on a thread of its own, so a slow search never holds up a read. A
   process's stdin is fed in order by a thread of its own. Its stderr's last 64 KB is kept.
 - Every call has a timeout: 60 s for a listing, a search or git, 30 s for the rest. A timeout is an

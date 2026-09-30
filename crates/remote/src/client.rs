@@ -24,6 +24,8 @@ use lathe_project::{
     ChangeSink, Command, Control, DataEntry, Entry, GitOutput, Link, LinkSink, Match, Process, Project, Query, Watch,
 };
 
+mod tracker;
+
 use crate::protocol::{Call, Event, Failure, Frame, Pid, Reply, VERSION, read_frame, write_frame};
 
 /// One live connection to `lathe-remote`: what the host says, what to send it, and a way to end it.
@@ -173,7 +175,16 @@ impl Shared {
     }
 
     fn hello(&self) -> io::Result<String> {
-        match self.request(Call::Hello { version: VERSION, root: self.asked_root.clone() })? {
+        let answer = self.request(Call::Hello { version: VERSION, root: self.asked_root.clone() }).map_err(|error| {
+            // A helper of another protocol: a new one says so in words, an old one with its numbers.
+            let words = error.to_string();
+            if error.kind() == io::ErrorKind::InvalidInput && (words.contains("speaks version") || words.contains("update lathe")) {
+                io::Error::new(io::ErrorKind::InvalidInput, "the lathe helper on this host is a different version: update lathe on this host")
+            } else {
+                error
+            }
+        });
+        match answer? {
             Reply::Hello { root } => Ok(root),
             other => Err(io::Error::other(format!("a hello answered with {other:?}"))),
         }
@@ -282,6 +293,9 @@ pub struct RemoteProject {
     /// The data folder on the host, once the host has said: it never moves, so it is asked once. A call
     /// that failed (the link was down) is asked again next time.
     data_path: Mutex<Option<Option<PathBuf>>>,
+    tracker: lathe_project::TrackerSlot,
+    /// How often the tracker asks the host for changes made elsewhere, while someone listens.
+    poll_tasks: Duration,
 }
 
 impl RemoteProject {
@@ -304,11 +318,18 @@ impl RemoteProject {
         });
         attach(&shared, connection);
         let root = shared.hello()?;
-        Ok(Self { shared, root: PathBuf::from(root), data_path: Mutex::default() })
+        Ok(Self { shared, root: PathBuf::from(root), data_path: Mutex::default(), tracker: Default::default(), poll_tasks: tracker::POLL })
     }
 
     fn call(&self, call: Call) -> io::Result<Reply> {
         self.shared.request(call)
+    }
+
+    /// A tracker that asks the host for changes this often, as a test wants.
+    #[cfg(test)]
+    pub(crate) fn poll_tasks_every(mut self, every: Duration) -> Self {
+        self.poll_tasks = every;
+        self
     }
 }
 
@@ -398,6 +419,10 @@ impl Project for RemoteProject {
         };
         *lock(&self.data_path) = Some(answer.clone());
         answer
+    }
+
+    fn tracker(&self) -> lathe_tracker::TrackerResult<Arc<dyn lathe_tracker::Tracker>> {
+        self.tracker.get_or_open(|| Ok(Arc::new(tracker::RemoteTracker::open(self.shared.clone(), self.poll_tasks)?)))
     }
 
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {

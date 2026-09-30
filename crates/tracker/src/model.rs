@@ -121,7 +121,7 @@ pub struct PrLink {
     pub repo: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Task {
     pub id: TaskId,
     /// The short id people say: "LAT-42".
@@ -144,7 +144,7 @@ pub struct Task {
 }
 
 /// What a new task is made from.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NewTask {
     pub title: String,
     pub description: String,
@@ -173,7 +173,7 @@ impl NewTask {
 
 /// A change to fields. A field left `None` stays as it is; an `Option<Option<_>>` field can also be taken
 /// off with `Some(None)`.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Patch {
     pub title: Option<String>,
     pub description: Option<String>,
@@ -193,7 +193,7 @@ impl Patch {
 }
 
 /// Which tasks to list. Every part that is set must match.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Query {
     /// Any of these statuses. Empty means all.
     pub statuses: Vec<Status>,
@@ -208,7 +208,7 @@ pub struct Query {
 }
 
 /// What to append to a task's activity. A session and a pull request also become links of the task.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Entry {
     Comment(String),
     SessionStarted(SessionLink),
@@ -219,7 +219,7 @@ pub enum Entry {
 }
 
 /// One line of the append-only log. `by` is a name, or `rule:<id>` for the automation.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Activity {
     pub id: i64,
     pub task: TaskId,
@@ -243,7 +243,7 @@ pub enum ActivityKind {
 }
 
 /// A change, told to whoever subscribed.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Event {
     Created(Task),
     Updated(Task),

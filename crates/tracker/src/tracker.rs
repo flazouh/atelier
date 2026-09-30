@@ -1,9 +1,11 @@
 //! The interface to a tracker. Every call blocks and may be slow, so none is made on the UI thread.
 use std::sync::mpsc::Receiver;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{Activity, Entry, Event, NewTask, Patch, Query, Task, TaskId};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrackerError {
     /// No task has this id.
     NotFound(TaskId),

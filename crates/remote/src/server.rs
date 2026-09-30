@@ -18,7 +18,12 @@ use std::{
 
 use lathe_project::{Control, LocalProject, Project, Watch};
 
+mod tracker;
+
 use crate::protocol::{Call, Event, Failure, Frame, Pid, Reply, VERSION, read_frame, write_frame};
+
+/// What a helper of another protocol says to the app, in words a reader acts on: no protocol numbers.
+const UPDATE_WORDS: &str = "the app and the lathe helper on this host are different versions: update lathe";
 
 type Out = Arc<Mutex<Box<dyn Write + Send>>>;
 
@@ -110,7 +115,7 @@ fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Reply> {
     match call {
         Call::Hello { version, root } => {
             if version != VERSION {
-                return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("the app speaks version {version}, this lathe-remote {VERSION}")));
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, UPDATE_WORDS));
             }
             let project = LocalProject::open(expand(&root))?;
             let project = match &state.data_dir {
@@ -139,6 +144,7 @@ fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Reply> {
             *state.watch.lock().unwrap_or_else(|p| p.into_inner()) = Some(watch);
             Ok(Reply::Done)
         }
+        Call::Tracker(call) => Ok(Reply::Tracker(Box::new(project(state)?.tracker().and_then(|t| tracker::answer(&*t, call))))),
         Call::Search { query } => Ok(Reply::Matches(project(state)?.search(&query)?)),
         Call::Git { args } => {
             let args: Vec<&str> = args.iter().map(String::as_str).collect();

@@ -3862,6 +3862,7 @@ version = "0.1.0"
 dependencies = [
  "dirs 6.0.0",
  "ignore",
+ "lathe-tracker",
  "notify",
  "regex",
  "serde",
@@ -3873,6 +3874,7 @@ name = "lathe-remote"
 version = "0.1.0"
 dependencies = [
  "lathe-project",
+ "lathe-tracker",
  "postcard",
  "serde",
  "sha2 0.10.9",

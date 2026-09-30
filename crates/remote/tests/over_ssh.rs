@@ -73,3 +73,22 @@ fn remote_costs() {
     std::fs::remove_file(std::path::Path::new(&root).join("lathe-bench.rs")).ok();
     let _ = std::process::Command::new("ssh").args([host.as_str(), &format!("rm -f {root}/lathe-bench.rs")]).status();
 }
+
+/// Protocol 5: the tasks of a project over a real ssh live in the host's data folder.
+#[test]
+#[ignore]
+fn tasks_over_ssh_live_on_the_host() {
+    use lathe_tracker::{NewTask, Tracker};
+    let host = std::env::var("LATHE_TEST_SSH_HOST").expect("LATHE_TEST_SSH_HOST names a host");
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("tasks")).unwrap();
+    let root = dir.path().join("tasks");
+    let project = lathe_remote::ssh::connect(&host, &root.display().to_string(), &|line| eprintln!("{line}")).expect("connects");
+    let tracker = project.tracker().expect("the host opens its store");
+    let task = tracker.create(&NewTask::titled("Over ssh"), "qa").unwrap();
+    assert!(task.key.starts_with("TAS-"), "{}", task.key);
+    assert_eq!(tracker.get(&task.id).unwrap().map(|t| t.title), Some("Over ssh".to_string()));
+    let file = project.data_path().expect("a data folder").join("tracker.sqlite");
+    let local = lathe_tracker::LocalTracker::open(&file, "TAS").unwrap();
+    assert_eq!(local.get(&task.id).unwrap().map(|t| t.key), Some(task.key.clone()));
+}

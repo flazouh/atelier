@@ -5,7 +5,7 @@ use std::{
     io::{self, BufRead, BufReader, Read},
     path::{Path, PathBuf},
     process::Stdio,
-    sync::mpsc,
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
@@ -14,9 +14,11 @@ use ignore::{WalkBuilder, gitignore::Gitignore};
 use notify::{EventKind, RecursiveMode, Watcher};
 use regex::RegexBuilder;
 
+use lathe_tracker::{LocalTracker, Tracker, TrackerError, TrackerResult, prefix_for};
+
 use crate::{
     Change, ChangeKind, ChangeSink, Command, DataEntry, Entry, GitOutput, Match, Process, Project, Query, Watch,
-    data::DataFolder, host_path, process::LocalChild,
+    TrackerSlot, data::DataFolder, host_path, process::LocalChild,
 };
 
 /// Writes `target` whole, through a temporary file beside it, so a reader never sees half of it. The
@@ -43,6 +45,7 @@ const SEARCH_MAX_BYTES: u64 = 4 << 20;
 pub struct LocalProject {
     root: PathBuf,
     data: Option<DataFolder>,
+    tracker: TrackerSlot,
 }
 
 impl LocalProject {
@@ -53,7 +56,7 @@ impl LocalProject {
             return Err(io::Error::new(io::ErrorKind::NotADirectory, format!("{} is not a folder", root.display())));
         }
         let data = DataFolder::for_root(&root, None);
-        Ok(Self { root, data })
+        Ok(Self { root, data, tracker: TrackerSlot::default() })
     }
 
     /// The same project with its data folder under `dir`, as a test wants.
@@ -134,6 +137,14 @@ impl Project for LocalProject {
 
     fn data_path(&self) -> Option<PathBuf> {
         self.data.as_ref().map(|d| d.path().to_path_buf())
+    }
+
+    fn tracker(&self) -> TrackerResult<Arc<dyn Tracker>> {
+        self.tracker.get_or_open(|| {
+            let folder = self.data_path().ok_or_else(|| TrackerError::Unsupported("keep tasks with no data folder".into()))?;
+            let name = self.root.file_name().and_then(|n| n.to_str()).unwrap_or("project");
+            Ok(Arc::new(LocalTracker::open(&folder.join(crate::TRACKER_FILE), &prefix_for(name))?))
+        })
     }
 
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
