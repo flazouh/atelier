@@ -288,6 +288,9 @@ impl TasksPane {
                 if target.is_some() || self.list.read(cx).cursor().row.is_none() {
                     self.list.update(cx, |list, cx| list.put_cursor_on(target.as_ref(), cx));
                 }
+                if target.is_some() || self.board.read(cx).cursor().is_none() {
+                    self.board.update(cx, |board, cx| board.put_cursor_on(target.as_ref(), cx));
+                }
             }
             Err(error) => self.load = Load::Failed(error.to_string().into()),
         }

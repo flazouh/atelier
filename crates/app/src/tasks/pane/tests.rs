@@ -282,3 +282,38 @@ fn after_create_the_cursor_is_on_the_new_task(cx: &mut TestAppContext) {
     let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new").unwrap();
     assert_eq!(new.status, lathe_tracker::Status::Done, "the key acted on the new task");
 }
+
+/// The board has the same default cursor: on the first card when it opens, and on the new card after Create.
+#[gpui_kit::test]
+fn the_board_has_a_cursor_when_it_opens_so_a_key_works_at_once(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    pane.update(cx, |p, cx| {
+        p.mode = Mode::Board;
+        cx.notify();
+    });
+    settle(&pane, cx);
+    focus_body(&pane, cx);
+    cx.simulate_keystrokes("s");
+    settle(&pane, cx);
+    assert!(cx.debug_bounds("picker-row-0").is_some(), "the status picker opened with no move first");
+}
+
+#[gpui_kit::test]
+fn after_create_the_board_cursor_is_on_the_new_card(cx: &mut TestAppContext) {
+    let (pane, tracker, cx) = open(900., cx);
+    pane.update(cx, |p, cx| {
+        p.mode = Mode::Board;
+        cx.notify();
+    });
+    settle(&pane, cx);
+    let draft = beui::new_task_model::Draft { title: "Brand new card".into(), ..Default::default() };
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.create(&draft, false, window, cx)));
+    settle(&pane, cx);
+    focus_body(&pane, cx);
+    cx.simulate_keystrokes("s");
+    settle(&pane, cx);
+    press_row(cx, 4);
+    settle(&pane, cx);
+    let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new card").unwrap();
+    assert_eq!(new.status, lathe_tracker::Status::Done, "the key acted on the new card");
+}
