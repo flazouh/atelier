@@ -230,8 +230,10 @@ impl ReviewPane {
                 this.decide_every_file(Decision::Accept, window, cx);
                 this.open_ship(window, cx);
             }
-            StripEvent::Committed { sha, paths } => {
+            StripEvent::Committed { sha, paths, subject } => {
                 this.committed(sha, paths, cx);
+                let event = crate::tasks::signal::TaskEvent::Committed { sha: sha.clone(), subject: subject.clone() };
+                this.session.update(cx, |s, cx| s.tell_task(event, cx));
                 // The strip's fields close, so the review takes the keys back: the push key reaches it.
                 this.focus.focus(window, cx);
             }
@@ -240,7 +242,11 @@ impl ReviewPane {
             StripEvent::ShowPull(reference) => cx.emit(PaneEvent::ShowPull(reference.clone())),
             StripEvent::PullOpened(reference) => {
                 let reference = reference.clone();
-                this.session.update(cx, |s, cx| s.set_pull(reference, cx));
+                let event = crate::tasks::signal::TaskEvent::PrOpened { number: reference.number, repo: reference.repo.slug() };
+                this.session.update(cx, |s, cx| {
+                    s.set_pull(reference, cx);
+                    s.tell_task(event, cx);
+                });
                 cx.emit(PaneEvent::GitChanged);
             }
         });
@@ -440,7 +446,11 @@ impl ReviewPane {
         if kept.is_empty() && self.ship.read(cx).stage == crate::ship::strip::Stage::NothingKept {
             return self.ship.update(cx, |strip, cx| strip.accept_all_and_commit(cx));
         }
-        self.ship.update(cx, |strip, cx| strip.open(kept, window, cx));
+        let refs = self.session.read(cx).task.as_ref().map(|t| t.key.clone());
+        self.ship.update(cx, |strip, cx| {
+            strip.set_refs(refs);
+            strip.open(kept, window, cx)
+        });
     }
 
     /// The server's words for the status line, when the open file has one.

@@ -57,6 +57,15 @@ pub fn message(draft: &str) -> String {
     text.trim().trim_matches(|c| c == '"' || c == '`' || c == '\'').trim().to_string()
 }
 
+/// The message with a line that names the task it works on, unless it names it already. The reader sees
+/// the line in the draft and can take it out.
+pub fn with_refs(message: &str, key: &str) -> String {
+    let line = format!("Refs {key}");
+    if message.lines().any(|l| l.trim() == line) {
+        return message.to_string();
+    }
+    format!("{}\n\n{line}", message.trim_end())
+}
 /// The agent's answer as a branch name git takes: its first line, lowercase, hyphens for anything else.
 pub fn branch_name(draft: &str) -> Option<String> {
     let line = draft.trim().lines().next()?.trim().trim_matches(|c| c == '`' || c == '"' || c == '\'');

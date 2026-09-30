@@ -249,3 +249,19 @@ fn a_commit_moves_no_task_and_is_logged_on_the_tasks_of_the_session() {
     assert!(log.iter().any(|a| a.kind == ActivityKind::Commit { sha: "abc1234".into(), subject: "Fix it".into() }));
     assert_eq!(t.get(&task.id).unwrap().unwrap().status, Status::InProgress, "the start moved it, the commit did not");
 }
+
+#[test]
+fn a_merge_seen_again_is_logged_and_counted_once() {
+    use crate::{ActivityKind, LocalTracker, NewTask, Tracker};
+    let rules = RuleSet::default();
+    let t = LocalTracker::in_memory("LAT").unwrap();
+    let task = t.create(&NewTask::titled("A"), "me").unwrap();
+    let pr = PrLink { number: 7, repo: "o/r".into() };
+    super::handle(&t, &rules, &Signal::PrOpened { task: task.id.clone(), pr, by: "me".into() }).unwrap();
+    for _ in 0..3 {
+        super::handle(&t, &rules, &merged()).unwrap();
+    }
+    let merges = t.activity(&task.id).unwrap().iter().filter(|a| matches!(a.kind, ActivityKind::PrMerged { .. })).count();
+    assert_eq!(merges, 1, "the app sees the same merged pull request at every launch");
+    assert_eq!(t.get(&task.id).unwrap().unwrap().status, Status::Done);
+}

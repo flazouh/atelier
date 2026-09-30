@@ -779,15 +779,22 @@ impl Shell {
     }
 
     /// A key from GitQuiet's table. ⌘B and ⌘⇧B arrive as actions instead, so they work from the
-    /// editor too; here, Go to file, and only while nothing is being typed.
+    /// editor too; here, Go to file and Go to tasks (`g t`), and only while nothing is being typed.
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let press = Press::from_keystroke(&event.keystroke);
         if press.secondary || keys::typing(window) {
             return;
         }
-        if keys::read_now(&press, cx) == Some(Command::GoToFile) {
-            cx.stop_propagation();
-            self.go_to_file(window, cx);
+        match keys::read_now(&press, cx) {
+            Some(Command::GoToFile) => {
+                cx.stop_propagation();
+                self.go_to_file(window, cx);
+            }
+            Some(Command::GoToTasks) => {
+                cx.stop_propagation();
+                self.show_tasks(window, cx);
+            }
+            _ => {}
         }
     }
 

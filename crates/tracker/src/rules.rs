@@ -165,7 +165,12 @@ pub fn handle(tracker: &dyn Tracker, rules: &RuleSet, signal: &Signal) -> Tracke
             .tasks_of_pr(*number)?
             .iter()
             .map(|id| {
-                if let Some(pr) = tracker.get(id)?.and_then(|t| t.prs.into_iter().find(|p| p.number == *number)) {
+                // The app sees a merged pull request at every launch: it is logged the first time only.
+                let told = tracker
+                    .activity(id)?
+                    .iter()
+                    .any(|a| matches!(&a.kind, crate::ActivityKind::PrMerged { pr } if pr.number == *number));
+                if !told && let Some(pr) = tracker.get(id)?.and_then(|t| t.prs.into_iter().find(|p| p.number == *number)) {
                     tracker.record(id, &Entry::PrMerged(pr), by)?;
                 }
                 decide_and_move(tracker, rules, id, signal)

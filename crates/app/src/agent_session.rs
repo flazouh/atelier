@@ -107,7 +107,7 @@ pub struct AgentSession {
     /// The task the session began from, for the header's chip and the first signal.
     pub task: Option<crate::tasks::TaskRef>,
     /// The task heard that the session started.
-    task_told: bool,
+    pub(crate) task_told: bool,
     /// Why it could not start, or a message that did not go.
     pub problem: Option<SharedString>,
     /// What the agent wrote to stderr as it failed: the tail behind "Show details".
@@ -357,6 +357,8 @@ impl AgentSession {
                     if self.task.is_some() && !self.task_told {
                         self.task_told = true;
                         cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::Started));
+                    } else if self.task.is_none() {
+                        cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::Adopt));
                     }
                 }
                 Event::TurnEnded(end) => {
@@ -428,6 +430,11 @@ impl AgentSession {
     }
 
     /// Sends a message; the first one names the session.
+    /// Tells the tasks linked to this session that something happened in it.
+    pub fn tell_task(&mut self, event: crate::tasks::signal::TaskEvent, cx: &mut Context<Self>) {
+        cx.emit(SessionEvent::Task(event));
+    }
+
     pub fn send(&mut self, text: String, cx: &mut Context<Self>) {
         if text.trim().is_empty() {
             return;
