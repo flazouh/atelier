@@ -13,6 +13,7 @@ use beui::{
     finder::{Filter, Finder, FinderEvent, FinderItem},
     segmented::{Segment, Segmented},
     keys::{self, Command, Press},
+    modal::Modal,
     popover::{Hang, Popover},
     theme::{ActiveTheme, radius},
     typography::{FONT_FAMILY, TextSize},
@@ -1183,24 +1184,23 @@ impl Shell {
             .child(div().flex().flex_1().min_h_0().child(body))
             .child(self.status_line(cx))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
-            // Both on the shared Popover: a press outside only closes, as do Escape and Tab.
+            // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {
                 let this = cx.entity().downgrade();
                 let focus = form.read(cx).focus_handle(cx);
-                Popover::new("open-over-ssh")
-                    .open(true)
-                    .hang(Hang::Centre(TITLE_BAR + 60.))
-                    .panel_focus(&focus)
+                Modal::new("open-over-ssh")
+                    .view(form.read(cx).view_key())
+                    .width(480.)
+                    .focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_ssh(window, cx))))
                     .child(form.clone())
             }))
             .children(self.folder.as_ref().map(|(picker, _)| {
                 let this = cx.entity().downgrade();
                 let focus = picker.read(cx).focus_handle(cx);
-                Popover::new("open-folder-picker")
-                    .open(true)
-                    .hang(Hang::Centre(TITLE_BAR + 60.))
-                    .panel_focus(&focus)
+                Modal::new("open-folder-picker")
+                    .width(560.)
+                    .focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_folder_picker(window, cx))))
                     .child(picker.clone())
             }))

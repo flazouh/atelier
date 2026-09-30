@@ -10,7 +10,7 @@ fn open<'a>(hosts: &[&str], cx: &'a mut TestAppContext) -> (Entity<SshForm>, &'a
     });
     let hosts: Vec<String> = hosts.iter().map(|h| h.to_string()).collect();
     let (form, cx) = cx.add_window_view(move |window, cx| SshForm::new(hosts, window, cx));
-    cx.simulate_resize(size(px(900.), px(700.)));
+    cx.simulate_resize(size(px(438.), px(700.))); // the width the modal leaves the form
     for _ in 0..3 {
         cx.run_until_parked();
         form.update(cx, |_, cx| cx.notify());
