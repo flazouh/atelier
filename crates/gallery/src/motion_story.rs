@@ -2,7 +2,7 @@
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use gpui_kit::AppContext as _;
-use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, FileUpload, FileUploadEvent, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
+use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, BloomMenu, FileUpload, FileUploadEvent, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
 use gpui_kit::{
     AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -60,6 +60,7 @@ pub struct MotionStory {
     toasts: Entity<ToastStack>,
     notes: Entity<NotificationStack>,
     uploads: Entity<FileUpload>,
+    bloom: Entity<BloomMenu>,
     upload_variant: beui::UploadVariant,
     upload_ticks: Vec<gpui_kit::Task<()>>,
     position: ToastPosition,
@@ -107,7 +108,8 @@ impl MotionStory {
             FileUploadEvent::Removed(_) => {}
         })
         .detach();
-        let mut story = Self { uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
+        let bloom = cx.new(|cx| BloomMenu::new("bloom", beui::bloom_menu::default_items(), cx));
+        let mut story = Self { bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
         story.tick_upload("release-video".to_string(), cx);
         story
     }
@@ -460,6 +462,10 @@ impl Render for MotionStory {
                 .child(uploads);
             let demo = div().flex().w_full().justify_center().pt(px(24.)).child(card);
             parts.push(if alone { demo.into_any_element() } else { section("File upload: the demo (drop files on it, or press Browse)", &theme, demo) });
+        }
+        if self.shows("bloom-menu") {
+            let demo = div().flex().w_full().min_h(px(420.)).justify_center().pt(px(96.)).items_start().child(self.bloom.clone());
+            parts.push(if alone { demo.into_any_element() } else { section("Bloom menu: the demo", &theme, demo) });
         }
         if self.shows("multi-select") {
             let demo = div().w(px(384.)).child(self.teams.clone());
