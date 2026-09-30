@@ -104,6 +104,10 @@ pub struct Shell {
     panels: Entity<AgentPanels>,
     /// Names the reader gave sessions, by the agent's id.
     names: BTreeMap<String, String>,
+    /// The colours and images the reader gave projects' badges.
+    badges: agents_view::Badges,
+    /// "Choose an icon…", while it is open: the chooser, the project's place, and its events.
+    icon: Option<(Entity<beui::icon_picker::IconPicker>, SharedString, Subscription)>,
     /// With `LATHE_FRAMES=1`, times every frame.
     meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
     /// The sidebar's and the right pane's widths as the reader dragged them; the window's width may
@@ -168,6 +172,8 @@ impl Shell {
             agents_sidebar,
             panels,
             names: saved.session_names.clone(),
+            badges: agents_view::Badges::saved(saved),
+            icon: None,
             meter: crate::frame_meter::enabled().then(Default::default),
             sidebar_width: fit::SIDEBAR_DEFAULT,
             right_width: fit::RIGHT_DEFAULT,
@@ -199,7 +205,7 @@ impl Shell {
         if !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
             return;
         }
-        let projects = agents_view::sidebar(&self.projects, &self.names, cx);
+        let projects = agents_view::sidebar(&self.projects, &self.names, &self.badges, cx);
         let now = agent_session::now();
         self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
     }
@@ -214,7 +220,7 @@ impl Shell {
 
     /// The sidebar and the panels, drawn again from the projects as they are now.
     fn sync(&mut self, cx: &mut Context<Self>) {
-        let projects = agents_view::sidebar(&self.projects, &self.names, cx);
+        let projects = agents_view::sidebar(&self.projects, &self.names, &self.badges, cx);
         // Each open session keeps one view across syncs, so its panel is drawn from its last frame.
         let sessions: Vec<Entity<AgentSession>> = self.projects.iter().flat_map(|p| p.read(cx).sessions.clone()).collect();
         self.panel_views.retain(|id, _| sessions.iter().any(|s| s.entity_id() == *id));
@@ -411,6 +417,7 @@ impl Shell {
                     self.sync(cx);
                 }
             }
+            SidebarEvent::ChooseIcon { project } => self.choose_icon(project.clone(), window, cx),
             // A remote project reconnects by itself; Retry says so.
             SidebarEvent::Retry { .. } => self.say("Reconnecting on its own; it retries every few seconds.".into(), cx),
         }
@@ -1018,6 +1025,87 @@ impl Shell {
         cx.notify();
     }
 
+    /// "Choose an icon…": lists the image files of the project and lets the reader pick one for its badge.
+    fn choose_icon(&mut self, place: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(at) = self.project_by_id(&place, cx) else { return };
+        let project = self.projects[at].clone();
+        let Listing::Ready(tree) = &project.read(cx).listing else {
+            self.say("The project is still being read. Try again in a moment.".into(), cx);
+            return;
+        };
+        let paths = tree.file_paths();
+        let root = match &project.read(cx).location {
+            lathe_settings::Location::Local { path } => Some(path.clone()),
+            lathe_settings::Location::Ssh { .. } => None,
+        };
+        let picker = cx.new(|cx| beui::icon_picker::IconPicker::new(paths, root, window, cx));
+        let key = place.clone();
+        let events = cx.subscribe_in(&picker, window, move |this, _, event: &beui::icon_picker::IconPickerEvent, window, cx| match event {
+            beui::icon_picker::IconPickerEvent::Choose(path) => this.save_icon(key.clone(), Some(path.to_string()), window, cx),
+            beui::icon_picker::IconPickerEvent::Clear => this.save_icon(key.clone(), None, window, cx),
+            beui::icon_picker::IconPickerEvent::Cancel => this.close_icon_picker(window, cx),
+        });
+        picker.read(cx).focus_handle(cx).focus(window, cx);
+        self.icon = Some((picker, place, events));
+        cx.notify();
+    }
+
+    fn close_icon_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.icon.take().is_some() {
+            self.focus.focus(window, cx);
+        }
+        cx.notify();
+    }
+
+    /// Keeps the chosen image for the project's badge: its bytes are copied into the data folder, since the file may be
+    /// on another host, and the copy's path is saved. `None` puts the letter back.
+    fn save_icon(&mut self, place: SharedString, file: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_icon_picker(window, cx);
+        let Some(settings) = lathe_settings::path() else { return };
+        let key = place.to_string();
+        let Some(file) = file else {
+            self.badges.icons.remove(&key);
+            cx.background_spawn(async move {
+                if let Err(error) = lathe_settings::update(&settings, |s| drop(s.project_icons.remove(&key))) {
+                    eprintln!("could not save the icon: {error}");
+                }
+            })
+            .detach();
+            self.sync(cx);
+            return;
+        };
+        let Some(at) = self.project_by_id(&place, cx) else { return };
+        let read = self.projects[at].update(cx, |p, cx| p.read_bytes(&file, cx));
+        cx.spawn_in(window, async move |this, cx| {
+            let bytes = match read.await {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    _ = this.update(cx, |this, cx| this.say(format!("Could not read {file}: {error}"), cx));
+                    return;
+                }
+            };
+            let Some(folder) = settings.parent().map(|p| p.join("project-icons")) else { return };
+            let copy = folder.join(crate::project_icons::file_name(&key, &file));
+            let saved = copy.clone();
+            let written = cx
+                .background_spawn(async move {
+                    std::fs::create_dir_all(&folder)?;
+                    std::fs::write(&saved, bytes)?;
+                    let path = saved.display().to_string();
+                    lathe_settings::update(&settings, |s| drop(s.project_icons.insert(key, path))).map(drop)
+                })
+                .await;
+            _ = this.update(cx, |this, cx| match written {
+                Ok(()) => {
+                    this.badges.icons.insert(place.to_string(), copy.display().to_string());
+                    this.sync(cx);
+                }
+                Err(error) => this.say(format!("Could not keep the icon: {error}"), cx),
+            });
+        })
+        .detach();
+    }
+
     /// Closes "Open over SSH…", and gives focus back here.
     fn close_ssh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.ssh.take().is_some() {
@@ -1567,6 +1655,15 @@ impl Shell {
                     .width(520.)
                     .focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_folder_picker(window, cx))))
+                    .child(picker.clone())
+            }))
+            .children(self.icon.as_ref().map(|(picker, _, _)| {
+                let this = cx.entity().downgrade();
+                let focus = picker.read(cx).focus_handle(cx);
+                Modal::new("choose-icon")
+                    .width(520.)
+                    .focus(&focus)
+                    .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_icon_picker(window, cx))))
                     .child(picker.clone())
             }))
             .children(self.finder.as_ref().map(|(finder, _, _)| {

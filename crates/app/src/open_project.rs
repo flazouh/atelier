@@ -365,6 +365,12 @@ impl OpenProject {
         self.list_sessions(cx);
     }
 
+    /// Reads a file of the project on the project's own thread: the bytes, or why not.
+    pub fn read_bytes(&self, path: &str, cx: &mut Context<Self>) -> Task<std::io::Result<Vec<u8>>> {
+        let project = self.project.clone();
+        let path = path.to_string();
+        cx.background_spawn(async move { project.read(&path) })
+    }
     pub fn name(&self) -> String {
         self.location.name()
     }

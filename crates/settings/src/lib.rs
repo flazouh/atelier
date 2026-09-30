@@ -35,6 +35,11 @@ pub struct Settings {
     pub design_elevation: Option<u8>,
     /// design preview: remove after Alex picks. How strong the elevation is, 0 to 100.
     pub design_strength: Option<u8>,
+    /// The badge colour (an index into the palette) the reader gave a project, by its place. A project with none has
+    /// the one its place gives it.
+    pub project_colors: std::collections::BTreeMap<String, u8>,
+    /// The image file kept for a project's badge, by its place.
+    pub project_icons: std::collections::BTreeMap<String, String>,
     /// The ids of the task rules the reader turned off (`lathe_tracker::Rule::id`).
     pub task_rules_off: Vec<String>,
     /// Names the reader gave sessions, by the agent's id for the session.
