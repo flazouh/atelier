@@ -59,6 +59,8 @@ pub struct TasksPane {
     open: Option<SharedString>,
     creating: bool,
     said: Option<SharedString>,
+    /// The task to put the cursor on when the tasks are read again: the one just made.
+    select_after: Option<SharedString>,
     width: f32,
     list: Entity<TaskList>,
     board: Entity<TaskBoard>,
@@ -145,6 +147,7 @@ impl TasksPane {
             open: None,
             creating: false,
             said: None,
+            select_after: None,
             width: 0.,
             list,
             board,
@@ -280,6 +283,11 @@ impl TasksPane {
                 let (people, labels) = (self.people.clone(), self.labels.clone());
                 self.dialog.update(cx, |d, _| d.set_people(people, labels));
                 self.push_all(Source::None, cx);
+                // A key needs a task under the cursor: the one just made, else the first when there is none.
+                let target = self.select_after.take();
+                if target.is_some() || self.list.read(cx).cursor().row.is_none() {
+                    self.list.update(cx, |list, cx| list.put_cursor_on(target.as_ref(), cx));
+                }
             }
             Err(error) => self.load = Load::Failed(error.to_string().into()),
         }
@@ -364,6 +372,7 @@ impl TasksPane {
             let made = making.await;
             this.update(cx, |this, cx| match made {
                 Ok(task) => {
+                    this.select_after = Some(task.id.0.clone().into());
                     this.reload(cx);
                     if start_session {
                         cx.emit(TasksEvent::Start(task.id));
@@ -508,7 +517,7 @@ impl Render for TasksPane {
             Modal::new("new-task-modal")
                 .width(600.)
                 .focus(&focus)
-                .on_close(move |window, cx| pane.update(cx, |p, cx| p.close_dialog(window, cx)))
+                .on_close(move |_, cx| pane.update(cx, |p, cx| p.dialog.update(cx, |d, cx| d.ask_cancel(cx))))
                 .child(self.dialog.clone())
         });
         let _ = window;

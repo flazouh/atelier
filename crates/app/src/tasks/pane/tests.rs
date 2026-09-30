@@ -201,3 +201,84 @@ fn a_press_in_the_dialog_chooses_an_assignee_and_a_press_on_the_description_puts
     settle(&pane, cx);
     assert_eq!(pane.read_with(cx, |p, cx| p.dialog.read(cx).description_text(cx)), "Say hi");
 }
+
+fn types_in_the_dialog(pane: &Entity<TasksPane>, cx: &mut VisualTestContext, title: &str) {
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.new_task(window, cx)));
+    settle(pane, cx);
+    cx.simulate_input(title);
+    settle(pane, cx);
+}
+
+/// The create key works from the description too, not only from the title.
+#[gpui_kit::test]
+fn command_enter_creates_from_the_description_too(cx: &mut TestAppContext) {
+    let (pane, tracker, cx) = open(900., cx);
+    types_in_the_dialog(&pane, cx, "Ship it");
+    let description = cx.debug_bounds("new-task-description").expect("the description is drawn").center();
+    cx.simulate_click(description, gpui_kit::Modifiers::default());
+    settle(&pane, cx);
+    cx.simulate_input("with a description");
+    settle(&pane, cx);
+    cx.simulate_keystrokes("ctrl-enter");
+    settle(&pane, cx);
+    let made = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Ship it").expect("the task was made");
+    assert_eq!(made.description, "with a description");
+    assert!(!pane.read_with(cx, |p, _| p.creating), "the dialog closed");
+}
+
+/// Escape on a dialog with typed text asks first, and a second Escape keeps the draft.
+#[gpui_kit::test]
+fn escape_on_a_typed_dialog_asks_before_it_drops_the_draft(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    types_in_the_dialog(&pane, cx, "A draft");
+    cx.simulate_keystrokes("escape");
+    settle(&pane, cx);
+    assert!(pane.read_with(cx, |p, _| p.creating), "the dialog is still open");
+    assert!(cx.debug_bounds("discard-question").is_some(), "it asks");
+    cx.simulate_keystrokes("escape");
+    settle(&pane, cx);
+    assert!(pane.read_with(cx, |p, _| p.creating), "Escape again keeps editing");
+    assert!(cx.debug_bounds("discard-question").is_none(), "the question is gone");
+    assert_eq!(pane.read_with(cx, |p, cx| p.dialog.read(cx).draft().title.clone()), "A draft", "the draft is kept");
+    cx.simulate_keystrokes("escape");
+    settle(&pane, cx);
+    let discard = cx.debug_bounds("discard-new-task").expect("the discard button is drawn").center();
+    cx.simulate_click(discard, gpui_kit::Modifiers::default());
+    settle(&pane, cx);
+    assert!(!pane.read_with(cx, |p, _| p.creating), "Discard closes it");
+}
+
+#[gpui_kit::test]
+fn escape_on_an_empty_dialog_closes_it_at_once(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.new_task(window, cx)));
+    settle(&pane, cx);
+    cx.simulate_keystrokes("escape");
+    settle(&pane, cx);
+    assert!(!pane.read_with(cx, |p, _| p.creating));
+}
+
+/// The list has a cursor on a task when it opens, and on the new task after Create, so `s` works at once.
+#[gpui_kit::test]
+fn the_list_has_a_cursor_when_it_opens_so_a_key_works_at_once(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    focus_body(&pane, cx);
+    cx.simulate_keystrokes("s");
+    settle(&pane, cx);
+    assert!(cx.debug_bounds("picker-row-0").is_some(), "the status picker opened with no move first");
+}
+
+#[gpui_kit::test]
+fn after_create_the_cursor_is_on_the_new_task(cx: &mut TestAppContext) {
+    let (pane, tracker, cx) = open(900., cx);
+    let draft = beui::new_task_model::Draft { title: "Brand new".into(), ..Default::default() };
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.create(&draft, false, window, cx)));
+    settle(&pane, cx);
+    focus_body(&pane, cx);
+    cx.simulate_keystrokes("s");
+    settle(&pane, cx);
+    press_row(cx, 4);
+    settle(&pane, cx);
+    let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new").unwrap();
+    assert_eq!(new.status, lathe_tracker::Status::Done, "the key acted on the new task");
+}
