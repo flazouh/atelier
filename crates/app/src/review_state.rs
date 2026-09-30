@@ -26,6 +26,26 @@ pub fn record_path(id: &str) -> String {
 /// and edits (`None` for a file with no text), and the text last written or read on disk.
 pub type Decided = HashMap<(Scope, String), (Option<Merged>, Option<String>)>;
 
+/// How the reader answered a call's approval, kept across a resume: the history the agent replays has
+/// no approvals in it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Approval {
+    Approved,
+    AlwaysAllowed,
+    Denied,
+}
+
+impl Approval {
+    pub fn of(kind: lathe_agents::session::ChoiceKind) -> Self {
+        use lathe_agents::session::ChoiceKind;
+        match kind {
+            ChoiceKind::Allow => Self::Approved,
+            ChoiceKind::AllowAlways => Self::AlwaysAllowed,
+            ChoiceKind::Deny => Self::Denied,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct ReviewState {
     /// Every finished turn of the session.
@@ -37,6 +57,8 @@ pub struct ReviewState {
     pub committed: HashMap<(Scope, String), String>,
     /// The pull request the session opened, if it opened one.
     pub pull: Option<lathe_forge::PullRef>,
+    /// The reader's answer to each call's approval, by the call's id.
+    pub approvals: HashMap<String, Approval>,
     reviewed: Reviewed,
     /// The marks as `reviewed` holds them, which it does not list: by scope key, path and version.
     marks: Vec<(usize, String, u64)>,
@@ -100,6 +122,11 @@ impl ReviewState {
                 committed
             },
             pull: self.pull.clone(),
+            approvals: {
+                let mut kept: Vec<_> = self.approvals.iter().map(|(id, a)| (id.clone(), *a)).collect();
+                kept.sort_by(|a, b| a.0.cmp(&b.0));
+                kept
+            },
             marks: self.marks.clone(),
             comments: self.comments.all().iter().map(CommentRecord::of).collect(),
             sent: self.sent.iter().map(|(c, answered)| (CommentRecord::of(c), *answered)).collect(),
@@ -118,6 +145,7 @@ impl ReviewState {
             .map(|d| ((d.scope.rebuild(), d.path), (d.texts.map(|(baseline, current)| Merged::diff(&baseline, &current)), d.on_disk)))
             .collect();
         state.pull = record.pull;
+        state.approvals = record.approvals.into_iter().collect();
         state.committed = record.committed.into_iter().map(|(scope, path, sha)| ((scope.rebuild(), path), sha)).collect();
         for (key, path, version) in record.marks {
             let file = match key {
@@ -151,6 +179,9 @@ pub struct Record {
     /// Missing from records written before pull requests were kept.
     #[serde(default)]
     pull: Option<lathe_forge::PullRef>,
+    /// Missing from records written before approvals were kept.
+    #[serde(default)]
+    approvals: Vec<(String, Approval)>,
     marks: Vec<(usize, String, u64)>,
     comments: Vec<CommentRecord>,
     sent: Vec<(CommentRecord, bool)>,

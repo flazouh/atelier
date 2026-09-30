@@ -31,3 +31,15 @@ fn each_answer_has_its_mark() {
     assert_eq!(mark(&with(Answer::Answered(ChoiceKind::Deny)), &ToolId::new("a")), Some("Denied"));
     assert_eq!(mark(&with(Answer::Withdrawn), &ToolId::new("a")), Some("Not answered"));
 }
+/// A resumed session has no approvals in its history: the row's mark comes from the answers the
+/// session's record kept, and a live approval still wins.
+#[test]
+fn a_resumed_call_keeps_its_mark_from_the_record() {
+    let mut kept = std::collections::HashMap::new();
+    kept.insert("a".to_string(), crate::review_state::Approval::Approved);
+    kept.insert("b".to_string(), crate::review_state::Approval::Denied);
+    let items = vec![tool("a"), tool("b"), asked("b", Answer::Answered(ChoiceKind::AllowAlways))];
+    assert_eq!(mark_kept(&items, &ToolId::new("a"), &kept), Some("Approved"));
+    assert_eq!(mark_kept(&items, &ToolId::new("b"), &kept), Some("Always allowed"), "the live answer wins");
+    assert_eq!(mark_kept(&items, &ToolId::new("c"), &kept), None);
+}

@@ -31,5 +31,17 @@ pub fn mark(items: &[Item], id: &ToolId) -> Option<&'static str> {
     }
 }
 
+/// As `mark`, with the answers the session's record kept for a call the history no longer asks about.
+pub fn mark_kept(items: &[Item], id: &ToolId, kept: &std::collections::HashMap<String, crate::review_state::Approval>) -> Option<&'static str> {
+    use crate::review_state::Approval;
+    mark(items, id).or_else(|| {
+        kept.get(id.as_str()).map(|a| match a {
+            Approval::Approved => "Approved",
+            Approval::AlwaysAllowed => "Always allowed",
+            Approval::Denied => "Denied",
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests;

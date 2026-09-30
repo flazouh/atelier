@@ -126,7 +126,7 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
             let running = if last { s.conversation.running_subagents() } else { 0 };
             Thinking::new(id("think"), look, phase).subagents(running).into_any_element()
         }
-        Item::Tool(call) => tool_row(id("tool"), call, &root, calls::mark(items, &call.call.id)).into_any_element(),
+        Item::Tool(call) => tool_row(id("tool"), call, &root, calls::mark_kept(items, &call.call.id, &s.reviews.approvals)).into_any_element(),
         Item::Subagent { subagent, status, activity, calls, summary } => {
             let name = subagent.kind.clone().unwrap_or_else(|| "Subagent".into());
             let mut card = SubagentCard::new(id("sub"), look, name, subagent.task.clone())

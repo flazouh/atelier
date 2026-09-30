@@ -458,6 +458,15 @@ impl AgentSession {
             _ => None,
         });
         let Some(choice) = choice else { return };
+        // Kept with the review, so the call's row keeps its mark after a resume.
+        let call = self.conversation.items().iter().find_map(|item| match item {
+            Item::Permission { request: r, .. } if r.id == *request => Some(r.call.id.as_str().to_string()),
+            _ => None,
+        });
+        if let Some(call) = call {
+            self.reviews.approvals.insert(call, crate::review_state::Approval::of(kind));
+            self.save_review(cx);
+        }
         self.conversation.answered(request, kind);
         self.status = status::sent();
         self.refresh_rows();
