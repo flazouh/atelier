@@ -58,3 +58,14 @@ fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
     let focused = cx.update(|window, cx| host.read(cx).input.read(cx).focus_handle(cx).is_focused(window));
     assert!(focused, "the input kept the focus");
 }
+
+/// A9: Stop shows only while a turn goes on.
+#[test]
+fn stop_shows_only_while_a_turn_runs() {
+    use super::shows_stop;
+    assert!(shows_stop(true, &SessionStatus::Working));
+    assert!(!shows_stop(true, &SessionStatus::Idle));
+    assert!(!shows_stop(true, &SessionStatus::Finished));
+    assert!(!shows_stop(false, &SessionStatus::Working));
+    assert!(!shows_stop(false, &SessionStatus::Failed("gone".into())));
+}

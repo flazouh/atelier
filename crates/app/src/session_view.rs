@@ -383,11 +383,16 @@ fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> 
 
 /// The panel's top line: the title (a press renames it), what the session is doing, and Stop while
 /// its agent runs.
+/// A9: Stop shows while a turn goes on (working, or waiting for the reader), not while the agent idles.
+fn shows_stop(running: bool, status: &SessionStatus) -> bool {
+    running && matches!(status, SessionStatus::Working | SessionStatus::NeedsYou(_))
+}
+
 fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
     let (key, renaming, shown_title, running, status_words) = {
         let s = session.read(cx);
-        (s.key.clone(), s.renaming.clone(), s.shown_title(), s.running(), s.status.words())
+        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words())
     };
     let title = match &renaming {
         Some(input) => div()
