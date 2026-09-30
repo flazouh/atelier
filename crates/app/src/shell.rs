@@ -112,6 +112,8 @@ pub struct Shell {
     before_review: Option<f32>,
     /// Sessions open at the last quit, waiting for their project to open.
     restoring: Vec<lathe_settings::OpenSession>,
+    /// Projects being opened: until they all arrive, a saved session may still find its project.
+    opening: usize,
     /// The session in front at the last quit, by the agent's id.
     front: Option<String>,
     /// The open sessions and the one in front as the settings file has them, to write only a change.
@@ -156,6 +158,7 @@ impl Shell {
             sidebar_in_medium: false,
             narrow: Pane::Session,
             restoring: Vec::new(),
+            opening: 0,
             front: None,
             saved_open: (saved.open.clone(), saved.front.clone()),
             before_review: None,
@@ -215,10 +218,14 @@ impl Shell {
         }
     }
 
-    /// Opens the projects of the sessions open at the last quit; each one's sessions open as it arrives.
-    pub fn restore(&mut self, open: Vec<lathe_settings::OpenSession>, front: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+    /// The sessions open at the last quit: each opens again when its project opens. With `open_projects`
+    /// (no folder named at launch), their projects open too; else only the named ones do.
+    pub fn restore(&mut self, open: Vec<lathe_settings::OpenSession>, front: Option<String>, open_projects: bool, window: &mut Window, cx: &mut Context<Self>) {
         let places = restore::locations(&open);
         (self.restoring, self.front) = (open, front);
+        if !open_projects {
+            return;
+        }
         for place in places {
             match place {
                 Location::Local { path } => self.open_local(path, window, cx),
@@ -402,18 +409,32 @@ impl Shell {
 
     /// Opens the folder at `path`, or shows it when this window has it open already.
     pub fn open_local(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        self.opening += 1;
         let opening = cx.background_spawn(async move { LocalProject::open(path) });
         cx.spawn_in(window, async move |this, cx| {
             let opened = opening.await;
-            _ = this.update_in(cx, |this, window, cx| match opened {
-                Ok(project) => {
-                    let location = Location::Local { path: lathe_project::Project::root(&project).to_path_buf() };
-                    this.add(location, Arc::new(project), window, cx);
+            _ = this.update_in(cx, |this, window, cx| {
+                match opened {
+                    Ok(project) => {
+                        let location = Location::Local { path: lathe_project::Project::root(&project).to_path_buf() };
+                        this.add(location, Arc::new(project), window, cx);
+                    }
+                    Err(error) => this.say(format!("Could not open the folder: {error}"), cx),
                 }
-                Err(error) => this.say(format!("Could not open the folder: {error}"), cx),
+                this.opened_one(cx);
             });
         })
         .detach();
+    }
+
+    /// One project opening ended, opened or not. Once none is left opening, the sessions from the last
+    /// quit that found no project stop waiting, and the open ones are kept from now on.
+    fn opened_one(&mut self, cx: &mut Context<Self>) {
+        self.opening = self.opening.saturating_sub(1);
+        if self.opening == 0 && !self.restoring.is_empty() {
+            self.restoring.clear();
+            self.save_open(cx);
+        }
     }
 
     /// ⌘,: the Settings pane over the window, or back to the window when it is open.
@@ -466,6 +487,7 @@ impl Shell {
     /// Opens `path` on `host` over ssh: the host is probed and given lathe-remote if need be, all on
     /// a background thread, and the form, when open, shows each step and any failure.
     pub fn open_remote(&mut self, host: String, path: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.opening += 1;
         let (tx, mut steps) = futures_channel::mpsc::unbounded::<String>();
         let connecting = {
             let (host, path) = (host.clone(), path.clone());
@@ -484,20 +506,23 @@ impl Shell {
                     futures_util::future::Either::Right((connected, _)) => break connected,
                 }
             };
-            _ = this.update_in(cx, |this, window, cx| match connected {
-                Ok(project) => {
-                    this.ssh = None;
-                    let location = Location::Ssh { host, path: PathBuf::from(path) };
-                    this.add(location, Arc::new(project), window, cx);
-                }
-                Err(error) => {
-                    let why = error.to_string();
-                    if this.ssh.is_some() {
-                        this.form_phase(Phase::Failed(why.into()), cx);
-                    } else {
-                        this.say(format!("Could not open {path} on {host}: {why}"), cx);
+            _ = this.update_in(cx, |this, window, cx| {
+                match connected {
+                    Ok(project) => {
+                        this.ssh = None;
+                        let location = Location::Ssh { host, path: PathBuf::from(path) };
+                        this.add(location, Arc::new(project), window, cx);
+                    }
+                    Err(error) => {
+                        let why = error.to_string();
+                        if this.ssh.is_some() {
+                            this.form_phase(Phase::Failed(why.into()), cx);
+                        } else {
+                            this.say(format!("Could not open {path} on {host}: {why}"), cx);
+                        }
                     }
                 }
+                this.opened_one(cx);
             });
         })
         .detach();
