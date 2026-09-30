@@ -343,6 +343,28 @@ Bugs found in QA, each with a regression test in `crates/app/src/review_pane/tes
 - Each file's first frame took 30 to 65 ms: every new editor compiled the Rust highlight queries again
   (gpui-component patch 3, `tests/shared_queries.rs`).
 
+## Ship: commit and push (M4)
+The review pane holds the Ship strip under its bar (`crates/app/src/ship/`). All its git work runs
+off the UI thread, through the project, so it works on a remote project the same way.
+- **Commit what you kept** (⌘⇧C) lists the kept files with +N −M against HEAD. It shows the branch,
+  and the agent drafts a message with `Backend::draft`, which lists no session. On the default
+  branch, it also drafts a new branch name, and takes the first free one (`name-2` and on).
+  Drafts lose Co-Authored-By and Signed-off-by lines.
+- **Commit** (⌘↵) writes the kept text to a temporary index and runs `git commit -F -` on it, so
+  hooks and signing hold, and the reader's staged work and files stay as they were. A hook that
+  refuses keeps the card open with its words.
+- After a commit, the file shows "Committed in <id>" in place of Accept file and Reject file. The
+  undo stops there, and the session record keeps the mark. The title, the sidebar and the status
+  line read git again.
+- **Push** (⌘⇧U) runs `git push -u origin <branch>`. It is never forced. It has no login prompt,
+  and the reader's own ssh command gets `-o BatchMode=yes`. No remote, offline, a refused
+  login and a rejection each say what happened and what to do next.
+- **Pull and rebase** (⌘⇧U after a rejection) fetches the branch, rebases onto it, and pushes. A
+  conflict undoes the rebase and names the files. The reader's other edits stop it before it starts.
+  A second button, "Set my edits aside, rebase, and put them back", stashes them under the entry
+  "lathe: edits set aside to pull and rebase" and pops it after. A clash leaves the entry and names
+  it. The marks and the record follow the rebased commits, matched by patch id.
+
 ## Pull requests in the app (M5)
 
 alex-31's pull request view (`crates/pr-view`, `docs/pr-view.md`) is mounted per project, for the project's own repository only (the origin remote; its searches carry `repo:owner/name`, and its cache is its own). A project with no GitHub remote shows the menu entry off, with "No GitHub remote for this project". The reader's whole working set, on its Courts, waits for a top-level place outside any project.
