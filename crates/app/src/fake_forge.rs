@@ -14,6 +14,9 @@ pub struct FakeForge {
     pub fails: Mutex<Option<ForgeError>>,
     /// The open pull request a branch already has, as `open_pull_for` answers.
     pub open: Mutex<Option<PullBrief>>,
+    /// The pull requests `briefs` knows, by number, and each batch of numbers it was asked for.
+    pub known: Mutex<Vec<PullBrief>>,
+    pub briefs_asked: Mutex<Vec<Vec<u64>>>,
 }
 
 impl FakeForge {
@@ -44,7 +47,11 @@ impl Forge for FakeForge {
     fn job_log(&self, _: &JobRef) -> ForgeResult<String> { unimplemented!() }
     fn last_review_point(&self, _: &PullRef) -> ForgeResult<Option<String>> { unimplemented!() }
     fn involved(&self) -> ForgeResult<Vec<Involved>> { unimplemented!() }
-    fn briefs(&self, _: &RepoRef, _: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> { unimplemented!() }
+    fn briefs(&self, _: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+        self.briefs_asked.lock().unwrap().push(numbers.to_vec());
+        let known = self.known.lock().unwrap();
+        Ok(numbers.iter().map(|n| known.iter().find(|b| b.reference.number == *n).cloned()).collect())
+    }
     fn update_pull(&self, _: &PullRef, _: &PullUpdate) -> ForgeResult<()> { unimplemented!() }
     fn merge(&self, _: &PullRef, _: &MergeRequest) -> ForgeResult<MergeOutcome> { unimplemented!() }
     fn request_review(&self, _: &PullRef, _: &[Reviewer]) -> ForgeResult<()> { unimplemented!() }

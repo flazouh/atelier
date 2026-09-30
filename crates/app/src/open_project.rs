@@ -154,6 +154,12 @@ pub struct OpenProject {
     /// them, handed to each session.
     list_rows: Vec<beui::PrChipData>,
     pr_chips: std::rc::Rc<Vec<beui::PrChipData>>,
+    /// Chips looked up for numbers the list lacks, by number; `None` for one that is no pull request.
+    looked_up: HashMap<u64, Option<beui::PrChipData>>,
+    /// When each number was last asked about, so it is not asked again for a while.
+    asked: HashMap<u64, std::time::Instant>,
+    /// The forge the lookups ask; GitHub through gh unless a test gives another.
+    chip_forge: Option<std::sync::Arc<dyn lathe_forge::Forge>>,
     opening_pulls: Task<()>,
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
@@ -202,6 +208,9 @@ impl OpenProject {
             repo: None,
             list_rows: Vec::new(),
             pr_chips: std::rc::Rc::default(),
+            looked_up: HashMap::new(),
+            asked: HashMap::new(),
+            chip_forge: None,
             opening_pulls: Task::ready(()),
             dirty: None,
             reading_dirty: Task::ready(()),
@@ -287,6 +296,10 @@ impl OpenProject {
                 SessionEvent::Changed => {}
                 SessionEvent::OpenPull(chip) => return this.open_pull(chip, window, cx),
                 SessionEvent::ShowPull(reference) => return this.show_pull(reference.clone(), window, cx),
+                SessionEvent::TextSettled => {
+                    let texts = session.read(cx).agent_texts();
+                    return this.look_up_chips(texts, cx);
+                }
                 SessionEvent::ChooseAgent(backend) => {
                     if let Some(agent) = lathe_agents::registry::by_backend(backend) {
                         this.choose_agent(&session.read(cx).key.clone(), agent, window, cx);
@@ -454,7 +467,7 @@ impl OpenProject {
     /// sessions hear only of chips that changed.
     fn refresh_chips(&mut self, cx: &mut Context<Self>) {
         let slug = self.repo.as_ref().map(lathe_forge::RepoRef::slug);
-        let chips = pulls::chips_of(self.list_rows.iter().cloned(), slug.as_deref());
+        let chips = chips::merged(pulls::chips_of(self.list_rows.iter().cloned(), slug.as_deref()), &self.looked_up);
         if *self.pr_chips == chips {
             return;
         }
@@ -466,6 +479,65 @@ impl OpenProject {
                 cx.notify();
             });
         }
+    }
+
+    /// The chips the sessions' text shows.
+    #[cfg(test)]
+    pub fn chips(&self) -> std::rc::Rc<Vec<beui::PrChipData>> {
+        self.pr_chips.clone()
+    }
+
+    /// The forge the chip lookups ask, in place of GitHub through gh.
+    #[cfg(test)]
+    pub fn set_chip_forge(&mut self, forge: std::sync::Arc<dyn lathe_forge::Forge>) {
+        self.chip_forge = Some(forge);
+    }
+
+    /// Looks up the `#N` in `texts` that the list lacks, in the project's own repository: one request
+    /// for all the new numbers, off the UI thread. A number asked in the last five minutes waits; a
+    /// failed request gives no chip and says nothing, since the text reads as well without one.
+    pub fn look_up_chips(&mut self, texts: Vec<String>, cx: &mut Context<Self>) {
+        const AGAIN_AFTER: std::time::Duration = std::time::Duration::from_secs(300);
+        let Some(repo) = self.repo.clone() else { return };
+        let known: HashSet<u64> = self.pr_chips.iter().map(|c| c.number).filter(|n| !self.looked_up.contains_key(n)).collect();
+        let now = std::time::Instant::now();
+        let asked: HashSet<u64> = self.asked.iter().filter(|(_, at)| now.duration_since(**at) < AGAIN_AFTER).map(|(n, _)| *n).collect();
+        let numbers = chips::wanted(texts.iter().map(String::as_str), &known, &asked);
+        if numbers.is_empty() {
+            return;
+        }
+        self.asked.extend(numbers.iter().map(|n| (*n, now)));
+        let project = self.project.clone();
+        let forge = self
+            .chip_forge
+            .get_or_insert_with(|| {
+                // Tests never reach a forge: their lookups ask an empty one.
+                #[cfg(test)]
+                let forge: std::sync::Arc<dyn lathe_forge::Forge> = {
+                    drop(project);
+                    std::sync::Arc::new(lathe_pr_view::fixture::FixtureForge::new())
+                };
+                #[cfg(not(test))]
+                let forge: std::sync::Arc<dyn lathe_forge::Forge> = std::sync::Arc::new(lathe_forge::github::GitHub::new(project));
+                forge
+            })
+            .clone();
+        let asking = cx.background_spawn(async move {
+            let found = forge.briefs(&repo, &numbers);
+            (numbers, found)
+        });
+        // Each lookup runs to its end: a later one must not cancel it, or its numbers would wait.
+        cx.spawn(async move |this, cx| {
+            let (numbers, found) = asking.await;
+            let Ok(found) = found else { return };
+            _ = this.update(cx, |this, cx| {
+                for (number, brief) in numbers.into_iter().zip(found) {
+                    this.looked_up.insert(number, brief.as_ref().map(lathe_forge::present::chip));
+                }
+                this.refresh_chips(cx);
+            });
+        })
+        .detach();
     }
 
     /// Opens the pull request a chip names, in the pull request pane.
@@ -895,6 +967,7 @@ impl OpenProject {
     }
 }
 
+mod chips;
 mod past;
 #[cfg(test)]
 mod tests;

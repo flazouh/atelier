@@ -59,6 +59,8 @@ pub enum SessionEvent {
     Renamed,
     /// The reader pressed the session's pull request card.
     ShowPull(lathe_forge::PullRef),
+    /// A turn ended, or the history loaded: the agent's text is whole, and its #N can be looked up.
+    TextSettled,
 }
 
 impl EventEmitter<SessionEvent> for AgentSession {}
@@ -262,6 +264,9 @@ impl AgentSession {
                 for event in &history {
                     s.conversation.apply(event);
                 }
+                if !history.is_empty() {
+                    cx.emit(SessionEvent::TextSettled);
+                }
                 if let Some(record) = record {
                     s.reviews = ReviewState::from_record(record);
                     // The record knows when the agent last worked; the agent's list, which a resume
@@ -353,6 +358,7 @@ impl AgentSession {
         }
         if ended_turns {
             self.save_review(cx);
+            cx.emit(SessionEvent::TextSettled);
         }
         if events.iter().any(is_activity) {
             self.active_at = now();
@@ -537,6 +543,14 @@ impl AgentSession {
         }));
         self.pull_card = Some(card);
         cx.notify();
+    }
+
+    /// The agent's text, message by message.
+    pub fn agent_texts(&self) -> Vec<String> {
+        self.conversation.items().iter().filter_map(|item| match item {
+            Item::Text { text, .. } => Some(text.clone()),
+            _ => None,
+        }).collect()
     }
 
     /// Writes the review to the project's data folder, a moment after its last change, off the UI thread.

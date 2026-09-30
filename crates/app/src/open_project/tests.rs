@@ -382,3 +382,29 @@ fn a_project_with_no_forge_remote_opens_no_pull_requests(cx: &mut TestAppContext
     cx.run_until_parked();
     assert!(cx.update(|_, cx| project.read(cx).pulls.is_none()), "nothing opened");
 }
+/// A #N the list does not hold is looked up in the project's repository, in one request for all the
+/// new numbers, and becomes a chip once the answer lands; a number already asked is not asked again.
+#[gpui_kit::test]
+fn a_number_the_list_lacks_is_looked_up_once(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
+    let repo = lathe_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe".into() };
+    let forge = std::sync::Arc::new(crate::fake_forge::FakeForge::default());
+    forge.known.lock().unwrap().push(lathe_forge::PullBrief {
+        reference: lathe_forge::PullRef { repo: repo.clone(), number: 12 },
+        title: "Twelve".into(),
+        state: lathe_forge::PullState::Open,
+        url: "https://github.com/flazouh/lathe/pull/12".into(),
+    });
+    cx.update(|_, cx| project.update(cx, |p, cx| {
+        p.set_chip_forge(forge.clone());
+        p.set_repo(Some(repo.clone()), cx);
+        p.look_up_chips(vec!["See #12 and #13.".into()], cx);
+    }));
+    cx.run_until_parked();
+    assert_eq!(*forge.briefs_asked.lock().unwrap(), [vec![12, 13]], "one request for the new numbers");
+    let chips: Vec<u64> = cx.update(|_, cx| project.read(cx).chips().iter().map(|c| c.number).collect());
+    assert_eq!(chips, [12], "13 is not a pull request, so it has no chip");
+    cx.update(|_, cx| project.update(cx, |p, cx| p.look_up_chips(vec!["#12 and #13 again".into()], cx)));
+    cx.run_until_parked();
+    assert_eq!(forge.briefs_asked.lock().unwrap().len(), 1, "asked once");
+}
