@@ -32,6 +32,9 @@ pub(crate) fn body_needs_fold(body: &str) -> bool {
     lines > 6
 }
 
+/// The height of the fade at the foot of the rail while it has more to show.
+const RAIL_FADE: f32 = 36.;
+
 /// The height of the switch between the two parts in a narrow pane.
 const PARTS_HEIGHT: f32 = 46.;
 
@@ -134,7 +137,7 @@ impl PullView {
         let paths: Vec<String> = listed.iter().map(|t| t.path.clone()).collect();
         let (more_threads, more_remarks) = (this.clone(), this.clone());
         let header = self.header(cx);
-        div()
+        let scroller = div()
             .id("pr-rail")
             .debug_selector(|| "pr-rail".into())
             .track_scroll(&self.rail_scroll)
@@ -189,6 +192,32 @@ impl PullView {
             .child(self.verdict.clone())
             .child(self.merge.clone())
             .child(CommitsSummary::new("pr-commits", commits))
+            ;
+        // A fade at the foot while there is more below, so the cut cards do not look like the end.
+        let offset = self.rail_scroll.offset().y;
+        let more_below = -f32::from(offset) < f32::from(self.rail_scroll.max_offset().y) - 1.;
+        div()
+            .relative()
+            .flex_none()
+            .w(px(width))
+            .h(px(height))
+            .child(scroller)
+            .when(more_below, |d| {
+                d.child(
+                    div()
+                        .debug_selector(|| "pr-rail-fade".into())
+                        .absolute()
+                        .bottom_0()
+                        .left_0()
+                        .right_0()
+                        .h(px(RAIL_FADE))
+                        .bg(gpui_kit::linear_gradient(
+                            180.,
+                            gpui_kit::linear_color_stop(theme.background.opacity(0.), 0.),
+                            gpui_kit::linear_color_stop(theme.background, 1.),
+                        )),
+                )
+            })
             .into_any_element()
     }
 

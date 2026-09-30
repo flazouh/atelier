@@ -8,6 +8,7 @@
 use std::time::Instant;
 
 use beui::{
+    PressStop,
     AgentText, AgentTextStatus, MessageBubble, MessageBubbleAlign, MessageBubbleVariant, SubagentCard, SubagentRow,
     SubagentStrip, Thinking, ThinkingPhase, Todo as TodoRow, TodoList, TodoStatus as RowStatus, ToolApproval,
     ToolApprovalStatus, ToolCall as ToolRow, ToolStatus as RowToolStatus,
@@ -321,7 +322,7 @@ pub fn session_view(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
     };
     let composer = s.composer.clone();
     let pull_card = session.read(cx).pull_card.clone();
-    let header = header(session, cx);
+    let header = header(session, window, cx);
     let interrupt = session.clone();
     div()
         .key_context("AgentSession")
@@ -382,11 +383,13 @@ fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> 
 
 /// The panel's top line: the title (a press renames it), what the session is doing, and Stop while
 /// its agent runs.
-fn header(session: &Entity<AgentSession>, cx: &mut App) -> impl IntoElement {
+fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let s = session.read(cx);
-    let key = s.key.clone();
-    let title = match &s.renaming {
+    let (key, renaming, shown_title, running, status_words) = {
+        let s = session.read(cx);
+        (s.key.clone(), s.renaming.clone(), s.shown_title(), s.running(), s.status.words())
+    };
+    let title = match &renaming {
         Some(input) => div()
             .flex_1()
             .min_w_0()
@@ -405,12 +408,13 @@ fn header(session: &Entity<AgentSession>, cx: &mut App) -> impl IntoElement {
                 .text_size(TextSize::Sm.font_size())
                 .font_weight(gpui_kit::FontWeight::MEDIUM)
                 .tooltip(beui::tooltip::Tooltip::text("Rename"))
+                .press_stop(gpui_kit::ElementId::Name(format!("{key}-title-focus").into()), radius::MD, window, cx)
                 .on_click(move |_, window, cx| rename.update(cx, |s, cx| s.start_rename(window, cx)))
-                .child(s.shown_title())
+                .child(shown_title)
                 .into_any_element()
         }
     };
-    let stop = s.running().then(|| {
+    let stop = running.then(|| {
         let stop = session.clone();
         Button::new(gpui_kit::ElementId::Name(format!("{key}-stop").into()))
             .label("Stop")
@@ -426,7 +430,7 @@ fn header(session: &Entity<AgentSession>, cx: &mut App) -> impl IntoElement {
         .h(px(40.))
         .px(px(16.))
         .child(title)
-        .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(s.status.words()))
+        .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(status_words))
         .children(stop)
 }
 
