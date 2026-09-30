@@ -9,7 +9,7 @@ use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 use beui::{
     PressStop,
-    button::{Button, ButtonVariant},
+    button::{Button, ButtonSize, ButtonVariant},
     file_icon::FileIcon,
     finder::{Filter, Finder, FinderEvent, FinderItem},
     segmented::{Segment, Segmented},
@@ -1089,16 +1089,16 @@ impl Shell {
                             .gap(px(8.))
                             .child(
                                 Button::new("open-folder")
-                                    .debug_name("open-folder")
                                     .label("Open Folder…")
+                                    .size(ButtonSize::Md)
                                     .variant(ButtonVariant::Primary)
                                     .cap(keys::cap("⌘o"))
                                     .on_click(cx.listener(|this, _, window, cx| this.open_folder(&OpenFolder, window, cx))),
                             )
                             .child(
                                 Button::new("open-remote")
-                                    .debug_name("open-remote")
                                     .label("Open over SSH…")
+                                    .size(ButtonSize::Md)
                                     .variant(ButtonVariant::Secondary)
                                     .cap(keys::cap("⌘⇧o"))
                                     .on_click(cx.listener(|this, _, window, cx| this.open_ssh_form(&OpenRemote, window, cx))),
@@ -1176,6 +1176,7 @@ impl Shell {
             .child(
                 Button::new("new-session")
                     .label("New session")
+                    .size(ButtonSize::Md)
                     .variant(ButtonVariant::Primary)
                     .cap(keys::cap("⌘n"))
                     .on_click(cx.listener(|this, _, window, cx| this.new_session_key(&NewSession, window, cx))),

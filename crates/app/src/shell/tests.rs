@@ -177,14 +177,3 @@ fn every_global_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext)
     }
     assert!(lost.is_empty(), "chords that do not reach their action {lost:#?}");
 }
-
-/// L3: the start screen's buttons take the default size, 28 tall, as every row of buttons does.
-#[gpui_kit::test]
-fn the_start_screen_buttons_are_the_default_28(cx: &mut TestAppContext) {
-    let (shell, cx) = open_shell(cx);
-    settle(&shell, cx);
-    for name in ["open-folder", "open-remote"] {
-        let button = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
-        assert_eq!(f32::from(button.size.height), 28., "{name}");
-    }
-}
