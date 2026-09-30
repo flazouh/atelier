@@ -74,6 +74,7 @@ pub struct PullForm {
     pub body: Entity<TextareaState>,
     base_focus: FocusHandle,
     draft_focus: FocusHandle,
+    cancel_focus: FocusHandle,
     open_focus: FocusHandle,
     work: Task<()>,
     checks: Task<()>,
@@ -112,6 +113,7 @@ impl PullForm {
             body,
             base_focus: cx.focus_handle(),
             draft_focus: cx.focus_handle(),
+            cancel_focus: cx.focus_handle(),
             open_focus: cx.focus_handle(),
             work: Task::ready(()),
             checks: Task::ready(()),
@@ -199,10 +201,10 @@ impl PullForm {
         if self.ahead > 0 { "Push and open pull request" } else { "Open pull request" }
     }
 
-    /// The form's Tab stops, in order: the title, the body, the base, the draft switch, and Open.
+    /// The form's Tab stops, in order: the title, the body, the base, the draft switch, Cancel, and Open.
     #[cfg(test)]
     pub fn tab_stops(&self, cx: &gpui_kit::App) -> Vec<FocusHandle> {
-        vec![self.title.focus_handle(cx), self.body.focus_handle(cx), self.base_focus.clone(), self.draft_focus.clone(), self.open_focus.clone()]
+        vec![self.title.focus_handle(cx), self.body.focus_handle(cx), self.base_focus.clone(), self.draft_focus.clone(), self.cancel_focus.clone(), self.open_focus.clone()]
     }
 
     /// Asks the agent for a title and a body against the base picked; a draft fills only an empty field.
@@ -340,7 +342,7 @@ impl Render for PullForm {
                             .flex()
                             .justify_end()
                             .gap(px(8.))
-                            .child(Button::new("pull-cancel").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                            .child(Button::new("pull-cancel").label("Cancel").focus_handle(self.cancel_focus.clone()).variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
                                 _ = cancel.update(cx, |form, cx| form.cancel(cx));
                             }))
                             .child(
