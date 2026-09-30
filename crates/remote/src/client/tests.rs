@@ -369,3 +369,50 @@ fn a_remote_tracker_hears_of_tasks_changed_elsewhere() {
         other => panic!("{other:?}"),
     }
 }
+
+/// The app's writes to the host, counted in bytes.
+struct Counted(Arc<std::sync::atomic::AtomicUsize>, PipeWriter);
+
+impl Write for Counted {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let n = self.1.write(bytes)?;
+        self.0.fetch_add(n, Ordering::Relaxed);
+        Ok(n)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.1.flush()
+    }
+}
+
+#[test]
+fn a_dropped_subscription_stops_the_poll_before_its_next_list() {
+    let dir = folder(&[("a.txt", "a")]);
+    let data = tempfile::tempdir().unwrap();
+    let sent = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counted = sent.clone();
+    let dial: Dial = Box::new(move || {
+        let (app_reader, host_writer) = io::pipe()?;
+        let (host_reader, app_writer) = io::pipe()?;
+        let data = Some(data.path().to_path_buf());
+        thread::spawn(move || crate::server::serve_with_data(host_reader, host_writer, data));
+        Ok(Connection {
+            reader: Box::new(app_reader),
+            writer: Box::new(Counted(counted.clone(), app_writer)),
+            close: Box::new(|| {}),
+            last_words: Box::new(String::new),
+        })
+    });
+    let remote = connect(&dir, dial).poll_tasks_every(Duration::from_millis(20));
+    let tracker = remote.tracker().unwrap();
+    let subscription = tracker.subscribe();
+    std::thread::sleep(Duration::from_millis(100));
+    let polling = sent.load(Ordering::Relaxed);
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(sent.load(Ordering::Relaxed) > polling, "the poll lists while the subscription lives");
+    drop(subscription);
+    // One tick may be under way; after it, nothing more goes to the host.
+    std::thread::sleep(Duration::from_millis(60));
+    let stopped = sent.load(Ordering::Relaxed);
+    std::thread::sleep(Duration::from_millis(200));
+    assert_eq!(sent.load(Ordering::Relaxed), stopped, "no list after the subscription dropped");
+}
