@@ -17,6 +17,7 @@ mod fake_agent;
 #[cfg(test)]
 mod fake_forge;
 mod frame_meter;
+mod key_table;
 mod list_diff;
 mod open_project;
 mod pull_card;
