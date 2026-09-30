@@ -107,6 +107,8 @@ pub struct Line {
     pub path: String,
     pub added: usize,
     pub removed: usize,
+    /// The file held the reader's own uncommitted edits before the turn, and the commit takes them too.
+    pub own_edits: bool,
 }
 
 pub struct ShipStrip {
@@ -192,7 +194,7 @@ impl ShipStrip {
             .zip(&heads)
             .map(|(kept, head)| {
                 let (added, removed) = against(head.as_deref(), kept);
-                Line { path: kept.path.clone(), added, removed }
+                Line { path: kept.path.clone(), added, removed, own_edits: crate::ship::kept::own_edits(kept, head.as_deref()) }
             })
             .collect();
         (self.branch, self.on_default) = (branch, on_default);
@@ -534,8 +536,10 @@ impl Render for ShipStrip {
                         .gap(px(8.))
                         .text_size(TextSize::Xs.font_size())
                         .child(div().flex_1().min_w_0().truncate().child(line.path.clone()))
-                        .child(div().font_family(MONO_FONT_FAMILY).text_color(theme.diff_color(true)).child(format!("+{}", line.added)))
-                        .child(div().font_family(MONO_FONT_FAMILY).text_color(theme.diff_color(false)).child(format!("\u{2212}{}", line.removed)))
+                        // The reader's own edits from before the turn go in too: said on that file alone.
+                        .when(line.own_edits, |d| d.child(div().flex_none().text_color(muted).child("with your edits from before the turn")))
+                        .when(line.added > 0, |d| d.child(div().font_family(MONO_FONT_FAMILY).text_color(theme.diff_color(true)).child(format!("+{}", line.added))))
+                        .when(line.removed > 0, |d| d.child(div().font_family(MONO_FONT_FAMILY).text_color(theme.diff_color(false)).child(format!("\u{2212}{}", line.removed))))
                 });
                 let on = self.branch.clone().unwrap_or_else(|| "a detached HEAD".into());
                 let cancel = this.clone();
@@ -553,7 +557,6 @@ impl Render for ShipStrip {
                     .flex_col()
                     .gap(px(8.))
                     .child(div().text_size(TextSize::Sm.font_size()).child(format!("Commit what you kept, on {on}")))
-                    .child(words("Against HEAD: the text before the turn may hold your own uncommitted edits.".into()))
                     .child(div().flex().flex_col().gap(px(2.)).children(lines))
                     .when(self.on_default, |d| {
                         d.child(words(format!("{on} is the default branch: this commit goes on a new one").into()))

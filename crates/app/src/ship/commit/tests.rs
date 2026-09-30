@@ -28,7 +28,7 @@ fn repo(files: &[(&str, &str)]) -> (tempfile::TempDir, Arc<dyn Project>) {
 }
 
 fn write(path: &str, text: &str) -> Kept {
-    Kept { path: path.into(), text: Some(text.into()) }
+    Kept { path: path.into(), text: Some(text.into()), before: None }
 }
 
 /// The commit takes what the review kept, not the disk: the reader's other staged work stays staged and
@@ -54,7 +54,7 @@ fn a_commit_takes_what_was_kept_and_leaves_the_rest() {
 #[test]
 fn a_removal_and_a_first_commit() {
     let (dir, project) = repo(&[("gone.txt", "g\n")]);
-    commit(project.as_ref(), &[Kept { path: "gone.txt".into(), text: None }], "Remove it").unwrap();
+    commit(project.as_ref(), &[Kept { path: "gone.txt".into(), text: None, before: None }], "Remove it").unwrap();
     assert!(git(dir.path(), &["ls-tree", "--name-only", "HEAD"]).trim().is_empty());
     let (fresh, project) = repo(&[]);
     commit(project.as_ref(), &[write("first.txt", "1\n")], "First").unwrap();

@@ -38,7 +38,7 @@ fn the_strip_commits_the_accepted_hunk_on_a_drafted_branch(cx: &mut TestAppConte
     cx.update(|_, cx| {
         let s = strip.read(cx);
         assert_eq!(s.stage, Stage::Open);
-        assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 1, removed: 1 }]);
+        assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 1, removed: 1, own_edits: false }]);
         assert!(s.on_default, "a fresh repository sits on its default branch");
         assert_eq!(s.message.read(cx).value().as_ref(), "Keep TWO\n\nFrom the review.");
         assert_eq!(s.new_branch.read(cx).value().as_ref(), "fix/keep-two");
@@ -80,7 +80,7 @@ fn the_strip_makes_the_first_commit_of_a_new_repository(cx: &mut TestAppContext)
     cx.run_until_parked();
     cx.update(|_, cx| {
         let s = strip.read(cx);
-        assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 2, removed: 0 }], "nothing is in HEAD yet");
+        assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 2, removed: 0, own_edits: false }], "nothing is in HEAD yet");
         assert!(s.on_default, "main is the default");
     });
     cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
@@ -355,6 +355,6 @@ fn commit_with_nothing_accepted_offers_accept_all(cx: &mut TestAppContext) {
         assert_eq!(pane.read(cx).decided_words(0).as_deref(), Some("Accepted"));
         let s = strip.read(cx);
         assert_eq!(s.stage, Stage::Open);
-        assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 1, removed: 1 }]);
+        assert_eq!(s.lines, [Line { path: "a.txt".into(), added: 1, removed: 1, own_edits: false }]);
     });
 }
