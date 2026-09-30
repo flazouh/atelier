@@ -63,6 +63,11 @@ pub enum SessionEvent {
 
 impl EventEmitter<SessionEvent> for AgentSession {}
 
+/// Whether `event` is the agent at work, which stamps the session's row: its start on a resume is not.
+fn is_activity(event: &Event) -> bool {
+    !matches!(event, Event::Started(_))
+}
+
 /// Seconds since the Unix epoch, for "2m ago".
 pub fn now() -> u64 {
     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_or(0, |d| d.as_secs())
@@ -195,7 +200,8 @@ impl AgentSession {
             title,
             name: None,
             status: SessionStatus::Idle,
-            active_at: now(),
+            // A resumed session's last activity comes from the agent's list; a new one starts now.
+            active_at: if resume.is_some() { 0 } else { now() },
             seen: false,
             model: None,
             mode: None,
@@ -337,7 +343,9 @@ impl AgentSession {
         if ended_turns {
             self.save_review(cx);
         }
-        self.active_at = now();
+        if events.iter().any(is_activity) {
+            self.active_at = now();
+        }
         self.refresh_rows();
         let working = self.conversation.working();
         self.composer.update(cx, |c, cx| c.set_running(working, cx));
