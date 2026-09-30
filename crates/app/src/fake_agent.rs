@@ -59,7 +59,7 @@ impl Backend for FakeBackend {
             return Err(SessionError::Missing { program: "fake".into() });
         }
         let id = request.resume.unwrap_or_else(|| SessionId::new("fake-1"));
-        sink(Event::Started(Started { session: id, model: None, mode: None }));
+        sink(Event::Started(Started { session: id, model: None, mode: None, commands: Vec::new() }));
         Ok(Box::new(FakeSession { backend: self.0.clone(), sink }))
     }
 

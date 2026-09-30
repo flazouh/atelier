@@ -165,7 +165,7 @@ impl Runner {
     }
 
     fn run(mut self) {
-        self.emit(Event::Started(Started { session: SessionId::new(self.meta.id.clone()), model: Some(self.model_id()), mode: Some(self.mode()) }));
+        self.emit(Event::Started(Started { session: SessionId::new(self.meta.id.clone()), model: Some(self.model_id()), mode: Some(self.mode()) , commands: Vec::new() }));
         self.meta.model = self.model_id();
         loop {
             let text = match self.queue.pop_front() {

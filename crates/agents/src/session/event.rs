@@ -182,6 +182,8 @@ pub struct Started {
     pub session: SessionId,
     pub model: Option<String>,
     pub mode: Option<PermissionMode>,
+    /// The agent's own slash commands, by name without the slash, for the composer to offer.
+    pub commands: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

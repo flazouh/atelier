@@ -174,6 +174,7 @@ impl Mapper {
                     session: SessionId::new(id),
                     model: system.model,
                     mode: system.permission_mode.as_deref().and_then(mode_from_name),
+                    commands: system.slash_commands,
                 })],
                 None => Vec::new(),
             },

@@ -27,6 +27,9 @@ pub(super) enum Line {
 pub(super) struct System {
     pub subtype: String,
     pub session_id: Option<String>,
+    /// The init's own commands, by name without the slash.
+    #[serde(default)]
+    pub slash_commands: Vec<String>,
     pub model: Option<String>,
     #[serde(rename = "permissionMode")]
     pub permission_mode: Option<String>,

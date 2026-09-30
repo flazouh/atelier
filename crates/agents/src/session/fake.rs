@@ -53,7 +53,7 @@ impl Backend for FakeBackend {
         sink: EventSink,
     ) -> Result<Box<dyn Session>, SessionError> {
         let id = request.resume.unwrap_or_else(|| SessionId::new("fake-1"));
-        sink(Event::Started(Started { session: id, model: request.model, mode: request.mode }));
+        sink(Event::Started(Started { session: id, model: request.model, mode: request.mode , commands: Vec::new() }));
         Ok(Box::new(FakeSession {
             turns: Mutex::new(self.turns.clone().into()),
             sink,

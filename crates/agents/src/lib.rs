@@ -6,6 +6,7 @@ mod assets;
 pub mod claude;
 pub mod claude_code;
 pub mod coding_agents;
+pub mod commands;
 pub mod labs;
 pub mod own;
 pub mod registry;

@@ -467,3 +467,15 @@ fn history_does_not_end_a_subagent_twice() {
     assert_eq!(ended_subagents(&events).len(), 1, "{events:#?}");
     assert_eq!(ended_subagents(&events)[0].2.as_deref(), Some("counted"));
 }
+
+/// The agent's own commands come with its init, so the composer can offer them after `/`.
+#[test]
+fn the_init_lists_the_agents_own_commands() {
+    let mut mapper = Mapper::new();
+    let events = mapper.line(
+        r#"{"type":"system","subtype":"init","session_id":"s","slash_commands":["compact","review","goal"]}"#,
+        Instant::now(),
+    );
+    let [Event::Started(started)] = events.as_slice() else { panic!("{events:?}") };
+    assert_eq!(started.commands, ["compact", "review", "goal"]);
+}
