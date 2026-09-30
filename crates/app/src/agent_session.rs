@@ -124,6 +124,11 @@ pub struct AgentSession {
 }
 
 impl AgentSession {
+    /// The project's folder, as tool calls name paths under it.
+    pub fn root(&self) -> String {
+        self.project.root().display().to_string()
+    }
+
     /// Starts a new session, or resumes `resume` after reading its history, in `project`.
     pub fn start(
         key: SharedString,
