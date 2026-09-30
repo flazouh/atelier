@@ -43,6 +43,10 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                 let project = project.clone();
                 div()
                     .id(("tree-row", i))
+                    .debug_selector({
+                        let path = path.clone();
+                        move || format!("tree-row-{path}")
+                    })
                     .flex()
                     .items_center()
                     .gap(px(6.))
@@ -55,8 +59,15 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                     .text_size(TextSize::Sm.font_size())
                     .when(shown, |d| d.bg(theme.muted_hover()))
                     .hover(|s| s.bg(theme.muted_hover()))
-                    .on_click(move |_, window, cx| {
-                        project.update(cx, |p, cx| if dir { p.toggle_folder(&path, cx) } else { p.open_file(&path, window, cx) })
+                    // A file goes through the shell, which opens it and brings the editor to the front.
+                    .on_click(move |_, _, cx| {
+                        project.update(cx, |p, cx| {
+                            if dir {
+                                p.toggle_folder(&path, cx)
+                            } else {
+                                cx.emit(crate::open_project::ProjectEvent::Open(path.clone()))
+                            }
+                        })
                     })
                     .child(
                         div().w(px(12.)).flex_none().when(row.dir, |d| {
