@@ -12,6 +12,16 @@ fn stand_in(script: &str) -> (tempfile::TempDir, GhCli) {
     let path: PathBuf = dir.path().join("gh");
     std::fs::write(&path, format!("#!/bin/sh\n{script}\n")).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // While this file was open for writing, a process that another test thread forked may have inherited that handle
+    // until it ran its own program, and a program that a handle is open on for writing will not start ("Text file
+    // busy"). Start it once with nothing to read, until it starts: after that no such handle is left, so the test does
+    // not depend on which thread forked when. Its own output is overwritten by the test's real call.
+    for _ in 0..200 {
+        match std::process::Command::new(&path).arg("--probe").stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status() {
+            Err(error) if error.raw_os_error() == Some(26) => std::thread::sleep(std::time::Duration::from_millis(5)),
+            _ => break,
+        }
+    }
     let project = Arc::new(LocalProject::open(dir.path()).unwrap());
     let cli = GhCli::new(project).with_program(path.to_string_lossy());
     (dir, cli)
