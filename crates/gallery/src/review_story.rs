@@ -113,6 +113,8 @@ struct Thread {
 }
 
 pub struct ReviewStory {
+    /// The scope the bar's switch shows: 0 this turn, 1 the whole session.
+    scope: usize,
     editor: Entity<EditorState>,
     /// The pane's own focus: Escape in the editor moves here, so the letters work.
     focus: FocusHandle,
@@ -154,6 +156,7 @@ impl ReviewStory {
             focus: cx.focus_handle(),
             marked: HashSet::new(),
             review_mode: false,
+            scope: 0,
             files,
             current: 0,
             resolving: Vec::new(),
@@ -391,7 +394,20 @@ impl Render for ReviewStory {
             .w(width)
             .min_w_0()
             .overflow_hidden()
-            .child(ReviewBar::new("review-bar", self.progress(), handlers.clone()).review_mode(self.review_mode))
+            .child({
+                let this = cx.entity().downgrade();
+                let mut with_scopes = handlers.clone();
+                with_scopes.on_switch_scope = Some(std::rc::Rc::new(move |_, cx| {
+                    this.update(cx, |s, cx| {
+                        s.scope = 1 - s.scope;
+                        cx.notify();
+                    })
+                    .ok();
+                }));
+                ReviewBar::new("review-bar", self.progress(), with_scopes)
+                    .scopes([("This turn".into(), "Turn".into()), ("Whole session".into(), "Session".into())], self.scope)
+                    .review_mode(self.review_mode)
+            })
             .child(
                 div()
                     .flex()

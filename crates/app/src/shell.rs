@@ -11,6 +11,7 @@ use beui::{
     button::{Button, ButtonSize, ButtonVariant},
     file_icon::FileIcon,
     finder::{Filter, Finder, FinderEvent, FinderItem},
+    segmented::{Segment, Segmented},
     keys::{self, Command, Press},
     popover::{Hang, Popover},
     theme::{ActiveTheme, radius},
@@ -1030,30 +1031,25 @@ impl Shell {
                 "Editor"
             }
         };
-        let tab = |pane: Pane, label: &'static str, cap: Option<&'static str>, cx: &mut Context<Self>| {
-            let button = Button::new(label)
-                .label(label)
-                .size(ButtonSize::Sm)
-                .variant(if self.narrow == pane { ButtonVariant::Secondary } else { ButtonVariant::Ghost })
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.narrow = pane;
-                    cx.notify();
-                }));
-            match cap {
-                Some(cap) => button.cap(keys::cap(cap)),
-                None => button,
-            }
+        let panes = [Pane::Projects, Pane::Session, Pane::Right];
+        let segment = |label: &'static str, cap: Option<&'static str>| match cap {
+            Some(cap) => Segment::new(label).cap(keys::cap(cap)),
+            None => Segment::new(label),
         };
-        let tabs = div()
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap(px(4.))
-            .px(px(8.))
-            .h(px(36.))
-            .child(tab(Pane::Projects, "Projects", Some("⌘b"), cx))
-            .child(tab(Pane::Session, "Session", None, cx))
-            .child(tab(Pane::Right, right, Some("⌘⇧b"), cx));
+        let this = cx.entity();
+        let tabs = div().flex().flex_none().items_center().px(px(8.)).h(px(44.)).child(
+            Segmented::new(
+                "narrow-panes",
+                [segment("Projects", Some("⌘b")), segment("Session", None), segment(right, Some("⌘⇧b"))],
+                panes.iter().position(|p| *p == self.narrow).unwrap_or(0),
+            )
+            .on_change(move |i, _, cx| {
+                this.update(cx, |this, cx| {
+                    this.narrow = panes[i];
+                    cx.notify();
+                })
+            }),
+        );
         let body = match self.narrow {
             Pane::Projects => self.sidebar(cx).into_any_element(),
             Pane::Session => {

@@ -4,7 +4,7 @@
 //! build can start and the models each offers. A change applies at once, to every window, and is kept in
 //! `lathe-settings`. Escape closes the pane.
 use beui::{
-    ActiveTheme, Button, ButtonSize, ButtonVariant, ColorSelector, IconName, Kbd, Swatch,
+    ActiveTheme, Button, ButtonSize, ButtonVariant, ColorSelector, IconName, Kbd, Segment, Segmented, Swatch,
     keys,
     theme::{Appearance, can_be_primary, follow_system, set_appearance, set_pick},
     theme_picker::theme_picker,
@@ -158,22 +158,19 @@ impl Render for SettingsPane {
                 .child(control)
         };
 
-        let modes = div().flex().gap(px(4.)).children(Mode::ALL.into_iter().map(|mode| {
+        let modes = {
             let this = this.clone();
-            Button::new(SharedString::from(format!("mode-{}", mode.key())))
-                .debug_name(match mode {
+            let segments = Mode::ALL.into_iter().map(|mode| {
+                Segment::new(mode.word()).debug_name(match mode {
                     Mode::Light => "mode-light",
                     Mode::Dark => "mode-dark",
                     Mode::System => "mode-system",
                 })
-                .label(mode.word())
-                .size(ButtonSize::Sm)
-                .variant(if self.mode == mode { ButtonVariant::Secondary } else { ButtonVariant::Ghost })
-                .on_click(move |_, _, cx| {
-                    this.update(cx, |pane, cx| pane.choose_mode(mode, cx)).ok();
-                })
-        }));
-
+            });
+            Segmented::new("mode", segments, Mode::ALL.iter().position(|m| *m == self.mode).unwrap_or(0)).on_change(move |i, _, cx| {
+                this.update(cx, |pane, cx| pane.choose_mode(Mode::ALL[i], cx)).ok();
+            })
+        };
         let swatches = std::iter::once(Swatch::new("default", theme.foreground, "Default: the theme's ink")).chain(PRIMARIES.iter().map(|(name, bytes, words)| {
             let color = colour(*bytes);
             Swatch::new(*name, color, *words).disabled(!can_be_primary(&theme, color))

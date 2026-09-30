@@ -2,7 +2,7 @@
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use gpui_kit::AppContext as _;
-use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, BloomMenu, FileUpload, FileUploadEvent, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
+use beui::{ActiveTheme, Segment, Segmented, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, BloomMenu, FileUpload, FileUploadEvent, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
 use gpui_kit::{
     AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -56,6 +56,7 @@ fn accents() -> Vec<Swatch> {
 
 pub struct MotionStory {
     part: Option<String>,
+    segs: [usize; 3],
     teams: Entity<MultiSelect>,
     toasts: Entity<ToastStack>,
     notes: Entity<NotificationStack>,
@@ -109,7 +110,7 @@ impl MotionStory {
         })
         .detach();
         let bloom = cx.new(|cx| BloomMenu::new("bloom", beui::bloom_menu::default_items(), cx));
-        let mut story = Self { bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
+        let mut story = Self { segs: [0, 1, 1], bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
         story.tick_upload("release-video".to_string(), cx);
         story
     }
@@ -413,25 +414,22 @@ impl Render for MotionStory {
             let ready = uploads.read(cx).items().iter().filter(|i| i.status == beui::UploadStatus::Success).count();
             let total = uploads.read(cx).items().len();
             let variants = [(beui::UploadVariant::Centered, "Centered"), (beui::UploadVariant::Row, "Row")];
-            let switch = variants.into_iter().map(|(variant, label)| {
+            let switch = {
                 let (this, uploads) = (cx.entity().downgrade(), uploads.clone());
-                Button::new(label)
-                    .label(label)
-                    .size(ButtonSize::Sm)
-                    .pill(true)
-                    .variant(if self.upload_variant == variant { ButtonVariant::Invert } else { ButtonVariant::Ghost })
-                    .on_click(move |_, _, cx| {
-                        this.update(cx, |s, cx| {
-                            s.upload_variant = variant;
-                            cx.notify();
-                        })
-                        .ok();
-                        uploads.update(cx, |u, cx| {
-                            u.set_variant(variant, cx);
-                            u.set_words(if variant == beui::UploadVariant::Centered { "Drop files to upload" } else { "Drop release files" }, "PDF, images, video or zipped assets", cx);
-                        });
+                let selected = variants.iter().position(|(v, _)| *v == self.upload_variant).unwrap_or(0);
+                Segmented::new("upload-variant", variants.iter().map(|(_, label)| Segment::new(*label)), selected).on_change(move |i, _, cx| {
+                    let variant = variants[i].0;
+                    this.update(cx, |s, cx| {
+                        s.upload_variant = variant;
+                        cx.notify();
                     })
-            });
+                    .ok();
+                    uploads.update(cx, |u, cx| {
+                        u.set_variant(variant, cx);
+                        u.set_words(if variant == beui::UploadVariant::Centered { "Drop files to upload" } else { "Drop release files" }, "PDF, images, video or zipped assets", cx);
+                    });
+                })
+            };
             let reset = {
                 let (this, uploads) = (cx.entity().downgrade(), uploads.clone());
                 Button::new("upload-reset").icon(beui::IconName::RotateLeft).size(ButtonSize::Icon).pill(true).variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
@@ -457,11 +455,34 @@ impl Render for MotionStory {
                         .justify_between()
                         .gap(px(8.))
                         .child(div().child(div().text_size(px(14.)).line_height(px(20.)).font_weight(gpui_kit::FontWeight::SEMIBOLD).text_color(theme.foreground).child("Upload package")).child(div().text_size(px(12.)).line_height(px(16.)).text_color(theme.muted_foreground).child(format!("{ready} of {total} files ready"))))
-                        .child(div().flex().items_center().gap(px(6.)).child(div().flex().rounded_full().bg(theme.card_strong).p(px(4.)).children(switch)).child(reset)),
+                        .child(div().flex().items_center().gap(px(6.)).child(div().flex().child(switch)).child(reset)),
                 )
                 .child(uploads);
             let demo = div().flex().w_full().justify_center().pt(px(24.)).child(card);
             parts.push(if alone { demo.into_any_element() } else { section("File upload: the demo (drop files on it, or press Browse)", &theme, demo) });
+        }
+        if self.shows("segmented") {
+            let this = cx.entity().downgrade();
+            let track = |slot: usize, id: &'static str, names: &[&'static str], caps: bool| {
+                let this = this.clone();
+                let segments = names.iter().enumerate().map(|(i, n)| if caps && i == 1 { Segment::new(*n).cap("⌘L") } else { Segment::new(*n) });
+                Segmented::new(id, segments, self.segs[slot]).on_change(move |i, _, cx| {
+                    this.update(cx, |s, cx| {
+                        s.segs[slot] = i;
+                        cx.notify();
+                    })
+                    .ok();
+                })
+            };
+            let demo = div()
+                .flex()
+                .flex_col()
+                .items_start()
+                .gap(px(12.))
+                .child(track(0, "seg-a", &["Centered", "Row"], false))
+                .child(track(1, "seg-b", &["Light", "Dark", "System"], false))
+                .child(track(2, "seg-c", &["Side by side", "Single view"], true));
+            parts.push(if alone { demo.into_any_element() } else { section("Segmented", &theme, demo) });
         }
         if self.shows("bloom-menu") {
             let demo = div().flex().w_full().min_h(px(420.)).justify_center().pt(px(96.)).items_start().child(self.bloom.clone());
