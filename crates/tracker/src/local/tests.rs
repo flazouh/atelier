@@ -353,3 +353,15 @@ fn a_commit_is_a_line_of_the_activity_and_links_nothing_new() {
     let after = t.get(&task.id).unwrap().unwrap();
     assert!(after.sessions.is_empty() && after.prs.is_empty(), "a commit adds no link");
 }
+
+#[test]
+fn a_dropped_subscription_is_forgotten_at_the_next_change() {
+    let t = LocalTracker::in_memory("LAT").unwrap();
+    let kept = t.subscribe();
+    let dropped = t.subscribe();
+    assert_eq!(t.subscribers.lock().unwrap().len(), 2);
+    drop(dropped);
+    t.create(&NewTask::titled("x"), "me").unwrap();
+    assert_eq!(t.subscribers.lock().unwrap().len(), 1, "the dropped one is gone");
+    assert!(kept.recv_timeout(std::time::Duration::from_secs(1)).is_ok(), "the kept one still hears");
+}

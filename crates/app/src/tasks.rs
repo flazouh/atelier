@@ -3,14 +3,13 @@
 use std::sync::Arc;
 
 use gpui_kit::{AppContext, Context, Entity, SharedString, Subscription, Window};
-use lathe_tracker::Tracker;
+use lathe_project::Project;
 
 use crate::open_project::OpenProject;
 
 pub mod map;
 pub mod pane;
 pub mod signal;
-pub mod store;
 #[cfg(test)]
 mod tests;
 
@@ -37,10 +36,15 @@ pub struct Slot {
 }
 
 impl Slot {
-    pub fn new(tracker: Result<Arc<dyn Tracker>, SharedString>, window: &mut Window, cx: &mut Context<OpenProject>) -> Self {
+    /// The pane for `project`; its tracker opens off the UI thread.
+    pub fn new(project: Arc<dyn Project>, window: &mut Window, cx: &mut Context<OpenProject>) -> Self {
         let me = std::env::var("USER").unwrap_or_else(|_| "me".to_string());
         let agents = vec![("Claude".into(), lathe_agents::claude::look())];
-        let pane = cx.new(|cx| TasksPane::new(tracker, me, agents, window, cx));
+        let pane = cx.new(|cx| {
+            let mut pane = TasksPane::new(me, agents, window, cx);
+            pane.open_from(project, cx);
+            pane
+        });
         let _events = cx.subscribe_in(&pane, window, |this: &mut OpenProject, _, event: &TasksEvent, window, cx| match event {
             TasksEvent::Start(id) => this.start_from_task(id.clone(), window, cx),
         });

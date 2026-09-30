@@ -45,6 +45,9 @@ impl Project for Quiet {
     fn data_path(&self) -> Option<std::path::PathBuf> {
         self.disk.data_path()
     }
+    fn tracker(&self) -> lathe_tracker::TrackerResult<Arc<dyn lathe_tracker::Tracker>> {
+        self.disk.tracker()
+    }
 }
 
 /// Tells the project `paths` changed, as its watch would.
@@ -442,7 +445,7 @@ fn the_tasks_take_the_right_pane_and_give_it_back(cx: &mut TestAppContext) {
 /// to In Progress on a reply.
 #[gpui_kit::test]
 fn a_session_started_from_a_task_moves_it_along(cx: &mut TestAppContext) {
-    use lathe_tracker::{NewTask, Status, Tracker};
+    use lathe_tracker::{NewTask, Status};
     let (_dir, project, _, cx) = open(cx, &[]);
     let (agent, fake) = crate::fake_agent::scripted_agent("Fake", vec![vec![crate::fake_agent::ended()], vec![]]);
     cx.update(|_, cx| project.update(cx, |p, _| p.agent = agent));

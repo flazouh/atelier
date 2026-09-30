@@ -6,7 +6,7 @@ use std::{
     path::Path,
     sync::{
         Mutex,
-        mpsc::{Receiver, Sender, channel},
+        mpsc::{Sender, channel},
     },
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -15,7 +15,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params, params_from_i
 
 use crate::{
     Activity, ActivityKind, Assignee, Entry, Event, NewTask, Patch, PrLink, Priority, ProjectKey, Query, SessionLink, Status,
-    Task, TaskId, Tracker, TrackerError, TrackerResult, prefix_for,
+    StopFlag, Subscription, Task, TaskId, Tracker, TrackerError, TrackerResult, prefix_for,
 };
 
 mod migrations;
@@ -36,7 +36,7 @@ pub struct LocalTracker {
     conn: Mutex<Connection>,
     prefix: String,
     clock: Box<dyn Fn() -> i64 + Send + Sync>,
-    subscribers: Mutex<Vec<Sender<Event>>>,
+    subscribers: Mutex<Vec<(Sender<Event>, StopFlag)>>,
 }
 
 impl LocalTracker {
@@ -107,7 +107,7 @@ impl LocalTracker {
     fn emit(&self, events: Vec<Event>) {
         if let Ok(mut subscribers) = self.subscribers.lock() {
             for event in events {
-                subscribers.retain(|s| s.send(event.clone()).is_ok());
+                subscribers.retain(|(send, stop)| !stop.is_stopped() && send.send(event.clone()).is_ok());
             }
         }
     }
@@ -527,12 +527,14 @@ impl Tracker for LocalTracker {
         Ok(stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?)
     }
 
-    fn subscribe(&self) -> Receiver<Event> {
+    fn subscribe(&self) -> Subscription {
         let (send, receive) = channel();
+        let (subscription, stop) = Subscription::new(receive);
         if let Ok(mut subscribers) = self.subscribers.lock() {
-            subscribers.push(send);
+            subscribers.retain(|(_, stop)| !stop.is_stopped());
+            subscribers.push((send, stop));
         }
-        receive
+        subscription
     }
 }
 

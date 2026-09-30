@@ -588,24 +588,10 @@ impl OpenProject {
             }
             return cx.notify();
         }
-        let tracker = crate::tasks::store::open(&self.location, self.project.as_ref(), &self.name());
-        self.tasks = Some(crate::tasks::Slot::new(tracker, window, cx));
+        self.tasks = Some(crate::tasks::Slot::new(self.project.clone(), window, cx));
         self.right_asked = front::Front::Tasks;
         cx.emit(ProjectEvent::TasksShown);
         cx.notify();
-    }
-
-    /// The project's tracker if it has one already: the Tasks pane's, or the file in its data folder. A
-    /// project that never used tasks gets no file from a session's turn.
-    fn tracker_if_any(&self, cx: &gpui_kit::App) -> Option<Arc<dyn lathe_tracker::Tracker>> {
-        if let Some(slot) = &self.tasks {
-            return slot.pane.read(cx).tracker();
-        }
-        let file = self.project.data_path()?.join(crate::tasks::store::FILE);
-        if !file.exists() {
-            return None;
-        }
-        crate::tasks::store::open(&self.location, self.project.as_ref(), &self.name()).ok()
     }
 
     /// Tells the tasks a session is linked to what happened in it, and lets the rules move them.
@@ -614,13 +600,28 @@ impl OpenProject {
         let Some(id) = s.id.as_ref().map(|id| id.as_str().to_string()) else { return };
         let (title, agent) = (s.shown_title().to_string(), s.agent.name);
         let signal = crate::tasks::signal::of(event, s.task.as_ref(), &crate::tasks::signal::SessionRef { id: &id, title: &title, agent });
-        let (Some(signal), Some(tracker)) = (signal, self.tracker_if_any(cx)) else { return };
+        let Some(signal) = signal else { return };
+        // The tracker of the pane if it is open. Else the project has one only if it kept a file: a session of
+        // a project that never used tasks makes none.
+        let (open, project) = (self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()), self.project.clone());
         // One signal after the other: a turn that ends must find the link the start wrote.
         let previous = std::mem::replace(&mut self.task_signals, Task::ready(()));
         self.task_signals = cx.spawn(async move |this, cx| {
             previous.await;
             let handled = cx
-                .background_spawn(async move { lathe_tracker::handle(tracker.as_ref(), &crate::tasks::rules(), &signal) })
+                .background_spawn(async move {
+                    let tracker = match open {
+                        Some(tracker) => tracker,
+                        None => {
+                            let kept = project.data_path().is_some_and(|dir| dir.join(lathe_project::TRACKER_FILE).exists());
+                            if !kept {
+                                return Ok(Vec::new());
+                            }
+                            project.tracker()?
+                        }
+                    };
+                    lathe_tracker::handle(tracker.as_ref(), &crate::tasks::rules(), &signal)
+                })
                 .await;
             this.update(cx, |this, cx| {
                 if let Err(error) = handled {

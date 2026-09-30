@@ -19,4 +19,4 @@ pub use model::{
 };
 pub use project::{ProjectKey, prefix_for};
 pub use rules::{Decision, Handled, Rule, RuleSet, Signal, handle};
-pub use tracker::{Tracker, TrackerError, TrackerResult};
+pub use tracker::{StopFlag, Subscription, Tracker, TrackerError, TrackerResult};

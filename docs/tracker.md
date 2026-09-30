@@ -25,18 +25,19 @@ and no network code. The app maps a `Task` to beui's `TaskData`, and an agent's 
   A patch that changes nothing writes nothing, logs nothing, and does not move `updated_at`.
 - `Entry` is what `record` appends: a comment, a session started, a pull request opened, a pull request
   merged. The last three also become links of the task, once each.
-- `subscribe` gives a channel of `Event`: `Created(Task)`, `Updated(Task)`, `Activity(Activity)`. Drop the
-  receiver to stop.
+- `subscribe` gives a `Subscription` that reads as a channel of `Event`: `Created(Task)`, `Updated(Task)`,
+  `Activity(Activity)`. Drop it to stop: a backend that polls a service checks its `StopFlag` at each tick.
 ### The activity log
 Append-only. Each line has an id, a time, who did it (`by`), and a kind:
 created, status changed (from and to), assigned (to whom, or nobody), edited (which field), commented,
 session started, PR opened, PR merged. `by` is a person's name, an agent's name, or `rule:<id>` when the
 automation did it. Nothing edits or deletes a line.
 ## The local tracker
-- **Where.** `<app data folder>/tracker/<folder>-<hash>.sqlite`, never in the repository.
-  `ProjectKey::Local { path }` or `ProjectKey::Ssh { host, path }` gives the file; the hash is FNV-1a of the
-  identity, so two folders of one name do not share a file, and the name is the same on every machine and
-  run. A trailing slash and the case of a host make no difference.
+- **Where.** In the project data folder, `<data>/lathe/projects/<folder>-<hash>/tracker.sqlite`, never in the
+  repository. `Project::tracker()` opens it: `LocalProject` on this machine, and `RemoteTracker` for a project
+  over SSH, which asks lathe-remote to open the host own file. So every machine that opens the project sees the
+  same tasks. `ProjectKey` and `path_in` are the older way (a file per project in the app data folder) and
+  nothing uses them now.
 - **Short ids.** The prefix is the first three letters or digits of the project's name, in capitals ("lathe"
   gives LAT). The database keeps the prefix it was made with, so renaming a project keeps its ids. The number
   is one more than the highest so far.
