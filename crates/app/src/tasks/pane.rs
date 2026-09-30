@@ -518,7 +518,7 @@ impl Render for TasksPane {
             let pane = cx.entity();
             let focus = self.dialog.read(cx).focus_handle(cx);
             Modal::new("new-task-modal")
-                .width(600.)
+                .width(560.)
                 .focus(&focus)
                 .on_close(move |_, cx| pane.update(cx, |p, cx| p.dialog.update(cx, |d, cx| d.ask_cancel(cx))))
                 .child(self.dialog.clone())

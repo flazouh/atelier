@@ -1419,7 +1419,7 @@ impl Shell {
                 let focus = form.read(cx).focus_handle(cx);
                 Modal::new("open-over-ssh")
                     .view(form.read(cx).view_key())
-                    .width(480.)
+                    .width(440.)
                     .focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_ssh(window, cx))))
                     .child(form.clone())
@@ -1428,7 +1428,7 @@ impl Shell {
                 let this = cx.entity().downgrade();
                 let focus = picker.read(cx).focus_handle(cx);
                 Modal::new("open-folder-picker")
-                    .width(560.)
+                    .width(520.)
                     .focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_folder_picker(window, cx))))
                     .child(picker.clone())

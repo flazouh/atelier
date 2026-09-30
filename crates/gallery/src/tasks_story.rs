@@ -206,7 +206,7 @@ impl Render for TasksStory {
                 let this = cx.entity();
                 let focus = self.dialog.read(cx).focus_handle(cx);
                 beui::Modal::new("new-task-modal")
-                    .width(600.)
+                    .width(560.)
                     .focus(&focus)
                     .on_close(move |window, cx| this.update(cx, |s, cx| s.go(Tab::List, window, cx)))
                     .child(self.dialog.clone())

@@ -99,7 +99,7 @@ impl Render for SshForm {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let field = TextInput::new("ssh-host-field", &self.host).debug_name("ssh-field").label("Host");
+        let field = TextInput::new("ssh-host-field", &self.host).debug_name("ssh-field").label("Host").surface(theme.popover);
         let this = cx.entity().downgrade();
         // The config's hosts, as chips under the field: a press puts the name in it. They are filled chips that
         // change on hover, and the ones that do not fit the first line wrap under the first chip, not under the label.
