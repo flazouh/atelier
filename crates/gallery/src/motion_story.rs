@@ -2,7 +2,7 @@
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use gpui_kit::AppContext as _;
-use beui::{ActiveTheme, Checkbox, ColorSelector, MultiOption, MultiSelect, RangeSlider, Swatch};
+use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, RangeSlider, Swatch};
 use gpui_kit::{
     AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -245,6 +245,18 @@ impl Render for MotionStory {
                         .child(RangeSlider::new("r5", 0.).step(10.).on_change(|_, _, _| {})),
                 ));
             }
+        }
+        if self.part.as_deref() == Some("button") {
+            // The web's `button-base` primary (crop this one), and the same with a key cap, as the Settings QA found it.
+            parts.push(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .child(Button::new("continue").label("Continue").trailing_icon(beui::IconName::ArrowForward).variant(ButtonVariant::Primary).size(ButtonSize::Md))
+                    .child(Button::new("new-session").label("New session").cap("⌃ N").variant(ButtonVariant::Primary).size(ButtonSize::Md))
+                    .into_any_element(),
+            );
         }
         if self.shows("multi-select") {
             let demo = div().w(px(384.)).child(self.teams.clone());

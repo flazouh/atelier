@@ -4,7 +4,7 @@
 //! build can start and the models each offers. A change applies at once, to every window, and is kept in
 //! `lathe-settings`. Escape closes the pane.
 use beui::{
-    ActiveTheme, Button, ButtonSize, ButtonVariant, ColorSelector, Kbd, Swatch,
+    ActiveTheme, Button, ButtonSize, ButtonVariant, ColorSelector, IconName, Kbd, Swatch,
     keys,
     theme::{Appearance, can_be_primary, follow_system, set_appearance, set_pick},
     theme_picker::theme_picker,
@@ -199,8 +199,9 @@ impl Render for SettingsPane {
                 .children(chord.map(|c| Kbd::new(keys::cap(c))))
         });
 
-        let agent_rows = self.agents.iter().map(|agent| {
+        let agent_rows = self.agents.iter().enumerate().map(|(i, agent)| {
             div()
+                .debug_selector(move || format!("agent-row-{i}"))
                 .flex()
                 .gap(px(12.))
                 .py(px(8.))
@@ -212,6 +213,7 @@ impl Render for SettingsPane {
                 }))
         });
 
+        let close = this.clone();
         div()
             .id("settings-pane")
             .key_context("SettingsPane")
@@ -221,13 +223,18 @@ impl Render for SettingsPane {
                     cx.emit(SettingsEvent::Close);
                 }
             }))
+            .relative()
             .size_full()
-            .overflow_y_scroll()
             .bg(theme.background)
-            .flex()
-            .justify_center()
             .child(
                 div()
+                    .id("settings-scroll")
+                    .debug_selector(|| "settings-scroll".into())
+                    .size_full()
+                    .overflow_y_scroll()
+                    .child(
+                div()
+                    .mx_auto()
                     .w_full()
                     .max_w(px(640.))
                     .px(px(24.))
@@ -256,6 +263,20 @@ impl Render for SettingsPane {
                     .child(heading("Agents"))
                     .child(div().flex().flex_col().children(agent_rows))
                     .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available."))),
+                    ),
+            )
+            .child(
+                div().absolute().top(px(16.)).right(px(16.)).child(
+                    Button::new("settings-close")
+                        .debug_name("settings-close")
+                        .icon(IconName::Close)
+                        .cap("Esc")
+                        .variant(ButtonVariant::Ghost)
+                        .size(ButtonSize::Sm)
+                        .on_click(move |_, _, cx| {
+                            close.update(cx, |_, cx| cx.emit(SettingsEvent::Close)).ok();
+                        }),
+                ),
             )
     }
 }

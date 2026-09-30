@@ -123,3 +123,40 @@ fn the_pane_opens_on_what_was_kept_and_lists_the_agents_and_the_keys(cx: &mut Te
         assert_eq!(p.agents.len(), 2);
     });
 }
+
+fn wheel(cx: &mut VisualTestContext, dy: f32) {
+    cx.simulate_event(gpui_kit::ScrollWheelEvent {
+        position: gpui_kit::point(px(450.), px(200.)),
+        delta: gpui_kit::ScrollDelta::Pixels(gpui_kit::point(px(0.), px(dy))),
+        modifiers: gpui_kit::Modifiers::default(),
+        touch_phase: gpui_kit::TouchPhase::Moved,
+    });
+    for _ in 0..3 {
+        cx.run_until_parked();
+    }
+}
+
+/// One test, since the settings file is named by an environment variable the whole process shares.
+#[gpui_kit::test]
+fn a_short_window_scrolls_to_the_last_agent_and_the_close_button_closes_the_pane(cx: &mut TestAppContext) {
+    let (_, cx, closed) = open(&lathe_settings::Settings::default(), cx);
+    cx.simulate_resize(gpui_kit::size(px(900.), px(500.)));
+    for _ in 0..3 {
+        cx.run_until_parked();
+    }
+    let window = 500.;
+    let last = cx.debug_bounds("agent-row-1").expect("the last agent row is drawn");
+    assert!(f32::from(last.bottom()) > window, "at 500 px tall the last row starts off screen: {last:?}");
+    wheel(cx, -4000.);
+    let last = cx.debug_bounds("agent-row-1").expect("still drawn");
+    assert!(f32::from(last.top()) >= 0. && f32::from(last.bottom()) <= window, "after the wheel it is on screen: {last:?}");
+    wheel(cx, 4000.);
+    let first = cx.debug_bounds("agent-row-0").expect("drawn");
+    assert!(f32::from(first.top()) > window, "and it scrolls back up");
+
+    let close = cx.debug_bounds("settings-close").expect("a close button is drawn");
+    assert!(f32::from(close.right()) > 900. - 40. && f32::from(close.top()) < 40., "at the top right: {close:?}");
+    assert_eq!(closed.get(), 0);
+    click(cx, "settings-close");
+    assert_eq!(closed.get(), 1, "a click on it closes the pane");
+}
