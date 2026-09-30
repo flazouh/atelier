@@ -25,6 +25,7 @@ mod sidebar_story;
 mod pr_view_story;
 mod motion_story;
 mod tasks_story;
+mod streaming_story;
 mod variants_story;
 mod replay_story;
 mod merge_story;
@@ -73,12 +74,13 @@ enum Story {
     AgentReplay,
     Tasks,
     Variants,
+    Streaming,
     Motion,
     PullRequestView,
 }
 
 impl Story {
-    const ALL: [Story; 33] = [
+    const ALL: [Story; 34] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -110,6 +112,7 @@ impl Story {
         Story::AgentReplay,
         Story::Tasks,
         Story::Variants,
+        Story::Streaming,
         Story::PullRequestView,
         Story::Motion,
     ];
@@ -148,6 +151,7 @@ impl Story {
             Story::PullRequestView => "Pull request view",
             Story::Tasks => "Tasks",
             Story::Variants => "Variants",
+            Story::Streaming => "Streaming",
             Story::Motion => "Motion",
         }
     }
@@ -213,6 +217,7 @@ struct Gallery {
     pr_view: Option<Entity<pr_view_story::PrViewStory>>,
     tasks: Option<Entity<tasks_story::TasksStory>>,
     variants: Option<Entity<variants_story::VariantsStory>>,
+    streaming: Option<Entity<streaming_story::StreamingStory>>,
     motion: Option<Entity<motion_story::MotionStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
@@ -320,6 +325,7 @@ impl Gallery {
             pr_view: None,
             tasks: None,
             variants: None,
+            streaming: None,
             motion: None,
             agent_panels: None,
             agent_replay: None,
@@ -348,6 +354,9 @@ impl Gallery {
         }
         if self.story == Story::Motion && self.motion.is_none() {
             self.motion = Some(cx.new(|cx| motion_story::MotionStory::new(window, cx)));
+        }
+        if self.story == Story::Streaming && self.streaming.is_none() {
+            self.streaming = Some(cx.new(|cx| streaming_story::StreamingStory::new(window, cx)));
         }
         if self.story == Story::Variants && self.variants.is_none() {
             self.variants = Some(cx.new(|cx| variants_story::VariantsStory::new(window, cx)));
@@ -477,6 +486,7 @@ impl Gallery {
             Story::AgentPanels => self.agent_panels.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Tasks => self.tasks.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Variants => self.variants.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::Streaming => self.streaming.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Motion => self.motion.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequestView => self.pr_view.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
