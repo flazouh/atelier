@@ -202,3 +202,69 @@ fn a_refused_commit_keeps_the_card_open_on_the_new_branch(cx: &mut TestAppContex
     assert!(matches!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::Committed(_)));
     assert_eq!(git(&["log", "-1", "--format=%s"]).trim(), "Keep TWO");
 }
+/// Gives `dir` a bare remote as origin, with its main pushed; the remote's path.
+fn with_origin(dir: &std::path::Path) -> std::path::PathBuf {
+    let bare = tempfile::tempdir().unwrap().keep().join("remote.git");
+    let run = |at: &std::path::Path, args: &[&str]| {
+        let out = Git::new("git").args(["-c", "user.name=q", "-c", "user.email=q@q", "-c", "commit.gpgsign=false"]).args(args).current_dir(at).output().unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    run(dir, &["init", "-q", "--bare", bare.to_str().unwrap()]);
+    run(dir, &["remote", "add", "origin", bare.to_str().unwrap()]);
+    run(dir, &["push", "-q", "origin", "HEAD:main"]);
+    bare
+}
+/// After the commit, Push sends the new branch to origin and says so.
+#[gpui_kit::test]
+fn after_the_commit_push_sends_the_branch(cx: &mut TestAppContext) {
+    let bare = std::cell::RefCell::new(None);
+    let (dir, _pane, strip, cx) = opened_strip(cx, |dir| *bare.borrow_mut() = Some(with_origin(dir)));
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.push(window, cx)));
+    cx.run_until_parked();
+    let stage = cx.update(|_, cx| strip.read(cx).stage.clone());
+    assert_eq!(stage, Stage::Pushed("Pushed fix/keep-two to origin".into()));
+    let git = |args: &[&str]| String::from_utf8(Git::new("git").args(args).current_dir(&dir).output().unwrap().stdout).unwrap();
+    assert_eq!(git(&["rev-parse", "origin/fix/keep-two"]), git(&["rev-parse", "HEAD"]));
+}
+/// A push the remote rejects offers Pull and rebase, which puts the commit on top of the remote's and
+/// pushes; the push is never forced.
+#[gpui_kit::test]
+fn a_rejected_push_offers_pull_and_rebase(cx: &mut TestAppContext) {
+    let (dir, _pane, strip, cx) = opened_strip(cx, |dir| {
+        let bare = with_origin(dir);
+        // Someone else pushed a branch of the same name first.
+        let other = tempfile::tempdir().unwrap().keep();
+        let run = |at: &std::path::Path, args: &[&str]| {
+            let out = Git::new("git").args(["-c", "user.name=o", "-c", "user.email=o@o", "-c", "commit.gpgsign=false"]).args(args).current_dir(at).output().unwrap();
+            assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+        };
+        run(&other, &["clone", "-q", bare.to_str().unwrap(), "."]);
+        std::fs::write(other.join("b.txt"), "theirs\n").unwrap();
+        run(&other, &["add", "-A"]);
+        run(&other, &["commit", "-qm", "Theirs"]);
+        run(&other, &["push", "-q", "origin", "HEAD:fix/keep-two"]);
+    });
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.push(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::Rejected);
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.pull_and_rebase(window, cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| strip.read(cx).stage.clone()), Stage::Pushed("Pulled, rebased and pushed fix/keep-two".into()));
+    let git = |args: &[&str]| String::from_utf8(Git::new("git").args(args).current_dir(&dir).output().unwrap().stdout).unwrap();
+    assert_eq!(git(&["log", "--format=%s", "origin/fix/keep-two"]).lines().take(2).collect::<Vec<_>>(), ["Keep TWO", "Theirs"]);
+}
+/// With no remote, Push says so.
+#[gpui_kit::test]
+fn push_with_no_remote_says_so(cx: &mut TestAppContext) {
+    let (_dir, _pane, strip, cx) = opened_strip(cx, |_| {});
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.push(window, cx)));
+    cx.run_until_parked();
+    let stage = cx.update(|_, cx| strip.read(cx).stage.clone());
+    assert!(matches!(&stage, Stage::Failed(w) if w.contains("no remote named origin")), "{stage:?}");
+}

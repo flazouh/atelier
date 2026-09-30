@@ -221,7 +221,7 @@ impl ReviewPane {
         let _ship = cx.subscribe_in(&ship, window, |this, _, event: &StripEvent, window, cx| match event {
             StripEvent::WantsOpen => this.open_ship(window, cx),
             StripEvent::Committed { sha, paths } => this.committed(sha, paths, cx),
-            StripEvent::BranchMade => cx.emit(PaneEvent::GitChanged),
+            StripEvent::BranchMade | StripEvent::Pushed => cx.emit(PaneEvent::GitChanged),
         });
         // Typing not yet written when the pane goes is written as it goes.
         cx.on_release(|pane: &mut Self, cx| pane.flush(cx)).detach();
@@ -697,6 +697,7 @@ impl ReviewPane {
             .on_reject_all(with(|s, w, cx| s.decide_every_file(Decision::Reject, w, cx)))
             .on_switch_scope(with(|s, w, cx| s.switch_scope(w, cx)))
             .on_commit(with(|s, w, cx| s.open_ship(w, cx)))
+            .on_push(with(|s, w, cx| s.ship.update(cx, |strip, cx| strip.push(w, cx))))
             .on_mark(with(|s, _, cx| s.toggle_mark(cx)))
             .on_review_mode(with(|s, _, cx| {
                 s.review_mode = !s.review_mode;
