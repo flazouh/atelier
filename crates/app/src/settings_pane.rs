@@ -95,7 +95,6 @@ pub struct SettingsPane {
     /// Which task rules move a task by themselves.
     rules: lathe_tracker::RuleSet,
     // design preview: remove after Alex picks
-    toggle: usize,
     tabs: usize,
     elevation: usize,
     strength: usize,
@@ -123,7 +122,6 @@ impl SettingsPane {
             mode,
             primary: primary.into(),
             rules,
-            toggle: saved.design_toggle.map_or(2, usize::from).min(3),
             tabs: saved.design_tabs.map_or(0, usize::from).min(3),
             elevation: saved.design_elevation.map_or(2, usize::from).min(3),
             strength: saved.design_strength.map_or(50, usize::from).min(100),
@@ -137,13 +135,6 @@ impl SettingsPane {
         cx.notify();
     }
 
-    // design preview: remove after Alex picks
-    pub(crate) fn choose_toggle(&mut self, design: usize, cx: &mut Context<Self>) {
-        self.toggle = design;
-        beui::design_preview::set_toggle(design, cx);
-        save(cx, move |s| s.design_toggle = Some(design as u8));
-        cx.notify();
-    }
     // design preview: remove after Alex picks
     pub(crate) fn choose_strength(&mut self, value: usize, cx: &mut Context<Self>) {
         self.strength = value.min(100);
@@ -182,7 +173,6 @@ impl SettingsPane {
 }
 
 // design preview: remove after Alex picks
-const DESIGN_TOGGLE: [&str; 4] = ["design-toggle-0", "design-toggle-1", "design-toggle-2", "design-toggle-3"];
 const DESIGN_ELEVATION: [&str; 4] = ["design-elevation-0", "design-elevation-1", "design-elevation-2", "design-elevation-3"];
 const DESIGN_TABS: [&str; 4] = ["design-tabs-0", "design-tabs-1", "design-tabs-2", "design-tabs-3"];
 /// The name a test finds a rule's switch by.
@@ -340,21 +330,6 @@ impl Render for SettingsPane {
                     // design preview: remove after Alex picks
                     .child(heading("Design preview"))
                     .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Pick a design for each control. It applies at once, in the panels bar and in the editor tabs."))
-                    .child(row(
-                        "Group toggle",
-                        {
-                            let pane = this.clone();
-                            Segmented::new(
-                                "design-toggle",
-                                beui::design_preview::TOGGLE_DESIGNS.iter().enumerate().map(|(i, words)| Segment::new(*words).debug_name(DESIGN_TOGGLE[i])),
-                                self.toggle,
-                            )
-                            .on_change(move |i, _, cx| {
-                                pane.update(cx, |p, cx| p.choose_toggle(i, cx)).ok();
-                            })
-                            .into_any_element()
-                        },
-                    ))
                     .child(row(
                         "Editor tabs",
                         {

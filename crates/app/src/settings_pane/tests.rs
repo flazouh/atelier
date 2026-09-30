@@ -178,12 +178,11 @@ fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestApp
 #[gpui_kit::test]
 fn a_design_choice_applies_at_once(cx: &mut TestAppContext) {
     let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
-    assert_eq!(cx.update(|_, cx| (beui::design_preview::toggle(cx), beui::design_preview::tabs(cx))), (2, 0));
-    pane.update(cx, |p, cx| p.choose_toggle(3, cx));
+    assert_eq!(cx.update(|_, cx| beui::design_preview::tabs(cx)), 0);
     pane.update(cx, |p, cx| p.choose_tabs(1, cx));
-    assert_eq!(cx.update(|_, cx| (beui::design_preview::toggle(cx), beui::design_preview::tabs(cx))), (3, 1));
-    assert!(cx.debug_bounds("design-toggle-3").is_some(), "the toggle designs are listed");
+    assert_eq!(cx.update(|_, cx| beui::design_preview::tabs(cx)), 1);
     assert!(cx.debug_bounds("design-tabs-3").is_some(), "the tab designs are listed");
+    assert!(cx.debug_bounds("design-toggle-3").is_none(), "the grouping toggle is not in the list any more");
 }
 
 /// design preview: remove after Alex picks. The elevation choice applies at once and is listed.

@@ -2,17 +2,16 @@
 //! borderless) with the motion running, so Alex can pick. The toggle and tab designs are the parts the real app
 //! shows through Settings, "Design preview" (`beui::design_preview`): there is no second copy.
 //!
-//! 1. The grouping toggle: A a button, B a button with a check, C a compact 20px switch, D a segmented Off / On.
-//! 2. The spinner: A the old glyph, B the ring, C three dots, D a bar sweep. Each 14px, at the text size.
-//! 3. The editor tabs: A a chip, B a chip with a 2px bottom line, C a text tab with an under-dot, D a tab with a
+//! 1. The spinner: A the old glyph, B the ring, C three dots, D a bar sweep. Each 14px, at the text size.
+//! 2. The editor tabs: A a chip, B a chip with a 2px bottom line, C a text tab with an under-dot, D a tab with a
 //!    left accent tick. The marker glides between the tabs on the tabs' own spring.
 //!
-//! `VARIANTS_GROUP=toggle|spinner|tabs` shows one group alone, for a screenshot.
-use std::{rc::Rc, time::Duration};
+//! `VARIANTS_GROUP=spinner|tabs` shows one group alone, for a screenshot.
+use std::time::Duration;
 
 use beui::{
     ActiveTheme, FileIcon, Icon, IconName, Tab, Tabs,
-    design_preview::{self, Change},
+    design_preview,
     motion::duration,
     typography::TextSize,
 };
@@ -21,14 +20,13 @@ use gpui_kit::{
 };
 
 pub struct VariantsStory {
-    toggles: [bool; 4],
     tabs: [usize; 4],
     group: Option<String>,
 }
 
 impl VariantsStory {
     pub fn new(_: &mut Window, _: &mut Context<Self>) -> Self {
-        Self { toggles: [true; 4], tabs: [0; 4], group: std::env::var("VARIANTS_GROUP").ok() }
+        Self { tabs: [0; 4], group: std::env::var("VARIANTS_GROUP").ok() }
     }
 
     fn shows(&self, group: &str) -> bool {
@@ -69,39 +67,6 @@ impl Render for VariantsStory {
         let theme = cx.theme().clone();
         let this = cx.entity();
         let mut groups: Vec<AnyElement> = Vec::new();
-
-        if self.shows("toggle") {
-            // Each design in both states: the first is live (a press flips it), the second is the other state, still.
-            let both = |i: usize, letter: &str, words: &str, cx: &App| {
-                let now = self.toggles[i];
-                let flip: Change = {
-                    let this = this.clone();
-                    Rc::new(move |on, _, cx| {
-                        this.update(cx, |s, cx| {
-                            s.toggles[i] = on;
-                            cx.notify();
-                        })
-                    })
-                };
-                let label = Some("Group by project".into());
-                let live = design_preview::grouping(i, &format!("vt{i}-live"), now, label.clone(), None, Some(flip), cx);
-                let still = design_preview::grouping(i, &format!("vt{i}-still"), !now, label, None, None, cx);
-                labelled(letter, words, &theme, div().flex().flex_col().gap(px(8.)).child(live).child(still))
-            };
-            groups.push(
-                group(
-                    "The grouping toggle (first row: live, second row: the other state)",
-                    &theme,
-                    vec![
-                        both(0, "A", design_preview::TOGGLE_DESIGNS[0], cx),
-                        both(1, "B", design_preview::TOGGLE_DESIGNS[1], cx),
-                        both(2, "C", design_preview::TOGGLE_DESIGNS[2], cx),
-                        both(3, "D", design_preview::TOGGLE_DESIGNS[3], cx),
-                    ],
-                )
-                .into_any_element(),
-            );
-        }
 
         if self.shows("spinner") {
             let words = |t: &str| div().text_size(TextSize::Sm.font_size()).text_color(theme.muted_foreground).child(t.to_string());

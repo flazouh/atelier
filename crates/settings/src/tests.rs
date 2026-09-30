@@ -114,12 +114,16 @@ fn the_task_rules_the_reader_turned_off_are_kept_and_an_old_file_has_none() {
 }
 
 #[test]
-fn the_design_choices_are_kept_and_an_old_file_has_none() {
+fn the_design_choice_is_kept_and_an_old_file_has_none() {
     let old: Settings = serde_json::from_str("{}").unwrap();
-    assert_eq!((old.design_toggle, old.design_tabs), (None, None));
-    let kept = Settings { design_toggle: Some(3), design_tabs: Some(1), ..Settings::default() };
+    assert_eq!(old.design_tabs, None);
+    let kept = Settings { design_tabs: Some(1), ..Settings::default() };
     let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
-    assert_eq!((round.design_toggle, round.design_tabs), (Some(3), Some(1)));
+    assert_eq!(round.design_tabs, Some(1));
+    // A file an older lathe wrote, with the toggle choice in it, still reads and keeps the key as it is.
+    let older: Settings = serde_json::from_str(r#"{"design_toggle": 3, "design_tabs": 2}"#).unwrap();
+    assert_eq!(older.design_tabs, Some(2));
+    assert_eq!(older.other.get("design_toggle"), Some(&serde_json::json!(3)));
 }
 
 #[test]
