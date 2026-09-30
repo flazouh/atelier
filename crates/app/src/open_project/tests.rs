@@ -408,3 +408,18 @@ fn a_number_the_list_lacks_is_looked_up_once(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(forge.briefs_asked.lock().unwrap().len(), 1, "asked once");
 }
+/// A lookup the forge refuses gives no chip and no alarm: the text reads as well without one.
+#[gpui_kit::test]
+fn a_failed_lookup_gives_no_chip(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
+    let repo = lathe_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe".into() };
+    let forge = std::sync::Arc::new(crate::fake_forge::FakeForge::default());
+    *forge.reads_fail.lock().unwrap() = Some(lathe_forge::ForgeError::RateLimited { retry_after: None });
+    cx.update(|_, cx| project.update(cx, |p, cx| {
+        p.set_chip_forge(forge.clone());
+        p.set_repo(Some(repo), cx);
+        p.look_up_chips(vec!["See #12.".into()], cx);
+    }));
+    cx.run_until_parked();
+    assert!(cx.update(|_, cx| project.read(cx).chips().is_empty()));
+}

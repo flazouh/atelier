@@ -148,3 +148,20 @@ fn a_card_off_screen_pauses_and_reads_when_it_shows(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(forge.count("pull"), paused + 1, "read at once when it shows");
 }
+/// A read that fails offline says so on the card and backs off, and the next read that works clears it.
+#[gpui_kit::test]
+fn an_offline_read_says_so_and_backs_off(cx: &mut TestAppContext) {
+    let (forge, card, cx) = card(cx, true);
+    forge.fail("pull", ForgeError::Offline);
+    cx.executor().advance_clock(Duration::from_secs(11));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let c = card.read(cx);
+        assert_eq!(c.unread(cx).map(|w| w.to_string()), Some(ForgeError::Offline.to_string()));
+        assert_eq!(c.next(cx), Some(Duration::from_secs(10)), "the first wait after a failure");
+        assert!(c.pull(cx).is_some(), "the last pull request read stays on the card");
+    });
+    cx.executor().advance_clock(Duration::from_secs(11));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| card.read(cx).unread(cx)), None, "a read that works clears it");
+}

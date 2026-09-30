@@ -160,3 +160,30 @@ fn tab_walks_the_form_in_order(cx: &mut TestAppContext) {
         assert!(on, "Tab stop {at} is next");
     }
 }
+/// Each way the forge can refuse the create keeps the form, with the forge's words: gh missing, signed
+/// out, and asked to wait.
+#[gpui_kit::test]
+fn each_refusal_of_the_create_keeps_the_form(cx: &mut TestAppContext) {
+    let (_dir, forge, f, opened, cx) = form(cx, pushed_branch());
+    for error in [ForgeError::ToolMissing { tool: "gh".into() }, ForgeError::NotSignedIn, ForgeError::RateLimited { retry_after: Some(30) }, ForgeError::Offline] {
+        *forge.fails.lock().unwrap() = Some(error.clone());
+        cx.update(|window, cx| f.update(cx, |f, cx| f.submit(window, cx)));
+        cx.run_until_parked();
+        cx.update(|_, cx| {
+            let f = f.read(cx);
+            assert_eq!(f.stage, FormStage::Open, "{error}");
+            assert_eq!(f.refused.as_ref().map(|w| w.to_string()), Some(error.to_string()));
+        });
+    }
+    assert!(opened.lock().unwrap().is_empty());
+}
+/// When the look for the branch's pull request fails, the form says why and offers no create: it
+/// cannot know that a second pull request would not be made.
+#[gpui_kit::test]
+fn a_failed_look_for_the_branchs_pull_request_offers_no_create(cx: &mut TestAppContext) {
+    let (_dir, forge, f, _opened, cx) = form_with(cx, pushed_branch(), |forge| *forge.reads_fail.lock().unwrap() = Some(ForgeError::NotSignedIn));
+    assert_eq!(cx.update(|_, cx| f.read(cx).stage.clone()), FormStage::Failed(ForgeError::NotSignedIn.to_string().into()));
+    cx.update(|window, cx| f.update(cx, |f, cx| f.submit(window, cx)));
+    cx.run_until_parked();
+    assert!(forge.created.lock().unwrap().is_empty());
+}

@@ -14,6 +14,8 @@ pub struct FakeForge {
     pub fails: Mutex<Option<ForgeError>>,
     /// The open pull request a branch already has, as `open_pull_for` answers.
     pub open: Mutex<Option<PullBrief>>,
+    /// The error `open_pull_for` and `briefs` answer with, if any.
+    pub reads_fail: Mutex<Option<ForgeError>>,
     /// The pull requests `briefs` knows, by number, and each batch of numbers it was asked for.
     pub known: Mutex<Vec<PullBrief>>,
     pub briefs_asked: Mutex<Vec<Vec<u64>>>,
@@ -35,6 +37,9 @@ impl Forge for FakeForge {
         Ok(reference)
     }
     fn open_pull_for(&self, _: &RepoRef, _: &str) -> ForgeResult<Option<PullBrief>> {
+        if let Some(error) = self.reads_fail.lock().unwrap().clone() {
+            return Err(error);
+        }
         Ok(self.open.lock().unwrap().clone())
     }
     fn repository(&self, _: &str) -> ForgeResult<Repository> { unimplemented!() }
@@ -49,6 +54,9 @@ impl Forge for FakeForge {
     fn involved(&self) -> ForgeResult<Vec<Involved>> { unimplemented!() }
     fn briefs(&self, _: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
         self.briefs_asked.lock().unwrap().push(numbers.to_vec());
+        if let Some(error) = self.reads_fail.lock().unwrap().clone() {
+            return Err(error);
+        }
         let known = self.known.lock().unwrap();
         Ok(numbers.iter().map(|n| known.iter().find(|b| b.reference.number == *n).cloned()).collect())
     }

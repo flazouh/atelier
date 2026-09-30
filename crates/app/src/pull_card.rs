@@ -58,6 +58,12 @@ impl PullCard {
         &self.watch.read(cx).checks
     }
 
+    /// Why the last read failed, while reads fail.
+    #[cfg(test)]
+    pub fn unread(&self, cx: &App) -> Option<SharedString> {
+        self.watch.read(cx).unread.clone()
+    }
+
     /// The wait before the next read; `None` when the card reads no more on its own.
     #[cfg(test)]
     pub fn next(&self, cx: &App) -> Option<std::time::Duration> {
