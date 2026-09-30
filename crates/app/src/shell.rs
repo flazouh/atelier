@@ -552,6 +552,14 @@ impl Shell {
         }
     }
 
+    /// `element`, timed as the part `name` under `LATHE_FRAMES`.
+    fn part(&self, name: &'static str, element: AnyElement) -> AnyElement {
+        match self.meter.clone() {
+            Some(meter) => crate::frame_meter::Part { name, child: element, meter }.into_any_element(),
+            None => element,
+        }
+    }
+
     fn open_tasks_key(&mut self, _: &OpenTasks, window: &mut Window, cx: &mut Context<Self>) {
         self.show_tasks(window, cx);
     }
@@ -1230,9 +1238,9 @@ impl Shell {
                 }
                 cx.notify();
             }))
-            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.sidebar(cx)).child(handle(Edge::Sidebar))))
-            .child(div().flex_1().min_w_0().h_full().child(self.agent_panel(cx)))
-            .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.right_pane(project, cx)).child(handle(Edge::Right))))
+            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("sidebar", self.sidebar(cx).into_any_element())).child(handle(Edge::Sidebar))))
+            .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.agent_panel(cx))))
+            .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
     }
 
@@ -1345,12 +1353,16 @@ const WHAT_LATHE_IS: &str = "Run coding agents on your code, review every change
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let built = std::time::Instant::now();
         // A key goes up from the focus, so with nothing focused (a closed form, a pane that went away) no
         // chord would reach the shell: the shell takes the focus back.
         if window.focused(cx).is_none() {
             self.focus.focus(window, cx);
         }
         let root = self.root(window, cx);
+        if let Some(meter) = &self.meter {
+            crate::frame_meter::add_part(meter, "shell-render", built.elapsed());
+        }
         match self.meter.clone() {
             Some(meter) => crate::frame_meter::Timed { child: root, meter }.into_any_element(),
             None => root,
@@ -1411,7 +1423,7 @@ impl Shell {
             .child(self.title_bar(cx))
             .children(banner)
             .child(div().flex().flex_1().min_h_0().child(body))
-            .child(self.status_line(cx))
+            .child(self.part("status", self.status_line(cx).into_any_element()))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {

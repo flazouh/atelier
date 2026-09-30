@@ -62,14 +62,41 @@ pub struct Meter {
     layout: Duration,
     layouts: Vec<Duration>,
     frames: Vec<Duration>,
+    /// This frame's named parts ([`Part`]), in the order they were drawn.
+    parts: Vec<(&'static str, Duration)>,
+}
+
+impl Meter {
+    fn add_part(&mut self, name: &'static str, spent: Duration) {
+        match self.parts.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, total)) => *total += spent,
+            None => self.parts.push((name, spent)),
+        }
+    }
+}
+
+/// Adds `spent` to this frame's part `name`, for time spent outside any [`Part`] (a view's own render).
+pub fn add_part(meter: &Rc<RefCell<Meter>>, name: &'static str, spent: Duration) {
+    meter.borrow_mut().add_part(name, spent);
+}
+
+/// One frame's line under `LATHE_FRAMES=each`: when, the whole frame, then each part, in ms.
+pub fn each_line(at_ms: u128, frame: Duration, parts: &[(&'static str, Duration)]) -> String {
+    let ms = |d: Duration| d.as_secs_f64() * 1000.;
+    let mut line = format!("frame {at_ms} {:.2}", ms(frame));
+    for (name, spent) in parts {
+        line.push_str(&format!(" {name}={:.2}", ms(*spent)));
+    }
+    line
 }
 
 impl Meter {
     fn frame_done(&mut self) {
         LAST.with(|last| last.set(self.current));
+        let parts = std::mem::take(&mut self.parts);
         if each() {
             let at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
-            eprintln!("frame {} {:.2}", at.as_millis(), self.current.as_secs_f64() * 1000.);
+            eprintln!("{}", each_line(at.as_millis(), self.current, &parts));
         }
         self.frames.push(std::mem::take(&mut self.current));
         self.layouts.push(std::mem::take(&mut self.layout));
@@ -90,6 +117,48 @@ impl Meter {
                 ms(l[l.len() * 95 / 100]),
             );
         }
+    }
+}
+
+/// Times one part of the window (the sidebar, the panels) inside the frame [`Timed`] times, so a frame's line
+/// says where its time went. A part drawn twice in a frame adds up.
+pub struct Part {
+    pub name: &'static str,
+    pub child: AnyElement,
+    pub meter: Rc<RefCell<Meter>>,
+}
+
+impl IntoElement for Part {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl Element for Part {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+    fn source_location(&self) -> Option<&'static Location<'static>> {
+        None
+    }
+    fn request_layout(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, ()) {
+        let at = Instant::now();
+        let id = self.child.request_layout(window, cx);
+        self.meter.borrow_mut().add_part(self.name, at.elapsed());
+        (id, ())
+    }
+    fn prepaint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), window: &mut Window, cx: &mut App) {
+        let at = Instant::now();
+        self.child.prepaint(window, cx);
+        self.meter.borrow_mut().add_part(self.name, at.elapsed());
+    }
+    fn paint(&mut self, _: Option<&GlobalElementId>, _: Option<&InspectorElementId>, _: Bounds<Pixels>, _: &mut (), _: &mut (), window: &mut Window, cx: &mut App) {
+        let at = Instant::now();
+        self.child.paint(window, cx);
+        self.meter.borrow_mut().add_part(self.name, at.elapsed());
     }
 }
 
