@@ -60,7 +60,7 @@ fn main() {
         // or the system's, which keeps the pick.
         beui::design_preview::init_strength(saved.design_strength); // design preview: remove after Alex picks
         beui::design_preview::init_elevation(saved.design_elevation); // design preview: remove after Alex picks
-        beui::design_preview::init(saved.design_toggle, saved.design_tabs, cx); // design preview: remove after Alex picks
+        beui::design_preview::init(saved.design_tabs, cx); // design preview: remove after Alex picks
         beui::theme::set_pick(saved.primary.map(settings_pane::colour), cx);
         if let Some(theme) = saved.theme.as_deref().and_then(beui::themes::named) {
             beui::theme::set_theme(theme.clone(), cx);

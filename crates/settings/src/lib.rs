@@ -28,8 +28,7 @@ pub struct Settings {
     pub primary: Option<[u8; 3]>,
     /// Newest first.
     pub recent: Vec<Location>,
-    /// design preview: remove after Alex picks. The designs in force for the grouping toggle and the editor tabs (0 to 3).
-    pub design_toggle: Option<u8>,
+    /// design preview: remove after Alex picks. The design in force for the editor tabs (0 to 3).
     pub design_tabs: Option<u8>,
     /// design preview: remove after Alex picks. The elevation of floating panels (0 to 3).
     pub design_elevation: Option<u8>,
