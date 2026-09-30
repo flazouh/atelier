@@ -1,5 +1,5 @@
-//! "Open over SSH…": a host, typed or picked from the user's `~/.ssh/config` below the field, a
-//! folder on it, and Connect. Focus starts on the host; Tab goes to the folder; Enter in either
+//! "Open over SSH…": a host, typed or picked from the user's `~/.ssh/config` below the field, and Connect. The
+//! folder is chosen next, in the folder picker over the host's own folders. Focus starts on the host; Enter
 //! connects, and Escape closes the form. While it connects the form shows each step ("Reaching hp-agent…", "Putting lathe-remote
 //! on hp-agent…"); a failure shows ssh's own words and leaves the form open to try again.
 
@@ -23,7 +23,7 @@ const HOST_CHIPS: [&str; 8] = ["ssh-host-0", "ssh-host-1", "ssh-host-2", "ssh-ho
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SshFormEvent {
-    Connect { host: String, path: String },
+    Connect { host: String },
     Cancel,
 }
 
@@ -38,9 +38,8 @@ pub enum Phase {
 pub struct SshForm {
     hosts: Vec<String>,
     host: Entity<InputState>,
-    path: Entity<InputState>,
     pub phase: Phase,
-    _enter: [gpui_kit::Subscription; 2],
+    _enter: gpui_kit::Subscription,
 }
 
 impl EventEmitter<SshFormEvent> for SshForm {}
@@ -54,11 +53,6 @@ impl Focusable for SshForm {
 impl SshForm {
     pub fn new(hosts: Vec<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let host = cx.new(|cx| InputState::new(window, cx).placeholder("user@host, or a host from ~/.ssh/config"));
-        let path = cx.new(|cx| {
-            let mut state = InputState::new(window, cx).placeholder("~/code/project");
-            state.set_value("~/", window, cx);
-            state
-        });
         if let Some(first) = hosts.first() {
             host.update(cx, |h, cx| h.set_value(first.clone(), window, cx));
         }
@@ -67,8 +61,8 @@ impl SshForm {
                 this.connect(cx);
             }
         };
-        let _enter = [cx.subscribe_in(&host, window, enter), cx.subscribe_in(&path, window, enter)];
-        Self { hosts, host, path, phase: Phase::Idle, _enter }
+        let _enter = cx.subscribe_in(&host, window, enter);
+        Self { hosts, host, phase: Phase::Idle, _enter }
     }
 
     /// The config's hosts, once they have been read off the UI thread.
@@ -87,14 +81,13 @@ impl SshForm {
             return;
         }
         let host = self.host.read(cx).value().trim().to_string();
-        let path = self.path.read(cx).value().trim().to_string();
-        if host.is_empty() || path.is_empty() {
-            self.phase = Phase::Failed("Name a host and a folder.".into());
+        if host.is_empty() {
+            self.phase = Phase::Failed("Name a host.".into());
             cx.notify();
             return;
         }
         self.phase = Phase::Connecting(format!("Reaching {host}…").into());
-        cx.emit(SshFormEvent::Connect { host, path });
+        cx.emit(SshFormEvent::Connect { host });
         cx.notify();
     }
 }
@@ -103,7 +96,7 @@ impl Render for SshForm {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let (host_focus, path_focus) = (self.host.focus_handle(cx), self.path.focus_handle(cx));
+        let host_focus = self.host.focus_handle(cx);
         let field = |label: &'static str, input: &Entity<InputState>, focus: FocusHandle| {
             div()
                 .flex()
@@ -170,7 +163,6 @@ impl Render for SshForm {
             .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open over SSH"))
             .child(field("Host", &self.host, host_focus))
             .children(hosts)
-            .child(field("Folder on the host", &self.path, path_focus))
             .children(status)
             .child(
                 div()

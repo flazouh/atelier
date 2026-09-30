@@ -370,7 +370,7 @@ impl Shell {
         })
         .detach();
         let events = cx.subscribe_in(&form, window, |this, _, event: &SshFormEvent, window, cx| match event {
-            SshFormEvent::Connect { host, path } => this.open_remote(host.clone(), path.clone(), window, cx),
+            SshFormEvent::Connect { host } => this.browse_remote(host.clone(), window, cx),
             SshFormEvent::Cancel => this.close_ssh(window, cx),
         });
         form.read(cx).focus_handle(cx).focus(window, cx);
@@ -632,35 +632,84 @@ impl Shell {
 
     /// The app's own folder picker, over this machine's folders. It starts in the home folder.
     fn open_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let picker = cx.new(|cx| beui::FolderPicker::new("~/", window, cx));
-        let events = cx.subscribe_in(&picker, window, |this, picker, event: &beui::FolderPickerEvent, window, cx| match event {
+        self.open_folder_picker_over(FolderSource::Local, window, cx);
+    }
+
+    /// The folder picker over `source`'s folders: this machine's, or a host's through its project.
+    fn open_folder_picker_over(&mut self, source: FolderSource, window: &mut Window, cx: &mut Context<Self>) {
+        let recent: Vec<SharedString> = match &source {
+            FolderSource::Local => Vec::new(),
+            FolderSource::Remote { host, .. } => self
+                .recent
+                .iter()
+                .filter_map(|l| match l {
+                    Location::Ssh { host: h, path } if h == host => Some(SharedString::from(path.display().to_string())),
+                    _ => None,
+                })
+                .take(5)
+                .collect(),
+        };
+        let picker = cx.new(|cx| beui::FolderPicker::new("~/", window, cx).with_recent(recent));
+        let events = cx.subscribe_in(&picker, window, move |this, picker, event: &beui::FolderPickerEvent, window, cx| match event {
             beui::FolderPickerEvent::Want(dir) => {
                 let dir = dir.to_string();
                 let listing = cx.background_spawn({
-                    let dir = dir.clone();
-                    async move { lathe_project::read_local_dir(&dir) }
+                    let (dir, source) = (dir.clone(), source.clone());
+                    async move {
+                        match source {
+                            FolderSource::Local => lathe_project::read_local_dir(&dir),
+                            FolderSource::Remote { project, .. } => project.read_dir(&dir),
+                        }
+                    }
                 });
                 let picker = picker.downgrade();
                 cx.spawn_in(window, async move |_, cx| {
                     let answer = listing.await.map(|all| all.into_iter().map(|e| (SharedString::from(e.name), e.dir)).collect()).map_err(|e| folder_error(&e));
-                    _ = picker.update(cx, |p, cx| p.show(&dir, answer, cx));
+                    _ = picker.update_in(cx, |p, window, cx| p.show(&dir, answer, window, cx));
                 })
                 .detach();
             }
             beui::FolderPickerEvent::Choose(path) => {
                 // The picker stays until the folder opens: a folder that will not open is said in the picker, with
                 // the path as the reader typed it.
-                match lathe_project::expand_home(path) {
-                    Some(target) => {
-                        let opening = cx.background_spawn(async move { LocalProject::open(target) });
+                match &source {
+                    FolderSource::Local => match lathe_project::expand_home(path) {
+                        Some(target) => {
+                            let opening = cx.background_spawn(async move { LocalProject::open(target) });
+                            let picker = picker.downgrade();
+                            cx.spawn_in(window, async move |this, cx| {
+                                let opened = opening.await;
+                                _ = this.update_in(cx, |this, window, cx| match opened {
+                                    Ok(project) => {
+                                        this.close_folder_picker(window, cx);
+                                        let location = Location::Local { path: lathe_project::Project::root(&project).to_path_buf() };
+                                        this.add(location, Arc::new(project), window, cx);
+                                    }
+                                    Err(error) => {
+                                        picker.update(cx, |p, cx| p.refuse(folder_error(&error), cx)).ok();
+                                    }
+                                });
+                            })
+                            .detach();
+                        }
+                        None => {
+                            picker.update(cx, |p, cx| p.refuse(beui::FolderError::Missing, cx));
+                        }
+                    },
+                    FolderSource::Remote { host, .. } => {
+                        let (host, path) = (host.clone(), path.to_string());
+                        picker.update(cx, |p, cx| p.working(Some(format!("Opening {path} on {host}…").into()), cx));
+                        let connecting = {
+                            let (host, path) = (host.clone(), path.clone());
+                            cx.background_spawn(async move { lathe_remote::ssh::connect(&host, &path, &|_| {}) })
+                        };
                         let picker = picker.downgrade();
                         cx.spawn_in(window, async move |this, cx| {
-                            let opened = opening.await;
-                            _ = this.update_in(cx, |this, window, cx| match opened {
+                            let connected = connecting.await;
+                            _ = this.update_in(cx, |this, window, cx| match connected {
                                 Ok(project) => {
                                     this.close_folder_picker(window, cx);
-                                    let location = Location::Local { path: lathe_project::Project::root(&project).to_path_buf() };
-                                    this.add(location, Arc::new(project), window, cx);
+                                    this.add(Location::Ssh { host, path: PathBuf::from(path) }, Arc::new(project), window, cx);
                                 }
                                 Err(error) => {
                                     picker.update(cx, |p, cx| p.refuse(folder_error(&error), cx)).ok();
@@ -668,9 +717,6 @@ impl Shell {
                             });
                         })
                         .detach();
-                    }
-                    None => {
-                        picker.update(cx, |p, cx| p.refuse(beui::FolderError::Missing, cx));
                     }
                 }
             }
@@ -680,6 +726,38 @@ impl Shell {
         picker.read(cx).focus_handle(cx).focus(window, cx);
         self.folder = Some((picker, events));
         cx.notify();
+    }
+
+    /// Connects to `host` at its home folder, and offers its folders to choose from.
+    fn browse_remote(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+        let (tx, mut steps) = futures_channel::mpsc::unbounded::<String>();
+        let connecting = {
+            let host = host.clone();
+            cx.background_spawn(async move { lathe_remote::ssh::connect_at_home(&host, &|line| drop(tx.unbounded_send(line))) })
+        };
+        cx.spawn_in(window, async move |this, cx| {
+            use futures_util::StreamExt;
+            let mut connecting = std::pin::pin!(connecting);
+            let connected = loop {
+                let step = std::pin::pin!(steps.next());
+                match futures_util::future::select(step, connecting.as_mut()).await {
+                    futures_util::future::Either::Left((Some(line), _)) => {
+                        _ = this.update(cx, |this, cx| this.form_phase(Phase::Connecting(line.into()), cx));
+                    }
+                    futures_util::future::Either::Left((None, _)) => break connecting.await,
+                    futures_util::future::Either::Right((connected, _)) => break connected,
+                }
+            };
+            _ = this.update_in(cx, |this, window, cx| match connected {
+                Ok((project, _home)) => {
+                    this.ssh = None;
+                    let project: Arc<dyn lathe_project::Project> = Arc::new(project);
+                    this.open_folder_picker_over(FolderSource::Remote { host, project }, window, cx);
+                }
+                Err(error) => this.form_phase(Phase::Failed(error.to_string().into()), cx),
+            });
+        })
+        .detach();
     }
 
     fn close_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1142,6 +1220,14 @@ impl Shell {
             }))
             .into_any_element()
     }
+}
+
+/// Whose folders the folder picker lists.
+#[derive(Clone)]
+enum FolderSource {
+    Local,
+    /// A host's, through a project connected at its home folder.
+    Remote { host: String, project: Arc<dyn lathe_project::Project> },
 }
 
 /// A failure to read or open a folder, as the picker tells it.

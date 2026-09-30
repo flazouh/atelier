@@ -226,5 +226,19 @@ pub fn connect(host: &str, root: &str, say: &dyn Fn(String)) -> io::Result<Remot
     RemoteProject::connect(host, root, dial(host, &binary), Timeouts::default())
 }
 
+/// Like [`connect`], with the host's home folder as the root, so the app can browse the host's folders before the reader
+/// has chosen one. It returns the project and the home folder's path.
+pub fn connect_at_home(host: &str, say: &dyn Fn(String)) -> io::Result<(RemoteProject, String)> {
+    say(format!("Reaching {host}…"));
+    let (platform, home) = probe(host)?;
+    if home.is_empty() {
+        return Err(io::Error::other(format!("{host} did not say where its home folder is")));
+    }
+    let binary = deploy(host, &platform, say)?;
+    say(format!("Opening {host}…"));
+    let project = RemoteProject::connect(host, &home, dial(host, &binary), Timeouts::default())?;
+    Ok((project, home))
+}
+
 #[cfg(test)]
 mod tests;
