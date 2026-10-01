@@ -1663,30 +1663,43 @@ impl Shell {
     /// One pane at a time, with a tab for each: the sidebar, the sessions, and the editor or what
     /// stands in its place.
     fn narrow_panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        // The right pane has a tab only while it holds something: the review, the pull requests or the tasks.
+        // The editor is the Files view's.
         let right = {
             let p = project.read(cx);
             match p.front() {
-                crate::open_project::front::Front::Review => "Review",
-                crate::open_project::front::Front::Pulls => "Pull requests",
-                crate::open_project::front::Front::Tasks => "Tasks",
-                crate::open_project::front::Front::Editor => "Editor",
+                crate::open_project::front::Front::Review => Some("Review"),
+                crate::open_project::front::Front::Pulls => Some("Pull requests"),
+                crate::open_project::front::Front::Tasks => Some("Tasks"),
+                crate::open_project::front::Front::Editor => None,
             }
         };
-        let panes = [Pane::Projects, Pane::Session, Pane::Right];
-        let segment = |label: &'static str, cap: Option<&'static str>| match cap {
-            Some(cap) => Segment::new(label).cap(keys::cap(cap)),
-            None => Segment::new(label),
+        let panes: Vec<Pane> = [Pane::Projects, Pane::Session].into_iter().chain(right.map(|_| Pane::Right)).collect();
+        if right.is_none() && self.narrow == Pane::Right {
+            self.narrow = Pane::Session;
+        }
+        let segment = |label: &'static str, cap: Option<&'static str>| {
+            let name = match label {
+                "Projects" => "narrow-tab-Projects",
+                "Session" => "narrow-tab-Session",
+                "Review" => "narrow-tab-Review",
+                "Pull requests" => "narrow-tab-Pull requests",
+                _ => "narrow-tab-Tasks",
+            };
+            let segment = Segment::new(label).debug_name(name);
+            match cap {
+                Some(cap) => segment.cap(keys::cap(cap)),
+                None => segment,
+            }
         };
         let this = cx.entity();
+        let mut segments = vec![segment("Projects", Some("⌘b")), segment("Session", None)];
+        segments.extend(right.map(|label| segment(label, Some("⌘⇧b"))));
+        let shown = panes.clone();
         let tabs = div().flex().flex_none().items_center().px(px(8.)).h(px(44.)).child(
-            Segmented::new(
-                "narrow-panes",
-                [segment("Projects", Some("⌘b")), segment("Session", None), segment(right, Some("⌘⇧b"))],
-                panes.iter().position(|p| *p == self.narrow).unwrap_or(0),
-            )
-            .on_change(move |i, _, cx| {
+            Segmented::new("narrow-panes", segments, panes.iter().position(|p| *p == self.narrow).unwrap_or(0)).on_change(move |i, _, cx| {
                 this.update(cx, |this, cx| {
-                    this.narrow = panes[i];
+                    this.narrow = shown[i];
                     cx.notify();
                 })
             }),

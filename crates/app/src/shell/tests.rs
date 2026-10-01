@@ -475,3 +475,14 @@ fn a_long_run_of_tool_calls_is_capped_while_live_and_folds_after(cx: &mut TestAp
     settle(&shell, cx);
     assert!(session.read_with(cx, |s, _| s.group_is_open(1, 11)), "a press opens the group");
 }
+
+/// In a narrow Sessions view the third tab is there only while the right pane holds a review, the pull
+/// requests or the tasks: with none of them there is no "Editor" tab, since the editor is the Files view's.
+#[gpui_kit::test]
+fn a_narrow_sessions_view_has_no_editor_tab(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 700.);
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("sessions-view").is_some());
+    assert!(cx.debug_bounds("narrow-tab-Projects").is_some() && cx.debug_bounds("narrow-tab-Session").is_some());
+    assert!(cx.debug_bounds("narrow-tab-Editor").is_none(), "no Editor tab in the Sessions view");
+}
