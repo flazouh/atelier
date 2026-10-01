@@ -190,6 +190,10 @@ atelier reads it through a process the project spawns (`sh`), never from disk di
   finishes what is open: each running call fails, each waiting question is cancelled, each subagent ends,
   then `TurnEnded(Failed("the agent exited with code N: <its last stderr line>"))` and `Ended(Exited { code, stderr })`, where `stderr` is the last 20 lines the process wrote. `Ended` comes once.
 - **A line does not parse:** a `Warning`. The stream goes on.
+- **atelier dies** (a crash, a kill): every process a local project starts has a watchdog (`sh`, detached)
+  that stops it, and kills it two seconds later if it still runs, once atelier is gone. An agent that ignores
+  the end of its stdin, as Cursor's does, ends too. On a remote project `atelier-remote` kills its processes
+  when the app's connection closes.
 - **atelier closes the session:** dropping it closes stdin, kills the process and sends `Ended(Closed)` at
   once. The process can have children that keep its pipes open, so atelier does not wait for the end of
   stdout.
@@ -249,7 +253,7 @@ them back. `crates/agents/tests/cursor_live.rs` runs the real CLI end to end:
 - **Usage:** Cursor reports no tokens, so its turns have no `Usage`.
 - **Processes:** `agent acp` starts a `worker-server` for the folder, which outlives it and the next run
   in that folder reuses. Cursor's own `agent -p` leaves it too. After a turn, `agent acp` does not exit
-  when its stdin closes, so if atelier dies without closing its sessions, the agent keeps running.
+  when its stdin closes. So atelier ties every local child to itself (see "Failure" above).
 
 Other agents that speak ACP (Gemini CLI, opencode, Codex through an adapter) are an `AcpAgent` each, with
 no change in `acp` or `session`. Their launch and modes are to be checked against the real agent first.
@@ -392,5 +396,3 @@ Targets and numbers are in `docs/performance.md` ("Agent sessions"). The measure
 - `Project::spawn` drops stderr, so a crash has no message. The interface needs a way to keep it.
 - `Backend::sessions` and `history` start `sh` on the host. A host with no POSIX shell has no list.
 - Cursor reports no tokens, so a Cursor turn has no `Usage`.
-- A Cursor agent outlives a atelier that crashes, since it ignores the end of its stdin. Starting agents in a
-  process group atelier kills on exit would close that.
