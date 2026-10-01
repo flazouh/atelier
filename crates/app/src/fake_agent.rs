@@ -114,7 +114,11 @@ impl gpui_kit::Render for Root {
 
 /// A git repository with `files` committed, for a turn's review to diff against.
 pub fn git_project(files: &[(&str, &str)]) -> PathBuf {
-    let dir = crate::test_dirs::path();
+    git_project_in(crate::test_dirs::path(), files)
+}
+
+/// The same, in `dir`, which may hold files already: all of them are committed.
+pub fn git_project_in(dir: PathBuf, files: &[(&str, &str)]) -> PathBuf {
     for (path, text) in files {
         std::fs::write(dir.join(path), text).unwrap();
     }

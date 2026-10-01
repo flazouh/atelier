@@ -11,6 +11,8 @@
 //! agent's own thread, as it arrives, so a file is read before the tool that names it writes it; and the
 //! turn's end `finish`es it there too. The panel shows the turn's changed files after its last row.
 
+mod composer_lists;
+
 use std::{sync::Arc, time::SystemTime};
 
 use beui::session_status::SessionStatus;
@@ -65,6 +67,10 @@ pub enum SessionEvent {
     Task(crate::tasks::signal::TaskEvent),
     /// The reader pressed the task chip in the header.
     OpenTask,
+    /// The reader ran `/files`: the Files view comes to the front.
+    ShowFiles,
+    /// The reader ran `/tasks`: the project's tasks come to the right pane.
+    ShowTasks,
 }
 
 impl EventEmitter<SessionEvent> for AgentSession {}
@@ -139,6 +145,10 @@ pub struct AgentSession {
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
+    /// What the project adds to the `/` list, and the agent's own commands once it has said them.
+    project_commands: Vec<lathe_agents::commands::CommandInfo>,
+    agent_commands: Vec<String>,
+    _lists: Task<()>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
     _renaming: Option<Subscription>,
@@ -200,6 +210,7 @@ impl AgentSession {
                 }
             }
             PromptInputEvent::Action(_) => {}
+            PromptInputEvent::Command { name, args } => this.run_command(name, args, cx),
         });
         let (id, title) = match &resume {
             Some((id, title)) => (Some(id.clone()), title.clone()),
@@ -245,6 +256,9 @@ impl AgentSession {
             _pull_card: None,
             _saving: Task::ready(()),
             composer,
+            project_commands: Vec::new(),
+            agent_commands: Vec::new(),
+            _lists: Task::ready(()),
             renaming: None,
             _renaming: None,
             thinking_since: HashMap::new(),
@@ -253,7 +267,50 @@ impl AgentSession {
             _start: Task::ready(()),
         };
         this.open(resume.map(|(id, _)| id), true, cx);
+        this.read_lists(cx);
         this
+    }
+
+    /// Reads the project's skills, command files and files off the UI thread, for the composer's lists.
+    fn read_lists(&mut self, cx: &mut Context<Self>) {
+        let project = self.project.clone();
+        let reading = cx.background_spawn(async move { composer_lists::read(project.as_ref()) });
+        self._lists = cx.spawn(async move |this, cx| {
+            let lists = reading.await;
+            _ = this.update(cx, |s, cx| {
+                s.project_commands = lists.project_commands;
+                s.composer.update(cx, |c, cx| c.set_files(lists.files.into_iter().map(Into::into).collect(), cx));
+                s.offer_commands(cx);
+            });
+        });
+    }
+
+    /// Gives the composer the `/` list: lathe's, the project's and the agent's own.
+    fn offer_commands(&mut self, cx: &mut Context<Self>) {
+        let items = composer_lists::commands(self.project_commands.clone(), &self.agent_commands)
+            .into_iter()
+            .map(|c| beui::command_item::CommandItem {
+                name: c.name.into(),
+                source: match c.source {
+                    lathe_agents::commands::CommandSource::Agent => beui::command_item::CommandSource::Agent,
+                    lathe_agents::commands::CommandSource::Lathe => beui::command_item::CommandSource::Lathe,
+                    lathe_agents::commands::CommandSource::Skill => beui::command_item::CommandSource::Skill,
+                },
+                summary: c.summary.into(),
+                args_hint: c.args_hint.map(Into::into),
+            })
+            .collect();
+        self.composer.update(cx, |c, cx| c.set_commands(items, cx));
+    }
+
+    /// A `/` command the reader chose: lathe's own runs here, any other goes to the agent as its text.
+    fn run_command(&mut self, name: &str, args: &str, cx: &mut Context<Self>) {
+        match name {
+            "files" if composer_lists::lathe_runs(name) => cx.emit(SessionEvent::ShowFiles),
+            "tasks" if composer_lists::lathe_runs(name) => cx.emit(SessionEvent::ShowTasks),
+            "review" if composer_lists::lathe_runs(name) => cx.emit(SessionEvent::Review { turn: None, path: None }),
+            _ => self.send(composer_lists::agent_text(name, args), cx),
+        }
     }
 
     /// Opens the agent's session off the UI thread: its history first when it resumes and the panel
@@ -354,6 +411,10 @@ impl AgentSession {
                     self.id = Some(started.session.clone());
                     self.model = started.model.clone().or(self.model.take());
                     self.mode = started.mode.or(self.mode);
+                    if self.agent_commands != started.commands {
+                        self.agent_commands = started.commands.clone();
+                        self.offer_commands(cx);
+                    }
                     if self.task.is_some() && !self.task_told {
                         self.task_told = true;
                         cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::Started));

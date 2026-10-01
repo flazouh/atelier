@@ -791,6 +791,13 @@ impl Shell {
                 }
                 cx.notify();
             }
+            ProjectEvent::ShowFiles => this.show_view(ShellView::Files, window, cx),
+            ProjectEvent::ShowTasks => {
+                if let Some(i) = this.projects.iter().position(|p| p == project) {
+                    this.active = i;
+                }
+                this.show_tasks(window, cx);
+            }
             ProjectEvent::Sessions => this.sync(cx),
             ProjectEvent::Renamed { id, name } => {
                 this.names.insert(id.0.clone(), name.to_string());

@@ -122,6 +122,10 @@ pub enum ProjectEvent {
     TasksShown,
     /// The review closed: the editor is back.
     ReviewClosed,
+    /// The reader ran `/files` in a session: the Files view comes to the front.
+    ShowFiles,
+    /// The reader ran `/tasks` in a session: the tasks come to the right pane.
+    ShowTasks,
 }
 
 impl EventEmitter<ProjectEvent> for OpenProject {}
@@ -336,6 +340,8 @@ impl OpenProject {
                     return cx.emit(ProjectEvent::Review { session: session.clone(), turn: *turn, path: path.clone() });
                 }
                 SessionEvent::OpenFile(path) => return cx.emit(ProjectEvent::Open(path.clone())),
+                SessionEvent::ShowFiles => return cx.emit(ProjectEvent::ShowFiles),
+                SessionEvent::ShowTasks => return cx.emit(ProjectEvent::ShowTasks),
                 SessionEvent::Renamed => {
                     let s = session.read(cx);
                     if let (Some(id), Some(name)) = (s.id.clone(), s.name.clone()) {
