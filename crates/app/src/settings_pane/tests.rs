@@ -210,3 +210,14 @@ fn the_sidebar_section_edits_the_layout_and_says_so_once(cx: &mut TestAppContext
     assert_eq!((looks[1].project_badge, looks[1].fold_after), (BadgeShow::Always, 12));
     assert_eq!(pane.read_with(cx, |p, _| p.look.project_badge), BadgeShow::Always);
 }
+
+/// Agents has a switch for skills picked from the `/` list: off, a skill waits in the box; on, it runs at once.
+#[gpui_kit::test]
+fn a_switch_in_agents_makes_a_picked_skill_run_at_once(cx: &mut TestAppContext) {
+    let (_pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
+    let runs = |cx: &mut VisualTestContext| cx.update(|_, cx| crate::agent_session::runs_picked_skills(cx));
+    assert!(!runs(cx), "a picked skill waits by default");
+    click(cx, "section-agents");
+    click(cx, "skills-run-when-picked");
+    assert!(runs(cx));
+}

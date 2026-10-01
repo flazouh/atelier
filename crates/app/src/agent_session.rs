@@ -19,6 +19,7 @@ mod types;
 
 pub use helpers::now;
 pub use structs::AgentSession;
+pub(crate) use structs::{RunPickedSkills, runs_picked_skills};
 pub use types::SessionEvent;
 
 #[cfg(test)]

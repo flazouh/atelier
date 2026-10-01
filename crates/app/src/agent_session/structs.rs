@@ -28,6 +28,15 @@ use super::helpers::{is_activity, mode_from, mode_word, now, problem_words};
 
 impl EventEmitter<SessionEvent> for AgentSession {}
 
+/// Whether a skill picked from a composer's `/` list runs at once, as the settings say.
+pub(crate) struct RunPickedSkills(pub bool);
+
+impl gpui_kit::Global for RunPickedSkills {}
+
+pub(crate) fn runs_picked_skills(cx: &gpui_kit::App) -> bool {
+    cx.try_global::<RunPickedSkills>().is_some_and(|r| r.0)
+}
+
 pub struct AgentSession {
     /// The panel's id: stable from the start, before the agent names the session.
     pub key: SharedString,
@@ -104,6 +113,7 @@ pub struct AgentSession {
     /// When each thinking block began, for its live "Thinking for 12s".
     pub thinking_since: HashMap<atelier_agents::session::BlockId, Instant>,
     _composer: Subscription,
+    _skills: Subscription,
     _pump: Task<()>,
     _start: Task<()>,
 }
@@ -164,7 +174,12 @@ impl AgentSession {
         let composer = cx.new(|cx| {
             let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
             input.set_dictation(true, cx);
+            input.set_run_picked_skills(runs_picked_skills(cx));
             input
+        });
+        let _skills = cx.observe_global::<RunPickedSkills>(|this: &mut Self, cx| {
+            let run = runs_picked_skills(cx);
+            this.composer.update(cx, |c, _| c.set_run_picked_skills(run));
         });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
             PromptInputEvent::Submit(text) => this.send(text.to_string(), cx),
@@ -235,6 +250,7 @@ impl AgentSession {
             _renaming: None,
             thinking_since: HashMap::new(),
             _composer,
+            _skills,
             _pump,
             _start: Task::ready(()),
         };

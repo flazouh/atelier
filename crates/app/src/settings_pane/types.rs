@@ -89,7 +89,7 @@ impl Section {
         match self {
             Section::Appearance => "The theme, light or dark, and the colour of the main button.",
             Section::Sidebar => "What a session row shows, and how many sessions the sidebar shows before it folds the rest.",
-            Section::Agents => "The agents this build can start, and the models each offers.",
+            Section::Agents => "How a picked skill runs, the agents this build can start, and the models each offers.",
             Section::Tasks => "What moves a task by itself. Every move shows in its activity, and you can move it back.",
             Section::Keys => "The keys of the review. They cannot be changed yet.",
         }
