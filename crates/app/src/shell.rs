@@ -52,7 +52,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [ShowSessions, ShowFiles, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(lathe, [ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -76,7 +76,6 @@ pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-o", OpenFolder, None),
         KeyBinding::new("secondary-1", ShowSessions, None),
-        KeyBinding::new("secondary-2", ShowFiles, None),
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("secondary-shift-o", OpenRemote, None),
         KeyBinding::new("secondary-shift-O", OpenRemote, None),
@@ -410,11 +409,12 @@ impl Shell {
                     self.new_session(at, window, cx);
                 }
             }
-            SidebarEvent::RevealProject { project } => {
+            // The project's menu is the way into the Files view: its tree and its editor.
+            SidebarEvent::OpenFiles { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
                     self.active = at;
-                    self.sidebar = true;
-                    cx.notify();
+                    self.files_narrow = FilesPane::Tree;
+                    self.show_view(ShellView::Files, window, cx);
                 }
             }
             SidebarEvent::Tasks { project } => {
@@ -708,7 +708,7 @@ impl Shell {
         self.show_file(cx);
     }
 
-    /// Shows `view`. Its keys are ⌘1 and ⌘2 (⌃ elsewhere). The focus comes to the shell: what had it (a
+    /// Shows `view`. The way into Files is a project's menu; ⌘1 (⌃ elsewhere) goes back to Sessions. The focus comes to the shell: what had it (a
     /// composer, the editor) is not drawn in the other view, and a key from it would reach nothing.
     pub fn show_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         if self.view != view {
@@ -1242,7 +1242,7 @@ impl Shell {
             .text_size(TextSize::Sm.font_size())
             .child(div().font_weight(gpui_kit::FontWeight::MEDIUM).child(name.unwrap_or_else(|| "lathe".into())))
             .children(branch.map(|b| div().text_color(theme.muted_foreground).child(b)))
-            .children(self.active().is_some().then(|| self.view_switch(cx)))
+            .children(self.active().and_then(|_| self.back_to_sessions(cx)))
             .relative()
             .children(self.layout_button(cx))
             .child(div().flex_1().flex().justify_center().child(beui::SessionsIsland::new("sessions-island", counts).on_press(
@@ -1250,18 +1250,22 @@ impl Shell {
             )))
     }
 
-    /// Sessions or Files, with their keys.
-    fn view_switch(&self, cx: &mut Context<Self>) -> AnyElement {
+    /// In the Files view, the way back: "Sessions" with its key. Nothing in the Sessions view: Files is entered
+    /// from a project's menu, so there is no switch to draw.
+    fn back_to_sessions(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.view != ShellView::Files {
+            return None;
+        }
         let this = cx.entity();
-        let views = [ShellView::Sessions, ShellView::Files];
-        Segmented::new(
-            "view-switch",
-            [Segment::new("Sessions").cap(keys::cap("⌘1")), Segment::new("Files").cap(keys::cap("⌘2"))],
-            views.iter().position(|v| *v == self.view).unwrap_or(0),
+        Some(
+            Button::new("back-to-sessions")
+                .debug_name("back-to-sessions")
+                .label("Sessions")
+                .cap(keys::cap("⌘1"))
+                .variant(ButtonVariant::Ghost)
+                .on_click(move |_, window, cx| this.update(cx, |this, cx| this.show_view(ShellView::Sessions, window, cx)))
+                .into_any_element(),
         )
-        .debug_name("view-switch")
-        .on_change(move |i, window, cx| this.update(cx, |this, cx| this.show_view(views[i], window, cx)))
-        .into_any_element()
     }
 
     /// The ⋯ at the top right of the session area, and its layout menu: side by side or single, grouped by
@@ -1811,7 +1815,6 @@ impl Shell {
             .on_action(cx.listener(Self::toggle_right))
             .on_action(cx.listener(Self::pull_requests_key))
             .on_action(cx.listener(|this, _: &ShowSessions, window, cx| this.show_view(ShellView::Sessions, window, cx)))
-            .on_action(cx.listener(|this, _: &ShowFiles, window, cx| this.show_view(ShellView::Files, window, cx)))
             .on_action(cx.listener(Self::open_tasks_key))
             .on_key_down(cx.listener(Self::key_down))
             .flex()

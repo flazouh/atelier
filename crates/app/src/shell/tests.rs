@@ -312,18 +312,31 @@ fn with_a_session(cx: &mut TestAppContext, width: f32) -> (Entity<Shell>, &mut g
     (shell, cx, dir)
 }
 
+/// What a press on "Files" in the active project's ⋯ menu sends: the only way into the Files view.
+fn open_files_from_the_menu(shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext) {
+    shell.update_in(cx, |s, window, cx| {
+        let project = crate::agents_view::project_id(s.active().unwrap().read(cx));
+        let sidebar = s.agents_sidebar.clone();
+        s.sidebar_event(&sidebar, &beui::sidebar::SidebarEvent::OpenFiles { project }, window, cx);
+    });
+    settle(shell, cx);
+}
+
 /// Views and commands, part 2: the Sessions view and the Files view, one on screen at a time. The sidebar
 /// holds no tree; the Files view holds the tree and the editor, which shows nothing until a file is open.
 #[gpui_kit::test]
-fn one_view_shows_at_a_time_and_the_keys_switch_them(cx: &mut TestAppContext) {
+fn the_project_menu_opens_files_and_a_key_or_button_goes_back(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1600.);
-    let files = if cfg!(target_os = "macos") { "cmd-2" } else { "ctrl-2" };
     let sessions = if cfg!(target_os = "macos") { "cmd-1" } else { "ctrl-1" };
     assert!(cx.debug_bounds("sessions-view").is_some(), "the Sessions view shows first");
     assert!(cx.debug_bounds("files-view").is_none() && cx.debug_bounds("files-tree").is_none(), "no tree in it");
-    cx.simulate_keystrokes(files);
+    assert!(cx.debug_bounds("view-switch").is_none() && cx.debug_bounds("back-to-sessions").is_none(), "no switch in the Sessions view");
+    cx.simulate_keystrokes(if cfg!(target_os = "macos") { "cmd-2" } else { "ctrl-2" });
     settle(&shell, cx);
-    assert!(cx.debug_bounds("files-view").is_some() && cx.debug_bounds("files-tree").is_some(), "{files} shows the Files view");
+    assert!(cx.debug_bounds("files-view").is_none(), "⌘2 does nothing: the project menu is the way in");
+    open_files_from_the_menu(&shell, cx);
+    assert!(cx.debug_bounds("files-view").is_some() && cx.debug_bounds("files-tree").is_some(), "the menu's Files shows the Files view");
+    assert!(cx.debug_bounds("back-to-sessions").is_some(), "with a way back");
     assert!(cx.debug_bounds("sessions-view").is_none(), "and only it");
     assert!(cx.debug_bounds("editor-tab-0").is_none(), "no editor before a file is open");
     cx.simulate_keystrokes(sessions);
@@ -383,9 +396,8 @@ fn a_file_picked_in_a_narrow_tree_shows_in_the_editor(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn going_back_to_sessions_puts_the_caret_in_the_composer(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1600.);
-    let (files, sessions) = if cfg!(target_os = "macos") { ("cmd-2", "cmd-1") } else { ("ctrl-2", "ctrl-1") };
-    cx.simulate_keystrokes(files);
-    settle(&shell, cx);
+    let sessions = if cfg!(target_os = "macos") { "cmd-1" } else { "ctrl-1" };
+    open_files_from_the_menu(&shell, cx);
     cx.simulate_keystrokes(sessions);
     settle(&shell, cx);
     cx.simulate_input("hello");
