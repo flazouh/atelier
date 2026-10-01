@@ -559,3 +559,17 @@ fn the_panel_menu_holds_the_actions_for_a_session(cx: &mut TestAppContext) {
     assert_eq!(open(&shell, cx), 2, "New session in this project opens another panel");
     assert!(cx.debug_bounds("panel-rename").is_none(), "and the menu shut");
 }
+
+/// Only the single view has a session in front, so only there does the sidebar mark one.
+#[gpui_kit::test]
+fn the_sidebar_marks_the_open_session_in_the_single_view_only(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let marked = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).open_session().is_some());
+    assert!(!marked(&shell, cx), "side by side: no row is marked");
+    shell.update(cx, |s, cx| s.choose_layout(beui::panel_types::Layout::Single, cx));
+    settle(&shell, cx);
+    assert!(marked(&shell, cx), "single view: the one in front is marked");
+    shell.update(cx, |s, cx| s.choose_layout(beui::panel_types::Layout::SideBySide, cx));
+    settle(&shell, cx);
+    assert!(!marked(&shell, cx), "back side by side: none");
+}

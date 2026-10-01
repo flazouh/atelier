@@ -84,6 +84,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
             let open = p.sessions.iter().map(|s| {
                 let s = s.read(cx);
                 SessionData {
+                    in_panel: true,
                     archived: s.id.as_ref().is_some_and(|id| archived.contains(id.as_str())),
                     id: s.key.clone(),
                     title: s.shown_title(),
@@ -93,6 +94,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                 }
             });
             let past = p.past.iter().map(|past| SessionData {
+                in_panel: false,
                 archived: archived.contains(&past.id.0),
                 id: format!("{PAST}{}", past.id.0).into(),
                 title: names.get(&past.id.0).cloned().unwrap_or_else(|| past.title.clone()).into(),

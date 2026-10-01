@@ -372,9 +372,12 @@ impl Shell {
     }
 
     /// Marks the row of the session in the active panel, in the sidebar.
+    /// Tells the sidebar which session is the one in front. Only the single view has one: side by side, every panel
+    /// is in front at once, so no row is marked.
     fn mark_open_session(&mut self, cx: &mut Context<Self>) {
-        let active = self.panels.read(cx).active().cloned();
-        self.agents_sidebar.update(cx, |s, cx| s.set_open(active, cx));
+        let panels = self.panels.read(cx);
+        let front = (panels.layout() == Layout::Single).then(|| panels.active().cloned()).flatten();
+        self.agents_sidebar.update(cx, |s, cx| s.set_open(front, cx));
     }
     fn project_by_id(&self, id: &str, cx: &App) -> Option<usize> {
         self.projects.iter().position(|p| agents_view::project_id(p.read(cx)).as_ref() == id)
@@ -438,6 +441,14 @@ impl Shell {
                 }
             }
             SidebarEvent::Archive { session, archive, .. } => self.set_archived(session, *archive, cx),
+            SidebarEvent::CopySessionId { session, .. } => match self.agent_id_of(session, cx) {
+                Some(id) => {
+                    cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(id));
+                    self.say("Copied the session id.".into(), cx);
+                }
+                None => self.say("This session has not started, so it has no id yet.".into(), cx),
+            },
+            SidebarEvent::CloseSession { session, .. } => self.close_session(session.as_ref(), cx),
             SidebarEvent::NewSession { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
                     self.new_session(at, window, cx);
@@ -485,15 +496,21 @@ impl Shell {
         }
     }
 
+    /// The id the agent knows the session on the sidebar's row `row` by: a past session's own, an open one's once it has started.
+    fn agent_id_of(&self, row: &str, cx: &App) -> Option<String> {
+        match agents_view::pick(row) {
+            agents_view::Pick::Past(id) => Some(id.0),
+            agents_view::Pick::Open(key) => self.session_by_key(&key, cx).and_then(|(_, s)| s.read(cx).id.as_ref().map(|i| i.as_str().to_string())),
+        }
+    }
+
     /// Puts the session on the sidebar's row `row` into the archive, or takes it out. An open session closes first:
     /// archiving puts it away. The choice is kept in the settings.
     fn set_archived(&mut self, row: &str, archive: bool, cx: &mut Context<Self>) {
-        let (agent_id, open) = match agents_view::pick(row) {
-            agents_view::Pick::Past(id) => (Some(id.0), None),
-            agents_view::Pick::Open(key) => {
-                let id = self.session_by_key(&key, cx).and_then(|(_, s)| s.read(cx).id.as_ref().map(|i| i.as_str().to_string()));
-                (id, Some(key))
-            }
+        let agent_id = self.agent_id_of(row, cx);
+        let open = match agents_view::pick(row) {
+            agents_view::Pick::Open(key) => Some(key),
+            agents_view::Pick::Past(_) => None,
         };
         let Some(id) = agent_id else {
             return self.say("This session has not started, so it has nothing to archive yet.".into(), cx);
@@ -542,6 +559,7 @@ impl Shell {
             }
             PanelsEvent::Closed(key) => self.close_session(key.as_ref(), cx),
             PanelsEvent::StateChanged => {
+                self.mark_open_session(cx);
                 let state = self.panels.read(cx).state();
                 let panels = lathe_settings::Panels {
                     single: state.layout == Layout::Single,
@@ -1483,6 +1501,7 @@ impl Shell {
 
     fn choose_layout(&mut self, layout: beui::panel_types::Layout, cx: &mut Context<Self>) {
         self.panels.update(cx, |p, cx| p.set_layout(layout, cx));
+        self.mark_open_session(cx);
         self.close_layout_menu(cx);
     }
 
