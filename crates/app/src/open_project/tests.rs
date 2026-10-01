@@ -326,7 +326,7 @@ fn a_file_put_back_is_no_longer_deleted(cx: &mut TestAppContext) {
 fn a_new_session_takes_another_agent_until_its_first_message(cx: &mut TestAppContext) {
     let (_dir, project, _, cx) = open(cx, &[]);
     cx.update(|_, cx| project.update(cx, |p, _| p.agent = crate::fake_agent::fake_agent("first")));
-    let key = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, window, cx).read(cx).key.clone()));
+    let key = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, None, window, cx).read(cx).key.clone()));
     cx.run_until_parked();
     cx.update(|window, cx| project.update(cx, |p, cx| p.choose_agent(&key, crate::fake_agent::fake_agent("second"), window, cx)));
     cx.run_until_parked();
@@ -342,6 +342,18 @@ fn a_new_session_takes_another_agent_until_its_first_message(cx: &mut TestAppCon
     assert_eq!(cx.update(|_, cx| project.read(cx).sessions[0].read(cx).agent.name), "second", "it has a conversation now");
 }
 
+/// A session opened again with the agent that ran it runs that agent, not the project's.
+#[gpui_kit::test]
+fn a_session_opened_again_runs_the_agent_that_ran_it(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[]);
+    cx.update(|_, cx| project.update(cx, |p, _| p.agent = crate::fake_agent::fake_agent("default")));
+    let resume = Some((atelier_agents::session::SessionId::new("s1"), "hi".into()));
+    let ran = Some(crate::fake_agent::fake_agent("ran it"));
+    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(resume, ran, window, cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).agent.name), "ran it");
+}
+
 fn chip(repo: &str, number: u64) -> atelier_ui::PrChipData {
     atelier_ui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::pr::PrState::Open, url: "u".into() }
 }
@@ -352,7 +364,7 @@ fn chip(repo: &str, number: u64) -> atelier_ui::PrChipData {
 fn the_chips_follow_the_repository_and_stay_quiet_when_the_list_does(cx: &mut TestAppContext) {
     let (_dir, project, _, cx) = open(cx, &[]);
     cx.update(|_, cx| project.update(cx, |p, _| p.agent = crate::fake_agent::fake_agent("fake")));
-    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, window, cx)));
+    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, None, window, cx)));
     cx.run_until_parked();
     let told = std::rc::Rc::new(std::cell::Cell::new(0));
     let count = told.clone();
@@ -502,7 +514,7 @@ fn a_session_opened_again_finds_its_task(cx: &mut TestAppContext) {
     let link = SessionLink { session_id: "fake-1".into(), title: "Old".into(), agent: "Fake".into() };
     tracker.record(&task.id, &Entry::SessionStarted(link), "Fake").unwrap();
     let resume = Some((atelier_agents::session::SessionId::new("fake-1"), "Old".into()));
-    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(resume, window, cx)));
+    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(resume, None, window, cx)));
     cx.run_until_parked();
     let found = cx.update(|_, cx| session.read(cx).task.clone());
     assert_eq!(found.map(|t| t.key.to_string()), Some(task.key));

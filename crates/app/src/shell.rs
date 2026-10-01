@@ -299,7 +299,12 @@ impl Shell {
             for session in &p.sessions {
                 let s = session.read(cx);
                 if let Some(id) = &s.id {
-                    open.push(atelier_settings::OpenSession { location: p.location.clone(), id: id.as_str().to_string(), title: s.shown_title().to_string() });
+                    open.push(atelier_settings::OpenSession {
+                        location: p.location.clone(),
+                        id: id.as_str().to_string(),
+                        title: s.shown_title().to_string(),
+                        agent: Some(s.agent.backend.name().to_string()),
+                    });
                 }
             }
         }
@@ -354,7 +359,8 @@ impl Shell {
         for saved in mine {
             let id = atelier_agents::session::SessionId::new(saved.id.clone());
             let title = self.names.get(&saved.id).cloned().unwrap_or(saved.title.clone());
-            let session = project.update(cx, |p, cx| p.open_session(Some((id, title.into())), window, cx));
+            let agent = saved.agent.as_deref().and_then(atelier_agents::registry::by_backend);
+            let session = project.update(cx, |p, cx| p.open_session(Some((id, title.into())), agent, window, cx));
             if let Some(name) = self.names.get(&saved.id) {
                 session.update(cx, |s, _| s.name = Some(name.clone().into()));
             }
@@ -388,7 +394,7 @@ impl Shell {
 
     fn new_session(&mut self, project: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(p) = self.projects.get(project).cloned() else { return };
-        let session = p.update(cx, |p, cx| p.open_session(None, window, cx));
+        let session = p.update(cx, |p, cx| p.open_session(None, None, window, cx));
         self.show_session(project, &session, window, cx);
     }
 
@@ -428,7 +434,7 @@ impl Shell {
                         let p = self.projects[at].clone();
                         let title = p.read(cx).past.iter().find(|s| s.id == id).map(|s| s.title.clone()).unwrap_or_default();
                         let title = self.names.get(&id.0).cloned().unwrap_or(title);
-                        let session = p.update(cx, |p, cx| p.open_session(Some((id.clone(), title.into())), window, cx));
+                        let session = p.update(cx, |p, cx| p.open_session(Some((id.clone(), title.into())), None, window, cx));
                         if let Some(name) = self.names.get(&id.0) {
                             session.update(cx, |s, _| s.name = Some(name.clone().into()));
                         }

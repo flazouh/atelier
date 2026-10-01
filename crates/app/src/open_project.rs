@@ -278,14 +278,15 @@ impl OpenProject {
     }
 
     /// Starts a new session, or resumes the past one `resume`, and returns it.
-    pub fn open_session(&mut self, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+    /// A session of `agent`, or of the project's agent with `None`: a new one, or `resume`d.
+    pub fn open_session(&mut self, resume: Option<(SessionId, SharedString)>, agent: Option<Agent>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let key: SharedString = format!("session-{}", NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)).into();
         let when = resume.as_ref().and_then(|(id, _)| past::last_activity(&self.past, id));
         if let Some((id, _)) = &resume {
             self.past.retain(|p| p.id != *id);
         }
-        let session = self.start_session(key, self.agent.clone(), resume, window, cx);
+        let session = self.start_session(key, agent.unwrap_or_else(|| self.agent.clone()), resume, window, cx);
         // An opened past session keeps its place: its stamp is its last activity, not now.
         if let Some(when) = when {
             session.update(cx, |s, _| {
@@ -719,7 +720,7 @@ impl OpenProject {
     }
 
     fn begin_session_for(&mut self, task: atelier_tracker::Task, window: &mut Window, cx: &mut Context<Self>) {
-        let session = self.open_session(None, window, cx);
+        let session = self.open_session(None, None, window, cx);
         let text = crate::tasks::map::first_message(&task);
         let reference = crate::tasks::TaskRef { id: task.id.clone(), key: task.key.clone().into() };
         session.update(cx, |s, cx| {

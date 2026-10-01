@@ -92,8 +92,8 @@ fn the_open_sessions_come_back() {
     let here = Location::Local { path: "/work/atelier".into() };
     update(&path, |s| {
         s.open = vec![
-            OpenSession { location: here.clone(), id: "s1".into(), title: "Fix the lease".into() },
-            OpenSession { location: here.clone(), id: "s2".into(), title: "Add a test".into() },
+            OpenSession { location: here.clone(), id: "s1".into(), title: "Fix the lease".into(), agent: None },
+            OpenSession { location: here.clone(), id: "s2".into(), title: "Add a test".into(), agent: None },
         ];
         s.front = Some("s2".into());
     })
@@ -102,6 +102,17 @@ fn the_open_sessions_come_back() {
     assert_eq!(back.open.iter().map(|o| o.id.as_str()).collect::<Vec<_>>(), ["s1", "s2"]);
     assert_eq!(back.open[0].location, here);
     assert_eq!(back.front.as_deref(), Some("s2"));
+}
+
+/// Each open session keeps the agent that runs it; a file from before has none, and its sessions take the default.
+#[test]
+fn an_open_session_keeps_its_agent_and_an_old_file_has_none() {
+    let here = Location::Local { path: "/work/atelier".into() };
+    let kept = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: Some("cursor".into()) };
+    let round: OpenSession = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
+    assert_eq!(round, kept);
+    let old: OpenSession = serde_json::from_str(r#"{"location":{"kind":"local","path":"/w"},"id":"s1","title":"hi"}"#).unwrap();
+    assert_eq!(old.agent, None);
 }
 
 #[test]

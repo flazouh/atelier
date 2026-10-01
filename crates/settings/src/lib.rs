@@ -89,12 +89,15 @@ pub struct Panels {
     pub widths: Vec<(String, f32)>,
 }
 
-/// A session open at quit: its project, the agent's id for it, and its title as the panel showed it.
+/// A session open at quit: its project, the agent's id for it, its title as the panel showed it, and the
+/// backend of the agent that runs it (`None` in a file from before, for the default agent).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OpenSession {
     pub location: Location,
     pub id: String,
     pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 /// Where a project lives.

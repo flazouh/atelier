@@ -1,7 +1,7 @@
 use atelier_settings::{Location, OpenSession};
 use super::*;
 fn open(place: &str, id: &str) -> OpenSession {
-    OpenSession { location: Location::Local { path: place.into() }, id: id.into(), title: format!("Session {id}") }
+    OpenSession { location: Location::Local { path: place.into() }, id: id.into(), title: format!("Session {id}"), agent: None }
 }
 /// Each project opens once, in the order its first session was open.
 #[test]
