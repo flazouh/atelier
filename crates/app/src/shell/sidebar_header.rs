@@ -6,7 +6,6 @@ use beui::{
     menu::{self, Choice, Entry, Menu, MenuItem, MenuLook, Origin},
     sidebar_filter::{SessionFilter, describe, hidden_by},
 };
-use gpui_kit::component::input::{Input, InputEvent, InputState};
 
 /// What a button of the head looks like: its name, icon and tip, whether its filter is on (`lit`), and its menu.
 struct HeadButton {
@@ -19,20 +18,6 @@ struct HeadButton {
 }
 
 impl Shell {
-    /// Makes the box that narrows the sessions, the first time there is a window; a change in it narrows the list.
-    pub(super) fn ensure_filter_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.filter_input.is_some() {
-            return;
-        }
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder("Filter sessions"));
-        self._filter_input = Some(cx.subscribe(&input, |this, _, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Change) {
-                this.push_sidebar(cx);
-            }
-        }));
-        self.filter_input = Some(input);
-    }
-
     /// A button with a menu hung under it, drawn open while its menu shows.
     fn head_button(&self, look: HeadButton, press: impl Fn(&mut Window, &mut gpui_kit::App) + 'static) -> AnyElement {
         let HeadButton { id, icon, tip, lit, open, menu } = look;
@@ -58,7 +43,6 @@ impl Shell {
     pub(super) fn sidebar_header(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let this = cx.entity().downgrade();
-        let query = self.filter_input.as_ref().map(|i| i.read(cx).value().to_string()).unwrap_or_default();
         let filter = self.session_filter;
 
         let filter_menu = self.filter_menu.then(|| {
@@ -125,12 +109,12 @@ impl Shell {
         });
 
         let (toggle_filter, toggle_add) = (this.clone(), this.clone());
-        let lit = !filter.is_default() || !query.trim().is_empty();
+        let lit = !filter.is_default();
         let buttons = div()
             .flex()
             .items_center()
             .gap(px(4.))
-            .child(self.head_button(HeadButton { id: "filter-button", icon: beui::IconName::FilterList, tip: describe(filter, &query), lit, open: self.filter_menu, menu: filter_menu }, move |_, cx| {
+            .child(self.head_button(HeadButton { id: "filter-button", icon: beui::IconName::FilterList, tip: describe(filter), lit, open: self.filter_menu, menu: filter_menu }, move |_, cx| {
                 drop(toggle_filter.update(cx, |s, cx| {
                     s.filter_menu = !s.filter_menu;
                     s.add_menu = false;
@@ -144,15 +128,6 @@ impl Shell {
                     cx.notify();
                 }))
             }));
-        let search = self.filter_input.as_ref().map(|input| {
-            div()
-                .debug_selector(|| "session-filter".into())
-                .mx(px(8.))
-                .mb(px(4.))
-                .rounded(radius::LG)
-                .bg(theme.card)
-                .child(Input::new(input).appearance(false).px(px(8.)).text_size(TextSize::Sm.font_size()))
-        });
         div()
             .flex_none()
             .flex()
@@ -168,7 +143,6 @@ impl Shell {
                     .child(div().text_size(TextSize::Xs.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).text_color(theme.muted_foreground).child("Projects"))
                     .child(buttons),
             )
-            .children(search)
             .into_any_element()
     }
 }

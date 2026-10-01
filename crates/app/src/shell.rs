@@ -158,10 +158,8 @@ pub struct Shell {
     layout_menu: bool,
     /// The sessions the reader archived, by the agent's id.
     archived: std::collections::BTreeSet<String>,
-    /// What the sidebar lists, and the box that narrows it by title. The box is made with the window.
+    /// What the sidebar lists.
     session_filter: beui::sidebar_filter::SessionFilter,
-    filter_input: Option<Entity<gpui_kit::component::input::InputState>>,
-    _filter_input: Option<Subscription>,
     filter_menu: bool,
     add_menu: bool,
     /// Every project with every session, before the filter: the island and the urgent key count from this.
@@ -225,8 +223,6 @@ impl Shell {
             layout_menu: false,
             archived: saved.archived_sessions.iter().cloned().collect(),
             session_filter: beui::sidebar_filter::SessionFilter::default(),
-            filter_input: None,
-            _filter_input: None,
             filter_menu: false,
             add_menu: false,
             all_projects: Vec::new(),
@@ -254,8 +250,7 @@ impl Shell {
     /// The sidebar's projects from the sessions as they are now, narrowed by the filter and the box.
     fn push_sidebar(&mut self, cx: &mut Context<Self>) {
         let all = agents_view::sidebar(&self.projects, &self.names, &self.badges, &self.archived, cx);
-        let query = self.filter_input.as_ref().map(|i| i.read(cx).value().to_string()).unwrap_or_default();
-        let shown = beui::sidebar_filter::narrow(&all, self.session_filter, &query);
+        let shown = beui::sidebar_filter::narrow(&all, self.session_filter);
         // Each session carries its project's badge, for the head of its panel.
         let sessions: Vec<(Vec<Entity<AgentSession>>, beui::sidebar_model::Badge)> =
             self.projects.iter().zip(&all).map(|(p, data)| (p.read(cx).sessions.clone(), data.badge.clone())).collect();
@@ -1855,7 +1850,6 @@ impl Shell {
     fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         self.width = f32::from(window.viewport_size().width);
-        self.ensure_filter_input(window, cx);
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
             None => self.start_screen(window, cx).into_any_element(),

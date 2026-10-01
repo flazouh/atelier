@@ -501,7 +501,7 @@ fn a_panel_names_its_project_and_a_press_on_its_close_button_closes_it(cx: &mut 
 #[gpui_kit::test]
 fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
-    assert!(cx.debug_bounds("session-filter").is_some(), "the box that narrows the sessions");
+    assert!(cx.debug_bounds("session-filter").is_none(), "no box that narrows the sessions by title");
     let add = cx.debug_bounds("add-project").expect("the add button is drawn");
     cx.simulate_click(add.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
