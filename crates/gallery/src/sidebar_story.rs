@@ -22,7 +22,7 @@ const BASE: u64 = 1_790_700_000;
 const STEP: Duration = Duration::from_millis(1800);
 
 fn session(id: &str, title: &str, look: &AgentLook, status: SessionStatus, minutes_ago: u64) -> SessionData {
-    SessionData { id: id.to_string().into(), title: title.to_string().into(), look: look.clone(), status, active_at: BASE - minutes_ago * 60 }
+    SessionData { archived: false, id: id.to_string().into(), title: title.to_string().into(), look: look.clone(), status, active_at: BASE - minutes_ago * 60 }
 }
 
 fn sample(other: &AgentLook) -> Vec<ProjectData> {

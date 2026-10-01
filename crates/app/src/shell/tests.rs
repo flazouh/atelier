@@ -492,3 +492,46 @@ fn a_panel_names_its_project_and_a_press_on_its_close_button_closes_it(cx: &mut 
     assert_eq!(open(&shell, cx), 0, "a press closes the panel's session");
     assert!(cx.debug_bounds("panel-close").is_none());
 }
+
+/// The sidebar's head holds the two ways to add a project and the filter, each a button with a menu.
+#[gpui_kit::test]
+fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    assert!(cx.debug_bounds("session-filter").is_some(), "the box that narrows the sessions");
+    let add = cx.debug_bounds("add-project").expect("the add button is drawn");
+    cx.simulate_click(add.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("add-folder").is_some() && cx.debug_bounds("add-ssh").is_some(), "the add menu offers a folder and SSH");
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    let filter = cx.debug_bounds("filter-button").expect("the filter button is drawn");
+    cx.simulate_click(filter.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    for choice in beui::sidebar_filter::SessionFilter::ALL {
+        assert!(cx.debug_bounds(choice.row()).is_some(), "{} is on the menu", choice.words());
+    }
+    let archived = cx.debug_bounds("filter-archived").unwrap();
+    cx.simulate_click(archived.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.session_filter), beui::sidebar_filter::SessionFilter::Archived);
+}
+
+/// An archived session leaves the list until the Archived or All filter asks for it, and comes back when taken out.
+#[gpui_kit::test]
+fn an_archived_session_leaves_the_list_until_the_filter_asks(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+    project.update(cx, |p, _| p.past = vec![lathe_agents::session::SessionSummary { id: lathe_agents::session::SessionId::new("old-1"), title: "an old idea".into(), updated: Some(5) }]);
+    shell.update(cx, |s, cx| s.sync(cx));
+    let titles = |cx: &mut gpui_kit::VisualTestContext| {
+        shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).projects().iter().flat_map(|p| p.sessions.iter().map(|x| x.title.to_string())).collect::<Vec<_>>())
+    };
+    assert!(titles(cx).iter().any(|t| t == "an old idea"), "a past session is on the list");
+    shell.update(cx, |s, cx| s.set_archived("past:old-1", true, cx));
+    assert!(!titles(cx).iter().any(|t| t == "an old idea"), "archived: gone from the list");
+    shell.update(cx, |s, cx| s.choose_filter(beui::sidebar_filter::SessionFilter::Archived, cx));
+    assert_eq!(titles(cx), ["an old idea"], "the Archived filter shows only it");
+    shell.update(cx, |s, cx| s.set_archived("past:old-1", false, cx));
+    shell.update(cx, |s, cx| s.choose_filter(beui::sidebar_filter::SessionFilter::Active, cx));
+    assert!(titles(cx).iter().any(|t| t == "an old idea"), "taken out of the archive: back on the list");
+}

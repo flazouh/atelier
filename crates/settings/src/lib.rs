@@ -43,6 +43,9 @@ pub struct Settings {
     pub task_rules_off: Vec<String>,
     /// Names the reader gave sessions, by the agent's id for the session.
     pub session_names: std::collections::BTreeMap<String, String>,
+    /// The sessions the reader archived, by the agent's id for each. An archived session leaves the list until the
+    /// filter asks for it.
+    pub archived_sessions: Vec<String>,
     /// How the agent panels were laid out last.
     pub panels: Panels,
     /// The sessions open at quit, in their panels' order, for the next launch to open again.

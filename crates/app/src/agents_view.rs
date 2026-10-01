@@ -73,7 +73,7 @@ pub fn badge_of(place: &str, label: &str, badges: &Badges) -> Badge {
 }
 
 /// Every project with its sessions, open ones first as the agent names them, then past ones.
-pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String>, badges: &Badges, cx: &App) -> Vec<ProjectData> {
+pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String>, badges: &Badges, archived: &std::collections::BTreeSet<String>, cx: &App) -> Vec<ProjectData> {
     let places: Vec<(String, String)> = projects.iter().map(|p| (project_id(p.read(cx)).to_string(), p.read(cx).name())).collect();
     let pairs: Vec<(&str, &str)> = places.iter().map(|(place, name)| (place.as_str(), name.as_str())).collect();
     let labels = project_badge::labels(&pairs);
@@ -84,6 +84,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
             let open = p.sessions.iter().map(|s| {
                 let s = s.read(cx);
                 SessionData {
+                    archived: s.id.as_ref().is_some_and(|id| archived.contains(id.as_str())),
                     id: s.key.clone(),
                     title: s.shown_title(),
                     look: s.agent.look.clone(),
@@ -92,6 +93,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                 }
             });
             let past = p.past.iter().map(|past| SessionData {
+                archived: archived.contains(&past.id.0),
                 id: format!("{PAST}{}", past.id.0).into(),
                 title: names.get(&past.id.0).cloned().unwrap_or_else(|| past.title.clone()).into(),
                 look: p.agent.look.clone(),

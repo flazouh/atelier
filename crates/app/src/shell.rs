@@ -31,6 +31,7 @@ use lathe_settings::Location;
 use std::collections::BTreeMap;
 mod fit;
 mod restore;
+mod sidebar_header;
 mod view;
 
 pub use view::{FilesPane, ShellView};
@@ -155,6 +156,16 @@ pub struct Shell {
     files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
     layout_menu: bool,
+    /// The sessions the reader archived, by the agent's id.
+    archived: std::collections::BTreeSet<String>,
+    /// What the sidebar lists, and the box that narrows it by title. The box is made with the window.
+    session_filter: beui::sidebar_filter::SessionFilter,
+    filter_input: Option<Entity<gpui_kit::component::input::InputState>>,
+    _filter_input: Option<Subscription>,
+    filter_menu: bool,
+    add_menu: bool,
+    /// Every project with every session, before the filter: the island and the urgent key count from this.
+    all_projects: Vec<beui::sidebar_model::ProjectData>,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
     session_right: Option<f32>,
     /// The right pane's own view (`right_pane.rs`), cached.
@@ -212,6 +223,13 @@ impl Shell {
             view: ShellView::from_words(saved.view.as_deref()),
             files_narrow: FilesPane::default(),
             layout_menu: false,
+            archived: saved.archived_sessions.iter().cloned().collect(),
+            session_filter: beui::sidebar_filter::SessionFilter::default(),
+            filter_input: None,
+            _filter_input: None,
+            filter_menu: false,
+            add_menu: false,
+            all_projects: Vec::new(),
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
             _ages: cx.spawn(async move |this, cx| {
@@ -230,9 +248,17 @@ impl Shell {
         if !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
             return;
         }
-        let projects = agents_view::sidebar(&self.projects, &self.names, &self.badges, cx);
+        self.push_sidebar(cx);
+    }
+
+    /// The sidebar's projects from the sessions as they are now, narrowed by the filter and the box.
+    fn push_sidebar(&mut self, cx: &mut Context<Self>) {
+        let all = agents_view::sidebar(&self.projects, &self.names, &self.badges, &self.archived, cx);
+        let query = self.filter_input.as_ref().map(|i| i.read(cx).value().to_string()).unwrap_or_default();
+        let shown = beui::sidebar_filter::narrow(&all, self.session_filter, &query);
+        self.all_projects = all;
         let now = agent_session::now();
-        self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
+        self.agents_sidebar.update(cx, |s, cx| s.set_projects(shown, now, cx));
     }
 
     /// Hears the sidebar and the panels. Called once the window exists.
@@ -245,7 +271,6 @@ impl Shell {
 
     /// The sidebar and the panels, drawn again from the projects as they are now.
     fn sync(&mut self, cx: &mut Context<Self>) {
-        let projects = agents_view::sidebar(&self.projects, &self.names, &self.badges, cx);
         // Each open session keeps one view across syncs, so its panel is drawn from its last frame.
         let sessions: Vec<Entity<AgentSession>> = self.projects.iter().flat_map(|p| p.read(cx).sessions.clone()).collect();
         self.panel_views.retain(|id, _| sessions.iter().any(|s| s.entity_id() == *id));
@@ -256,8 +281,7 @@ impl Shell {
         }
         let views = &self.panel_views;
         let (panels, order) = agents_view::panels(&self.projects, &|s| views[&s.entity_id()].clone().into(), cx);
-        let now = agent_session::now();
-        self.agents_sidebar.update(cx, |s, cx| s.set_projects(projects, now, cx));
+        self.push_sidebar(cx);
         self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));
         self.mark_open_session(cx);
         self.save_open(cx);
@@ -410,6 +434,7 @@ impl Shell {
                     }
                 }
             }
+            SidebarEvent::Archive { session, archive, .. } => self.set_archived(session, *archive, cx),
             SidebarEvent::NewSession { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
                     self.new_session(at, window, cx);
@@ -455,6 +480,52 @@ impl Shell {
             self.projects[at].update(cx, |p, cx| p.close_session(key, cx));
             self.sync(cx);
         }
+    }
+
+    /// Puts the session on the sidebar's row `row` into the archive, or takes it out. An open session closes first:
+    /// archiving puts it away. The choice is kept in the settings.
+    fn set_archived(&mut self, row: &str, archive: bool, cx: &mut Context<Self>) {
+        let (agent_id, open) = match agents_view::pick(row) {
+            agents_view::Pick::Past(id) => (Some(id.0), None),
+            agents_view::Pick::Open(key) => {
+                let id = self.session_by_key(&key, cx).and_then(|(_, s)| s.read(cx).id.as_ref().map(|i| i.as_str().to_string()));
+                (id, Some(key))
+            }
+        };
+        let Some(id) = agent_id else {
+            return self.say("This session has not started, so it has nothing to archive yet.".into(), cx);
+        };
+        if archive {
+            self.archived.insert(id.clone());
+            if let Some(key) = open {
+                self.close_session(&key, cx);
+            }
+        } else {
+            self.archived.remove(&id);
+        }
+        if let Some(path) = settings_path() {
+            cx.background_spawn(async move {
+                let result = lathe_settings::update(&path, |s| {
+                    s.archived_sessions.retain(|kept| *kept != id);
+                    if archive {
+                        s.archived_sessions.push(id.clone());
+                    }
+                });
+                if let Err(error) = result {
+                    eprintln!("could not keep the archive: {error}");
+                }
+            })
+            .detach();
+        }
+        self.sync(cx);
+    }
+
+    /// Chooses what the sidebar lists.
+    fn choose_filter(&mut self, filter: beui::sidebar_filter::SessionFilter, cx: &mut Context<Self>) {
+        self.session_filter = filter;
+        self.filter_menu = false;
+        self.push_sidebar(cx);
+        cx.notify();
     }
 
     fn panels_event(&mut self, _: &Entity<AgentPanels>, event: &PanelsEvent, _: &mut Window, cx: &mut Context<Self>) {
@@ -1235,12 +1306,12 @@ impl Shell {
     /// Opens the session that needs the reader most: one waiting for a yes or no, then a question, then one finished and unseen.
     fn open_most_urgent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let sidebar = self.agents_sidebar.clone();
-        let Some((project, session)) = beui::most_urgent(sidebar.read(cx).projects()) else { return };
+        let Some((project, session)) = beui::most_urgent(&self.all_projects) else { return };
         self.sidebar_event(&sidebar, &SidebarEvent::Open { project, session }, window, cx);
     }
 
     fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let counts = beui::counts_of(self.agents_sidebar.read(cx).projects());
+        let counts = beui::counts_of(&self.all_projects);
         let this = cx.entity().downgrade();
         div()
             .id("title-bar")
@@ -1499,12 +1570,13 @@ impl Shell {
     }
 
     /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
-    fn sidebar(&self, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         // The projects and their sessions; the files are the Files view's.
         div()
             .flex()
             .flex_col()
             .size_full()
+            .child(self.sidebar_header(cx))
             .child(div().flex_1().min_h_0().child(crate::view_cache::draw(&self.agents_sidebar)))
     }
 
@@ -1775,6 +1847,7 @@ impl Shell {
     fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         self.width = f32::from(window.viewport_size().width);
+        self.ensure_filter_input(window, cx);
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
             None => self.start_screen(window, cx).into_any_element(),
