@@ -1,3 +1,5 @@
+use gpui_kit::Focusable;
+use atelier_ui::ActiveTheme;
 use std::{cell::Cell, rc::Rc};
 
 use gpui_kit::{Entity, TestAppContext, VisualTestContext};

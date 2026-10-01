@@ -1,3 +1,5 @@
+use gpui_kit::Focusable;
+use gpui_kit::AppContext;
 use std::process::Command as Git;
 
 use gpui_kit::TestAppContext;

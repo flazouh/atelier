@@ -1,3 +1,4 @@
+use gpui_kit::AppContext;
 use std::sync::{Arc, Mutex};
 use gpui_kit::TestAppContext;
 use atelier_forge::{ForgeError, NewPull, PullRef, RepoRef};

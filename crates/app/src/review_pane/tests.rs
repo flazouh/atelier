@@ -1,3 +1,5 @@
+use gpui_kit::Focusable;
+use gpui_kit::AppContext;
 use std::path::Path;
 
 use gpui_kit::TestAppContext;

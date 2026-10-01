@@ -1,3 +1,4 @@
+use gpui_kit::AppContext;
 use std::{sync::Arc, time::Duration};
 use atelier_ui::merge::{Action, MergeMethod as UiMethod};
 use gpui_kit::{Entity, TestAppContext};
