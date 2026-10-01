@@ -449,6 +449,14 @@ impl Shell {
         }
     }
 
+    /// Closes the session keyed `key`: its panel goes, its agent stops, and it is in the project's past list.
+    fn close_session(&mut self, key: &str, cx: &mut Context<Self>) {
+        if let Some((at, _)) = self.session_by_key(key, cx) {
+            self.projects[at].update(cx, |p, cx| p.close_session(key, cx));
+            self.sync(cx);
+        }
+    }
+
     fn panels_event(&mut self, _: &Entity<AgentPanels>, event: &PanelsEvent, _: &mut Window, cx: &mut Context<Self>) {
         match event {
             PanelsEvent::Activated(key) => {
@@ -458,13 +466,7 @@ impl Shell {
                 self.seen(key, cx);
                 self.mark_open_session(cx);
             }
-            PanelsEvent::Closed(key) => {
-                if let Some((at, _)) = self.session_by_key(key, cx) {
-                    let key = key.to_string();
-                    self.projects[at].update(cx, |p, cx| p.close_session(&key, cx));
-                    self.sync(cx);
-                }
-            }
+            PanelsEvent::Closed(key) => self.close_session(&key.to_string(), cx),
             PanelsEvent::StateChanged => {
                 let state = self.panels.read(cx).state();
                 let panels = lathe_settings::Panels {
@@ -805,6 +807,7 @@ impl Shell {
                 }
                 cx.notify();
             }
+            ProjectEvent::CloseSession(key) => this.close_session(&key.to_string(), cx),
             ProjectEvent::ShowFiles => this.show_view(ShellView::Files, window, cx),
             ProjectEvent::ShowTasks => {
                 if let Some(i) = this.projects.iter().position(|p| p == project) {

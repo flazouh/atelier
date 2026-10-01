@@ -476,3 +476,19 @@ fn a_narrow_sessions_view_has_no_editor_tab(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("narrow-tab-Projects").is_some() && cx.debug_bounds("narrow-tab-Session").is_some());
     assert!(cx.debug_bounds("narrow-tab-Editor").is_none(), "no Editor tab in the Sessions view");
 }
+
+/// A panel names the project it works in, and its close button closes it.
+#[gpui_kit::test]
+fn a_panel_names_its_project_and_a_press_on_its_close_button_closes_it(cx: &mut TestAppContext) {
+    let (shell, cx, dir) = with_a_session(cx, 1400.);
+    assert!(cx.debug_bounds("panel-project").is_some(), "the panel names its project");
+    let name = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].read(cx).project_name());
+    assert_eq!(name.as_ref(), dir.path().file_name().unwrap().to_string_lossy());
+    let open = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions.len());
+    assert_eq!(open(&shell, cx), 1);
+    let close = cx.debug_bounds("panel-close").expect("the panel has a close button");
+    cx.simulate_click(close.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(open(&shell, cx), 0, "a press closes the panel's session");
+    assert!(cx.debug_bounds("panel-close").is_none());
+}

@@ -110,6 +110,8 @@ pub enum ProjectEvent {
     TasksShown,
     /// The review closed: the editor is back.
     ReviewClosed,
+    /// The reader pressed a session panel's close button, by the session's key.
+    CloseSession(SharedString),
     /// The reader ran `/files` in a session: the Files view comes to the front.
     ShowFiles,
     /// The reader ran `/tasks` in a session: the tasks come to the right pane.
@@ -328,6 +330,7 @@ impl OpenProject {
                     return cx.emit(ProjectEvent::Review { session: session.clone(), turn: *turn, path: path.clone() });
                 }
                 SessionEvent::OpenFile(path) => return cx.emit(ProjectEvent::Open(path.clone())),
+                SessionEvent::Close => return cx.emit(ProjectEvent::CloseSession(session.read(cx).key.clone())),
                 SessionEvent::ShowFiles => return cx.emit(ProjectEvent::ShowFiles),
                 SessionEvent::ShowTasks => return cx.emit(ProjectEvent::ShowTasks),
                 SessionEvent::Renamed => {

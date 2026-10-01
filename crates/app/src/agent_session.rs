@@ -67,6 +67,8 @@ pub enum SessionEvent {
     Task(crate::tasks::signal::TaskEvent),
     /// The reader pressed the task chip in the header.
     OpenTask,
+    /// The reader pressed the panel's close button.
+    Close,
     /// The reader ran `/files`: the Files view comes to the front.
     ShowFiles,
     /// The reader ran `/tasks`: the project's tasks come to the right pane.
@@ -162,6 +164,11 @@ pub struct AgentSession {
 }
 
 impl AgentSession {
+    /// The name of the project's folder: the panel names the project it works in.
+    pub fn project_name(&self) -> SharedString {
+        self.project.root().file_name().map_or_else(|| self.project.root().display().to_string(), |n| n.to_string_lossy().into_owned()).into()
+    }
+
     /// The project's folder, as tool calls name paths under it.
     pub fn root(&self) -> String {
         self.project.root().display().to_string()

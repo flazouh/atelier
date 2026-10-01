@@ -468,9 +468,9 @@ fn shows_stop(running: bool, status: &SessionStatus) -> bool {
 
 fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, status_words, task) = {
+    let (key, renaming, shown_title, running, status_words, task, project) = {
         let s = session.read(cx);
-        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words(), s.task.clone())
+        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words(), s.task.clone(), s.project_name())
     };
     let title = match &renaming {
         Some(input) => div()
@@ -519,17 +519,31 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
             .tooltip("Open the task")
             .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenTask)))
     });
+    let close = {
+        let close = session.clone();
+        Button::new(gpui_kit::ElementId::Name(format!("{key}-close").into()))
+            .debug_name("panel-close")
+            .icon(IconName::Close)
+            .variant(ButtonVariant::Ghost)
+            .size(beui::ButtonSize::IconSm)
+            .tooltip("Close the panel")
+            .on_click(move |_, _, cx| close.update(cx, |_, cx| cx.emit(SessionEvent::Close)))
+    };
     div()
         .flex()
         .flex_none()
         .items_center()
         .gap(px(8.))
         .h(px(40.))
-        .px(px(16.))
+        .pl(px(16.))
+        .pr(px(8.))
+        // The project the session works in, so a panel always says where it is.
+        .child(div().debug_selector(|| "panel-project".into()).flex_none().max_w(px(120.)).truncate().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(project))
         .child(title)
         .children(chip)
         .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(status_words))
         .children(stop)
+        .child(close)
 }
 
 pub(crate) mod calls;
