@@ -4,6 +4,7 @@ description = "The Project interface: a project's files, search, processes and g
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 dirs = "6"

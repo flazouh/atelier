@@ -4,6 +4,7 @@ description = "The Project interface over a pipe: lathe-remote serves it on a ho
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [[bin]]
 name = "lathe-remote"

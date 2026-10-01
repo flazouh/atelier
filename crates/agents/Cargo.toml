@@ -4,6 +4,7 @@ description = "Agents in lathe: their session model and backends, and each one's
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true

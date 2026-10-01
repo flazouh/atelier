@@ -4,6 +4,7 @@ description = "A file's editor wired to its language server: definitions, uses, 
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true

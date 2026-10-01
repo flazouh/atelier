@@ -4,6 +4,7 @@ description = "Reviewing what an agent did: the text of each file before its tur
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 beui.workspace = true

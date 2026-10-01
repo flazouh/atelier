@@ -4,6 +4,7 @@ description = "The tasks behind a project: a neutral Tracker interface, the loca
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 rusqlite = { version = "0.32", features = ["bundled"] }

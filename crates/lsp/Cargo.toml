@@ -4,6 +4,7 @@ description = "A small LSP client: diagnostics, go to definition, and hover, ove
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dev-dependencies]
 lsp-types = "0.97"

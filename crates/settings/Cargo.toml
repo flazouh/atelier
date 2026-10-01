@@ -4,6 +4,7 @@ description = "What lathe remembers across launches: the theme and the recent pr
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 dirs = "6"

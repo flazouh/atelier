@@ -4,6 +4,7 @@ description = "The forge behind a project: its pull requests, reviews and checks
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true
