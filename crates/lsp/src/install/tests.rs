@@ -50,7 +50,7 @@ fn spec(download: Option<Download>) -> ServerSpec {
     }
 }
 
-/// The same file for every platform lathe downloads for.
+/// The same file for every platform atelier downloads for.
 fn binary(url: &'static str, sha256: &'static str) -> Option<Download> {
     let files = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"]
         .map(|platform| PlatformFile { platform, url, sha256 });
@@ -125,7 +125,7 @@ fn a_failed_fetch_says_why() {
     let store_dir = scratch("missing-store");
     let store = Store::new(store_dir.clone(), vec![], false);
 
-    let error = store.launch(&spec(binary("file:///nowhere/lathe-server.gz", "00")), &|_| {}).expect_err("no file");
+    let error = store.launch(&spec(binary("file:///nowhere/atelier-server.gz", "00")), &|_| {}).expect_err("no file");
 
     assert!(matches!(&error, Unavailable::Failed(reason) if reason.starts_with("downloading file:///nowhere")), "{error}");
     assert!(names(&store_dir).is_empty());
@@ -136,7 +136,7 @@ fn offline_stops_before_the_network() {
     let store = Store::new(scratch("offline-store"), vec![], true);
     let (log, push) = heard();
 
-    let error = store.launch(&spec(binary("file:///nowhere/lathe-server.gz", "00")), &|line| push(&log, line));
+    let error = store.launch(&spec(binary("file:///nowhere/atelier-server.gz", "00")), &|line| push(&log, line));
 
     assert_eq!(error, Err(Unavailable::NotInstalled));
     assert!(log.borrow().is_empty());
@@ -154,7 +154,7 @@ fn a_server_the_user_installed_wins() {
     }
     let store = Store::new(store_dir.clone(), vec![search], false);
 
-    let launch = store.launch(&spec(binary("file:///nowhere/lathe-server.gz", "00")), &|_| {});
+    let launch = store.launch(&spec(binary("file:///nowhere/atelier-server.gz", "00")), &|_| {});
 
     assert_eq!(launch, Ok(Launch::direct(installed)));
     assert!(names(&store_dir).is_empty(), "nothing was downloaded");
@@ -177,10 +177,10 @@ fn a_platform_with_no_file_is_not_installed() {
 }
 
 #[test]
-fn a_node_server_runs_its_script_on_lathes_node() {
+fn a_node_server_runs_its_script_on_ateliers_node() {
     let (fixtures, store_dir) = (scratch("node-fixtures"), scratch("node-store"));
     let (url, sha256) = npm_tarball(&fixtures);
-    // lathe's Node.js is already there, so the test downloads only the package.
+    // atelier's Node.js is already there, so the test downloads only the package.
     let node = store_dir.join("node").join(NODE.version).join("bin/node");
     fs::create_dir_all(node.parent().unwrap()).unwrap();
     fs::write(&node, "").unwrap();

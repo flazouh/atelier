@@ -1,6 +1,6 @@
 use std::{sync::Mutex, time::Duration};
 
-use lathe_forge::{Change, ChangedFile, ForgeError, PullState};
+use atelier_forge::{Change, ChangedFile, ForgeError, PullState};
 
 use crate::{
     Part, PartKind, PullData,

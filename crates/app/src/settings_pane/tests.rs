@@ -21,7 +21,7 @@ fn every_offered_colour_is_a_distinct_name_and_colour() {
     assert!(!names.contains("default"), "\"default\" is the theme's own ink");
 }
 
-fn open<'a>(saved: &lathe_settings::Settings, cx: &'a mut TestAppContext) -> (Entity<SettingsPane>, &'a mut VisualTestContext, Rc<Cell<usize>>) {
+fn open<'a>(saved: &atelier_settings::Settings, cx: &'a mut TestAppContext) -> (Entity<SettingsPane>, &'a mut VisualTestContext, Rc<Cell<usize>>) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         set_appearance(Appearance::Light, cx);
@@ -30,7 +30,7 @@ fn open<'a>(saved: &lathe_settings::Settings, cx: &'a mut TestAppContext) -> (En
     let closed = Rc::new(Cell::new(0));
     let counter = closed.clone();
     let saved = saved.clone();
-    let agents = vec![AgentRow { name: "Claude Code".into(), models: vec!["Opus".into(), "Sonnet".into()] }, AgentRow { name: "lathe".into(), models: Vec::new() }];
+    let agents = vec![AgentRow { name: "Claude Code".into(), models: vec!["Opus".into(), "Sonnet".into()] }, AgentRow { name: "atelier".into(), models: Vec::new() }];
     let (pane, cx) = cx.add_window_view(move |_, cx| SettingsPane::new(&saved, agents, cx));
     cx.update(|window, cx| {
         let sub = cx.subscribe(&pane, move |_, event: &SettingsEvent, _| {
@@ -58,15 +58,15 @@ fn click(cx: &mut VisualTestContext, selector: &'static str) {
     }
 }
 
-fn wait_for(path: &std::path::Path, ok: impl Fn(&lathe_settings::Settings) -> bool) -> lathe_settings::Settings {
+fn wait_for(path: &std::path::Path, ok: impl Fn(&atelier_settings::Settings) -> bool) -> atelier_settings::Settings {
     for _ in 0..200 {
-        let now = lathe_settings::load(path);
+        let now = atelier_settings::load(path);
         if ok(&now) {
             return now;
         }
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
-    lathe_settings::load(path)
+    atelier_settings::load(path)
 }
 
 /// One test, since the settings file is named by an environment variable the whole process shares.
@@ -75,8 +75,8 @@ fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
     let dir = crate::test_dirs::path();
     let file = dir.join("settings.json");
     // SAFETY: nothing else in this test binary reads or writes the variable while this test runs.
-    unsafe { std::env::set_var("LATHE_SETTINGS", &file) };
-    let (_pane, cx, closed) = open(&lathe_settings::Settings::default(), cx);
+    unsafe { std::env::set_var("ATELIER_SETTINGS", &file) };
+    let (_pane, cx, closed) = open(&atelier_settings::Settings::default(), cx);
 
     // The default primary is the theme's ink.
     let (ink, page) = cx.update(|_, cx| (cx.theme().foreground, cx.theme().background));
@@ -108,12 +108,12 @@ fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
     // Escape asks to close.
     cx.simulate_keystrokes("escape");
     assert_eq!(closed.get(), 1);
-    unsafe { std::env::remove_var("LATHE_SETTINGS") };
+    unsafe { std::env::remove_var("ATELIER_SETTINGS") };
 }
 
 #[gpui_kit::test]
 fn the_pane_opens_on_what_was_kept_and_lists_the_agents_and_the_keys(cx: &mut TestAppContext) {
-    let saved = lathe_settings::Settings { mode: Some("dark".into()), primary: Some(PRIMARIES[3].1), ..Default::default() };
+    let saved = atelier_settings::Settings { mode: Some("dark".into()), primary: Some(PRIMARIES[3].1), ..Default::default() };
     let (pane, cx, _) = open(&saved, cx);
     pane.read_with(cx, |p, _| {
         assert_eq!(p.mode, Mode::Dark);
@@ -137,7 +137,7 @@ fn wheel(cx: &mut VisualTestContext, dy: f32) {
 /// A short window scrolls the long Keys list to its last row and back.
 #[gpui_kit::test]
 fn a_short_window_scrolls_the_keys_list(cx: &mut TestAppContext) {
-    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    let (pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
     pane.update(cx, |p, cx| p.show(Section::Keys, cx));
     cx.simulate_resize(gpui_kit::size(px(900.), px(300.)));
     for _ in 0..3 {
@@ -153,7 +153,7 @@ fn a_short_window_scrolls_the_keys_list(cx: &mut TestAppContext) {
 /// The sections are listed at the left, one shows at a time, and a press on an entry shows its section.
 #[gpui_kit::test]
 fn a_press_on_a_section_shows_it_alone(cx: &mut TestAppContext) {
-    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    let (pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
     for section in Section::ALL {
         assert!(cx.debug_bounds(section.entry()).is_some(), "{} is listed", section.words());
     }
@@ -161,7 +161,7 @@ fn a_press_on_a_section_shows_it_alone(cx: &mut TestAppContext) {
     click(cx, "section-agents");
     assert!(cx.debug_bounds("agent-row-0").is_some() && cx.debug_bounds("mode-dark").is_none(), "Agents shows its rows and Appearance goes");
     click(cx, "section-tasks");
-    assert!(cx.debug_bounds(super::rule_switch(lathe_tracker::Rule::MergeMovesToDone)).is_some(), "Tasks shows its switches");
+    assert!(cx.debug_bounds(super::rule_switch(atelier_tracker::Rule::MergeMovesToDone)).is_some(), "Tasks shows its switches");
     assert!(cx.debug_bounds("design-tabs-0").is_none() && cx.debug_bounds("design-elevation-0").is_none(), "no design preview anywhere");
     pane.read_with(cx, |p, _| assert_eq!(p.section, Section::Tasks));
 }
@@ -169,24 +169,24 @@ fn a_press_on_a_section_shows_it_alone(cx: &mut TestAppContext) {
 /// The task rules show as switches, on unless the reader turned them off, and a switch changes the set.
 #[gpui_kit::test]
 fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestAppContext) {
-    let saved = lathe_settings::Settings { task_rules_off: vec!["merge".into()], ..Default::default() };
+    let saved = atelier_settings::Settings { task_rules_off: vec!["merge".into()], ..Default::default() };
     let (pane, cx, _) = open(&saved, cx);
     pane.update(cx, |p, cx| p.show(Section::Tasks, cx));
-    for rule in lathe_tracker::Rule::ALL {
+    for rule in atelier_tracker::Rule::ALL {
         assert!(cx.debug_bounds(super::rule_switch(rule)).is_some(), "{} has its switch", rule.id());
     }
     let on = |cx: &mut VisualTestContext, rule| pane.read_with(cx, |p, _| p.rules.is_on(rule));
-    assert!(on(cx, lathe_tracker::Rule::SessionStartMovesToInProgress));
-    assert!(!on(cx, lathe_tracker::Rule::MergeMovesToDone), "kept off");
-    pane.update(cx, |p, _| p.rules.set(lathe_tracker::Rule::MergeMovesToDone, true));
-    assert!(on(cx, lathe_tracker::Rule::MergeMovesToDone));
+    assert!(on(cx, atelier_tracker::Rule::SessionStartMovesToInProgress));
+    assert!(!on(cx, atelier_tracker::Rule::MergeMovesToDone), "kept off");
+    pane.update(cx, |p, _| p.rules.set(atelier_tracker::Rule::MergeMovesToDone, true));
+    assert!(on(cx, atelier_tracker::Rule::MergeMovesToDone));
 }
 
 /// The Sidebar section holds the layout's knobs; a change reaches the shell as one event and is kept in the settings.
 #[gpui_kit::test]
 fn the_sidebar_section_edits_the_layout_and_says_so_once(cx: &mut TestAppContext) {
     use beui::sidebar_layout::BadgeShow;
-    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    let (pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
     let heard = Rc::new(std::cell::RefCell::new(Vec::new()));
     let log = heard.clone();
     cx.update(|_, cx| {

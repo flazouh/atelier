@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_project::Command;
+use atelier_project::Command;
 use serde_json::{Value, json};
 
 use super::{Access, MAX_RESULT, Tool, ToolContext, ToolResult, object};
@@ -36,7 +36,7 @@ impl Output {
             self.seen_head = true;
             let head = std::mem::take(&mut self.head);
             let line = String::from_utf8_lossy(&head[..end]).into_owned();
-            match line.strip_prefix("@@lathe-group ") {
+            match line.strip_prefix("@@atelier-group ") {
                 Some(group) => self.group = Some(group.trim().to_string()),
                 // Not the word we expect: it is the command's output, whole.
                 None => self.push(&head[..=end]),
@@ -97,7 +97,7 @@ impl Tool for Shell {
         // The shell's first word is its own process id, so that stopping the command can stop everything it
         // started, and not only the shell (see below). stderr joins stdout, so the model sees the two in the
         // order they were written.
-        const SCRIPT: &str = "printf '@@lathe-group %s\\n' \"$$\"\nexec 2>&1\nexec sh -c \"$1\"";
+        const SCRIPT: &str = "printf '@@atelier-group %s\\n' \"$$\"\nexec 2>&1\nexec sh -c \"$1\"";
         let command = Command::new("sh").args(["-c", SCRIPT, "sh", line]);
         let mut process = match ctx.project.spawn(&command) {
             Ok(process) => process,
@@ -107,7 +107,7 @@ impl Tool for Shell {
         let out = Arc::new(Mutex::new(Output::default()));
         let sink = out.clone();
         let mut stdout = std::mem::replace(&mut process.stdout, Box::new(std::io::empty()));
-        let reader = thread::Builder::new().name("lathe-shell-out".into()).spawn(move || {
+        let reader = thread::Builder::new().name("atelier-shell-out".into()).spawn(move || {
             let mut chunk = [0u8; 8192];
             while let Ok(n) = stdout.read(&mut chunk) {
                 if n == 0 {

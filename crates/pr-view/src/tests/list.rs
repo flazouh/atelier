@@ -1,4 +1,4 @@
-use lathe_forge::{CheckCounts, Involved, PullBrief, PullState, PullSummary, ReviewDecision, Shelf};
+use atelier_forge::{CheckCounts, Involved, PullBrief, PullState, PullSummary, ReviewDecision, Shelf};
 
 use crate::{
     fixture::sample,
@@ -74,7 +74,7 @@ fn only_open_and_draft_pull_requests_of_a_repository_keep_their_checkout() {
     let mut open = list.open_numbers(&sample::reference(1).repo);
     open.sort();
     assert_eq!(open, vec![1, 2]);
-    assert!(list.open_numbers(&lathe_forge::RepoRef::new("github.com", "x", "y")).is_empty());
+    assert!(list.open_numbers(&atelier_forge::RepoRef::new("github.com", "x", "y")).is_empty());
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn the_list_comes_back_from_disk() {
 /// reader's whole working set never shows in it, not even from the cache.
 #[test]
 fn a_scoped_list_holds_only_its_repository() {
-    use lathe_forge::{Forge, RepoRef};
+    use atelier_forge::{Forge, RepoRef};
     let ours = sample::reference(1).repo;
     let mut theirs = involved(2, PullState::Open, Some(Shelf::NeedsAction), 900);
     theirs.summary.brief.reference.repo = RepoRef { host: "github.com".into(), owner: "other".into(), name: "repo".into() };

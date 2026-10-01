@@ -1,8 +1,8 @@
 use std::{sync::Arc, time::Duration};
 use beui::merge::{Action, MergeMethod as UiMethod};
 use gpui_kit::{Entity, TestAppContext};
-use lathe_forge::{CheckStatus, ForgeError, MergeMethod, PullState};
-use lathe_pr_view::fixture::{FixtureForge, Write, sample};
+use atelier_forge::{CheckStatus, ForgeError, MergeMethod, PullState};
+use atelier_pr_view::fixture::{FixtureForge, Write, sample};
 use super::*;
 fn card(cx: &mut TestAppContext, running: bool) -> (Arc<FixtureForge>, Entity<PullCard>, &mut gpui_kit::VisualTestContext) {
     cx.update(|cx| {
@@ -12,12 +12,12 @@ fn card(cx: &mut TestAppContext, running: bool) -> (Arc<FixtureForge>, Entity<Pu
     });
     let mut data = sample::data(7, "abc", Vec::new());
     if running {
-        data.apply(lathe_pr_view::Part::Checks(vec![sample::check("test", CheckStatus::Running, None)]), sample::NOW);
+        data.apply(atelier_pr_view::Part::Checks(vec![sample::check("test", CheckStatus::Running, None)]), sample::NOW);
     }
     let forge = Arc::new(FixtureForge::new().with_pull(data));
     let mut made = None;
     let (_root, cx) = cx.add_window_view(|_, cx| {
-        let f: Arc<dyn lathe_forge::Forge> = forge.clone();
+        let f: Arc<dyn atelier_forge::Forge> = forge.clone();
         let c = cx.new(|cx| PullCard::new(sample::reference(7), f, cx));
         made = Some(c.clone());
         Host(vec![c], true)
@@ -110,10 +110,10 @@ fn two_cards_on_one_pull_request_read_it_once(cx: &mut TestAppContext) {
         beui::init(cx);
     });
     let mut data = sample::data(7, "abc", Vec::new());
-    data.apply(lathe_pr_view::Part::Checks(vec![sample::check("test", CheckStatus::Running, None)]), sample::NOW);
+    data.apply(atelier_pr_view::Part::Checks(vec![sample::check("test", CheckStatus::Running, None)]), sample::NOW);
     let forge = Arc::new(FixtureForge::new().with_pull(data));
     let (_root, cx) = cx.add_window_view(|_, cx| {
-        let f: Arc<dyn lathe_forge::Forge> = forge.clone();
+        let f: Arc<dyn atelier_forge::Forge> = forge.clone();
         let cards = (0..2).map(|_| cx.new(|cx| PullCard::new(sample::reference(7), f.clone(), cx))).collect();
         Host(cards, true)
     });

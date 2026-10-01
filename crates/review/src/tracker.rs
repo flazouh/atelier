@@ -6,8 +6,8 @@ use std::{
     io::ErrorKind,
 };
 
-use lathe_agents::session::{Event, ToolId, ToolKind};
-use lathe_project::Project;
+use atelier_agents::session::{Event, ToolId, ToolKind};
+use atelier_project::Project;
 
 use crate::{
     file_review::{Change, FileReview},

@@ -3,7 +3,7 @@
 //! the in-memory one, holding the pull request's threads, remarks, checks and a failing job with its log.
 use std::{path::Path, sync::Arc};
 
-use lathe_forge::{
+use atelier_forge::{
     Change, ChangedFile, CheckCounts, CheckStatus, Conclusion, Involved, Job, JobRef, MergeSettings, MergeState, Opinion, PullBrief, PullState, PullSummary,
     ReviewDecision, Shelf, Step, Verdict,
 };
@@ -149,7 +149,7 @@ pub const BODY: &str = "A client that aborted between two chunks left the relay 
 pub struct Relay {
     pub repo: Repo,
     pub forge: Arc<FixtureForge>,
-    pub reference: lathe_forge::PullRef,
+    pub reference: atelier_forge::PullRef,
     pub head: String,
     pub base: String,
     /// The commit the reader "last reviewed up to": the third of six.
@@ -233,7 +233,7 @@ impl Relay {
             pull.head = "rui/detach-stream".into();
             pull.merge_state = MergeState::Blocked;
             pull.checks = CheckCounts { passed: 3, failed: 1, running: 1 };
-            pull.merge = MergeSettings { methods: vec![lathe_forge::MergeMethod::Squash], default_method: lathe_forge::MergeMethod::Squash, delete_branch_on_merge: true, ..MergeSettings::default() };
+            pull.merge = MergeSettings { methods: vec![atelier_forge::MergeMethod::Squash], default_method: atelier_forge::MergeMethod::Squash, delete_branch_on_merge: true, ..MergeSettings::default() };
             pull.opinions = vec![Opinion { reviewer: "Ada".into(), verdict: Verdict::Comment }];
             pull.remarks = 3;
         }
@@ -254,7 +254,7 @@ impl Relay {
             comment("r2", "Jarred", "Pushed the decoder fix. The abort path is the interesting one.", 9_000),
             comment("r3", "bench", "http server throughput: 118,402 req/s on main, 119,180 req/s here.", 7_200),
         ];
-        let required = |mut c: lathe_forge::Check| {
+        let required = |mut c: atelier_forge::Check| {
             c.required = true;
             c
         };
@@ -289,10 +289,10 @@ impl Relay {
 pub fn involved() -> Vec<Involved> {
     let repo = |slug: &str| {
         let (owner, name) = slug.split_once('/').unwrap();
-        lathe_forge::RepoRef::new("github.com", owner, name)
+        atelier_forge::RepoRef::new("github.com", owner, name)
     };
     let item = |n: u64, slug: &str, title: &str, state: PullState, shelf: Option<Shelf>, review: ReviewDecision, checks: (u32, u32, u32), comments: u32, size: (u32, u32), ago: u64, author: &str| {
-        let reference = lathe_forge::PullRef { repo: repo(slug), number: n };
+        let reference = atelier_forge::PullRef { repo: repo(slug), number: n };
         Involved {
             summary: PullSummary {
                 brief: PullBrief { reference, title: title.into(), state, url: format!("https://github.com/{slug}/pull/{n}") },

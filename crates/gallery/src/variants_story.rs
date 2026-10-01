@@ -1,4 +1,4 @@
-//! The "Variants" story: designs for three controls, each in lathe's look (our tokens, sizes and radii,
+//! The "Variants" story: designs for three controls, each in atelier's look (our tokens, sizes and radii,
 //! borderless) with the motion running, so Alex can pick. The toggle and tab designs are the parts the real app
 //! shows through Settings, "Design preview" (`beui::design_preview`): there is no second copy.
 //!

@@ -39,7 +39,7 @@ fn a_damaged_or_foreign_file_is_a_miss_not_an_error() {
     assert!(snapshots.load(&saved.reference).is_none());
     std::fs::write(&file, "").unwrap();
     assert!(snapshots.load(&saved.reference).is_none());
-    // A file from another version of lathe.
+    // A file from another version of atelier.
     let mut value: serde_json::Value = serde_json::to_value(serde_json::json!({"version": 0, "data": serde_json::to_value(&saved).unwrap()})).unwrap();
     std::fs::write(&file, value.to_string()).unwrap();
     assert!(snapshots.load(&saved.reference).is_none(), "an old shape is not read");

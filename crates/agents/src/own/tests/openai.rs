@@ -133,11 +133,11 @@ fn statuses_map_to_errors() {
 fn openrouter_sends_two_headers_that_name_the_app() {
     let parts = [chunk(json!({"content": "x"}), Some("stop"))];
     let server = FakeServer::start(vec![Step::Raw { bytes: stream(&parts), chunk: 1000 }]);
-    let client = OpenAiCompatible::new(Some(Secret::new("or-key")), format!("{}/api/v1", server.url)).with_header("HTTP-Referer", "https://example.test").with_header("X-Title", "lathe");
+    let client = OpenAiCompatible::new(Some(Secret::new("or-key")), format!("{}/api/v1", server.url)).with_header("HTTP-Referer", "https://example.test").with_header("X-Title", "atelier");
     ask(&server, client).0.unwrap();
     let request = &server.recorded()[0];
     assert_eq!(request.path, "/api/v1/chat/completions");
-    assert_eq!((request.header("http-referer"), request.header("x-title")), (Some("https://example.test"), Some("lathe")));
+    assert_eq!((request.header("http-referer"), request.header("x-title")), (Some("https://example.test"), Some("atelier")));
     let router = OpenAiCompatible::openrouter(Secret::new("k"));
     let _ = router;
 }

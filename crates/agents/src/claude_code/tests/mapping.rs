@@ -242,7 +242,7 @@ fn a_line_that_is_not_json_or_is_cut_short_is_a_warning_and_the_stream_goes_on()
 }
 
 #[test]
-fn blank_lines_and_kinds_lathe_does_not_know_give_nothing() {
+fn blank_lines_and_kinds_atelier_does_not_know_give_nothing() {
     let mut mapper = Mapper::new();
     for line in ["", "   ", r#"{"type":"rate_limit_event"}"#, r#"{"type":"something_new","x":1}"#, r#"{"type":"system","subtype":"status"}"#] {
         assert!(mapper.line(line, Instant::now()).is_empty(), "{line}");
@@ -271,7 +271,7 @@ fn a_crash_with_no_turn_open_only_ends_the_session() {
 }
 
 #[test]
-fn a_session_lathe_closed_ends_closed_and_fails_nothing() {
+fn a_session_atelier_closed_ends_closed_and_fails_nothing() {
     let mut mapper = Mapper::new();
     mapper.user_sent();
     assert_eq!(mapper.closed(), [Event::Ended(EndReason::Closed)]);

@@ -1,6 +1,6 @@
 [package]
-name = "lathe-settings"
-description = "What lathe remembers across launches: the theme and the recent projects."
+name = "atelier-settings"
+description = "What atelier remembers across launches: the theme and the recent projects."
 version.workspace = true
 edition.workspace = true
 publish.workspace = true

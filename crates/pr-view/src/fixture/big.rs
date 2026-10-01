@@ -2,7 +2,7 @@
 //! threads spread across them. Real git, an in-memory forge.
 use std::{path::Path, sync::Arc};
 
-use lathe_forge::{Change, ChangedFile, PullRef};
+use atelier_forge::{Change, ChangedFile, PullRef};
 
 use super::{FixtureForge, repo::{Repo, put}, sample};
 use crate::services::PrConfig;

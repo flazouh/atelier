@@ -129,9 +129,9 @@ pub enum InputEvent {
 
 pub(super) const CONTEXT: &str = "Input";
 
-/// lathe patch: a wash over whole buffer rows, with an optional strip at the gutter's left edge, as
+/// atelier patch: a wash over whole buffer rows, with an optional strip at the gutter's left edge, as
 /// Zed marks changed lines. See [`InputBaseState::set_row_backgrounds`].
-/// lathe patch: an element placed at the right end of one buffer row. See
+/// atelier patch: an element placed at the right end of one buffer row. See
 /// [`InputBaseState::set_row_widgets`].
 #[derive(Clone)]
 pub struct RowWidget {
@@ -139,7 +139,7 @@ pub struct RowWidget {
     pub render: Rc<dyn Fn(&mut Window, &mut App) -> gpui::AnyElement>,
 }
 
-/// lathe patch: an element in a gap below one buffer row, as wide as the text and as tall as its
+/// atelier patch: an element in a gap below one buffer row, as wide as the text and as tall as its
 /// content, which pushes every row below it down. Unlike a [`RowGap`] it lasts: the pointer, the
 /// selection, the caret and the scroll height all count it. A comment thread under a row is one. See
 /// [`InputBaseState::set_row_blocks`].
@@ -149,11 +149,11 @@ pub struct RowBlock {
     pub render: Rc<dyn Fn(&mut Window, &mut App) -> gpui::AnyElement>,
 }
 
-/// lathe patch: draws an element in the gutter of the row under the pointer, given that row. A review's
+/// atelier patch: draws an element in the gutter of the row under the pointer, given that row. A review's
 /// "add a comment" button is one. See [`InputBaseState::set_gutter_widget`].
 pub type GutterWidget = Rc<dyn Fn(usize, &mut Window, &mut App) -> gpui::AnyElement>;
 
-/// lathe patch: empty space above one buffer row, `rows` row heights tall, which pushes that row and
+/// atelier patch: empty space above one buffer row, `rows` row heights tall, which pushes that row and
 /// every row below it down. An owner that shrinks it frame by frame slides those rows up into the
 /// place of rows it just deleted. See [`InputBaseState::set_row_gaps`].
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -251,7 +251,7 @@ pub(crate) fn init(cx: &mut App) {
         KeyBinding::new("ctrl-alt-down", AddCursorBelow, Some(CONTEXT)),
         #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         KeyBinding::new("shift-alt-down", AddCursorBelow, Some(CONTEXT)),
-        // lathe patch: Zed's select next occurrence.
+        // atelier patch: Zed's select next occurrence.
         #[cfg(target_os = "macos")]
         KeyBinding::new("cmd-d", SelectNextOccurrence, Some(CONTEXT)),
         #[cfg(not(target_os = "macos"))]
@@ -338,7 +338,7 @@ pub(crate) fn init(cx: &mut App) {
         KeyBinding::new("cmd-.", ToggleCodeActions, Some(CONTEXT)),
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("ctrl-.", ToggleCodeActions, Some(CONTEXT)),
-        // lathe patch: go to definition from the caret, as in Zed.
+        // atelier patch: go to definition from the caret, as in Zed.
         KeyBinding::new("f12", GoToDefinition, Some(CONTEXT)),
         #[cfg(target_os = "macos")]
         KeyBinding::new("cmd-f", Search, Some(CONTEXT)),
@@ -444,9 +444,9 @@ pub struct InputBaseState<M: InputModeKind> {
     /// The deferred scroll offset to apply on next layout.
     pub(crate) deferred_scroll_offset: Option<Point<Pixels>>,
     /// A text offset asked to be revealed while no layout described the text; the next paint
-    /// reveals it (lathe patch 17).
+    /// reveals it (atelier patch 17).
     pub(crate) reveal_after_layout: Option<usize>,
-    /// The last layout is of a text `set_value` has since replaced whole (lathe patch 17).
+    /// The last layout is of a text `set_value` has since replaced whole (atelier patch 17).
     pub(crate) layout_stale: bool,
     /// The size of the scrollable content.
     pub(crate) scroll_size: gpui::Size<Pixels>,
@@ -462,20 +462,20 @@ pub struct InputBaseState<M: InputModeKind> {
     /// colours once and then never see them as unset again, which is the same
     /// freeze in a different place.
     projected_editor_style: InputEditorStyle,
-    /// lathe patch: row washes the owner asked for, such as a review's added and removed rows.
+    /// atelier patch: row washes the owner asked for, such as a review's added and removed rows.
     row_backgrounds: Vec<RowBackground>,
-    /// lathe patch: elements placed at the end of a row. See `set_row_widgets`.
+    /// atelier patch: elements placed at the end of a row. See `set_row_widgets`.
     row_widgets: Vec<RowWidget>,
-    /// lathe patch: fills painted over the text. See `set_row_covers`.
+    /// atelier patch: fills painted over the text. See `set_row_covers`.
     row_covers: Vec<RowBackground>,
-    /// lathe patch: space above rows. See `set_row_gaps`.
+    /// atelier patch: space above rows. See `set_row_gaps`.
     row_gaps: Vec<RowGap>,
-    /// lathe patch: elements in gaps below rows. See `set_row_blocks`.
+    /// atelier patch: elements in gaps below rows. See `set_row_blocks`.
     row_blocks: Vec<RowBlock>,
-    /// lathe patch: the element in the hovered row's gutter, and that row. See `set_gutter_widget`.
+    /// atelier patch: the element in the hovered row's gutter, and that row. See `set_gutter_widget`.
     gutter_widget: Option<GutterWidget>,
     hovered_row: Option<usize>,
-    /// lathe patch: a style the owner pinned. While it is set, `set_editor_style` applies it in place
+    /// atelier patch: a style the owner pinned. While it is set, `set_editor_style` applies it in place
     /// of whatever it was given, so a wrapper that sets a theme style on every render cannot replace
     /// the owner's.
     pinned_editor_style: Option<InputEditorStyle>,
@@ -900,7 +900,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.projected_editor_style = style;
     }
 
-    /// lathe patch: pins `style`, so every later `set_editor_style` applies it instead of its own
+    /// atelier patch: pins `style`, so every later `set_editor_style` applies it instead of its own
     /// argument. `None` unpins. gpui-component's `Input` sets a theme style on every render, after
     /// its owner has set one, so without a pin an owner's style never reaches the screen.
     pub fn pin_editor_style(&mut self, style: Option<InputEditorStyle>) {
@@ -970,7 +970,7 @@ impl<M: InputModeKind> InputBaseState<M> {
             let local_offset = offset.saturating_sub(prev_lines_offset);
             if let Some(pos) = line.position_for_index(local_offset, last_layout, false) {
                 let sub_line_index = (pos.y / line_height) as usize;
-                // lathe patch: rows under a row block or a row gap sit lower by its height.
+                // atelier patch: rows under a row block or a row gap sit lower by its height.
                 let gap = last_layout.gap_above(last_layout.visible_buffer_lines[vi]);
                 let adjusted_pos = point(pos.x + last_layout.line_number_width, pos.y + y_offset + gap);
                 return (vi, sub_line_index, Some(adjusted_pos));
@@ -1388,7 +1388,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.select_vertical(1, cx);
     }
 
-    /// lathe patch: extends every selection one row up or down at its goal column, as plain Up and
+    /// atelier patch: extends every selection one row up or down at its goal column, as plain Up and
     /// Down move the caret. It used to land at the edge of the next line instead. Past the first or
     /// the last row there is no row to land on, so the head goes to the very start or end.
     fn select_vertical(&mut self, move_lines: isize, cx: &mut Context<Self>) {
@@ -2560,13 +2560,13 @@ impl<M: InputModeKind> InputBaseState<M> {
     ) {
         let laid_out = (self.last_layout.as_ref(), self.last_bounds.as_ref());
         let (Some(last_layout), Some(bounds)) = laid_out else {
-            // Nothing is laid out yet: the first paint reveals it (lathe patch 17).
+            // Nothing is laid out yet: the first paint reveals it (atelier patch 17).
             self.reveal_after_layout = Some(offset);
             return;
         };
         if self.layout_stale {
             // The layout is of the text before `set_value`: its sizes would clamp the scroll to the
-            // old text's height (lathe patch 17).
+            // old text's height (atelier patch 17).
             self.reveal_after_layout = Some(offset);
             return;
         }
@@ -2951,7 +2951,7 @@ impl<M: InputModeKind> InputBaseState<M> {
     ///
     /// Non-empty ranges expand to character boundaries. Empty ranges remain empty and are
     /// clipped to the preceding character boundary.
-    /// lathe patch: washes whole rows, under the text and across the gutter, where the editor paints
+    /// atelier patch: washes whole rows, under the text and across the gutter, where the editor paints
     /// its current line. An owner that draws its own bands has to guess the editor's padding, row
     /// height and wrapping, and lands a few pixels off on some platforms; this cannot.
     pub fn set_row_backgrounds(&mut self, backgrounds: Vec<RowBackground>, cx: &mut Context<Self>) {
@@ -2965,7 +2965,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         &self.row_backgrounds
     }
 
-    /// lathe patch: elements the editor places at the right end of a row, centred on it and laid out
+    /// atelier patch: elements the editor places at the right end of a row, centred on it and laid out
     /// in the same frame as the text, so they never trail a scroll. A review's Accept and Reject bar
     /// is one. The owner sets them on every render.
     pub fn set_row_widgets(&mut self, widgets: Vec<RowWidget>) {
@@ -2976,7 +2976,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         &self.row_widgets
     }
 
-    /// lathe patch: fills over whole rows, painted over the text and the line numbers. A cover in
+    /// atelier patch: fills over whole rows, painted over the text and the line numbers. A cover in
     /// the editor's background colour fades those rows out as its alpha rises, text and all, which
     /// a wash under the text cannot do. `marker` is ignored.
     pub fn set_row_covers(&mut self, covers: Vec<RowBackground>, cx: &mut Context<Self>) {
@@ -2990,7 +2990,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         &self.row_covers
     }
 
-    /// lathe patch: empty space above rows, as [`RowGap`] describes. It moves the text, washes,
+    /// atelier patch: empty space above rows, as [`RowGap`] describes. It moves the text, washes,
     /// covers, widgets, line numbers, indent guides, carets, selections and the pointer's hit test.
     /// The scroll height leaves it out, which is right for a gap that lives a few hundred milliseconds
     /// and wrong for anything longer: use a [`RowBlock`] for that.
@@ -3005,7 +3005,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         &self.row_gaps
     }
 
-    /// lathe patch: elements the editor places in a gap below their row, as [`RowBlock`] describes.
+    /// atelier patch: elements the editor places in a gap below their row, as [`RowBlock`] describes.
     /// The editor measures each one at the text's width in the frame it lays the text out, so the
     /// gap is always exactly as tall as the block. The owner sets them on every render.
     pub fn set_row_blocks(&mut self, blocks: Vec<RowBlock>) {
@@ -3016,7 +3016,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         &self.row_blocks
     }
 
-    /// lathe patch: an element the editor draws at the left of the gutter, centred on the row under
+    /// atelier patch: an element the editor draws at the left of the gutter, centred on the row under
     /// the pointer, and moves as the pointer does. `None` removes it.
     pub fn set_gutter_widget(&mut self, widget: Option<GutterWidget>) {
         self.gutter_widget = widget;
@@ -3026,12 +3026,12 @@ impl<M: InputModeKind> InputBaseState<M> {
         self.gutter_widget.as_ref()
     }
 
-    /// lathe patch: the buffer row under the pointer, while a gutter widget is set.
+    /// atelier patch: the buffer row under the pointer, while a gutter widget is set.
     pub fn hovered_row(&self) -> Option<usize> {
         self.hovered_row
     }
 
-    /// lathe patch: the syntax styles the highlighter holds for `range` now, as the editor paints
+    /// atelier patch: the syntax styles the highlighter holds for `range` now, as the editor paints
     /// them; `None` without a highlighter. For a test that compares them with a fresh parse.
     pub fn syntax_styles(
         &self,
@@ -3042,7 +3042,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         Some(highlighter.as_ref()?.styles(range, resolver))
     }
 
-    /// lathe patch: the text offset under the pointer, when the pointer is over the text, so a
+    /// atelier patch: the text offset under the pointer, when the pointer is over the text, so a
     /// command such as "the uses of the name under the pointer" can ask for it.
     pub fn offset_at_pointer(&self, window: &Window) -> Option<usize> {
         let position = window.mouse_position();
@@ -3050,7 +3050,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         over_text.then(|| self.index_for_mouse_position(position).0)
     }
 
-    /// lathe patch: the row the pointer is over, redrawing when it changes.
+    /// atelier patch: the row the pointer is over, redrawing when it changes.
     pub(super) fn set_hovered_row(&mut self, position: Option<Point<Pixels>>, cx: &mut Context<Self>) {
         let row = position.map(|p| self.text.offset_to_point(self.index_for_mouse_position(p).0).row);
         if self.hovered_row != row {
@@ -3059,14 +3059,14 @@ impl<M: InputModeKind> InputBaseState<M> {
         }
     }
 
-    /// lathe patch: every selection as a byte range, in text order.
+    /// atelier patch: every selection as a byte range, in text order.
     pub fn selected_ranges(&self) -> Vec<Range<usize>> {
         let mut ranges: Vec<_> = self.selections.iter().map(|sel| sel.start..sel.end).collect();
         ranges.sort_by_key(|range| range.start);
         ranges
     }
 
-    /// lathe patch: replaces every selection with `ranges`, each with its caret at its end, so a
+    /// atelier patch: replaces every selection with `ranges`, each with its caret at its end, so a
     /// command that edits many selections can put them all back. The first becomes the active one.
     /// An empty slice changes nothing.
     pub fn set_selected_ranges(&mut self, ranges: &[Range<usize>], cx: &mut Context<Self>) {
@@ -3158,7 +3158,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         {
             let line_start_offset = last_layout.visible_line_byte_offsets[vi];
 
-            // Calculate line origin for this display row. lathe patch: a row block or a row gap
+            // Calculate line origin for this display row. atelier patch: a row block or a row gap
             // above it moves it down, for the pointer as for the painter.
             let line_origin = point(px(0.), y_offset + last_layout.gap_above(*_buffer_line));
             let pos = inner_position - line_origin;
@@ -4325,7 +4325,7 @@ impl<M: InputModeKind> EntityInputHandler for InputBaseState<M> {
             }
 
             let index_offset = last_layout.visible_line_byte_offsets[vi];
-            // lathe patch: a row block or a row gap above the row moves it down.
+            // atelier patch: a row block or a row gap above the row moves it down.
             let row_top = y_offset + last_layout.gap_above(last_layout.visible_buffer_lines[vi]);
 
             if start_origin.is_none() {
@@ -4415,7 +4415,7 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
             self._pending_update = false;
         }
 
-        // lathe patch: a read-only input says so in its key context, so an owner can tell reading
+        // atelier patch: a read-only input says so in its key context, so an owner can tell reading
         // from typing and let bare letters through.
         let mut key_context = gpui::KeyContext::default();
         key_context.add(CONTEXT);
@@ -4500,7 +4500,7 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
             .on_scroll_wheel(window.listener_for(&entity, InputBaseState::on_scroll_wheel))
             .when(self.is_multi_line() && !self.disabled, |this| {
                 this.on_modifiers_changed(cx.listener(|this, event: &gpui::ModifiersChangedEvent, window, cx| {
-                    // lathe patch: letting go of Cmd drops the definition underline, and pressing it
+                    // atelier patch: letting go of Cmd drops the definition underline, and pressing it
                     // with the pointer already on a symbol looks it up at once, as in Zed. Before, the
                     // underline waited for the pointer to move.
                     let position = window.mouse_position();
@@ -4514,7 +4514,7 @@ impl<M: InputModeKind> Render for InputBaseState<M> {
                     cx.notify()
                 }))
             })
-            // lathe patch: the pointer is set by the text element, over the text only; see
+            // atelier patch: the pointer is set by the text element, over the text only; see
             // `TextElement::paint`. Set here, it covered the gutter and every control on top.
             .flex_1()
             .when(self.is_multi_line(), |this| this.h_full())
@@ -5042,7 +5042,7 @@ mod tests {
         });
     }
 
-    /// lathe patch 17: a caret set before the text has ever been laid out (a file just opened at a
+    /// atelier patch 17: a caret set before the text has ever been laid out (a file just opened at a
     /// definition) is revealed by the first layout, instead of the view staying at the top.
     #[gpui::test]
     fn test_a_caret_set_before_the_first_layout_is_revealed(cx: &mut TestAppContext) {
@@ -7121,7 +7121,7 @@ mod tests {
         );
     }
 
-    /// lathe patch: a pinned style survives a later `set_editor_style`, and unpinning lets one through.
+    /// atelier patch: a pinned style survives a later `set_editor_style`, and unpinning lets one through.
     #[gpui::test]
     fn test_a_pinned_editor_style_outlasts_a_theme_style(cx: &mut TestAppContext) {
         cx.update(crate::init);
@@ -7141,7 +7141,7 @@ mod tests {
         });
     }
 
-    /// lathe patch: Up on the first row goes to the very start, Down on the last to the very end, and
+    /// atelier patch: Up on the first row goes to the very start, Down on the last to the very end, and
     /// the goal column survives the trip.
     #[gpui::test]
     fn test_up_on_the_first_row_and_down_on_the_last_reach_the_ends(cx: &mut TestAppContext) {
@@ -7166,7 +7166,7 @@ mod tests {
         assert_eq!(caret(&mut cx), 9, "no row below: the very end");
     }
 
-    /// lathe patch: the rows an owner washes and the widgets it places start exactly where the text
+    /// atelier patch: the rows an owner washes and the widgets it places start exactly where the text
     /// of each row starts, padding and scroll included.
     #[gpui::test]
     fn test_row_rects_start_where_each_row_of_text_starts(cx: &mut TestAppContext) {
@@ -7194,7 +7194,7 @@ mod tests {
         });
     }
 
-    /// lathe patch: a row gap pushes its row and every row below it down by its height, and leaves
+    /// atelier patch: a row gap pushes its row and every row below it down by its height, and leaves
     /// the rows above it where they were.
     #[gpui::test]
     fn test_a_row_gap_pushes_its_row_and_the_rows_below_down(cx: &mut TestAppContext) {
@@ -7219,7 +7219,7 @@ mod tests {
         assert_eq!(after, vec![before[0], before[1], before[2] + gap, before[3] + gap]);
     }
 
-    /// lathe patch: a row block sits in a gap below its row, as tall as its content. The rows under it
+    /// atelier patch: a row block sits in a gap below its row, as tall as its content. The rows under it
     /// move down by that height for the pointer as well as the painter, and the text scrolls past it.
     #[gpui::test]
     fn test_a_row_block_opens_a_gap_below_its_row(cx: &mut TestAppContext) {
@@ -7272,7 +7272,7 @@ mod tests {
         view.input.read_with(&cx, |state, _| assert_eq!(state.cursor(), row_2, "a press on row 2 lands on row 2"));
     }
 
-    /// lathe patch: two blocks on one row stack, and the rows below move down by both.
+    /// atelier patch: two blocks on one row stack, and the rows below move down by both.
     #[gpui::test]
     fn test_blocks_on_one_row_stack(cx: &mut TestAppContext) {
         cx.update(crate::init);
@@ -7293,7 +7293,7 @@ mod tests {
         assert_eq!(tops(&mut cx), vec![before[0], before[1] + px(50.), before[2] + px(50.)]);
     }
 
-    /// lathe patch: the gutter widget shows on the row under the pointer, follows it, and leaves with it.
+    /// atelier patch: the gutter widget shows on the row under the pointer, follows it, and leaves with it.
     #[gpui::test]
     fn test_the_gutter_widget_follows_the_row_under_the_pointer(cx: &mut TestAppContext) {
         cx.update(crate::init);
@@ -7339,7 +7339,7 @@ mod tests {
         assert!(drawn.borrow().is_empty(), "it leaves with the pointer");
     }
 
-    /// lathe patch: every selection can be read and put back as byte ranges.
+    /// atelier patch: every selection can be read and put back as byte ranges.
     #[gpui::test]
     fn test_selected_ranges_round_trip(cx: &mut TestAppContext) {
         cx.update(crate::init);
@@ -7360,7 +7360,7 @@ mod tests {
         });
     }
 
-    /// lathe patch: select next occurrence selects the word, then each next match, wrapping.
+    /// atelier patch: select next occurrence selects the word, then each next match, wrapping.
     #[gpui::test]
     fn test_select_next_occurrence_adds_each_match_in_turn(cx: &mut TestAppContext) {
         cx.update(crate::init);
@@ -7391,7 +7391,7 @@ mod tests {
         assert_cursors(&mut cx, &view.input, "x| abc x|\nx|");
     }
 
-    /// lathe patch: the offset under the pointer is the text's when the pointer is over it, and none
+    /// atelier patch: the offset under the pointer is the text's when the pointer is over it, and none
     /// when it is outside the editor.
     #[gpui::test]
     fn test_the_offset_under_the_pointer(cx: &mut TestAppContext) {
@@ -7414,7 +7414,7 @@ mod tests {
         assert_eq!(cx.update(|window, cx| view.input.read(cx).offset_at_pointer(window)), None, "off the text: none");
     }
 
-    /// lathe patch: a read-only editor adds `readonly` to its key context; an editable one does not.
+    /// atelier patch: a read-only editor adds `readonly` to its key context; an editable one does not.
     #[gpui::test]
     fn test_a_read_only_input_says_so_in_its_key_context(cx: &mut TestAppContext) {
         cx.update(crate::init);
@@ -7434,7 +7434,7 @@ mod tests {
         assert_eq!(focused_context(&mut cx), Some(true), "a read-only one adds readonly");
     }
 
-    /// lathe patch: Shift+Up/Down keep the goal column, and past the edge select to the very start or end.
+    /// atelier patch: Shift+Up/Down keep the goal column, and past the edge select to the very start or end.
     #[gpui::test]
     fn test_shift_up_and_down_keep_the_goal_column(cx: &mut TestAppContext) {
         cx.update(crate::init);

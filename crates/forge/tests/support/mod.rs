@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use lathe_forge::{
+use atelier_forge::{
     PullRef, RepoRef,
     github::{GitHub, testing::Fixtures},
 };

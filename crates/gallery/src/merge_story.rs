@@ -19,7 +19,7 @@ use gpui_kit::{
 
 use crate::{agent_parts::pr_3344, narrow, section};
 
-const REPO: &str = "flazouh/lathe";
+const REPO: &str = "flazouh/atelier";
 
 /// Each state the button shows, with its name in the story.
 pub fn states() -> Vec<(&'static str, MergeFacts)> {

@@ -1,4 +1,4 @@
-//! The host's side: `lathe-remote --stdio` reads requests from stdin and answers on stdout, with a
+//! The host's side: `atelier-remote --stdio` reads requests from stdin and answers on stdout, with a
 //! [`LocalProject`] doing the work. Each request runs on a thread of its own, so a slow search never
 //! holds up a read; a process's stdin is fed by a thread of its own, so its order holds and a
 //! process that stops reading never holds up the pipe.
@@ -16,14 +16,14 @@ use std::{
     time::Duration,
 };
 
-use lathe_project::{Control, LocalProject, Project, Watch};
+use atelier_project::{Control, LocalProject, Project, Watch};
 
 mod tracker;
 
 use crate::protocol::{Call, Event, Failure, Frame, Pid, Reply, VERSION, read_frame, write_frame};
 
 /// What a helper of another protocol says to the app, in words a reader acts on: no protocol numbers.
-const UPDATE_WORDS: &str = "the app and the lathe helper on this host are different versions: update lathe";
+const UPDATE_WORDS: &str = "the app and the atelier helper on this host are different versions: update atelier";
 
 type Out = Arc<Mutex<Box<dyn Write + Send>>>;
 
@@ -169,7 +169,7 @@ fn with_control(state: &State, pid: Pid) -> io::Result<Arc<Mutex<Box<dyn Control
     running.get(&pid).map(|r| r.control.clone()).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no process {pid}")))
 }
 
-fn spawn(state: &Arc<State>, out: &Out, command: &lathe_project::Command) -> io::Result<Reply> {
+fn spawn(state: &Arc<State>, out: &Out, command: &atelier_project::Command) -> io::Result<Reply> {
     let process = project(state)?.spawn(command)?;
     let pid = state.next_pid.fetch_add(1, Ordering::Relaxed) + 1;
     let control = Arc::new(Mutex::new(process.control));

@@ -124,7 +124,7 @@ fn a_notification_we_do_not_read_is_dropped() {
 
 #[test]
 fn a_path_becomes_a_file_uri_with_its_spaces_encoded() {
-    let dir = std::env::temp_dir().join("lathe lsp uri test");
+    let dir = std::env::temp_dir().join("atelier lsp uri test");
     std::fs::create_dir_all(&dir).expect("the temp dir is writable");
     let uri = path_to_uri(&dir).expect("a real path has a uri");
     assert!(uri.as_str().starts_with("file:///"), "got {uri:?}");
@@ -137,7 +137,7 @@ fn a_path_becomes_a_file_uri_with_its_spaces_encoded() {
 /// byte for byte, and the caller then waited out its whole timeout while the answer sat unread.
 #[test]
 fn a_path_keeps_the_characters_a_server_leaves_raw() {
-    let dir = std::env::temp_dir().join("lathe+lsp,raw=chars!(one)");
+    let dir = std::env::temp_dir().join("atelier+lsp,raw=chars!(one)");
     std::fs::create_dir_all(&dir).expect("the temp dir is writable");
     let uri = path_to_uri(&dir).expect("a real path has a uri");
     let text = uri.as_str();
@@ -152,7 +152,7 @@ fn a_path_keeps_the_characters_a_server_leaves_raw() {
 /// would turn a real `%2B` in a filename into a `+` at the server.
 #[test]
 fn a_percent_sign_in_a_path_is_always_encoded() {
-    let dir = std::env::temp_dir().join("lathe%2Blsp");
+    let dir = std::env::temp_dir().join("atelier%2Blsp");
     std::fs::create_dir_all(&dir).expect("the temp dir is writable");
     let uri = path_to_uri(&dir).expect("a real path has a uri");
     assert!(uri.as_str().contains("%252B"), "the percent must be encoded, got {uri:?}");

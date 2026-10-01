@@ -11,12 +11,12 @@
 //! The call line holds an emoji before the call, so a server that counts UTF-16 units would put the
 //! caret in the wrong place if the worker did not convert.
 //!
-//! A test skips itself when its server is not installed, and says so. `LATHE_REQUIRE_LSP` lists the
-//! languages that must run (`LATHE_REQUIRE_LSP=rust,typescript,python,go`, or `1` for rust), and a
+//! A test skips itself when its server is not installed, and says so. `ATELIER_REQUIRE_LSP` lists the
+//! languages that must run (`ATELIER_REQUIRE_LSP=rust,typescript,python,go`, or `1` for rust), and a
 //! missing server for one of them fails the run rather than passing quietly.
 //!
-//! With `LATHE_TEST_DOWNLOADS=1` the tests ignore the servers installed here and use only the ones
-//! lathe downloads into an empty folder, so the run proves what a user with nothing installed gets.
+//! With `ATELIER_TEST_DOWNLOADS=1` the tests ignore the servers installed here and use only the ones
+//! atelier downloads into an empty folder, so the run proves what a user with nothing installed gets.
 
 use std::{
     fs,
@@ -25,7 +25,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_lsp::{
+use atelier_lsp::{
     Doc, Found, LspError, Navigation, ServerSpec, Store, Workers, find_program, find_root, language_id, search_dirs,
     server_for,
 };
@@ -141,7 +141,7 @@ fn one_server_per_project() {
     if !runs("rust", spec) {
         return;
     }
-    let base = std::env::temp_dir().join(format!("lathe-lsp-pool-{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("atelier-lsp-pool-{}", std::process::id()));
     let manifest = "[package]\nname = \"p\"\nversion = \"0.1.0\"\nedition = \"2021\"\n";
     for project in ["one", "two"] {
         write(&base.join(project).join("Cargo.toml"), manifest);
@@ -159,26 +159,26 @@ fn one_server_per_project() {
     fs::remove_dir_all(&base).ok();
 }
 
-/// Whether the tests use only the servers lathe downloads.
+/// Whether the tests use only the servers atelier downloads.
 fn downloading() -> bool {
-    std::env::var("LATHE_TEST_DOWNLOADS").is_ok_and(|v| v == "1")
+    std::env::var("ATELIER_TEST_DOWNLOADS").is_ok_and(|v| v == "1")
 }
 
-/// The servers to test: the ones installed here, or with `LATHE_TEST_DOWNLOADS=1` the ones lathe
+/// The servers to test: the ones installed here, or with `ATELIER_TEST_DOWNLOADS=1` the ones atelier
 /// downloads into a folder that starts empty. Go is still the one installed here, since gopls is
 /// built with it.
 fn workers() -> Workers {
     let store = if downloading() {
-        let dir = std::env::temp_dir().join(format!("lathe-lsp-downloads-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("atelier-lsp-downloads-{}", std::process::id()));
         // Go's own folder, not the one that links to it: a shared folder such as ~/.local/bin would
         // also hold installed servers, and the run would prove nothing about downloads.
         let go = find_program("go").and_then(|go| go.canonicalize().ok()).and_then(|go| go.parent().map(Path::to_path_buf));
         Store::new(dir, go.into_iter().collect(), false)
     } else {
-        Store::new(std::env::temp_dir().join("lathe-lsp-no-downloads"), search_dirs(), true)
+        Store::new(std::env::temp_dir().join("atelier-lsp-no-downloads"), search_dirs(), true)
     };
     // The whole disk as one project: each test's server starts in its own fixture folder.
-    let project = std::sync::Arc::new(lathe_project::LocalProject::open("/").expect("the disk opens"));
+    let project = std::sync::Arc::new(atelier_project::LocalProject::open("/").expect("the disk opens"));
     Workers::new(project, store, READY, ASK)
 }
 
@@ -190,7 +190,7 @@ fn say(line: String) {
 /// Whether this language's test can run here; if not, it says why and must not be required.
 fn runs(language: &str, spec: &ServerSpec) -> bool {
     let why = match downloading() {
-        true => spec.download.is_none().then_some("lathe does not download it"),
+        true => spec.download.is_none().then_some("atelier does not download it"),
         false => find_program(spec.program).is_none().then_some("it is not installed"),
     };
     if let Some(why) = why {
@@ -200,9 +200,9 @@ fn runs(language: &str, spec: &ServerSpec) -> bool {
     why.is_none()
 }
 
-/// Whether `LATHE_REQUIRE_LSP` says this language must run.
+/// Whether `ATELIER_REQUIRE_LSP` says this language must run.
 fn required(language: &str) -> bool {
-    std::env::var("LATHE_REQUIRE_LSP")
+    std::env::var("ATELIER_REQUIRE_LSP")
         .is_ok_and(|v| (v == "1" && language == "rust") || v.split(',').any(|l| l.trim() == language))
 }
 
@@ -213,7 +213,7 @@ fn column_of_width(line: &str) -> u32 {
 }
 
 /// Asks the worker one question and waits for its answer.
-fn ask<T: Send + 'static>(send: impl FnOnce(lathe_lsp::Reply<T>)) -> Result<T, LspError> {
+fn ask<T: Send + 'static>(send: impl FnOnce(atelier_lsp::Reply<T>)) -> Result<T, LspError> {
     let (tx, rx) = mpsc::channel();
     send(Box::new(move |answer| drop(tx.send(answer))));
     rx.recv_timeout(ASK + Duration::from_secs(5)).map_err(|_| LspError::Timeout)?
@@ -235,12 +235,12 @@ fn once_ready<T: std::fmt::Debug>(what: &str, mut question: impl FnMut() -> Resu
 }
 
 fn check(fixture: &Fixture) {
-    let spec = server_for(fixture.language).expect("lathe knows a server for the language");
+    let spec = server_for(fixture.language).expect("atelier knows a server for the language");
     if !runs(fixture.language, spec) {
         return;
     }
 
-    let dir = std::env::temp_dir().join(format!("lathe-lsp-{}-{}", fixture.language, std::process::id()));
+    let dir = std::env::temp_dir().join(format!("atelier-lsp-{}-{}", fixture.language, std::process::id()));
     for (name, text) in fixture.project {
         write(&dir.join(name), text);
     }
@@ -299,14 +299,14 @@ fn check(fixture: &Fixture) {
         let names = once_ready(
             "names in the file",
             || ask(|r| worker.symbols(doc(&text), r)),
-            |found: &Vec<lathe_lsp::Symbol>| found.len() >= 2,
+            |found: &Vec<atelier_lsp::Symbol>| found.len() >= 2,
         );
         let listed: Vec<(&str, u32)> = names.iter().map(|s| (s.name.as_str(), s.range.start.line)).collect();
         assert_eq!(listed, [("width", 0), ("broken", 4)], "the file's functions, in order, on their lines");
         let found = once_ready(
             "go to name",
             || ask(|r| worker.project_symbols(doc(&text), "wid".into(), r)),
-            |found: &Vec<lathe_lsp::Symbol>| found.iter().any(|s| s.name == "width"),
+            |found: &Vec<atelier_lsp::Symbol>| found.iter().any(|s| s.name == "width"),
         );
         let width = found.iter().find(|s| s.name == "width").unwrap();
         assert!(width.uri.as_str().ends_with("src/lib.rs"), "{}", width.uri.as_str());

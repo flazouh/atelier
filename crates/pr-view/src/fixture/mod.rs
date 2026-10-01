@@ -6,7 +6,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-use lathe_forge::{
+use atelier_forge::{
     Author, ChangedFile, Check, Comment, Forge, ForgeError, ForgeResult, HeldComment, Involved, Job, JobRef, MergeOutcome,
     MergeRequest, MergeSettings, MergeState, UpdateMethod, NewLine, NewPull, Opinion, Pull, PullBrief, PullRef, PullState, PullUpdate, Remark, RepoRef,
     Repository, ReviewDecision, Reviewer, Thread, ThreadId, Verdict,
@@ -321,7 +321,7 @@ impl Forge for FixtureForge {
                 line: held.line,
                 start_line: None,
                 original_line: held.line,
-                side: lathe_forge::Side::Right,
+                side: atelier_forge::Side::Right,
                 can_resolve: true,
                 can_reply: true,
                 comments: vec![comment],
@@ -381,7 +381,7 @@ pub fn repository(reference: &RepoRef) -> Repository {
 
 /// Plain pieces to build a pull request from, with every field a sensible value.
 pub mod sample {
-    use lathe_forge::{
+    use atelier_forge::{
         Author, CheckCounts, CheckStatus, Comment, Conclusion, MergeState, Pull, PullId, PullRef, PullState, Rights, Side, Thread,
         ThreadId,
     };

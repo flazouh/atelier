@@ -5,12 +5,12 @@ use std::{
 };
 
 use gpui_kit::{IntoElement, ParentElement, Render, Styled, TestAppContext, VisualTestContext, div, px};
-use lathe_project::{ChangeSink, Command, Entry, GitOutput, LocalProject, Match, Process, Query};
+use atelier_project::{ChangeSink, Command, Entry, GitOutput, LocalProject, Match, Process, Query};
 
 use super::*;
 
 /// A folder on disk whose watch the test fires itself, on the test's own thread, so every wake is
-/// the test scheduler's. The real watch has its own test in lathe-project.
+/// the test scheduler's. The real watch has its own test in atelier-project.
 struct Quiet {
     disk: LocalProject,
     sink: Arc<Mutex<Option<ChangeSink>>>,
@@ -45,10 +45,10 @@ impl Project for Quiet {
     fn data_path(&self) -> Option<std::path::PathBuf> {
         self.disk.data_path()
     }
-    fn tracker(&self) -> lathe_tracker::TrackerResult<Arc<dyn lathe_tracker::Tracker>> {
+    fn tracker(&self) -> atelier_tracker::TrackerResult<Arc<dyn atelier_tracker::Tracker>> {
         self.disk.tracker()
     }
-    fn data_list(&self, prefix: &str) -> io::Result<Vec<lathe_project::DataEntry>> {
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<atelier_project::DataEntry>> {
         self.disk.data_list(prefix)
     }
 }
@@ -236,7 +236,7 @@ fn closing_a_dirty_tab_asks_first(cx: &mut TestAppContext) {
     assert!(cx.update(|_, cx| project.read(cx).buffers.is_empty()), "Don't Save closes it");
 }
 
-/// The watch reporting lathe's own save, after the reader has typed on, is not a change on disk:
+/// The watch reporting atelier's own save, after the reader has typed on, is not a change on disk:
 /// the file holds what the tab last saved.
 #[gpui_kit::test]
 fn our_own_save_is_not_a_change_on_disk(cx: &mut TestAppContext) {
@@ -253,7 +253,7 @@ fn our_own_save_is_not_a_change_on_disk(cx: &mut TestAppContext) {
     cx.update(|_, cx| project.update(cx, |p, _| p.buffers.get_mut("a.txt").unwrap().dirty = true));
     changed(&sink, &["a.txt"]);
     cx.run_until_parked();
-    assert!(!cx.update(|_, cx| project.read(cx).buffers["a.txt"].changed_on_disk), "lathe's own write is not news");
+    assert!(!cx.update(|_, cx| project.read(cx).buffers["a.txt"].changed_on_disk), "atelier's own write is not news");
 }
 
 fn removed(sink: &Arc<Mutex<Option<ChangeSink>>>, path: &str, kind: ChangeKind) {
@@ -364,7 +364,7 @@ fn the_chips_follow_the_repository_and_stay_quiet_when_the_list_does(cx: &mut Te
     let before = told.get();
     cx.update(|_, cx| project.update(cx, |p, cx| p.set_list_rows(rows.clone(), cx)));
     assert_eq!(told.get(), before, "the same chips tell no session");
-    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some(lathe_forge::RepoRef { host: "github.com".into(), owner: "b".into(), name: "two".into() }), cx)));
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some(atelier_forge::RepoRef { host: "github.com".into(), owner: "b".into(), name: "two".into() }), cx)));
     assert_eq!(numbers(cx), [4], "the repository landed: only its own");
 }
 
@@ -383,13 +383,13 @@ fn a_project_with_no_forge_remote_opens_no_pull_requests(cx: &mut TestAppContext
 #[gpui_kit::test]
 fn a_number_the_list_lacks_is_looked_up_once(cx: &mut TestAppContext) {
     let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
-    let repo = lathe_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe".into() };
+    let repo = atelier_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "atelier".into() };
     let forge = std::sync::Arc::new(crate::fake_forge::FakeForge::default());
-    forge.known.lock().unwrap().push(lathe_forge::PullBrief {
-        reference: lathe_forge::PullRef { repo: repo.clone(), number: 12 },
+    forge.known.lock().unwrap().push(atelier_forge::PullBrief {
+        reference: atelier_forge::PullRef { repo: repo.clone(), number: 12 },
         title: "Twelve".into(),
-        state: lathe_forge::PullState::Open,
-        url: "https://github.com/flazouh/lathe/pull/12".into(),
+        state: atelier_forge::PullState::Open,
+        url: "https://github.com/flazouh/atelier/pull/12".into(),
     });
     cx.update(|_, cx| project.update(cx, |p, cx| {
         p.set_chip_forge(forge.clone());
@@ -408,9 +408,9 @@ fn a_number_the_list_lacks_is_looked_up_once(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_failed_lookup_gives_no_chip(cx: &mut TestAppContext) {
     let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
-    let repo = lathe_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe".into() };
+    let repo = atelier_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "atelier".into() };
     let forge = std::sync::Arc::new(crate::fake_forge::FakeForge::default());
-    *forge.reads_fail.lock().unwrap() = Some(lathe_forge::ForgeError::RateLimited { retry_after: None });
+    *forge.reads_fail.lock().unwrap() = Some(atelier_forge::ForgeError::RateLimited { retry_after: None });
     cx.update(|_, cx| project.update(cx, |p, cx| {
         p.set_chip_forge(forge.clone());
         p.set_repo(Some(repo), cx);
@@ -434,7 +434,7 @@ fn the_tasks_take_the_right_pane_and_give_it_back(cx: &mut TestAppContext) {
 /// to In Progress on a reply.
 #[gpui_kit::test]
 fn a_session_started_from_a_task_moves_it_along(cx: &mut TestAppContext) {
-    use lathe_tracker::{NewTask, Status};
+    use atelier_tracker::{NewTask, Status};
     let (_dir, project, _, cx) = open(cx, &[]);
     let (agent, fake) = crate::fake_agent::scripted_agent("Fake", vec![vec![crate::fake_agent::ended()], vec![]]);
     cx.update(|_, cx| project.update(cx, |p, _| p.agent = agent));
@@ -447,11 +447,11 @@ fn a_session_started_from_a_task_moves_it_along(cx: &mut TestAppContext) {
     cx.update(|window, cx| project.update(cx, |p, cx| p.start_from_task(task.id.clone(), window, cx)));
     cx.run_until_parked();
     let now = tracker.get(&task.id).unwrap().unwrap();
-    assert_eq!(now.assignee, Some(lathe_tracker::Assignee::Agent("Fake".into())), "the agent of the project takes it");
+    assert_eq!(now.assignee, Some(atelier_tracker::Assignee::Agent("Fake".into())), "the agent of the project takes it");
     assert_eq!(now.sessions.len(), 1, "the session is linked");
     assert_eq!(now.status, Status::InReview, "started, then a turn ended well");
     let first = fake.received.lock().unwrap().iter().find_map(|c| match c {
-        lathe_agents::session::Command::Send { text, .. } => Some(text.clone()),
+        atelier_agents::session::Command::Send { text, .. } => Some(text.clone()),
         _ => None,
     });
     let want = format!("{}: Add a line to the README\n\nSay hello.\n\nWork on this task. The task is {}.", task.key, task.key);
@@ -471,7 +471,7 @@ fn a_session_started_from_a_task_moves_it_along(cx: &mut TestAppContext) {
 /// adds nothing.
 #[gpui_kit::test]
 fn a_merged_pull_request_moves_its_task_to_done(cx: &mut TestAppContext) {
-    use lathe_tracker::{ActivityKind, Entry, NewTask, PrLink, Status};
+    use atelier_tracker::{ActivityKind, Entry, NewTask, PrLink, Status};
     let (_dir, project, _, cx) = open(cx, &[]);
     cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
     cx.run_until_parked();
@@ -491,7 +491,7 @@ fn a_merged_pull_request_moves_its_task_to_done(cx: &mut TestAppContext) {
 /// A session opened again after a restart gets its task from the tracker, so the chip shows.
 #[gpui_kit::test]
 fn a_session_opened_again_finds_its_task(cx: &mut TestAppContext) {
-    use lathe_tracker::{Entry, NewTask, SessionLink};
+    use atelier_tracker::{Entry, NewTask, SessionLink};
     let (_dir, project, _, cx) = open(cx, &[]);
     let (agent, _) = crate::fake_agent::scripted_agent("Fake", vec![]);
     cx.update(|_, cx| project.update(cx, |p, _| p.agent = agent));
@@ -501,7 +501,7 @@ fn a_session_opened_again_finds_its_task(cx: &mut TestAppContext) {
     let task = tracker.create(&NewTask::titled("Old work"), "me").unwrap();
     let link = SessionLink { session_id: "fake-1".into(), title: "Old".into(), agent: "Fake".into() };
     tracker.record(&task.id, &Entry::SessionStarted(link), "Fake").unwrap();
-    let resume = Some((lathe_agents::session::SessionId::new("fake-1"), "Old".into()));
+    let resume = Some((atelier_agents::session::SessionId::new("fake-1"), "Old".into()));
     let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(resume, window, cx)));
     cx.run_until_parked();
     let found = cx.update(|_, cx| session.read(cx).task.clone());
@@ -511,7 +511,7 @@ fn a_session_opened_again_finds_its_task(cx: &mut TestAppContext) {
 /// The sidebar hears how many tasks are open: a closed task does not count.
 #[gpui_kit::test]
 fn the_project_counts_its_open_tasks(cx: &mut TestAppContext) {
-    use lathe_tracker::{NewTask, Patch, Status};
+    use atelier_tracker::{NewTask, Patch, Status};
     let (_dir, project, _, cx) = open(cx, &[]);
     cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
     cx.run_until_parked();
@@ -534,7 +534,7 @@ fn the_project_counts_its_open_tasks(cx: &mut TestAppContext) {
 /// The session tells its task whether or not the Tasks pane is open: the tracker is found from the project.
 #[gpui_kit::test]
 fn a_session_tells_its_task_while_the_tasks_pane_is_closed(cx: &mut TestAppContext) {
-    use lathe_tracker::{NewTask, Status};
+    use atelier_tracker::{NewTask, Status};
     let (_dir, project, _, cx) = open(cx, &[]);
     let (agent, _) = crate::fake_agent::scripted_agent("Fake", vec![vec![crate::fake_agent::ended()], vec![]]);
     cx.update(|_, cx| project.update(cx, |p, _| p.agent = agent));

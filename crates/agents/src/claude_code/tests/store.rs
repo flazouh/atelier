@@ -11,7 +11,7 @@ fn user(text: &str) -> String {
 
 #[test]
 fn a_folder_becomes_claudes_project_name() {
-    assert_eq!(slug("/home/alex/code/local/lathe"), "-home-alex-code-local-lathe");
+    assert_eq!(slug("/home/alex/code/local/atelier"), "-home-alex-code-local-atelier");
     assert_eq!(slug("/tmp/a b.c"), "-tmp-a-b-c");
 }
 

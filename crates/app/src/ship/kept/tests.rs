@@ -1,4 +1,4 @@
-use lathe_review::{FileReview, Merged};
+use atelier_review::{FileReview, Merged};
 
 use super::*;
 
@@ -8,7 +8,7 @@ fn file(path: &str, before: Option<&str>, after: Option<&str>) -> FileReview {
 
 fn merged(file: &FileReview) -> Merged {
     match &file.content {
-        lathe_review::Content::Text(m) => m.clone(),
+        atelier_review::Content::Text(m) => m.clone(),
         _ => panic!("text"),
     }
 }

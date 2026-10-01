@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use gpui_kit::TestAppContext;
-use lathe_agents::session::{Attachment, Command};
+use atelier_agents::session::{Attachment, Command};
 
 use super::*;
 use crate::fake_agent::{ended, git_project, start_in};
@@ -21,7 +21,7 @@ fn reviewing(cx: &mut TestAppContext) -> (Entity<ReviewPane>, Entity<AgentSessio
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), AFTER).unwrap()));
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
     cx.run_until_parked();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project, Scope::Turn(0), Some("a.txt"), window, cx)));
     cx.run_until_parked();
     (pane, session, fake, dir, cx)
@@ -212,7 +212,7 @@ fn a_review_opened_again_keeps_an_accepted_hunk(cx: &mut TestAppContext) {
     }));
     cx.run_until_parked();
     assert_eq!(read(&dir, "a.txt"), AFTER, "an accept writes nothing");
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let again = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project, Scope::Turn(0), Some("a.txt"), window, cx)));
     cx.run_until_parked();
     assert_eq!(hunk_ids(&again, cx), [ids[1].clone()], "only the hunk not decided is left");
@@ -265,7 +265,7 @@ fn a_rejected_new_file_is_removed(cx: &mut TestAppContext) {
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("new.txt"), "made\n").unwrap()));
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("make a file".into(), cx)));
     cx.run_until_parked();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project, Scope::Turn(0), Some("new.txt"), window, cx)));
     cx.run_until_parked();
     cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_file(Decision::Reject, window, cx)));
@@ -289,13 +289,13 @@ fn the_whole_session_is_read_off_the_ui_thread(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_review_with_a_language_server_opens_its_file_once(cx: &mut TestAppContext) {
     let (pane, _, _, dir, cx) = reviewing(cx);
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
-    let workers = Arc::new(lathe_lsp::Workers::new(project, lathe_lsp::Store::from_env(), lathe_editor::READY, lathe_editor::ASK));
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
+    let workers = Arc::new(atelier_lsp::Workers::new(project, atelier_lsp::Store::from_env(), atelier_editor::READY, atelier_editor::ASK));
     let given = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let seen = given.clone();
     let language: SessionFor = std::rc::Rc::new(move |path, editor, rows, cx| {
         seen.borrow_mut().push(editor.entity_id());
-        cx.new(|cx| lathe_editor::EditorSession::for_review(workers.clone(), editor, dir.join(path), rows, None, cx))
+        cx.new(|cx| atelier_editor::EditorSession::for_review(workers.clone(), editor, dir.join(path), rows, None, cx))
     });
     let before = cx.update(|_, cx| pane.read(cx).editor.entity_id());
     cx.update(|window, cx| pane.update(cx, |p, cx| p.attach_language(language, window, cx)));

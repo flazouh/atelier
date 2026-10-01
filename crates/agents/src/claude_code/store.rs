@@ -3,7 +3,7 @@
 //! project's host, so they are read through a process the project spawns, never straight from disk.
 use std::time::Instant;
 
-use lathe_project::{Command, Project};
+use atelier_project::{Command, Project};
 use serde_json::Value;
 
 use super::map::Mapper;

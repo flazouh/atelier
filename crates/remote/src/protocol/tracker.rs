@@ -1,6 +1,6 @@
 //! The tracker's calls over the pipe (protocol 5): the `Tracker` trait, call by call, as serde values.
 
-use lathe_tracker::{Activity, Entry, NewTask, Patch, Query, Task, TaskId};
+use atelier_tracker::{Activity, Entry, NewTask, Patch, Query, Task, TaskId};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

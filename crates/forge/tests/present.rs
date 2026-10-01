@@ -6,7 +6,7 @@ use beui::{
     merge::{self, Blocker, MergeFacts, ReviewNeed, Rights as UiRights},
     pr::{ChecksSummary, PrState, ReviewState},
 };
-use lathe_forge::{Check, CheckStatus, Conclusion, Forge, present};
+use atelier_forge::{Check, CheckStatus, Conclusion, Forge, present};
 use serde_json::{Value, json};
 use support::{github, patched_pull, pull_ref, recorded};
 

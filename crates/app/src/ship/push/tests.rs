@@ -1,5 +1,5 @@
 use std::{path::Path, process::Command as Git, sync::Arc};
-use lathe_project::{LocalProject, Project};
+use atelier_project::{LocalProject, Project};
 use super::*;
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Git::new("git").args(args).current_dir(dir).output().unwrap();
@@ -88,7 +88,7 @@ fn no_remote_says_so() {
 #[test]
 fn an_unreachable_remote_reads_as_offline() {
     let (_top, work, _other, project) = remote();
-    git(&work, &["remote", "set-url", "origin", "https://lathe-qa.invalid/nobody/nothing.git"]);
+    git(&work, &["remote", "set-url", "origin", "https://atelier-qa.invalid/nobody/nothing.git"]);
     assert!(matches!(push(project.as_ref(), "main").unwrap_err(), PushError::Offline(_)));
 }
 /// What git says, sorted into what the reader does next.
@@ -170,9 +170,9 @@ fn edits_that_clash_stay_in_their_named_entry() {
     assert!(words.contains("a.txt") && words.contains(ENTRY_NAME), "{words}");
     assert_eq!(git(&work, &["log", "--format=%s", "-2"]).lines().collect::<Vec<_>>(), ["Mine", "Theirs"]);
 }
-/// Another entry pushed during the rebase is left alone: the pop takes the entry lathe made.
+/// Another entry pushed during the rebase is left alone: the pop takes the entry atelier made.
 #[test]
-fn the_pop_takes_lathes_own_entry() {
+fn the_pop_takes_ateliers_own_entry() {
     let (_top, work, other, project) = remote();
     commit(&other, "b.txt", "theirs\n", "Theirs");
     git(&other, &["push", "-q", "origin", "main"]);
@@ -186,7 +186,7 @@ fn the_pop_takes_lathes_own_entry() {
     };
     let rebased = pull_rebase_setting_aside_with(project.as_ref(), "main", &during).unwrap();
     assert_eq!(rebased.edits, Some(PutBack::Back));
-    assert_eq!(std::fs::read_to_string(work.join("a.txt")).unwrap(), "1\nTWO\n3\nmore\n", "lathe's entry came back");
+    assert_eq!(std::fs::read_to_string(work.join("a.txt")).unwrap(), "1\nTWO\n3\nmore\n", "atelier's entry came back");
     let list = git(&work, &["stash", "list"]);
     assert!(list.contains("someone else's") && !list.contains(ENTRY_NAME), "{list}");
 }
@@ -215,6 +215,6 @@ fn a_stopped_rebase_keeps_its_reason_and_names_the_entry() {
 #[should_panic(expected = "a test reached for a network remote")]
 fn a_test_never_reaches_a_real_remote() {
     let (_top, work, _other, project) = remote();
-    git(&work, &["remote", "set-url", "origin", "https://github.com/flazouh/lathe-qa-scratch.git"]);
+    git(&work, &["remote", "set-url", "origin", "https://github.com/flazouh/atelier-qa-scratch.git"]);
     let _ = push(project.as_ref(), "main");
 }

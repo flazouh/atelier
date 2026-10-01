@@ -1,5 +1,5 @@
 [package]
-name = "lathe-project"
+name = "atelier-project"
 description = "The Project interface: a project's files, search, processes and git, wherever it lives."
 version.workspace = true
 edition.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 
 [dependencies]
 dirs = "6"
-lathe-tracker.workspace = true
+atelier-tracker.workspace = true
 ignore = "0.4.33"
 notify = "7"
 regex = "1"

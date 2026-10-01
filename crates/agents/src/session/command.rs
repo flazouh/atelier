@@ -15,7 +15,7 @@ pub enum PermissionMode {
     Bypass,
 }
 
-/// Something a message carries beside its text, in lathe's terms. A backend that takes only text writes
+/// Something a message carries beside its text, in atelier's terms. A backend that takes only text writes
 /// it out with [`Attachment::render`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Attachment {

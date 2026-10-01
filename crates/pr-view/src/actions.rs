@@ -1,7 +1,7 @@
 //! What a press in the merge box asks of the forge, or why it cannot. Pure: the action and the choice in,
 //! a request out.
 use beui::merge::{Action, Choice, MergeMethod as UiMethod, UpdateWay};
-use lathe_forge::{MergeMethod, MergeRequest, UpdateMethod};
+use atelier_forge::{MergeMethod, MergeRequest, UpdateMethod};
 
 fn method(m: UiMethod) -> MergeMethod {
     match m {

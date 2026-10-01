@@ -1,6 +1,6 @@
-//! What lathe remembers across launches: the theme in force, whether it follows the system, the primary
+//! What atelier remembers across launches: the theme in force, whether it follows the system, the primary
 //! colour the reader picked, and the recent projects. One small JSON
-//! file in the app's data folder (`<data dir>/lathe/settings.json`), shared by the app and the gallery.
+//! file in the app's data folder (`<data dir>/atelier/settings.json`), shared by the app and the gallery.
 //! It is read once before the first window opens, and changed on a background thread, so the UI
 //! thread never waits on the disk.
 //!
@@ -51,7 +51,7 @@ pub struct Settings {
     pub project_colors: std::collections::BTreeMap<String, u8>,
     /// The image file kept for a project's badge, by its place.
     pub project_icons: std::collections::BTreeMap<String, String>,
-    /// The ids of the task rules the reader turned off (`lathe_tracker::Rule::id`).
+    /// The ids of the task rules the reader turned off (`atelier_tracker::Rule::id`).
     pub task_rules_off: Vec<String>,
     /// Names the reader gave sessions, by the agent's id for the session.
     pub session_names: std::collections::BTreeMap<String, String>,
@@ -72,7 +72,7 @@ pub struct Settings {
     pub ui_zoom: Option<f32>,
     /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
     pub sidebar_layout: SidebarSaved,
-    /// Keys a newer or older lathe wrote, kept as they are.
+    /// Keys a newer or older atelier wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
 }
@@ -142,12 +142,12 @@ impl Settings {
     }
 }
 
-/// Where the settings live: `LATHE_SETTINGS` when set, for tests and scripts, else the data folder.
+/// Where the settings live: `ATELIER_SETTINGS` when set, for tests and scripts, else the data folder.
 pub fn path() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("LATHE_SETTINGS") {
+    if let Some(path) = std::env::var_os("ATELIER_SETTINGS") {
         return Some(PathBuf::from(path));
     }
-    Some(dirs::data_dir()?.join("lathe").join("settings.json"))
+    Some(dirs::data_dir()?.join("atelier").join("settings.json"))
 }
 
 /// The settings at `path`; the defaults when the file is missing or unreadable.

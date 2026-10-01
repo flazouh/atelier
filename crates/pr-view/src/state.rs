@@ -4,7 +4,7 @@
 //! folder, the tracker's pattern: migrations by `user_version`, WAL.
 use std::{collections::HashMap, path::Path, sync::Mutex};
 
-use lathe_forge::PullRef;
+use atelier_forge::PullRef;
 use rusqlite::{Connection, params};
 
 const STEPS: &[&str] = &["CREATE TABLE reviewed (
@@ -35,7 +35,7 @@ fn open(mut conn: Connection) -> rusqlite::Result<Reviewed> {
     conn.pragma_update(None, "synchronous", "NORMAL")?;
     let version: usize = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
     if version > STEPS.len() {
-        return Err(rusqlite::Error::InvalidParameterName(format!("this database is version {version}, and this lathe knows up to {}: update lathe", STEPS.len())));
+        return Err(rusqlite::Error::InvalidParameterName(format!("this database is version {version}, and this atelier knows up to {}: update atelier", STEPS.len())));
     }
     for (index, step) in STEPS.iter().enumerate().skip(version) {
         let tx = conn.transaction()?;

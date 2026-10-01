@@ -1,6 +1,6 @@
 //! The agent's past sessions as the sidebar lists them: never a session that is open, which shows once,
 //! as the open one; and the last activity of each, which gives an open session its place and its stamp.
-use lathe_agents::session::{SessionId, SessionSummary};
+use atelier_agents::session::{SessionId, SessionSummary};
 
 /// `past` without the sessions whose ids are in `open`.
 pub fn not_open(past: Vec<SessionSummary>, open: &[SessionId]) -> Vec<SessionSummary> {

@@ -1,5 +1,5 @@
 //! The Claude Code backend: `claude` run as a child of the project (so a remote project runs it on
-//! its host), spoken to in stream-json. `wire` reads its lines, `map` turns them into lathe's events,
+//! its host), spoken to in stream-json. `wire` reads its lines, `map` turns them into atelier's events,
 //! `control` writes the lines it needs, `launch` builds its command line, `store` reads its past
 //! sessions. Only `session` touches a process; the rest is pure and tested on captured runs.
 //! The protocol is written down in `docs/agents.md`.
@@ -13,7 +13,7 @@ mod wire;
 
 use std::sync::Arc;
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 pub use map::Mapper;
 pub use store::history;

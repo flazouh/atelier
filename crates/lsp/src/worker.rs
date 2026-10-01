@@ -26,7 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_project::Project;
+use atelier_project::Project;
 use lsp_types::{Diagnostic, Hover, Position, Range, Uri};
 
 use crate::{

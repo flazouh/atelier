@@ -1,5 +1,5 @@
 //! The app's side: [`RemoteProject`] is a [`Project`] whose every call is a request to
-//! `lathe-remote` on the host, answered within a timeout.
+//! `atelier-remote` on the host, answered within a timeout.
 //!
 //! A connection comes from a [`Dial`], so the same client runs over the user's `ssh` in the app and
 //! over an in-process pipe in the tests. When the connection drops, every call waiting on it fails at
@@ -20,7 +20,7 @@ use std::{
     time::Duration,
 };
 
-use lathe_project::{
+use atelier_project::{
     ChangeSink, Command, Control, DataEntry, Entry, GitOutput, Link, LinkSink, Match, Process, Project, Query, Watch,
 };
 
@@ -28,7 +28,7 @@ mod tracker;
 
 use crate::protocol::{Call, Event, Failure, Frame, Pid, Reply, VERSION, read_frame, write_frame};
 
-/// One live connection to `lathe-remote`: what the host says, what to send it, and a way to end it.
+/// One live connection to `atelier-remote`: what the host says, what to send it, and a way to end it.
 pub struct Connection {
     pub reader: Box<dyn Read + Send>,
     pub writer: Box<dyn Write + Send>,
@@ -111,7 +111,7 @@ impl Pipes {
 struct Shared {
     host: String,
     timeouts: Timeouts,
-    /// The folder the app asked for, as it asked (`~/code/lathe`), for each hello.
+    /// The folder the app asked for, as it asked (`~/code/atelier`), for each hello.
     asked_root: String,
     dial: Dial,
     writer: Mutex<Option<Box<dyn Write + Send>>>,
@@ -178,8 +178,8 @@ impl Shared {
         let answer = self.request(Call::Hello { version: VERSION, root: self.asked_root.clone() }).map_err(|error| {
             // A helper of another protocol: a new one says so in words, an old one with its numbers.
             let words = error.to_string();
-            if error.kind() == io::ErrorKind::InvalidInput && (words.contains("speaks version") || words.contains("update lathe")) {
-                io::Error::new(io::ErrorKind::InvalidInput, "the lathe helper on this host is a different version: update lathe on this host")
+            if error.kind() == io::ErrorKind::InvalidInput && (words.contains("speaks version") || words.contains("update atelier")) {
+                io::Error::new(io::ErrorKind::InvalidInput, "the atelier helper on this host is a different version: update atelier on this host")
             } else {
                 error
             }
@@ -293,7 +293,7 @@ pub struct RemoteProject {
     /// The data folder on the host, once the host has said: it never moves, so it is asked once. A call
     /// that failed (the link was down) is asked again next time.
     data_path: Mutex<Option<Option<PathBuf>>>,
-    tracker: lathe_project::TrackerSlot,
+    tracker: atelier_project::TrackerSlot,
     /// How often the tracker asks the host for changes made elsewhere, while someone listens.
     poll_tasks: Duration,
 }
@@ -400,7 +400,7 @@ impl Project for RemoteProject {
         }
     }
 
-    fn read_dir(&self, dir: &str) -> io::Result<Vec<lathe_project::DirEntry>> {
+    fn read_dir(&self, dir: &str) -> io::Result<Vec<atelier_project::DirEntry>> {
         match self.call(Call::ReadDir { dir: dir.into() })? {
             Reply::DirEntries(entries) => Ok(entries),
             other => Err(unexpected(other)),
@@ -421,7 +421,7 @@ impl Project for RemoteProject {
         answer
     }
 
-    fn tracker(&self) -> lathe_tracker::TrackerResult<Arc<dyn lathe_tracker::Tracker>> {
+    fn tracker(&self) -> atelier_tracker::TrackerResult<Arc<dyn atelier_tracker::Tracker>> {
         self.tracker.get_or_open(|| Ok(Arc::new(tracker::RemoteTracker::open(self.shared.clone(), self.poll_tasks)?)))
     }
 

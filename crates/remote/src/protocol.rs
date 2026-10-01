@@ -1,4 +1,4 @@
-//! What goes over the pipe between the app and `lathe-remote`: frames of postcard bytes, each after
+//! What goes over the pipe between the app and `atelier-remote`: frames of postcard bytes, each after
 //! its length as four little-endian bytes. postcard is binary, so a file's bytes cross as they are,
 //! and it is serde, so the frames reuse the Project interface's own types.
 //!
@@ -8,7 +8,7 @@
 
 use std::io::{self, Read, Write};
 
-use lathe_project::{Change, Command, DataEntry, DirEntry, Entry, GitOutput, Match, Query};
+use atelier_project::{Change, Command, DataEntry, DirEntry, Entry, GitOutput, Match, Query};
 use serde::{Deserialize, Serialize};
 
 pub mod tracker;
@@ -21,7 +21,7 @@ pub const VERSION: u32 = 5;
 
 /// The protocol, as bytes a helper binary carries, so the app reads a copy's protocol from the file
 /// with no need to run it (it may be built for another machine). Keep it in step with [`VERSION`].
-pub const STAMP: &[u8] = b"lathe-remote-protocol:5;";
+pub const STAMP: &[u8] = b"atelier-remote-protocol:5;";
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -75,7 +75,7 @@ pub enum Reply {
     DataEntries(Vec<DataEntry>),
     DirEntries(Vec<DirEntry>),
     /// The tracker's answer, with its own error, so a missing task stays a missing task.
-    Tracker(Box<Result<TrackerReply, lathe_tracker::TrackerError>>),
+    Tracker(Box<Result<TrackerReply, atelier_tracker::TrackerError>>),
 }
 
 /// Why a call failed on the host: an `io::ErrorKind` by name, and the message.

@@ -1,4 +1,4 @@
-//! lathe's own agent: an agent loop that runs inside lathe and calls a model API directly. No child
+//! atelier's own agent: an agent loop that runs inside atelier and calls a model API directly. No child
 //! process and no wire format of ours; it is a [`Backend`] like the others, and the UI cannot tell.
 //!
 //! - [`Model`] is the one seam to a model API: a streaming chat call with tools. [`Anthropic`] is the
@@ -6,14 +6,14 @@
 //!   servers that copy it.
 //! - The tools (`read`, `list`, `search`, `edit`, `write`, `shell`) touch the project only through
 //!   `Project`, so the agent works on a local folder and on an SSH host with no other code.
-//! - Permissions are lathe's own ([`permission`]). The record of a session is kept in the project
+//! - Permissions are atelier's own ([`permission`]). The record of a session is kept in the project
 //!   ([`store`]), so a session resumes with no service behind it.
 //!
 //! Keys come from the caller: [`OwnAgent::from_env`] reads the environment, and a settings screen can
 //! hand a [`Secret`] to the constructors. A key is never logged, stored by this module, or put in an event.
 use std::{path::Path, sync::Arc, time::Duration};
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 pub mod anthropic;
 pub mod context;
@@ -104,7 +104,7 @@ pub fn anthropic_models() -> Vec<ModelChoice> {
 /// clock), so the prompt cache keeps it.
 pub fn system_prompt(root: &Path, extra: &str) -> String {
     let mut prompt = format!(
-        "You are lathe's coding agent. You work in the project \"{}\" (folder: {}). You help the user \
+        "You are atelier's coding agent. You work in the project \"{}\" (folder: {}). You help the user \
          read, understand and change its code.\n\n\
          Work like this:\n\
          - Look before you change. Use `search` and `list` to find code, and `read` to read it.\n\
@@ -192,7 +192,7 @@ impl OwnAgent {
 
 impl Backend for OwnAgent {
     fn name(&self) -> &str {
-        "lathe"
+        "atelier"
     }
 
     fn capabilities(&self) -> Capabilities {

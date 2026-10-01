@@ -8,8 +8,8 @@ use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FontWeight, IntoElement, ParentElement, Render, SharedString, Styled, Subscription,
     Window, div, px,
 };
-use lathe_forge::{Forge, PullRef, PullState};
-use lathe_project::Project;
+use atelier_forge::{Forge, PullRef, PullState};
+use atelier_project::Project;
 
 use crate::{
     list_view::{ListEvent, PullList},

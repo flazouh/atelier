@@ -1,28 +1,28 @@
 [package]
-name = "lathe-app"
-description = "lathe: the app."
+name = "atelier-app"
+description = "atelier: the app."
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "lathe"
+name = "atelier"
 path = "src/main.rs"
 
 [dependencies]
 gpui-kit.workspace = true
 beui.workspace = true
-lathe-agents.workspace = true
-lathe-editor.workspace = true
-lathe-forge.workspace = true
-lathe-lsp.workspace = true
-lathe-pr-view.workspace = true
-lathe-project.workspace = true
-lathe-remote.workspace = true
-lathe-review.workspace = true
-lathe-settings.workspace = true
-lathe-tracker.workspace = true
+atelier-agents.workspace = true
+atelier-editor.workspace = true
+atelier-forge.workspace = true
+atelier-lsp.workspace = true
+atelier-pr-view.workspace = true
+atelier-project.workspace = true
+atelier-remote.workspace = true
+atelier-review.workspace = true
+atelier-settings.workspace = true
+atelier-tracker.workspace = true
 futures-channel = "0.3"
 futures-util = "0.3"
 lsp-types = "0.97"

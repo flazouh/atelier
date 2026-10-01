@@ -1,5 +1,5 @@
 //! The numbers M5 asks for: 300 files and 5,000 comments, open to first paint from the local cache, and
-//! the cost of a frame. Run in release: `cargo test --release -p lathe-pr-view perf -- --ignored --nocapture`.
+//! the cost of a frame. Run in release: `cargo test --release -p atelier-pr-view perf -- --ignored --nocapture`.
 //! The frame is drawn on the test platform, so it counts layout and paint work but not the GPU.
 use std::time::{Duration, Instant};
 

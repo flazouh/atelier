@@ -13,16 +13,16 @@ license = "Apache-2.0"
 [workspace.dependencies]
 gpui-kit = "0.6.6"
 beui = { path = "crates/beui" }
-lathe-agents = { path = "crates/agents" }
-lathe-editor = { path = "crates/editor" }
-lathe-forge = { path = "crates/forge" }
-lathe-lsp = { path = "crates/lsp" }
-lathe-pr-view = { path = "crates/pr-view" }
-lathe-project = { path = "crates/project" }
-lathe-remote = { path = "crates/remote" }
-lathe-review = { path = "crates/review" }
-lathe-settings = { path = "crates/settings" }
-lathe-tracker = { path = "crates/tracker" }
+atelier-agents = { path = "crates/agents" }
+atelier-editor = { path = "crates/editor" }
+atelier-forge = { path = "crates/forge" }
+atelier-lsp = { path = "crates/lsp" }
+atelier-pr-view = { path = "crates/pr-view" }
+atelier-project = { path = "crates/project" }
+atelier-remote = { path = "crates/remote" }
+atelier-review = { path = "crates/review" }
+atelier-settings = { path = "crates/settings" }
+atelier-tracker = { path = "crates/tracker" }
 
 [patch.crates-io]
 # gpui-base 0.6.6 with the editor fixes in vendor/gpui-base/PATCHES.md.

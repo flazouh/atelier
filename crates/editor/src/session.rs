@@ -3,7 +3,7 @@
 //! definition; F12 does the same from the caret and ⇧F12 lists the uses; rest the pointer on a symbol
 //! for its hover card; problems are checked on open and again whenever typing pauses.
 //!
-//! Nothing here names a language: the file's path picks the server from `lathe_lsp::servers`, and
+//! Nothing here names a language: the file's path picks the server from `atelier_lsp::servers`, and
 //! [`LspWorker`] runs it on a thread of its own, so no answer ever holds the window.
 //!
 //! A pull request's diff shows removed rows the file does not have. Its session holds a [`RowMap`]:
@@ -26,7 +26,7 @@ use gpui_kit::{
     base::input::{self, DefinitionProvider, HoverProvider, InputEvent, Rope, RopeExt},
     component::input::EditorState,
 };
-use lathe_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Symbol, Target, Workers, canonical, client::uri_to_path};
+use atelier_lsp::{Doc, Found, LspError, LspWorker, Navigation, Reply, Symbol, Target, Workers, canonical, client::uri_to_path};
 use lsp_types::{Diagnostic, Hover, LocationLink, Position, ShowDocumentParams, Uri};
 
 /// How long one question may take. Servers answer in milliseconds once they have indexed.
@@ -411,7 +411,7 @@ pub fn go_to_definition(editor: &Entity<EditorState>, window: &mut Window, cx: &
 }
 
 /// Finds or starts the server for `path` on the background executor, so the window opens at once.
-/// Anything that stops it, such as a language lathe has no server for or one that is not installed,
+/// Anything that stops it, such as a language atelier has no server for or one that is not installed,
 /// comes back as the sentence the status line shows. The executor, not a thread of its own, runs it,
 /// so a test's scheduler sees every wake.
 fn start(workers: Arc<Workers>, path: PathBuf, cx: &App) -> mpsc::UnboundedReceiver<Starting> {

@@ -1,24 +1,24 @@
 //! Our own agent against the real Anthropic API. Ignored by default: it needs `ANTHROPIC_API_KEY` and it
 //! spends a few cents. Run it by hand:
-//! `ANTHROPIC_API_KEY=... cargo test -p lathe-agents --test own_live -- --ignored --nocapture --test-threads=1`
+//! `ANTHROPIC_API_KEY=... cargo test -p atelier-agents --test own_live -- --ignored --nocapture --test-threads=1`
 //! It uses Haiku 4.5, the cheapest model. The key is read from the environment and is never printed.
 use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
-use lathe_agents::{
+use atelier_agents::{
     own::{OwnAgent, OwnOptions, Secret, anthropic_models},
     session::{Backend, Command, Event, OpenRequest, PermissionMode, TurnOutcome},
 };
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
 fn key() -> Option<Secret> {
     std::env::var("ANTHROPIC_API_KEY").ok().filter(|k| !k.trim().is_empty()).map(|k| Secret::new(k.trim()))
 }
 
 fn agent(key: Secret) -> OwnAgent {
-    let model = lathe_agents::own::Anthropic::new(key);
+    let model = atelier_agents::own::Anthropic::new(key);
     let options = OwnOptions { default_model: "claude-haiku-4-5".into(), models: anthropic_models(), max_tokens: 2000, max_steps: 6, ..OwnOptions::default() };
     OwnAgent::new(Arc::new(model), options)
 }
@@ -27,7 +27,7 @@ fn agent(key: Secret) -> OwnAgent {
 fn run(agent: &OwnAgent, project: Arc<LocalProject>, message: &str, mode: PermissionMode) -> Vec<Event> {
     let events: Arc<Mutex<Vec<Event>>> = Arc::default();
     let log = events.clone();
-    let sink: lathe_agents::session::EventSink = Arc::new(move |e| log.lock().unwrap().push(e));
+    let sink: atelier_agents::session::EventSink = Arc::new(move |e| log.lock().unwrap().push(e));
     let session = agent.open(project, OpenRequest { mode: Some(mode), ..OpenRequest::default() }, sink).unwrap();
     session.send(Command::send(message)).unwrap();
     let start = Instant::now();

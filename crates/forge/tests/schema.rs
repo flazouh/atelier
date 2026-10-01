@@ -1,15 +1,15 @@
-//! Checks that every change lathe can send is shaped as GitHub's schema says, without sending any.
+//! Checks that every change atelier can send is shaped as GitHub's schema says, without sending any.
 //! Each write runs against answers held in memory, and the input it built is compared with the fields of
 //! its input type, which GitHub tells a read-only introspection query. A field GitHub renamed or dropped
 //! fails here, before the first live write. Ignored by default (it needs `gh` and a network):
-//!   cargo test -p lathe-forge --test schema -- --ignored --nocapture
+//!   cargo test -p atelier-forge --test schema -- --ignored --nocapture
 use std::sync::Arc;
 
-use lathe_forge::{
+use atelier_forge::{
     Forge, MergeMethod, MergeRequest, NewLine, NewPull, PullRef, PullUpdate, RepoRef, Side, ThreadId, Verdict,
     github::{GhCli, GitHub, Request, Transport, testing::Fixtures},
 };
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 use serde_json::{Value, json};
 
 fn data(value: Value) -> String {

@@ -1,19 +1,19 @@
-# The lathe app
+# The atelier app
 
-`lathe` is the app; the gallery stays the design system's workshop. This file describes the shell, the
+`atelier` is the app; the gallery stays the design system's workshop. This file describes the shell, the
 Project interface every part of the app reads and writes through, and (from M1b) the remote protocol.
 
 ## Crates
 
 | Crate | Binary | What it holds |
 | --- | --- | --- |
-| `crates/project` (`lathe-project`) | | The `Project` interface and `LocalProject`. No GPUI. |
-| `crates/settings` (`lathe-settings`) | | The settings file: the theme and the recent projects. |
-| `crates/editor` (`lathe-editor`) | | A file's editor wired to its language server (moved from the gallery). |
-| `crates/app` (`lathe-app`) | `lathe` | The window, the shell and the project state. |
-| `crates/remote` (`lathe-remote`) | `lathe-remote` | M1b: the Project interface served over stdio. |
+| `crates/project` (`atelier-project`) | | The `Project` interface and `LocalProject`. No GPUI. |
+| `crates/settings` (`atelier-settings`) | | The settings file: the theme and the recent projects. |
+| `crates/editor` (`atelier-editor`) | | A file's editor wired to its language server (moved from the gallery). |
+| `crates/app` (`atelier-app`) | `atelier` | The window, the shell and the project state. |
+| `crates/remote` (`atelier-remote`) | `atelier-remote` | M1b: the Project interface served over stdio. |
 
-`lathe-lsp` starts its servers through the Project's `spawn`, so a server runs where the project is.
+`atelier-lsp` starts its servers through the Project's `spawn`, so a server runs where the project is.
 
 ## The Project interface
 
@@ -32,12 +32,12 @@ over the SSH pipe and waits for the answer, with a timeout. Nothing above the tr
 | `search(query)` | Lines that match a literal or a regex, `.gitignore` respected, with a cap. |
 | `spawn(command)` | A process with piped stdin and stdout, and a handle to kill it, wait for it, and read the last 64KB of its stderr. |
 | `git(args)` | Runs `git` in the root and returns its status and output. |
-| `data_read(path)`, `data_write(path, bytes)`, `data_list(prefix)` | The project's data folder: lathe's own files about the project, on its host and outside the repository. The list is newest first, with each file's time. |
+| `data_read(path)`, `data_write(path, bytes)`, `data_list(prefix)` | The project's data folder: atelier's own files about the project, on its host and outside the repository. The list is newest first, with each file's time. |
 
-The data folder is `<data>/lathe/projects/<folder>-<hash of the root>/`, where `<data>` is the host's data
+The data folder is `<data>/atelier/projects/<folder>-<hash of the root>/`, where `<data>` is the host's data
 folder (`~/Library/Application Support` on macOS, `$XDG_DATA_HOME` or `~/.local/share` elsewhere), or
-`LATHE_DATA_DIR`. The hash is FNV-1a of the root's host path, so the same project always finds the same
-folder (`crates/project/src/data.rs`). A remote project's is on the host: `lathe-remote` answers the calls
+`ATELIER_DATA_DIR`. The hash is FNV-1a of the root's host path, so the same project always finds the same
+folder (`crates/project/src/data.rs`). A remote project's is on the host: `atelier-remote` answers the calls
 from its own data folder. A project that keeps no data folder (a test's stand-in) answers `Unsupported`.
 
 Paths are relative to the root in the interface, except `spawn`'s working folder and a language
@@ -47,7 +47,7 @@ or is absolute, is refused.
 A watch batches what happens in 50 ms. New and removed paths list the tree again; a changed open
 file reloads when its tab is clean. The app's tests fire a project's watch themselves, on the test
 thread (`Quiet` in `crates/app/src/open_project/tests.rs`), because GPUI's test scheduler rejects a
-wake from the watcher's own thread; lathe-project tests the real watcher.
+wake from the watcher's own thread; atelier-project tests the real watcher.
 
 ## The shell
 
@@ -63,8 +63,8 @@ wake from the watcher's own thread; lathe-project tests the real watcher.
   width when one hides; the agent panel takes what is left, within the width rules below.
 - `t` (GitQuiet's Go to file, while nothing is being typed) opens beui's Finder over the project's
   files; Enter opens the one picked, Escape closes it.
-- `lathe [folder…]` opens each folder named as a project.
-- `lathe` with no folder named opens again the sessions open at the last quit, each with its
+- `atelier [folder…]` opens each folder named as a project.
+- `atelier` with no folder named opens again the sessions open at the last quit, each with its
   project, and shows the one that was in front. The layout (side by side or single) comes back too.
 
 ## Window widths
@@ -97,32 +97,32 @@ them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
 
 ## Build the Mac app
 
-The app is `target/bundle/lathe.app`. It holds the app, an icon, and the Linux helper that it puts on
-an SSH host (`Contents/Resources/remote/linux-x86_64/lathe-remote`). The app finds that helper with no
+The app is `target/bundle/atelier.app`. It holds the app, an icon, and the Linux helper that it puts on
+an SSH host (`Contents/Resources/remote/linux-x86_64/atelier-remote`). The app finds that helper with no
 setup (see `crates/remote/src/ssh.rs`, `candidates`).
 
 1. On a Linux x86_64 machine, build the helper and its hash:
 
    ```
-   cargo build --release -p lathe-remote
-   cp target/release/lathe-remote lathe-remote-linux-x86_64
-   sha256sum lathe-remote-linux-x86_64 > lathe-remote-linux-x86_64.sha256
+   cargo build --release -p atelier-remote
+   cp target/release/atelier-remote atelier-remote-linux-x86_64
+   sha256sum atelier-remote-linux-x86_64 > atelier-remote-linux-x86_64.sha256
    ```
 
    On the HP the result stays in `~/shots/release/`.
 2. On the Mac, copy both files, then build the bundle from a checkout:
 
    ```
-   scp 'alex@hp-agent:shots/release/lathe-remote-linux-x86_64*' /tmp/
-   tools/bundle-mac.sh /tmp/lathe-remote-linux-x86_64
+   scp 'alex@hp-agent:shots/release/atelier-remote-linux-x86_64*' /tmp/
+   tools/bundle-mac.sh /tmp/atelier-remote-linux-x86_64
    ```
 
-   The script checks the hash, builds `lathe` in release for `aarch64-apple-darwin`, writes
-   `Info.plist` (id `dev.lathe.app`, version from `Cargo.toml`, macOS 13 or later) and the icon, and
+   The script checks the hash, builds `atelier` in release for `aarch64-apple-darwin`, writes
+   `Info.plist` (id `dev.atelier.app`, version from `Cargo.toml`, macOS 13 or later) and the icon, and
    signs the app ad hoc (`codesign -s -`). It needs no network beyond what cargo needs.
-3. Run it with `open target/bundle/lathe.app`, or copy it to `/Applications`.
+3. Run it with `open target/bundle/atelier.app`, or copy it to `/Applications`.
 
-The icon is `tools/mac/lathe-1024.png`, drawn from beui's `LatheMark` by `tools/mac/make-icon.sh`
+The icon is `tools/mac/atelier-1024.png`, drawn from beui's `AtelierMark` by `tools/mac/make-icon.sh`
 (ImageMagick, run only when the mark changes). Ad hoc signing opens the app on the Mac that built it.
 Another Mac shows the Gatekeeper warning until you allow the app.
 
@@ -135,7 +135,7 @@ The plan is `plans/m6-tasks.md`. The parts are in `docs/tasks.md`, the back end 
   press on a task shows it in full; "All tasks" (Esc) goes back. Under 560 px of pane width the board would clip,
   so the switch hides and the pane shows the list. Below 900 px of window width the third tab says "Tasks".
 - **Storage.** `Project::tracker()` opens `tracker.sqlite` in the project data folder: on this machine for a local
-  project, on the host (through lathe-remote) for a project over SSH. A change made on another machine reaches the
+  project, on the host (through atelier-remote) for a project over SSH. A change made on another machine reaches the
   pane through `Tracker::subscribe`. The subscription lives as long as the pane.
 - **Start a session.** "Start a session" on a task, "Create and start a session" in the new task dialog, and
   ⌘Enter on a row start a session with the task as its first message (`KEY: title`, the description, and "Work
@@ -182,7 +182,7 @@ The plan is `plans/m6-tasks.md`. The parts are in `docs/tasks.md`, the back end 
 ## QA, M1a
 
 Driven on the HP under Xvfb with `tools/app-drive-linux.sh`, in a throwaway clone of the repository
-(`/tmp/qa-lathe`, its `target` linked to the checkout's, so rust-analyzer loads quickly). The
+(`/tmp/qa-atelier`, its `target` linked to the checkout's, so rust-analyzer loads quickly). The
 recordings and stills are in `~/shots/m1/` on the HP.
 
 | What | Seen |
@@ -201,11 +201,11 @@ recordings and stills are in `~/shots/m1/` on the HP.
 ## Remote projects (M1b)
 
 A project on an SSH host is a `RemoteProject` (`crates/remote`): every `Project` call becomes a
-request to `lathe-remote`, which runs on the host and answers with a `LocalProject` there. Nothing
+request to `atelier-remote`, which runs on the host and answers with a `LocalProject` there. Nothing
 above the interface knows the difference: the tree, the editor, search, git and the language
 servers all go through the same calls. The servers run on the host, started through the remote
 `spawn`, found by the host's `PATH` (`Store::on_host`), each at the project's root
-(`Workers::at_project_root`); lathe downloads nothing onto a host.
+(`Workers::at_project_root`); atelier downloads nothing onto a host.
 
 ### The protocol
 
@@ -217,8 +217,8 @@ servers all go through the same calls. The servers run on the host, started thro
   `Hello { version, root }`; a version the host does not speak fails the hello. Version 2 added
   `Remove` and the data folder's calls, version 3 `DataPath` (the folder's path on the host, asked once and
   kept), version 4 `ReadDir`, and version 5 `Tracker` (below). A helper of another version answers
-  "update lathe on this host", with no protocol numbers. The deploy path holds the binary's hash, so a
-  new app puts its own `lathe-remote` on the host.
+  "update atelier on this host", with no protocol numbers. The deploy path holds the binary's hash, so a
+  new app puts its own `atelier-remote` on the host.
 - Tasks over SSH (protocol 5): `Project::tracker()` gives the project's `Arc<dyn Tracker>`. The store is
   `tracker.sqlite` in the project's data folder on its host, so every machine that opens the project sees
   the same tasks. `Call::Tracker(TrackerCall)` and `Reply::Tracker` carry each call of the trait, and a
@@ -237,19 +237,19 @@ user's own ssh with their config, keys and agent; `BatchMode` makes a host that 
 fail at once, in ssh's words, instead of waiting on a prompt nobody sees.
 
 1. Probe: `uname -sm` and `$HOME`.
-2. Deploy: `~/.cache/lathe/remote/<version>-<hash>/lathe-remote`, where the hash is of the copy the
+2. Deploy: `~/.cache/atelier/remote/<version>-<hash>/atelier-remote`, where the hash is of the copy the
    app would upload, must answer `--version`. If not, the copy goes up over ssh: `cat` into a
    `.part` file, `chmod +x`, and a rename, so a half copy never runs. This needs no `scp`.
-3. Dial: `ssh <host> <that path> --stdio`. On the host, lathe-remote takes its `PATH` from the
+3. Dial: `ssh <host> <that path> --stdio`. On the host, atelier-remote takes its `PATH` from the
    user's login shell, and adds `~/.cargo/bin` and `~/.local/bin` if missing, so it finds the
    language servers the user installed.
 
-The copy to upload comes from `$LATHE_REMOTE_DIR/<system>-<arch>/lathe-remote` (`linux-x86_64`,
-`darwin-aarch64`), or, for a host like this machine, the `lathe-remote` beside the app. In
-development the HP builds the linux-x86_64 copy (`cargo build --release -p lathe-remote`); a Mac
-app that opens a project on the HP points `LATHE_REMOTE_DIR` at a folder holding that file as
-`linux-x86_64/lathe-remote`. `tools/build-remote.sh` builds it and prints that folder; it sets its
-own PATH, so a plain `ssh hp-agent ~/code/local/lathe/tools/build-remote.sh` works.
+The copy to upload comes from `$ATELIER_REMOTE_DIR/<system>-<arch>/atelier-remote` (`linux-x86_64`,
+`darwin-aarch64`), or, for a host like this machine, the `atelier-remote` beside the app. In
+development the HP builds the linux-x86_64 copy (`cargo build --release -p atelier-remote`); a Mac
+app that opens a project on the HP points `ATELIER_REMOTE_DIR` at a folder holding that file as
+`linux-x86_64/atelier-remote`. `tools/build-remote.sh` builds it and prints that folder; it sets its
+own PATH, so a plain `ssh hp-agent ~/code/local/atelier/tools/build-remote.sh` works.
 
 ### Failures
 
@@ -257,29 +257,29 @@ own PATH, so a plain `ssh hp-agent ~/code/local/lathe/tools/build-remote.sh` wor
 | --- | --- |
 | Host unreachable | The form shows ssh's words: "ssh: Could not resolve hostname …". |
 | Auth fails | The form shows "Permission denied (publickey)." |
-| The connection drops, or lathe-remote crashes | Every waiting call fails at once. A banner says "Lost hp-agent:/path (why). Reconnecting; your unsaved edits are kept here." The client dials again, backing off from 0.5 s to 30 s; back, it says hello, restores the watch, lists the tree, and starts each open file's language server again. Tabs keep their text and dirty marks, and a save after the reconnect writes them. |
+| The connection drops, or atelier-remote crashes | Every waiting call fails at once. A banner says "Lost hp-agent:/path (why). Reconnecting; your unsaved edits are kept here." The client dials again, backing off from 0.5 s to 30 s; back, it says hello, restores the watch, lists the tree, and starts each open file's language server again. Tabs keep their text and dirty marks, and a save after the reconnect writes them. |
 | A slow link | A file being read shows as a pending tab with a spinner; a call that runs out of time says so in the status line. |
 
 Opening: the start screen's "Open over SSH…" (⌘⇧O) offers the hosts in `~/.ssh/config` as chips
-under a Host field, and a folder field (`~` works). `lathe ssh://host/path` opens one from the
+under a Host field, and a folder field (`~` works). `atelier ssh://host/path` opens one from the
 command line. Recent remote projects reopen from the start screen.
 
 ## QA, M1b
 
-On the HP under Xvfb, the app opening `/tmp/qa-lathe` over `ssh hp-agent` (the HP to itself).
+On the HP under Xvfb, the app opening `/tmp/qa-atelier` over `ssh hp-agent` (the HP to itself).
 The shots and recordings are in `~/shots/m1b/` on the HP.
 
 | What | Seen |
 | --- | --- |
-| Open over ssh | `remote-open.png`: `hp-agent:/tmp/qa-lathe`, main, 1008 files listed in 12 ms |
+| Open over ssh | `remote-open.png`: `hp-agent:/tmp/qa-atelier`, main, 1008 files listed in 12 ms |
 | Open a file, hover, definition, edit, save | `qa-remote.mp4`, `qa-*.png`: rust-analyzer running on the host; `Instant`'s card; `bind_keys` opens `shell.rs`; "Saved crates/app/src/shell.rs"; `git diff` on the host shows the line |
-| The connection drops mid-edit (lathe-remote killed with -9) | `failures.mp4`, `f-1-down.png` (the banner), `f-2-back.png` ("Reconnected", the dirty dot kept), `f-3-saved.png` (the edit saved after), `f-6-server-back.png` (rust-analyzer ready again) |
+| The connection drops mid-edit (atelier-remote killed with -9) | `failures.mp4`, `f-1-down.png` (the banner), `f-2-back.png` ("Reconnected", the dirty dot kept), `f-3-saved.png` (the edit saved after), `f-6-server-back.png` (rust-analyzer ready again) |
 | A stalled host (SIGSTOP) | `f-4-pending.png` (the pending tab), `f-5-timeout.png` ("hp-agent did not answer in 30 s") |
 | The form | `form-*.png`: the config's hosts; an unknown host; `nobody@hp-agent` refused; connecting; open |
 
 ## Agent sessions (M2)
 
-The agent comes from `lathe_agents::registry`, so the app names none. Each open project lists the
+The agent comes from `atelier_agents::registry`, so the app names none. Each open project lists the
 agent's past sessions (`Backend::sessions`, read off the UI thread); a session open in the window is an
 `AgentSession` (`crates/app/src/agent_session.rs`).
 
@@ -308,11 +308,11 @@ agent's past sessions (`Backend::sessions`, read off the UI thread); a session o
   file and input (long values as code). Allow once, Always allow and Deny answer with the choice of
   that kind the agent offered. **Always allow answers for this session:** Claude Code applies the
   rule it suggested to the running session. A lasting rule would live in the agent's own settings,
-  for Claude Code the project's `.claude/settings.local.json`; lathe writes none yet.
+  for Claude Code the project's `.claude/settings.local.json`; atelier writes none yet.
 - **The header.** The title (a press renames it; the name is kept in the settings file by the
   agent's session id), what the session does, and Stop while its agent runs.
 - **Remote projects.** The agent starts through `Project::spawn`, so on an SSH project `claude` runs on
-  the host, as a child of `lathe-remote`.
+  the host, as a child of `atelier-remote`.
 - **Failures.** claude missing on the host: "claude is not installed on this host. Install it there,
   then start a new session." Not logged in: claude's own "Not logged in · Please run /login". A crash
   mid-turn: "Stopped: the agent was stopped by a signal", or, when it left words on stderr, its last
@@ -327,13 +327,13 @@ A real Claude Code session on the HP (claude 2.1.284, logged in), in `/tmp/qa-m2
 
 | What | Seen |
 | --- | --- |
-| A first message | `live-1.png`: "hello from lathe" |
+| A first message | `live-1.png`: "hello from atelier" |
 | An edit that asks, allowed | `qa-1-ask.png` (ToolApproval for Write, the sidebar says Needs approval), `qa-2-allowed.png` (the file on disk, in the tree, and the reply) |
 | Todos and a subagent | `qa-3-work-*.png`: the todo list fills in; a general-purpose subagent runs and ends |
 | Interrupt during a question | `qa-4.png`: the question withdrawn, the call failed, Idle |
 | Interrupt during a tool | `qa-5.png`: Esc while Bash runs; the call failed, Idle |
 | Resume after a restart | `qa-6r.png`: the history is back, and a follow-up is answered from it |
-| An SSH project | `qa-7-ssh-ask.png`, `qa-7-ssh-done.png`: `claude` runs as a child of `lathe-remote`; hello.txt lands on the host |
+| An SSH project | `qa-7-ssh-ask.png`, `qa-7-ssh-done.png`: `claude` runs as a child of `atelier-remote`; hello.txt lands on the host |
 | A crash mid-turn | `qa-8-crash.png`: claude killed with -9; "Stopped: the agent was stopped by a signal" |
 | claude missing, not logged in | `qa-9.png` |
 | Rename, the mode picker, the single view, restored after a restart | `qa-10.png`, `qa-10-restored-open.png` |
@@ -446,7 +446,7 @@ off the UI thread, through the project, so it works on a remote project the same
 - **Pull and rebase** (⌘⇧U after a rejection) fetches the branch, rebases onto it, and pushes. A
   conflict undoes the rebase and names the files. The reader's other edits stop it before it starts.
   A second button, "Set my edits aside, rebase, and put them back", stashes them under the entry
-  "lathe: edits set aside to pull and rebase" and pops it after. A clash leaves the entry and names
+  "atelier: edits set aside to pull and rebase" and pops it after. A clash leaves the entry and names
   it. The marks and the record follow the rebased commits, matched by patch id.
 
 - **Open pull request** (⌘⇧R after a push) shows the form in the strip. It first asks the forge for the

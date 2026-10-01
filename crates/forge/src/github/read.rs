@@ -1,4 +1,4 @@
-//! GitHub's data as lathe's model. Pure: nothing here asks GitHub anything, so it is tested on recorded
+//! GitHub's data as atelier's model. Pure: nothing here asks GitHub anything, so it is tested on recorded
 //! answers.
 use super::wire::{
     CommentNode, CommitNode, ContextNode, Contexts, FileNode, Login, PullNode, Repo, RestJob, SearchHit, StateCount,
@@ -218,7 +218,7 @@ pub(super) fn comment(node: &CommentNode) -> Comment {
         kind,
         body: node.body.clone(),
         created_at: time::parse(&node.created_at).unwrap_or(0),
-        // GitHub calls a comment in a review that is not submitted `PENDING`; lathe calls it unsent.
+        // GitHub calls a comment in a review that is not submitted `PENDING`; atelier calls it unsent.
         unsent: node.state.as_deref() == Some("PENDING"),
     }
 }

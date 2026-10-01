@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
 use super::server::{FakeServer, Step};
 use crate::{
@@ -22,7 +22,7 @@ pub struct Rig {
     pub dir: tempfile::TempDir,
     /// The project's data folder, where the record goes.
     pub data: tempfile::TempDir,
-    pub project: Arc<dyn lathe_project::Project>,
+    pub project: Arc<dyn atelier_project::Project>,
     pub agent: OwnAgent,
     pub server: FakeServer,
     pub events: Arc<Mutex<Vec<Event>>>,
@@ -32,7 +32,7 @@ pub struct Rig {
 pub fn rig(steps: Vec<Step>, mode: PermissionMode) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
-    let project: Arc<dyn lathe_project::Project> = Arc::new(crate::testing::Locked(Arc::new(LocalProject::open(dir.path()).unwrap().with_data_dir(data.path()))));
+    let project: Arc<dyn atelier_project::Project> = Arc::new(crate::testing::Locked(Arc::new(LocalProject::open(dir.path()).unwrap().with_data_dir(data.path()))));
     let server = FakeServer::start(steps);
     let model = Anthropic::new(Secret::new(KEY)).with_base(server.url.clone());
     let agent = OwnAgent::new(Arc::new(model), options());

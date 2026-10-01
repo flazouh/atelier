@@ -1,6 +1,6 @@
 //! The words of an activity group's summary row: what the agent did in a run of thinking, tool calls and
 //! subagents, in one line ("Thought for 12s · 3 tool calls"). Pure.
-use lathe_agents::session::Item;
+use atelier_agents::session::Item;
 
 /// The viewport's height while the agent works: the group shows its newest items in this much room.
 pub const LIVE_HEIGHT: f32 = 208.;

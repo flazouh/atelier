@@ -128,7 +128,7 @@ impl<M: InputModeKind> TextElement<M> {
             .zip(last_layout.lines.iter())
         {
             let line = state.text.slice_line(buffer_line);
-            // lathe patch: a row gap moves the guides with their row.
+            // atelier patch: a row gap moves the guides with their row.
             let offset_y = row_top + last_layout.gap_above(buffer_line);
             let mut current_indents = vec![];
             if line.len() > 0 {

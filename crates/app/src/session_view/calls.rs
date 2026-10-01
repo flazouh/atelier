@@ -1,7 +1,7 @@
 //! One row per tool call. While a call waits for its approval, the approval stands in its place, so the
 //! call's own row hides; once answered, the approval hides and the call's row carries the answer as a
 //! mark, such as "Approved".
-use lathe_agents::session::{Answer, ChoiceKind, Item, ToolId};
+use atelier_agents::session::{Answer, ChoiceKind, Item, ToolId};
 
 /// The approval of the call `id`, if the call asked for one.
 fn approval<'a>(items: &'a [Item], id: &ToolId) -> Option<&'a Answer> {

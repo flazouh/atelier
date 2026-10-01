@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use lathe_tracker::{Tracker, TrackerResult};
+use atelier_tracker::{Tracker, TrackerResult};
 
 #[derive(Default)]
 pub struct TrackerSlot(Mutex<Option<Arc<dyn Tracker>>>);

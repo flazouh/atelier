@@ -1,8 +1,8 @@
 use super::*;
 
 #[test]
-fn lathe_offers_its_own_commands() {
-    let commands = lathe_commands();
+fn atelier_offers_its_own_commands() {
+    let commands = atelier_commands();
     let names: Vec<&str> = commands.iter().map(|c| c.name.as_str()).collect();
     for name in ["goal", "clear-goal", "login", "review", "tasks", "files"] {
         assert!(names.contains(&name), "{name} in {names:?}");
@@ -29,16 +29,16 @@ fn a_project_command_takes_its_file_name_and_its_description() {
 }
 
 #[test]
-fn the_list_has_each_name_once_and_lathe_answers_for_its_own() {
+fn the_list_has_each_name_once_and_atelier_answers_for_its_own() {
     let skills = vec![skill_from(".claude/skills/pdf/SKILL.md", "---\nname: pdf\n---").unwrap()];
     let agent = vec!["compact".to_string(), "login".to_string(), "pdf".to_string(), "review".to_string()];
-    let all = merge(lathe_commands(), skills, &agent);
+    let all = merge(atelier_commands(), skills, &agent);
     let names: Vec<&str> = all.iter().map(|c| c.name.as_str()).collect();
     for name in ["compact", "login", "pdf", "review"] {
         assert_eq!(names.iter().filter(|n| **n == name).count(), 1, "{name} once in {names:?}");
     }
     let login = all.iter().find(|c| c.name == "login").unwrap();
-    assert_eq!(login.source, CommandSource::Lathe, "lathe runs /login, the agent cannot headless");
+    assert_eq!(login.source, CommandSource::Atelier, "atelier runs /login, the agent cannot headless");
     let compact = all.iter().find(|c| c.name == "compact").unwrap();
     assert_eq!(compact.source, CommandSource::Agent);
     let pdf = all.iter().find(|c| c.name == "pdf").unwrap();

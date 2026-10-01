@@ -12,7 +12,7 @@ use beui::{
     AgentText, AgentTextStatus,
 };
 use gpui_kit::{Context, IntoElement, ParentElement, Styled, div, px};
-use lathe_agents::{claude, coding_agents::CodingAgent, labs::Lab};
+use atelier_agents::{claude, coding_agents::CodingAgent, labs::Lab};
 
 use super::{Gallery, narrow, row, section};
 
@@ -57,10 +57,10 @@ pub fn changed_files() -> Vec<ChangedFile> {
 pub fn pr_3344() -> PrChipData {
     PrChipData {
         number: 3344,
-        repo: "flazouh/lathe".into(),
+        repo: "flazouh/atelier".into(),
         title: "Fix the off-by-one in the diff view's line numbers".into(),
         state: PrState::Open,
-        url: "https://github.com/flazouh/lathe/pull/3344".into(),
+        url: "https://github.com/flazouh/atelier/pull/3344".into(),
     }
 }
 

@@ -31,7 +31,7 @@ impl OpenAiCompatible {
     /// OpenRouter: the same API with a different base and two headers that name the app.
     pub fn openrouter(key: Secret) -> Self {
         let mut client = Self::new(Some(key), OPENROUTER_BASE);
-        client.extra_headers = vec![("HTTP-Referer".into(), "https://github.com/flazouh/lathe".into()), ("X-Title".into(), "lathe".into())];
+        client.extra_headers = vec![("HTTP-Referer".into(), "https://github.com/flazouh/atelier".into()), ("X-Title".into(), "atelier".into())];
         client
     }
 

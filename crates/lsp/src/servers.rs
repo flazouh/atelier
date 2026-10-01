@@ -19,9 +19,9 @@ pub struct ServerSpec {
     pub language_ids: &'static [&'static str],
     /// Files whose directory is a project root for this server.
     pub root_markers: &'static [&'static str],
-    /// How to install it, for the status line when it is missing and lathe cannot download it.
+    /// How to install it, for the status line when it is missing and atelier cannot download it.
     pub install: &'static str,
-    /// The pinned copy lathe downloads when the user has none.
+    /// The pinned copy atelier downloads when the user has none.
     pub download: Option<Download>,
     /// The `initializationOptions` to send, from where the program is and the project root.
     pub initialization_options: fn(program: &Path, root: &Path) -> Option<Value>,
@@ -32,7 +32,7 @@ fn no_options(_: &Path, _: &Path) -> Option<Value> {
     None
 }
 
-/// The servers lathe knows how to run.
+/// The servers atelier knows how to run.
 pub const SERVERS: &[ServerSpec] = &[
     ServerSpec {
         name: "rust-analyzer",
@@ -87,7 +87,7 @@ pub const SERVERS: &[ServerSpec] = &[
         language_ids: &["java"],
         root_markers: &["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle"],
         install: "brew install jdtls",
-        // jdtls needs a Java runtime as well, which lathe does not download yet.
+        // jdtls needs a Java runtime as well, which atelier does not download yet.
         download: None,
         initialization_options: no_options,
     },
@@ -219,7 +219,7 @@ pub const NODE: Download = Download {
     },
 };
 
-/// The standard LSP language id of each language lathe knows, and the file extensions that are in it.
+/// The standard LSP language id of each language atelier knows, and the file extensions that are in it.
 pub const LANGUAGES: &[(&str, &[&str])] = &[
     ("rust", &["rs"]),
     ("typescript", &["ts", "mts", "cts"]),
@@ -237,7 +237,7 @@ pub fn language_id(path: &Path) -> Option<&'static str> {
     LANGUAGES.iter().find(|(_, extensions)| extensions.contains(&extension)).map(|(id, _)| *id)
 }
 
-/// The server for a language id, if lathe knows one.
+/// The server for a language id, if atelier knows one.
 pub fn server_for(language_id: &str) -> Option<&'static ServerSpec> {
     SERVERS.iter().find(|spec| spec.language_ids.contains(&language_id))
 }

@@ -11,7 +11,7 @@ pub enum ForgeError {
     NotSignedIn,
     /// The forge could not be reached.
     Offline,
-    /// The forge asked lathe to wait. `retry_after` is in seconds, when it says.
+    /// The forge asked atelier to wait. `retry_after` is in seconds, when it says.
     RateLimited { retry_after: Option<u64> },
     /// The thing is not there, or the reader may not see it.
     NotFound(String),
@@ -21,7 +21,7 @@ pub enum ForgeError {
     Rejected(String),
     /// The remote is not one this forge serves.
     UnknownRemote(String),
-    /// An answer lathe could not read: the forge changed shape, or the call broke in transit.
+    /// An answer atelier could not read: the forge changed shape, or the call broke in transit.
     Unexpected(String),
 }
 

@@ -9,12 +9,12 @@ license.workspace = true
 [dependencies]
 gpui-kit.workspace = true
 beui.workspace = true
-lathe-agents.workspace = true
-lathe-editor.workspace = true
-lathe-lsp.workspace = true
-lathe-pr-view.workspace = true
-lathe-project.workspace = true
-lathe-settings.workspace = true
+atelier-agents.workspace = true
+atelier-editor.workspace = true
+atelier-lsp.workspace = true
+atelier-pr-view.workspace = true
+atelier-project.workspace = true
+atelier-settings.workspace = true
 ignore = "0.4.33"
 lsp-types = "0.97"
 

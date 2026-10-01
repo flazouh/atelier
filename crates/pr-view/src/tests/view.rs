@@ -3,7 +3,7 @@ use std::{path::Path, sync::Arc, time::Duration};
 
 use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 use beui::verdict::Verb;
-use lathe_forge::{Change, ChangedFile, CheckStatus, Conclusion, Forge, PullRef};
+use atelier_forge::{Change, ChangedFile, CheckStatus, Conclusion, Forge, PullRef};
 
 use super::repo::{Scenario, put};
 use crate::{
@@ -129,8 +129,8 @@ fn a_read_only_view_sends_nothing_and_says_so(cx: &mut TestAppContext) {
     view.update_in(cx, |v, window, cx| {
         v.post_remark("hello".into(), window, cx);
         v.send_verdict(Verb::Approve, "ok".into(), window, cx);
-        v.reply(lathe_forge::ThreadId("T1".into()), "x".into(), cx);
-        v.resolve(lathe_forge::ThreadId("T1".into()), true, cx);
+        v.reply(atelier_forge::ThreadId("T1".into()), "x".into(), cx);
+        v.resolve(atelier_forge::ThreadId("T1".into()), true, cx);
     });
     cx.run_until_parked();
     std::thread::sleep(Duration::from_millis(50));
@@ -159,14 +159,14 @@ fn a_verdict_reply_and_resolve_each_send_one_write(cx: &mut TestAppContext) {
     settle(&view, cx, |v| v.current_view().is_some());
     view.update_in(cx, |v, window, cx| v.send_verdict(Verb::RequestChanges, "Please fix".into(), window, cx));
     write_seen(&h, cx, &view, 1);
-    view.update(cx, |v, cx| v.reply(lathe_forge::ThreadId("T1".into()), "Because".into(), cx));
+    view.update(cx, |v, cx| v.reply(atelier_forge::ThreadId("T1".into()), "Because".into(), cx));
     write_seen(&h, cx, &view, 2);
-    view.update(cx, |v, cx| v.resolve(lathe_forge::ThreadId("T1".into()), true, cx));
+    view.update(cx, |v, cx| v.resolve(atelier_forge::ThreadId("T1".into()), true, cx));
     write_seen(&h, cx, &view, 3);
     let writes = h.forge.writes();
-    assert_eq!(writes[0], Write::Submit { reference: h.reference.clone(), verdict: lathe_forge::Verdict::RequestChanges, body: "Please fix".into() });
-    assert_eq!(writes[1], Write::Reply { thread: lathe_forge::ThreadId("T1".into()), body: "Because".into() });
-    assert_eq!(writes[2], Write::Resolve { thread: lathe_forge::ThreadId("T1".into()), resolved: true });
+    assert_eq!(writes[0], Write::Submit { reference: h.reference.clone(), verdict: atelier_forge::Verdict::RequestChanges, body: "Please fix".into() });
+    assert_eq!(writes[1], Write::Reply { thread: atelier_forge::ThreadId("T1".into()), body: "Because".into() });
+    assert_eq!(writes[2], Write::Resolve { thread: atelier_forge::ThreadId("T1".into()), resolved: true });
 }
 
 #[gpui_kit::test]
@@ -183,7 +183,7 @@ fn a_merge_names_the_head_the_reader_saw_and_a_moved_branch_is_refused(cx: &mut 
     write_seen(&h, cx, &view, 1);
     settle(&view, cx, |v| v.notice.as_deref().is_some_and(|n| n.contains("moved")));
     assert!(matches!(&h.forge.writes()[0], Write::Merge { request, .. } if request.expected_head.as_deref() == Some(h.head.as_str()) && request.delete_branch));
-    assert_ne!(h.forge.data(&h.reference).unwrap().pull.unwrap().state, lathe_forge::PullState::Merged);
+    assert_ne!(h.forge.data(&h.reference).unwrap().pull.unwrap().state, atelier_forge::PullState::Merged);
 }
 
 #[gpui_kit::test]
@@ -195,7 +195,7 @@ fn a_merge_that_goes_through_shows_the_pull_request_as_merged(cx: &mut TestAppCo
     settle(&view, cx, |v| v.current_view().is_some());
     let choice = Choice { method: MergeMethod::Merge, auto: false, delete_branch: false };
     view.update_in(cx, |v, window, cx| v.merge_pull(Action::Merge(MergeMethod::Merge), choice, String::new(), String::new(), window, cx));
-    settle(&view, cx, |v| v.model.pull().is_some_and(|p| p.state == lathe_forge::PullState::Merged));
+    settle(&view, cx, |v| v.model.pull().is_some_and(|p| p.state == atelier_forge::PullState::Merged));
 }
 
 #[gpui_kit::test]
@@ -249,7 +249,7 @@ fn a_thread_that_arrives_while_reading_shows_up_and_the_reader_stays_on_their_fi
 fn not_being_signed_in_shows_why_and_a_retry_reads_the_pull_request(cx: &mut TestAppContext) {
     setup(cx);
     let h = harness();
-    h.forge.fail("pull", lathe_forge::ForgeError::NotSignedIn);
+    h.forge.fail("pull", atelier_forge::ForgeError::NotSignedIn);
     let (view, cx) = open(&h, cx);
     settle(&view, cx, |v| v.model.error_of(crate::data::PartKind::Pull).is_some());
     view.read_with(cx, |v, _| assert!(!v.model.ready()));
@@ -330,7 +330,7 @@ fn the_other_merge_box_presses_each_reach_the_forge_with_their_own_call(cx: &mut
     press(Action::ReadyForReview, &view, cx);
     write_seen(&h, cx, &view, 6);
     let writes = h.forge.writes();
-    assert_eq!(writes[0], Write::UpdateBranch { reference: h.reference.clone(), method: lathe_forge::UpdateMethod::Rebase, expected_head: h.head.clone() });
+    assert_eq!(writes[0], Write::UpdateBranch { reference: h.reference.clone(), method: atelier_forge::UpdateMethod::Rebase, expected_head: h.head.clone() });
     assert_eq!(writes[1], Write::CancelAutoMerge(h.reference.clone()));
     assert_eq!(writes[2], Write::Dequeue(h.reference.clone()));
     assert_eq!(writes[3], Write::DeleteBranch(h.reference.clone()));

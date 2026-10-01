@@ -36,7 +36,7 @@ fn a_new_task_gets_the_next_short_id_and_reads_back() {
     full.priority = Priority::High;
     full.assignee = Some(Assignee::Agent("Claude".into()));
     full.labels = vec!["ui".into(), "bug".into(), "ui".into()];
-    full.project = Some("lathe".into());
+    full.project = Some("atelier".into());
     full.parent = Some(a.id.clone());
     let c = t.create(&full, "alex").unwrap();
     assert_eq!(t.get(&c.id).unwrap().unwrap(), c);
@@ -249,18 +249,18 @@ fn subscribers_hear_of_each_change_and_a_dropped_receiver_is_forgotten() {
 #[test]
 fn the_database_survives_a_reopen_and_keeps_its_prefix() {
     let dir = tempfile::tempdir().unwrap();
-    let project = ProjectKey::Local { path: "/code/lathe".into() };
+    let project = ProjectKey::Local { path: "/code/atelier".into() };
     let id = {
-        let t = LocalTracker::open_project(dir.path(), &project, "lathe").unwrap();
-        assert_eq!(t.prefix(), "LAT");
+        let t = LocalTracker::open_project(dir.path(), &project, "atelier").unwrap();
+        assert_eq!(t.prefix(), "ATE");
         t.create(&new("Kept"), "a").unwrap().id
     };
     assert!(project.path_in(dir.path()).exists(), "the database is in the data folder");
     let t = LocalTracker::open_project(dir.path(), &project, "renamed-project").unwrap();
-    assert_eq!(t.prefix(), "LAT", "a renamed project keeps its short ids");
+    assert_eq!(t.prefix(), "ATE", "a renamed project keeps its short ids");
     let task = t.get(&id).unwrap().unwrap();
-    assert_eq!((task.title.as_str(), task.key.as_str()), ("Kept", "LAT-1"));
-    assert_eq!(t.create(&new("Next"), "a").unwrap().key, "LAT-2");
+    assert_eq!((task.title.as_str(), task.key.as_str()), ("Kept", "ATE-1"));
+    assert_eq!(t.create(&new("Next"), "a").unwrap().key, "ATE-2");
 }
 
 #[test]
@@ -287,10 +287,10 @@ fn an_old_database_is_brought_up_and_a_newer_one_is_refused() {
         conn.pragma_update(None, "user_version", migrations::CURRENT + 1).unwrap();
     }
     let error = LocalTracker::open(&path, "T").err().expect("a newer database is refused");
-    assert!(matches!(&error, TrackerError::Storage(why) if why.contains("update lathe")), "{error}");
+    assert!(matches!(&error, TrackerError::Storage(why) if why.contains("update atelier")), "{error}");
 }
 
-/// The numbers the task asks for. Run in release: `cargo test --release -p lathe-tracker -- --ignored --nocapture`.
+/// The numbers the task asks for. Run in release: `cargo test --release -p atelier-tracker -- --ignored --nocapture`.
 #[test]
 #[ignore = "a measuring run; needs --release"]
 fn ten_thousand_tasks_load_and_filter_in_under_50_ms_and_a_write_takes_under_5() {

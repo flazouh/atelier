@@ -1,17 +1,17 @@
 //! The whole path over a real `ssh`: probe, deploy, dial, and a project that answers. It needs a
-//! host that takes the user's key, and a lathe-remote built for it in `$LATHE_REMOTE_DIR/<platform>/`:
-//!     cargo build -p lathe-remote && mkdir -p /tmp/remote/linux-x86_64 && cp target/debug/lathe-remote /tmp/remote/linux-x86_64/
-//!     LATHE_REMOTE_DIR=/tmp/remote LATHE_TEST_SSH_HOST=hp-agent cargo test -p lathe-remote --test over_ssh -- --ignored --nocapture
+//! host that takes the user's key, and a atelier-remote built for it in `$ATELIER_REMOTE_DIR/<platform>/`:
+//!     cargo build -p atelier-remote && mkdir -p /tmp/remote/linux-x86_64 && cp target/debug/atelier-remote /tmp/remote/linux-x86_64/
+//!     ATELIER_REMOTE_DIR=/tmp/remote ATELIER_TEST_SSH_HOST=hp-agent cargo test -p atelier-remote --test over_ssh -- --ignored --nocapture
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 #[test]
 #[ignore]
 fn a_folder_over_ssh_lists_and_reads() {
-    let host = std::env::var("LATHE_TEST_SSH_HOST").expect("LATHE_TEST_SSH_HOST names a host");
+    let host = std::env::var("ATELIER_TEST_SSH_HOST").expect("ATELIER_TEST_SSH_HOST names a host");
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("hello.txt"), "over ssh\n").unwrap();
-    let project = lathe_remote::ssh::connect(&host, &dir.path().display().to_string(), &|line| eprintln!("{line}")).expect("it connects");
+    let project = atelier_remote::ssh::connect(&host, &dir.path().display().to_string(), &|line| eprintln!("{line}")).expect("it connects");
     assert_eq!(project.read("hello.txt").unwrap(), b"over ssh\n");
     assert!(project.list().unwrap().iter().any(|e| e.path == "hello.txt"));
     // Protocol 2: a remove, and the data folder on the host.
@@ -28,33 +28,33 @@ fn a_folder_over_ssh_lists_and_reads() {
 #[test]
 #[ignore]
 fn a_host_that_does_not_exist_says_so() {
-    let error = lathe_remote::ssh::connect("lathe-no-such-host.invalid", "/", &|_| {}).err().expect("no host");
+    let error = atelier_remote::ssh::connect("atelier-no-such-host.invalid", "/", &|_| {}).err().expect("no host");
     eprintln!("{error}");
-    assert!(error.to_string().contains("lathe-no-such-host.invalid"), "{error}");
-    assert_eq!(error.to_string().matches("lathe-no-such-host.invalid").count(), 1, "ssh's own words, not a second prefix: {error}");
+    assert!(error.to_string().contains("atelier-no-such-host.invalid"), "{error}");
+    assert_eq!(error.to_string().matches("atelier-no-such-host.invalid").count(), 1, "ssh's own words, not a second prefix: {error}");
 }
 
 /// What a remote project costs over a real ssh: the connect (probe, the copy's check, the dial and
-/// the hello), a file open (the read of a 10,000-line file), and the listing of `LATHE_TEST_SSH_ROOT`.
+/// the hello), a file open (the read of a 10,000-line file), and the listing of `ATELIER_TEST_SSH_ROOT`.
 /// Targets: connect < 3 s, file open < 150 ms on a LAN, listing a 1,000-file tree < 500 ms.
-///     LATHE_REMOTE_DIR=… LATHE_TEST_SSH_HOST=hp-agent LATHE_TEST_SSH_ROOT=/home/alex/code/local/lathe \
-///         cargo test --release -p lathe-remote --test over_ssh -- --ignored --nocapture remote_costs
+///     ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=hp-agent ATELIER_TEST_SSH_ROOT=/home/alex/code/local/atelier \
+///         cargo test --release -p atelier-remote --test over_ssh -- --ignored --nocapture remote_costs
 #[test]
 #[ignore]
 fn remote_costs() {
     use std::time::{Duration, Instant};
-    let host = std::env::var("LATHE_TEST_SSH_HOST").expect("LATHE_TEST_SSH_HOST names a host");
-    let root = std::env::var("LATHE_TEST_SSH_ROOT").expect("LATHE_TEST_SSH_ROOT names a folder on it");
+    let host = std::env::var("ATELIER_TEST_SSH_HOST").expect("ATELIER_TEST_SSH_HOST names a host");
+    let root = std::env::var("ATELIER_TEST_SSH_ROOT").expect("ATELIER_TEST_SSH_ROOT names a folder on it");
     let ms = |d: Duration| d.as_secs_f64() * 1000.;
     let at = Instant::now();
-    let project = lathe_remote::ssh::connect(&host, &root, &|_| {}).expect("it connects");
+    let project = atelier_remote::ssh::connect(&host, &root, &|_| {}).expect("it connects");
     println!("connect: {:.1} ms", ms(at.elapsed()));
     let text: String = (0..10_000).map(|i| format!("let line_{i} = {i};\n")).collect();
-    project.write("lathe-bench.rs", text.as_bytes()).unwrap();
+    project.write("atelier-bench.rs", text.as_bytes()).unwrap();
     let mut reads: Vec<Duration> = (0..20)
         .map(|_| {
             let at = Instant::now();
-            assert_eq!(project.read("lathe-bench.rs").unwrap().len(), text.len());
+            assert_eq!(project.read("atelier-bench.rs").unwrap().len(), text.len());
             at.elapsed()
         })
         .collect();
@@ -70,25 +70,25 @@ fn remote_costs() {
     lists.sort();
     let files = project.list().unwrap().iter().filter(|e| !e.dir).count();
     println!("listing {files} files: median {:.2} ms, p95 {:.2} ms", ms(lists[10]), ms(lists[18]));
-    std::fs::remove_file(std::path::Path::new(&root).join("lathe-bench.rs")).ok();
-    let _ = std::process::Command::new("ssh").args([host.as_str(), &format!("rm -f {root}/lathe-bench.rs")]).status();
+    std::fs::remove_file(std::path::Path::new(&root).join("atelier-bench.rs")).ok();
+    let _ = std::process::Command::new("ssh").args([host.as_str(), &format!("rm -f {root}/atelier-bench.rs")]).status();
 }
 
 /// Protocol 5: the tasks of a project over a real ssh live in the host's data folder.
 #[test]
 #[ignore]
 fn tasks_over_ssh_live_on_the_host() {
-    use lathe_tracker::{NewTask, Tracker};
-    let host = std::env::var("LATHE_TEST_SSH_HOST").expect("LATHE_TEST_SSH_HOST names a host");
+    use atelier_tracker::{NewTask, Tracker};
+    let host = std::env::var("ATELIER_TEST_SSH_HOST").expect("ATELIER_TEST_SSH_HOST names a host");
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("tasks")).unwrap();
     let root = dir.path().join("tasks");
-    let project = lathe_remote::ssh::connect(&host, &root.display().to_string(), &|line| eprintln!("{line}")).expect("connects");
+    let project = atelier_remote::ssh::connect(&host, &root.display().to_string(), &|line| eprintln!("{line}")).expect("connects");
     let tracker = project.tracker().expect("the host opens its store");
     let task = tracker.create(&NewTask::titled("Over ssh"), "qa").unwrap();
     assert!(task.key.starts_with("TAS-"), "{}", task.key);
     assert_eq!(tracker.get(&task.id).unwrap().map(|t| t.title), Some("Over ssh".to_string()));
     let file = project.data_path().expect("a data folder").join("tracker.sqlite");
-    let local = lathe_tracker::LocalTracker::open(&file, "TAS").unwrap();
+    let local = atelier_tracker::LocalTracker::open(&file, "TAS").unwrap();
     assert_eq!(local.get(&task.id).unwrap().map(|t| t.key), Some(task.key.clone()));
 }

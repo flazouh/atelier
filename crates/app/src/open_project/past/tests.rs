@@ -1,4 +1,4 @@
-use lathe_agents::session::{SessionId, SessionSummary};
+use atelier_agents::session::{SessionId, SessionSummary};
 use super::*;
 fn past(id: &str, updated: u64) -> SessionSummary {
     SessionSummary { id: SessionId::new(id), title: format!("Session {id}"), updated: Some(updated) }

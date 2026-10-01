@@ -439,6 +439,161 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-agents"
+version = "0.1.0"
+dependencies = [
+ "atelier-project",
+ "beui",
+ "gpui-kit",
+ "rustls",
+ "rustls-native-certs",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-app"
+version = "0.1.0"
+dependencies = [
+ "atelier-agents",
+ "atelier-editor",
+ "atelier-forge",
+ "atelier-lsp",
+ "atelier-pr-view",
+ "atelier-project",
+ "atelier-remote",
+ "atelier-review",
+ "atelier-settings",
+ "atelier-tracker",
+ "beui",
+ "futures-channel",
+ "futures-util",
+ "gpui-kit",
+ "libc",
+ "lsp-types",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-editor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "atelier-lsp",
+ "beui",
+ "futures-channel",
+ "futures-util",
+ "gpui-kit",
+ "lsp-types",
+]
+
+[[package]]
+name = "atelier-forge"
+version = "0.1.0"
+dependencies = [
+ "atelier-forge",
+ "atelier-project",
+ "beui",
+ "gpui-kit",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-lsp"
+version = "0.1.0"
+dependencies = [
+ "atelier-project",
+ "lsp-types",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-pr-view"
+version = "0.1.0"
+dependencies = [
+ "atelier-editor",
+ "atelier-forge",
+ "atelier-lsp",
+ "atelier-project",
+ "atelier-review",
+ "beui",
+ "futures-channel",
+ "futures-util",
+ "gpui-kit",
+ "lsp-types",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-project"
+version = "0.1.0"
+dependencies = [
+ "atelier-tracker",
+ "dirs 6.0.0",
+ "ignore",
+ "notify",
+ "regex",
+ "serde",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-remote"
+version = "0.1.0"
+dependencies = [
+ "atelier-project",
+ "atelier-tracker",
+ "postcard",
+ "serde",
+ "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-review"
+version = "0.1.0"
+dependencies = [
+ "atelier-agents",
+ "atelier-project",
+ "beui",
+ "imara-diff",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-settings"
+version = "0.1.0"
+dependencies = [
+ "dirs 6.0.0",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-tracker"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "atomic"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -596,15 +751,15 @@ dependencies = [
 name = "beui-gallery"
 version = "0.1.0"
 dependencies = [
+ "atelier-agents",
+ "atelier-editor",
+ "atelier-lsp",
+ "atelier-pr-view",
+ "atelier-project",
+ "atelier-settings",
  "beui",
  "gpui-kit",
  "ignore",
- "lathe-agents",
- "lathe-editor",
- "lathe-lsp",
- "lathe-pr-view",
- "lathe-project",
- "lathe-settings",
  "lsp-types",
 ]
 
@@ -3758,161 +3913,6 @@ dependencies = [
  "euclid",
  "polycool",
  "smallvec",
-]
-
-[[package]]
-name = "lathe-agents"
-version = "0.1.0"
-dependencies = [
- "beui",
- "gpui-kit",
- "lathe-project",
- "rustls",
- "rustls-native-certs",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-app"
-version = "0.1.0"
-dependencies = [
- "beui",
- "futures-channel",
- "futures-util",
- "gpui-kit",
- "lathe-agents",
- "lathe-editor",
- "lathe-forge",
- "lathe-lsp",
- "lathe-pr-view",
- "lathe-project",
- "lathe-remote",
- "lathe-review",
- "lathe-settings",
- "lathe-tracker",
- "libc",
- "lsp-types",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-editor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "beui",
- "futures-channel",
- "futures-util",
- "gpui-kit",
- "lathe-lsp",
- "lsp-types",
-]
-
-[[package]]
-name = "lathe-forge"
-version = "0.1.0"
-dependencies = [
- "beui",
- "gpui-kit",
- "lathe-forge",
- "lathe-project",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-lsp"
-version = "0.1.0"
-dependencies = [
- "lathe-project",
- "lsp-types",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-pr-view"
-version = "0.1.0"
-dependencies = [
- "beui",
- "futures-channel",
- "futures-util",
- "gpui-kit",
- "lathe-editor",
- "lathe-forge",
- "lathe-lsp",
- "lathe-project",
- "lathe-review",
- "lsp-types",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-project"
-version = "0.1.0"
-dependencies = [
- "dirs 6.0.0",
- "ignore",
- "lathe-tracker",
- "notify",
- "regex",
- "serde",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-remote"
-version = "0.1.0"
-dependencies = [
- "lathe-project",
- "lathe-tracker",
- "postcard",
- "serde",
- "sha2 0.10.9",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-review"
-version = "0.1.0"
-dependencies = [
- "beui",
- "imara-diff",
- "lathe-agents",
- "lathe-project",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-settings"
-version = "0.1.0"
-dependencies = [
- "dirs 6.0.0",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "lathe-tracker"
-version = "0.1.0"
-dependencies = [
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
 ]
 
 [[package]]

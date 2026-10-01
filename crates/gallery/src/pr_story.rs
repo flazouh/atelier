@@ -44,8 +44,8 @@ use gpui_kit::{
     component::input::EditorState,
     div, prelude::FluentBuilder, px,
 };
-use lathe_editor::{EditorSession, Elsewhere, Jump};
-use lathe_lsp::{LspError, canonical, client::uri_to_path};
+use atelier_editor::{EditorSession, Elsewhere, Jump};
+use atelier_lsp::{LspError, canonical, client::uri_to_path};
 use lsp_types::Position;
 
 use crate::{
@@ -505,7 +505,7 @@ impl PrStory {
         Some(Lead { path, position, shown_rows })
     }
 
-    fn fill_uses(&mut self, uses: Vec<lathe_lsp::Target>, cx: &mut Context<Self>) {
+    fn fill_uses(&mut self, uses: Vec<atelier_lsp::Target>, cx: &mut Context<Self>) {
         let mut items = Vec::new();
         let mut leads = Vec::new();
         for target in uses {
@@ -520,7 +520,7 @@ impl PrStory {
         self.set_rows(items, leads, cx);
     }
 
-    fn fill_names(&mut self, names: Vec<lathe_lsp::Symbol>, with_file: bool, cx: &mut Context<Self>) {
+    fn fill_names(&mut self, names: Vec<atelier_lsp::Symbol>, with_file: bool, cx: &mut Context<Self>) {
         let mut items = Vec::new();
         let mut leads = Vec::new();
         for symbol in names {

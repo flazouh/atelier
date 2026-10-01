@@ -1,4 +1,4 @@
-//! The agents lathe can start, as data, so the app offers them without naming one: each with its
+//! The agents atelier can start, as data, so the app offers them without naming one: each with its
 //! backend, the name and mark its session rows wear, its look while it works, and the lab whose
 //! mark its model picker shows.
 
@@ -30,9 +30,9 @@ pub fn agents() -> Vec<Agent> {
             look: claude::look(),
             lab: Lab::Anthropic,
         },
-        // lathe's own agent. With no key set it still shows, and opening it says which to set. The
-        // look is a stand-in until lathe has its own.
-        Agent { backend: Arc::new(OwnAgent::from_env()), name: "lathe", mark: None, look: claude::look(), lab: Lab::Anthropic },
+        // atelier's own agent. With no key set it still shows, and opening it says which to set. The
+        // look is a stand-in until atelier has its own.
+        Agent { backend: Arc::new(OwnAgent::from_env()), name: "atelier", mark: None, look: claude::look(), lab: Lab::Anthropic },
     ]
 }
 

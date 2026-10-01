@@ -1,4 +1,4 @@
-# gpui-base 0.6.6, patched for lathe
+# gpui-base 0.6.6, patched for atelier
 
 This is gpui-base 0.6.6 from crates.io (github.com/longbridge/gpui-kit), unchanged except for the
 patches below. Each one is small and carries its own test, so it can go upstream and be dropped here.
@@ -31,7 +31,7 @@ Tests: `test_select_next_occurrence_adds_each_match_in_turn` and `next_occurrenc
 ## 3. A pinned editor style
 
 gpui-component's `Input` calls `set_editor_style` with its theme's colours on every render, after
-the owner has set its own, so an owner's style never reached the screen: lathe's selection, current
+the owner has set its own, so an owner's style never reached the screen: atelier's selection, current
 line, fill and diagnostic colours were all replaced. `pin_editor_style(Some(style))` makes every later
 `set_editor_style` apply the pinned style instead; `None` unpins.
 Code: `pinned_editor_style`, `set_editor_style`, `pin_editor_style` in `src/input/base/state.rs`.
@@ -150,7 +150,7 @@ Test: `test_the_gutter_widget_follows_the_row_under_the_pointer`.
 ## 14. A read-only input says so in its key context
 
 An input's key context was `Input` whether it could be typed in or not, so an owner that lets bare
-letters through only when nobody is typing (lathe's review keys: `s`, `w`, `u`) could not tell a
+letters through only when nobody is typing (atelier's review keys: `s`, `w`, `u`) could not tell a
 read-only editor, such as a pull request's diff, from one being typed in. A read-only input's context
 is now `Input readonly`; bindings on `Input` still match it.
 Test: `test_a_read_only_input_says_so_in_its_key_context`.
@@ -158,7 +158,7 @@ Test: `test_a_read_only_input_says_so_in_its_key_context`.
 ## 15. The offset under the pointer
 
 `offset_at_pointer(window)` is the text offset under the pointer when the pointer is over the text,
-and `None` elsewhere, so an owner can act on "the name under the pointer", as lathe's `u` (Uses) does
+and `None` elsewhere, so an owner can act on "the name under the pointer", as atelier's `u` (Uses) does
 in a pull request's diff. It is `index_for_mouse_position` behind the bounds check the Cmd underline
 already makes.
 Test: `test_the_offset_under_the_pointer`.
@@ -167,7 +167,7 @@ Test: `test_the_offset_under_the_pointer`.
 
 `syntax_styles(range, resolver)` returns the styles the editor's highlighter holds for a range now,
 as the editor paints them, so a test can compare them with a fresh parse after an edit that took
-the background path. lathe's `crates/beui/src/code_editor/tests.rs` (module `background`) does.
+the background path. atelier's `crates/beui/src/code_editor/tests.rs` (module `background`) does.
 It borrows the highlighter the editor already keeps; nothing else changes.
 
 ## 17. A caret set before the first layout is revealed

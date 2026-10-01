@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use lathe_project::Entry;
+use atelier_project::Entry;
 
 /// One row of the tree.
 #[derive(Clone, Debug, PartialEq, Eq)]

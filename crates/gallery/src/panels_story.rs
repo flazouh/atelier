@@ -12,7 +12,7 @@ use gpui_kit::{
     AnyElement, AppContext, Context, Entity, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Window,
     div, px,
 };
-use lathe_agents::claude;
+use atelier_agents::claude;
 
 use crate::sidebar_story::run::Run;
 
@@ -27,7 +27,7 @@ const TITLES: [&str; 6] = [
 
 fn projects() -> [ProjectLabel; 2] {
     [
-        ProjectLabel { id: "lathe".into(), name: "lathe".into(), location: Location::Local },
+        ProjectLabel { id: "atelier".into(), name: "atelier".into(), location: Location::Local },
         ProjectLabel { id: "api".into(), name: "api-server".into(), location: Location::Ssh { host: "hp-agent".into() } },
     ]
 }

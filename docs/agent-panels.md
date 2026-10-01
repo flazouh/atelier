@@ -65,7 +65,7 @@ and each panel's width.
   scroll sideways, reorder by drag, and group by project under the project's name. The active tab is
   scrolled into view.
 - **Keys** (GPUI actions, with a modifier, so they never type into a panel's input). GitQuiet's table has no
-  command for these, so they are lathe's own, and the caps come from the same chord strings:
+  command for these, so they are atelier's own, and the caps come from the same chord strings:
 
 | Command | Chord |
 | --- | --- |

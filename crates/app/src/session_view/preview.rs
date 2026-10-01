@@ -2,7 +2,7 @@
 //! all-new lines, a Bash call as its command, each under the path relative to the project. The raw input
 //! stays behind "View details".
 use beui::tool_preview::{TextEdit, ToolPreview, relative_path};
-use lathe_agents::session::ToolCall;
+use atelier_agents::session::ToolCall;
 use serde_json::Value;
 
 /// The preview of `call`, whose paths are shown relative to `root`; `None` for a call with none, or

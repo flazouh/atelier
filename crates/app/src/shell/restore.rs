@@ -1,6 +1,6 @@
 //! The sessions open at quit, opened again at launch: each project once, then its sessions in the
 //! order their panels had, and the one in front shown.
-use lathe_settings::{Location, OpenSession};
+use atelier_settings::{Location, OpenSession};
 
 /// The projects to open, each once, in the order their first session was open.
 pub fn locations(open: &[OpenSession]) -> Vec<Location> {

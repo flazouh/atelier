@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use beui::task_model::TaskStatus;
 use gpui_kit::{Entity, TestAppContext, VisualTestContext, px, size};
-use lathe_tracker::{LocalTracker, NewTask, Query, Tracker};
+use atelier_tracker::{LocalTracker, NewTask, Query, Tracker};
 
 use super::*;
 
@@ -18,7 +18,7 @@ fn open(width: f32, cx: &mut TestAppContext) -> (Entity<TasksPane>, Arc<LocalTra
     tracker.create(&NewTask::titled("Write the docs"), "me").unwrap();
     let handle: Arc<dyn Tracker> = tracker.clone();
     let (pane, cx) = cx.add_window_view(move |window, cx| {
-        let mut pane = TasksPane::new("me", vec![("Claude".into(), lathe_agents::claude::look())], window, cx);
+        let mut pane = TasksPane::new("me", vec![("Claude".into(), atelier_agents::claude::look())], window, cx);
         pane.attach(Ok(handle), cx);
         pane
     });
@@ -50,7 +50,7 @@ fn a_change_in_the_pane_reaches_the_tracker(cx: &mut TestAppContext) {
     pane.update(cx, |p, cx| p.changed(std::slice::from_ref(&id), &Change::Status(TaskStatus::Done), Source::None, cx));
     settle(&pane, cx);
     let saved = tracker.get(&TaskId(id.to_string())).unwrap().unwrap();
-    assert_eq!(saved.status, lathe_tracker::Status::Done);
+    assert_eq!(saved.status, atelier_tracker::Status::Done);
     let line = tracker.activity(&saved.id).unwrap();
     assert!(line.iter().any(|a| a.by == "me"), "the change is logged as the reader's");
 }
@@ -133,7 +133,7 @@ fn focus_body(pane: &Entity<TasksPane>, cx: &mut VisualTestContext) {
     settle(pane, cx);
 }
 
-fn first_status(tracker: &LocalTracker) -> lathe_tracker::Status {
+fn first_status(tracker: &LocalTracker) -> atelier_tracker::Status {
     tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Fix the scroll").unwrap().status
 }
 
@@ -147,7 +147,7 @@ fn a_press_on_a_picker_row_chooses_it_in_the_list(cx: &mut TestAppContext) {
     press_row(cx, 4);
     settle(&pane, cx);
     let statuses: Vec<_> = tracker.list(&Query::default()).unwrap().into_iter().map(|t| t.status).collect();
-    assert!(statuses.contains(&lathe_tracker::Status::Done), "one task is Done now: {statuses:?}");
+    assert!(statuses.contains(&atelier_tracker::Status::Done), "one task is Done now: {statuses:?}");
     assert!(cx.debug_bounds("picker-row-0").is_none(), "the picker closed");
 }
 
@@ -165,7 +165,7 @@ fn a_press_on_a_picker_row_chooses_it_in_the_board(cx: &mut TestAppContext) {
     press_row(cx, 4);
     settle(&pane, cx);
     let statuses: Vec<_> = tracker.list(&Query::default()).unwrap().into_iter().map(|t| t.status).collect();
-    assert!(statuses.contains(&lathe_tracker::Status::Done), "{statuses:?}");
+    assert!(statuses.contains(&atelier_tracker::Status::Done), "{statuses:?}");
 }
 
 #[gpui_kit::test]
@@ -179,7 +179,7 @@ fn a_press_on_a_picker_row_chooses_it_in_the_task_in_full(cx: &mut TestAppContex
     settle(&pane, cx);
     press_row(cx, 4);
     settle(&pane, cx);
-    assert_eq!(first_status(&tracker), lathe_tracker::Status::Done);
+    assert_eq!(first_status(&tracker), atelier_tracker::Status::Done);
 }
 
 #[gpui_kit::test]
@@ -280,7 +280,7 @@ fn after_create_the_cursor_is_on_the_new_task(cx: &mut TestAppContext) {
     press_row(cx, 4);
     settle(&pane, cx);
     let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new").unwrap();
-    assert_eq!(new.status, lathe_tracker::Status::Done, "the key acted on the new task");
+    assert_eq!(new.status, atelier_tracker::Status::Done, "the key acted on the new task");
 }
 
 /// The board has the same default cursor: on the first card when it opens, and on the new card after Create.
@@ -315,7 +315,7 @@ fn after_create_the_board_cursor_is_on_the_new_card(cx: &mut TestAppContext) {
     press_row(cx, 4);
     settle(&pane, cx);
     let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new card").unwrap();
-    assert_eq!(new.status, lathe_tracker::Status::Done, "the key acted on the new card");
+    assert_eq!(new.status, atelier_tracker::Status::Done, "the key acted on the new card");
 }
 
 fn picker_rows(cx: &mut VisualTestContext) -> usize {

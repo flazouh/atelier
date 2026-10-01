@@ -3,7 +3,7 @@
 //! not have: a draft, a conflict, a queue, several pages.
 mod support;
 
-use lathe_forge::{
+use atelier_forge::{
     Author, Change, CheckState, CheckStatus, Conclusion, Forge, ForgeError, MergeMethod, MergeState, PullState,
     ReviewDecision, Reviewer, Rights, Side, Verdict, github::testing::Fixtures,
 };

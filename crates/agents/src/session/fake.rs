@@ -1,12 +1,12 @@
 //! A backend with no process, no wire and no thread: it answers each message with scripted events, in
-//! the caller's thread. It proves the trait fits a backend that lives inside lathe, and gives the
+//! the caller's thread. It proves the trait fits a backend that lives inside atelier, and gives the
 //! model's tests a session that behaves the same every run.
 use std::{
     collections::VecDeque,
     sync::{Arc, Mutex},
 };
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 use super::{
     Backend, Capabilities, Command, EndReason, Event, EventSink, OpenRequest, Session, SessionError, SessionId,

@@ -40,7 +40,7 @@ fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
             id: "p".into(),
             project: ProjectLabel { id: "project".into(), name: "project".into(), location: Location::Local },
             title: "A session".into(),
-            look: lathe_agents::registry::agents()[0].look.clone(),
+            look: atelier_agents::registry::agents()[0].look.clone(),
             status: SessionStatus::Idle,
             content: beui::panel_types::content_from(move |_, _| {
                 div().size_full().child(div().debug_selector(|| "composer".into()).h(px(40.)).child(Input::new(&shown))).into_any_element()

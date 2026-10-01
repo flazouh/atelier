@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::{Duration, Instant}};
 
-use lathe_project::{LocalProject, Project};
+use atelier_project::{LocalProject, Project};
 use serde_json::{Value, json};
 
 use crate::{

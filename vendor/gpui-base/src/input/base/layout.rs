@@ -30,12 +30,12 @@ pub(super) struct LastLayout {
     pub(super) cursor_bounds: Option<Bounds<Pixels>>,
     pub(super) text_align: TextAlign,
     pub(super) content_width: Pixels,
-    /// lathe patch: the owner's row gaps as `(row, height)`. See `InputBaseState::set_row_gaps`.
+    /// atelier patch: the owner's row gaps as `(row, height)`. See `InputBaseState::set_row_gaps`.
     pub(super) row_gaps: Vec<(usize, Pixels)>,
 }
 
 impl LastLayout {
-    /// lathe patch: every visible buffer row as `(row, top, height)`, the top measured from the text
+    /// atelier patch: every visible buffer row as `(row, top, height)`, the top measured from the text
     /// origin as the paint pass measures it (`visible_top` included). `extra` adds height after one
     /// row, which is how inline-completion ghost lines push the rows below them down.
     pub(super) fn row_rects(&self, extra: Option<(usize, Pixels)>) -> Vec<(usize, Pixels, Pixels)> {
@@ -54,7 +54,7 @@ impl LastLayout {
         rects
     }
 
-    /// lathe patch: how far the row gaps push buffer row `row` down: every gap at or above it.
+    /// atelier patch: how far the row gaps push buffer row `row` down: every gap at or above it.
     pub(super) fn gap_above(&self, row: usize) -> Pixels {
         self.row_gaps.iter().filter(|(at, _)| *at <= row).fold(px(0.), |sum, (_, gap)| sum + *gap)
     }

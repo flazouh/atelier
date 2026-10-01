@@ -5,7 +5,7 @@ mod support;
 
 use std::sync::Mutex;
 
-use lathe_forge::{
+use atelier_forge::{
     Court, Forge, ForgeError, PullState, Shelf, file_courts, present,
     github::{GitHub, Reply, Request, Transport, TransportError},
 };

@@ -1,4 +1,4 @@
-//! What a forge tells lathe, in GitQuiet's words. Plain data: no forge, no UI, no clock.
+//! What a forge tells atelier, in GitQuiet's words. Plain data: no forge, no UI, no clock.
 mod checks;
 mod conversation;
 mod merge;

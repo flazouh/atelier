@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
 use gpui_kit::TestAppContext;
-use lathe_forge::{ForgeError, NewPull, PullRef, RepoRef};
-use lathe_project::{LocalProject, Project};
+use atelier_forge::{ForgeError, NewPull, PullRef, RepoRef};
+use atelier_project::{LocalProject, Project};
 use super::*;
 use crate::fake_forge::{FakeForge, git, pushed_branch};
 fn scratch() -> RepoRef {
-    RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe-qa-scratch".into() }
+    RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "atelier-qa-scratch".into() }
 }
 /// The window draws the form, so its Tab stops are in the tree.
 struct Host(Entity<PullForm>);
@@ -101,11 +101,11 @@ fn no_github_remote_says_so(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_branch_with_a_pull_request_gets_that_one(cx: &mut TestAppContext) {
     let (_dir, forge, f, opened, cx) = form_with(cx, pushed_branch(), |forge| {
-        *forge.open.lock().unwrap() = Some(lathe_forge::PullBrief {
+        *forge.open.lock().unwrap() = Some(atelier_forge::PullBrief {
             reference: PullRef { repo: scratch(), number: 3 },
             title: "Make a two".into(),
-            state: lathe_forge::PullState::Open,
-            url: "https://github.com/flazouh/lathe-qa-scratch/pull/3".into(),
+            state: atelier_forge::PullState::Open,
+            url: "https://github.com/flazouh/atelier-qa-scratch/pull/3".into(),
         });
     });
     let reference = PullRef { repo: scratch(), number: 3 };

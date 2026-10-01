@@ -13,7 +13,7 @@ use gpui_kit::{
     AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, SharedString,
     StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
 };
-use lathe_agents::{
+use atelier_agents::{
     claude, claude_code::Mapper,
     session::{
         Answer, Call, ChoiceKind, Conversation, EventQueue, Item, PermissionRequest, SubagentStatus, TodoStatus,

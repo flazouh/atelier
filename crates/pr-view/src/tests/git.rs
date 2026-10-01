@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use lathe_forge::Change;
+use atelier_forge::Change;
 
 use super::repo::{Scenario, git, git_ok, put, remove};
 use crate::git::{Blob, FileEntry, GitError, PrGit, is_sha, parse_batch, parse_commits, parse_files, remote_for};
@@ -274,18 +274,18 @@ fn a_closed_pull_requests_checkout_goes_and_the_others_stay() {
 
 #[test]
 fn the_remote_that_names_the_repository_is_the_one_fetched_from() {
-    let repo = lathe_forge::RepoRef::new("github.com", "flazouh", "relay");
+    let repo = atelier_forge::RepoRef::new("github.com", "flazouh", "relay");
     let listing = "upstream\tgit@github.com:other/thing.git (fetch)\nupstream\tgit@github.com:other/thing.git (push)\nfork\thttps://github.com/flazouh/relay.git (fetch)\nfork\thttps://github.com/flazouh/relay.git (push)\norigin\tgit@github.com:flazouh/relay.git (fetch)\norigin\tgit@github.com:flazouh/relay.git (push)\n";
     assert_eq!(remote_for(listing, &repo).as_deref(), Some("git@github.com:flazouh/relay.git"), "origin wins");
     assert_eq!(remote_for("fork\thttps://github.com/flazouh/relay.git (fetch)\n", &repo).as_deref(), Some("https://github.com/flazouh/relay.git"));
-    assert_eq!(remote_for(listing, &lathe_forge::RepoRef::new("github.com", "nobody", "none")), None);
+    assert_eq!(remote_for(listing, &atelier_forge::RepoRef::new("github.com", "nobody", "none")), None);
 }
 
 #[test]
 fn the_data_folder_is_resolved_on_the_host() {
     let s = scenario();
-    let home = PrGit::new(s.project(), "~/lathe-test-data").data().unwrap();
-    assert!(home.starts_with('/') && home.ends_with("/lathe-test-data") && !home.contains('~'));
+    let home = PrGit::new(s.project(), "~/atelier-test-data").data().unwrap();
+    assert!(home.starts_with('/') && home.ends_with("/atelier-test-data") && !home.contains('~'));
     assert!(PrGit::new(s.project(), "relative/folder").data().is_err());
     assert_eq!(PrGit::new(s.project(), "/abs/folder").data().unwrap(), "/abs/folder");
 }
@@ -354,7 +354,7 @@ fn a_given_folder_is_still_the_one_used() {
 }
 
 #[test]
-fn what_an_older_lathe_left_moves_into_the_data_folder_once() {
+fn what_an_older_atelier_left_moves_into_the_data_folder_once() {
     let repo = Scenario::new(&[("a.txt", "a\n")]);
     let old = repo.root().join("old-pr");
     std::fs::create_dir_all(old.join("cache")).unwrap();

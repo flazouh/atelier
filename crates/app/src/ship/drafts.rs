@@ -2,7 +2,7 @@
 //! The agent sees the kept change as a diff; its answer is cleaned of fences and quotes, and a branch
 //! name is made one git takes. Pure.
 
-use lathe_review::Merged;
+use atelier_review::Merged;
 
 use crate::ship::kept::Kept;
 

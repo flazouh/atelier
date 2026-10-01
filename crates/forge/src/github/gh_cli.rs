@@ -1,12 +1,12 @@
 //! The transport that runs `gh api` through the project, so a remote project uses its host's `gh`. `gh`
-//! holds the token and adds it to the request itself: it never passes through lathe, so lathe has none
+//! holds the token and adds it to the request itself: it never passes through atelier, so atelier has none
 //! to store, log or print.
 use std::{
     io::{Read, Write},
     sync::Arc,
 };
 
-use lathe_project::{Command, Project};
+use atelier_project::{Command, Project};
 
 use super::transport::{Reply, Request, Transport, TransportError};
 

@@ -1,5 +1,5 @@
 //! The review path's numbers, against the targets in `docs/performance.md`. Run in release, on the HP:
-//!   cargo test -p lathe-review --release --test perf -- --ignored --nocapture --test-threads=1
+//!   cargo test -p atelier-review --release --test perf -- --ignored --nocapture --test-threads=1
 use std::{
     fs,
     path::Path,
@@ -9,9 +9,9 @@ use std::{
 };
 
 use beui::inline_review::Decision;
-use lathe_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolStatus};
-use lathe_project::LocalProject;
-use lathe_review::{FileReview, Merged, TurnTracker};
+use atelier_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolStatus};
+use atelier_project::LocalProject;
+use atelier_review::{FileReview, Merged, TurnTracker};
 
 const RUNS: usize = 15;
 

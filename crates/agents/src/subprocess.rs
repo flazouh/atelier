@@ -3,7 +3,7 @@
 //! `Backend` trait: a backend with no process never touches this.
 use std::io::{self, BufRead, BufReader, Read};
 
-use lathe_project::{Command, Process, Project};
+use atelier_project::{Command, Process, Project};
 
 use crate::session::SessionError;
 

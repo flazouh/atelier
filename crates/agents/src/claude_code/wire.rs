@@ -1,6 +1,6 @@
-//! The lines `claude` writes, as far as lathe reads them. A field lathe does not need is not here, and
-//! a line or a block of a kind lathe does not know reads as `Ignored` or `Other`, so a newer `claude`
-//! never breaks an older lathe.
+//! The lines `claude` writes, as far as atelier reads them. A field atelier does not need is not here, and
+//! a line or a block of a kind atelier does not know reads as `Ignored` or `Other`, so a newer `claude`
+//! never breaks an older atelier.
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -22,7 +22,7 @@ pub(super) enum Line {
 }
 
 /// A `system` line: `init`, `task_started`, `task_progress`, `task_notification`, and more that
-/// lathe ignores. One shape holds every field any of them uses.
+/// atelier ignores. One shape holds every field any of them uses.
 #[derive(Deserialize)]
 pub(super) struct System {
     pub subtype: String,
@@ -131,7 +131,7 @@ pub(super) struct Message {
     pub parent_tool_use_id: Option<String>,
     #[serde(alias = "toolUseResult")]
     pub tool_use_result: Option<Value>,
-    /// A transcript marks a subagent's own lines and lines lathe should not show.
+    /// A transcript marks a subagent's own lines and lines atelier should not show.
     #[serde(default, rename = "isSidechain")]
     pub sidechain: bool,
     #[serde(default, rename = "isMeta")]

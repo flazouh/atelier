@@ -1,11 +1,11 @@
-//! Reaching a host over the user's own `ssh`: their config, their keys, their agent. lathe asks for
+//! Reaching a host over the user's own `ssh`: their config, their keys, their agent. atelier asks for
 //! no credentials; `BatchMode` makes a host that wants a password fail at once and say so, instead
 //! of waiting on a prompt nobody sees.
 //!
 //! Connecting is three steps:
 //!
 //! 1. Probe: `uname -sm` names the host's system and architecture, and `$HOME` its home.
-//! 2. Deploy: `~/.cache/lathe/remote/<version>-<hash>/lathe-remote` must answer `--version` with
+//! 2. Deploy: `~/.cache/atelier/remote/<version>-<hash>/atelier-remote` must answer `--version` with
 //!    this app's version; the hash is of the copy this app would upload, so a new build of the same
 //!    version goes up once instead of an old one staying. If the host has not got it, the copy built
 //!    for that platform goes up over the same `ssh`
@@ -14,9 +14,9 @@
 //! 3. Dial: `ssh <host> <that path> --stdio`, whose stdin and stdout carry the frames.
 //!
 //! The copy to upload is found with no setup ([`candidates`]): next to the app, by the host's platform
-//! (`remote/<system>-<architecture>/lathe-remote`); in a Mac app's resources; the plain `lathe-remote`
+//! (`remote/<system>-<architecture>/atelier-remote`); in a Mac app's resources; the plain `atelier-remote`
 //! beside the app for a host of its own kind; and the folder `tools/build-remote.sh` fills. A developer
-//! may name another folder with `LATHE_REMOTE_DIR`, looked at first.
+//! may name another folder with `ATELIER_REMOTE_DIR`, looked at first.
 
 use std::{
     io::{self, Read, Write},
@@ -25,14 +25,14 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use lathe_project::Tail;
+use atelier_project::Tail;
 
 use crate::client::{Connection, Dial, RemoteProject, Timeouts};
 
 /// This app's version: the host's copy must say the same.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The host's system and architecture, as lathe names builds: `linux-x86_64`, `darwin-aarch64`.
+/// The host's system and architecture, as atelier names builds: `linux-x86_64`, `darwin-aarch64`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Platform {
     pub system: String,
@@ -79,7 +79,7 @@ impl Platform {
 /// Where the host keeps this build's copy, from its home folder: `hash` is the first twelve hex
 /// digits of the copy's SHA-256.
 pub fn remote_binary(version: &str, hash: &str) -> String {
-    format!(".cache/lathe/remote/{version}-{hash}/lathe-remote")
+    format!(".cache/atelier/remote/{version}-{hash}/atelier-remote")
 }
 
 /// The first twelve hex digits of `bytes`' SHA-256.
@@ -163,12 +163,12 @@ pub fn probe(host: &str) -> io::Result<(Platform, String)> {
     Ok((platform, home))
 }
 
-/// Where a copy of lathe-remote for `platform` may be, in the order to look: the folder a developer
+/// Where a copy of atelier-remote for `platform` may be, in the order to look: the folder a developer
 /// names (`env_dir`), next to the app `exe` by platform, in a Mac bundle's resources, the plain copy
 /// beside the app when the host is of the app's own kind (`same`), and the folder
 /// `tools/build-remote.sh` fills under `home`.
 pub fn candidates(exe: &std::path::Path, platform: &Platform, env_dir: Option<&std::path::Path>, home: Option<&std::path::Path>, same: bool) -> Vec<PathBuf> {
-    let by_platform = |dir: PathBuf| dir.join(platform.name()).join("lathe-remote");
+    let by_platform = |dir: PathBuf| dir.join(platform.name()).join("atelier-remote");
     let mut found = Vec::new();
     found.extend(env_dir.map(|d| by_platform(d.to_path_buf())));
     if let Some(dir) = exe.parent() {
@@ -178,17 +178,17 @@ pub fn candidates(exe: &std::path::Path, platform: &Platform, env_dir: Option<&s
             found.extend(dir.parent().map(|contents| by_platform(contents.join("Resources").join("remote"))));
         }
         if same {
-            found.push(dir.join("lathe-remote"));
+            found.push(dir.join("atelier-remote"));
         }
     }
-    found.extend(home.map(|h| by_platform(h.join(".cache/lathe/remote-builds"))));
+    found.extend(home.map(|h| by_platform(h.join(".cache/atelier/remote-builds"))));
     found
 }
 
-/// The copy of lathe-remote to upload to a host of `platform`, if there is one.
+/// The copy of atelier-remote to upload to a host of `platform`, if there is one.
 pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
-    let env_dir = std::env::var_os("LATHE_REMOTE_DIR").map(PathBuf::from);
+    let env_dir = std::env::var_os("ATELIER_REMOTE_DIR").map(PathBuf::from);
     let home = std::env::var_os("HOME").map(PathBuf::from);
     first_matching(&candidates(&exe, platform, env_dir.as_deref(), home.as_deref(), *platform == Platform::here()))
 }
@@ -196,7 +196,7 @@ pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
 /// The protocol a helper binary's bytes say it speaks, from its stamp; `None` for a copy with none, as
 /// helpers built before the stamp are.
 pub fn speaks(bytes: &[u8]) -> Option<u32> {
-    const MARK: &[u8] = b"lathe-remote-protocol:";
+    const MARK: &[u8] = b"atelier-remote-protocol:";
     let at = bytes.windows(MARK.len()).position(|w| w == MARK)? + MARK.len();
     let digits: Vec<u8> = bytes[at..].iter().take_while(|b| b.is_ascii_digit()).copied().collect();
     let end = bytes.get(at + digits.len())?;
@@ -217,15 +217,15 @@ pub fn version_line() -> String {
 /// What the reader reads when no copy for the host is found: what is missing, and what to do.
 pub fn missing_words(host: &str, platform: &Platform) -> String {
     format!(
-        "{host} is a {} machine, and this copy of lathe has no helper built for it, so it cannot open folders there. \
-         Install a lathe build that includes the {} helper, or, from a lathe checkout, build one with tools/build-remote.sh on a {} machine.",
+        "{host} is a {} machine, and this copy of atelier has no helper built for it, so it cannot open folders there. \
+         Install a atelier build that includes the {} helper, or, from a atelier checkout, build one with tools/build-remote.sh on a {} machine.",
         platform.describe(),
         platform.name(),
         platform.describe()
     )
 }
 
-/// Makes sure the host has this version's lathe-remote, uploading it when not, and returns its path
+/// Makes sure the host has this version's atelier-remote, uploading it when not, and returns its path
 /// from the host's home.
 pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Result<String> {
     let local = local_binary(platform).ok_or_else(|| {
@@ -241,12 +241,12 @@ pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Resu
     if has {
         return Ok(path);
     }
-    say(format!("Putting lathe-remote on {host}…"));
+    say(format!("Putting atelier-remote on {host}…"));
     let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
     run(host, &format!("mkdir -p {dir} && cat > {path}.part && chmod +x {path}.part && mv {path}.part {path}"), Some(&bytes))?;
     let version = run(host, &format!("{path} --version"), None)?;
     if version.trim() != version_line() {
-        return Err(io::Error::other(format!("{host}: the helper lathe put there does not start as it should")));
+        return Err(io::Error::other(format!("{host}: the helper atelier put there does not start as it should")));
     }
     Ok(path)
 }
@@ -278,7 +278,7 @@ pub fn dial(host: &str, binary: &str) -> Dial {
     })
 }
 
-/// Opens the folder `root` on `host` as a project: probes the host, puts lathe-remote there if it
+/// Opens the folder `root` on `host` as a project: probes the host, puts atelier-remote there if it
 /// has not got this version, and connects. `say` hears each step, for the app to show.
 pub fn connect(host: &str, root: &str, say: &dyn Fn(String)) -> io::Result<RemoteProject> {
     say(format!("Reaching {host}…"));

@@ -1,6 +1,6 @@
-//! Servers that come with the app. A user installs lathe and nothing else: when a file's server is
-//! missing, lathe downloads a pinned copy once and runs that copy from then on. The order is the
-//! server the user installed, then lathe's own copy, then a download. See `docs/code-editor.md`,
+//! Servers that come with the app. A user installs atelier and nothing else: when a file's server is
+//! missing, atelier downloads a pinned copy once and runs that copy from then on. The order is the
+//! server the user installed, then atelier's own copy, then a download. See `docs/code-editor.md`,
 //! Stage E.
 //!
 //! Every file is pinned by version and SHA-256 in the registry. A download is unpacked in a staging
@@ -34,7 +34,7 @@ pub struct Download {
 pub enum Kind {
     /// One archive per platform. `program` is the executable in it, relative to the server's folder.
     Platform { files: &'static [PlatformFile], unpack: Unpack, program: &'static str },
-    /// npm tarballs unpacked side by side into `node_modules`, run with lathe's Node.js. `script` is
+    /// npm tarballs unpacked side by side into `node_modules`, run with atelier's Node.js. `script` is
     /// the server's entry, relative to the server's folder.
     Node { packages: &'static [Package], script: &'static str },
     /// A Go module built by the user's Go into the server's folder, as the server's program. Go
@@ -67,7 +67,7 @@ pub enum Unpack {
     TarGz,
 }
 
-/// This machine's Rust target triple, if lathe downloads servers for it.
+/// This machine's Rust target triple, if atelier downloads servers for it.
 pub fn platform() -> Option<&'static str> {
     match (std::env::consts::ARCH, std::env::consts::OS) {
         ("aarch64", "macos") => Some("aarch64-apple-darwin"),
@@ -106,7 +106,7 @@ impl Launch {
 /// Why a server cannot run here.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Unavailable {
-    /// Nothing to run, and nothing lathe may download: no pin for it or this platform, downloads are
+    /// Nothing to run, and nothing atelier may download: no pin for it or this platform, downloads are
     /// off, or a tool it is built with is missing.
     NotInstalled,
     /// A download was tried and failed, for this reason.
@@ -122,7 +122,7 @@ impl fmt::Display for Unavailable {
     }
 }
 
-/// lathe's folder of downloaded servers, and where it looks for ones the user installed.
+/// atelier's folder of downloaded servers, and where it looks for ones the user installed.
 pub struct Store {
     dir: PathBuf,
     search: Vec<PathBuf>,
@@ -135,9 +135,9 @@ pub struct Store {
 }
 
 impl Store {
-    /// The app's folder, the usual search path, and `LATHE_OFFLINE`.
+    /// The app's folder, the usual search path, and `ATELIER_OFFLINE`.
     pub fn from_env() -> Self {
-        let offline = std::env::var("LATHE_OFFLINE").is_ok_and(|v| !v.is_empty() && v != "0");
+        let offline = std::env::var("ATELIER_OFFLINE").is_ok_and(|v| !v.is_empty() && v != "0");
         Self::new(default_dir(), search_dirs(), offline)
     }
 
@@ -147,12 +147,12 @@ impl Store {
 
     /// For a project on another host: each server by its program's name, for the host's `PATH` to
     /// find when the project starts it there. A server the host does not have fails to start, and
-    /// says so; lathe downloads nothing onto a host.
+    /// says so; atelier downloads nothing onto a host.
     pub fn on_host() -> Self {
         Self { on_host: true, ..Self::new(PathBuf::new(), Vec::new(), true) }
     }
 
-    /// How to run `spec`: the copy the user installed, else lathe's own, downloaded now if need be.
+    /// How to run `spec`: the copy the user installed, else atelier's own, downloaded now if need be.
     /// It can block for a download, so call it off the UI thread. `report` hears each download start.
     pub fn launch(&self, spec: &ServerSpec, report: &dyn Fn(String)) -> Result<Launch, Unavailable> {
         if self.on_host {
@@ -236,9 +236,9 @@ impl Store {
     }
 }
 
-/// Where lathe keeps its servers: `LATHE_SERVERS_DIR`, else the platform's app data folder.
+/// Where atelier keeps its servers: `ATELIER_SERVERS_DIR`, else the platform's app data folder.
 fn default_dir() -> PathBuf {
-    if let Some(dir) = std::env::var_os("LATHE_SERVERS_DIR") {
+    if let Some(dir) = std::env::var_os("ATELIER_SERVERS_DIR") {
         return PathBuf::from(dir);
     }
     let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
@@ -247,10 +247,10 @@ fn default_dir() -> PathBuf {
     } else {
         std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".local/share"))
     };
-    data.join("lathe/servers")
+    data.join("atelier/servers")
 }
 
-/// Moves a finished staging folder into place. When another lathe got there first, its copy is as
+/// Moves a finished staging folder into place. When another atelier got there first, its copy is as
 /// good as this one, so this one is dropped.
 fn settle(staging: &Path, folder: &Path) -> Result<(), Unavailable> {
     let parent = folder.parent().expect("a server folder has a parent");

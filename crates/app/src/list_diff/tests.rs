@@ -18,8 +18,8 @@ fn only_the_rows_that_changed_are_replaced_from_the_end() {
 
 #[test]
 fn a_streaming_text_changes_its_fingerprint() {
-    let a = Item::Text { block: lathe_agents::session::BlockId(1), text: "Hel".into() };
-    let b = Item::Text { block: lathe_agents::session::BlockId(1), text: "Hello".into() };
+    let a = Item::Text { block: atelier_agents::session::BlockId(1), text: "Hel".into() };
+    let b = Item::Text { block: atelier_agents::session::BlockId(1), text: "Hello".into() };
     assert_ne!(fingerprint(&a), fingerprint(&b));
 }
 
@@ -41,7 +41,7 @@ fn a_card_past_the_last_item_goes_at_the_end() {
 }
 
 fn tool(name: &str) -> Item {
-    use lathe_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
+    use atelier_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
     Item::Tool(Call {
         call: ToolCall { id: ToolId::new(name), name: name.into(), kind: ToolKind::Other, input: serde_json::json!({}), file: None, parent: None, status: ToolStatus::Done },
         output: None,
@@ -49,11 +49,11 @@ fn tool(name: &str) -> Item {
 }
 
 fn think() -> Item {
-    Item::Thinking { block: lathe_agents::session::BlockId(1), text: "hm".into(), took: None }
+    Item::Thinking { block: atelier_agents::session::BlockId(1), text: "hm".into(), took: None }
 }
 
 fn said() -> Item {
-    Item::Text { block: lathe_agents::session::BlockId(2), text: "ok".into() }
+    Item::Text { block: atelier_agents::session::BlockId(2), text: "ok".into() }
 }
 
 /// Two or more activity items in a row are one group; one alone stays a row; what is said ends a group.

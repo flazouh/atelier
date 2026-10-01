@@ -17,9 +17,9 @@ use gpui_kit::{
     div, prelude::FluentBuilder, 
 };
 use beui::scale::px;
-use lathe_agents::session::Backend;
-use lathe_forge::{Forge, NewPull, PullRef, RepoRef};
-use lathe_project::Project;
+use atelier_agents::session::Backend;
+use atelier_forge::{Forge, NewPull, PullRef, RepoRef};
+use atelier_project::Project;
 use crate::ship::{branch, commit::git, pull, push};
 
 actions!(pull_form, [
@@ -88,7 +88,7 @@ struct Read {
     bases: Vec<String>,
     ahead: usize,
     /// The open pull request the branch has, as the forge says.
-    existing: Result<Option<lathe_forge::PullBrief>, String>,
+    existing: Result<Option<atelier_forge::PullBrief>, String>,
 }
 
 impl PullForm {

@@ -1,22 +1,22 @@
 //! Reads a public pull request from GitHub through the real `gh`, end to end. Read-only: it never
 //! creates, comments, reviews, merges or pushes anything. Ignored by default, since it needs a network
 //! and a signed-in `gh`:
-//!   cargo test -p lathe-forge --test live -- --ignored --nocapture
-//! With `LATHE_FORGE_RECORD=<folder>` it also records every answer as a fixture for `tests/replay.rs`.
+//!   cargo test -p atelier-forge --test live -- --ignored --nocapture
+//! With `ATELIER_FORGE_RECORD=<folder>` it also records every answer as a fixture for `tests/replay.rs`.
 use std::{path::PathBuf, sync::Arc};
 
-use lathe_forge::{
+use atelier_forge::{
     Conclusion, Forge, PullRef, PullState, RepoRef,
     github::{GhCli, GitHub, testing::Recording},
 };
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
 /// The forge, and the folder its `gh` runs in, which must outlive it.
 fn forge() -> (GitHub, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let project = Arc::new(LocalProject::open(dir.path()).unwrap());
     let gh = GhCli::new(project);
-    let forge = match std::env::var("LATHE_FORGE_RECORD") {
+    let forge = match std::env::var("ATELIER_FORGE_RECORD") {
         Ok(folder) => GitHub::with_transport(Recording::new(gh, PathBuf::from(folder))),
         Err(_) => GitHub::with_transport(gh),
     };
@@ -81,7 +81,7 @@ fn reads_a_public_pull_end_to_end() {
     println!("50 numbers, one request: {} pull requests found, {:.0} ms", fifty.iter().flatten().count(), start.elapsed().as_secs_f64() * 1000.);
 
     // The reader's own working set reads private data, so it is counted and never recorded.
-    if std::env::var("LATHE_FORGE_RECORD").is_err() {
+    if std::env::var("ATELIER_FORGE_RECORD").is_err() {
         let start = std::time::Instant::now();
         let involved = forge.involved().unwrap();
         let mut shelves = std::collections::BTreeMap::new();

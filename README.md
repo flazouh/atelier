@@ -1,16 +1,16 @@
-# lathe
+# atelier
 
 A native code editor on GPUI, made for work with coding agents. It runs agent sessions next to your code,
 shows what each turn changed for review, and opens pull requests, on a local folder or over SSH.
 
-Agents plug in through one model of lathe's own (`crates/agents`): Claude Code, and lathe's own agent.
+Agents plug in through one model of atelier's own (`crates/agents`): Claude Code, and atelier's own agent.
 
 ## Build and run
 
 Rust 2024 (stable). macOS and Linux.
 
 ```sh
-cargo run -p lathe-app            # the editor
+cargo run -p atelier-app            # the editor
 cargo run -p beui-gallery         # every beui component in each state
 tools/check.sh                    # every check a change needs: tests, clippy, the gallery, the vendored crates
 ```

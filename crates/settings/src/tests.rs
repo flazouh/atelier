@@ -26,12 +26,12 @@ fn a_saved_theme_loads_back_and_a_missing_or_broken_file_is_the_default() {
 fn setting_the_theme_keeps_the_recent_projects_and_unknown_keys() {
     let path = scratch("keep");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, r#"{"theme":"lathe Dark","recent":[{"kind":"local","path":"/work/lathe"}],"font_size":14}"#).unwrap();
-    update(&path, |s| s.theme = Some("lathe Light".into())).unwrap();
+    std::fs::write(&path, r#"{"theme":"atelier Dark","recent":[{"kind":"local","path":"/work/atelier"}],"font_size":14}"#).unwrap();
+    update(&path, |s| s.theme = Some("atelier Light".into())).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     let back = load(&path);
-    assert_eq!(back.theme.as_deref(), Some("lathe Light"));
-    assert_eq!(back.recent, [Location::Local { path: "/work/lathe".into() }]);
+    assert_eq!(back.theme.as_deref(), Some("atelier Light"));
+    assert_eq!(back.recent, [Location::Local { path: "/work/atelier".into() }]);
     assert!(text.contains("\"font_size\": 14"), "an unknown key survives: {text}");
 }
 
@@ -47,11 +47,11 @@ fn opening_a_project_moves_it_first_once_and_the_list_stays_short() {
     s.opened(local(5));
     assert_eq!(s.recent[0], local(5));
     assert_eq!(s.recent.iter().filter(|l| **l == local(5)).count(), 1);
-    let remote = Location::Ssh { host: "hp-agent".into(), path: "/home/alex/code/lathe".into() };
+    let remote = Location::Ssh { host: "hp-agent".into(), path: "/home/alex/code/atelier".into() };
     s.opened(remote.clone());
     assert_eq!(s.recent[0], remote);
-    assert_eq!(remote.name(), "lathe");
-    assert_eq!(remote.place(), "hp-agent:/home/alex/code/lathe");
+    assert_eq!(remote.name(), "atelier");
+    assert_eq!(remote.place(), "hp-agent:/home/alex/code/atelier");
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn session_names_and_panels_come_back() {
 fn the_mode_and_the_primary_colour_are_kept_and_an_old_file_without_them_still_loads() {
     let path = scratch("mode");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-    std::fs::write(&path, r#"{"theme": "lathe Dark", "recent": []}"#).unwrap();
+    std::fs::write(&path, r#"{"theme": "atelier Dark", "recent": []}"#).unwrap();
     let old = load(&path);
     assert_eq!((old.mode, old.primary), (None, None));
     update(&path, |s| {
@@ -81,7 +81,7 @@ fn the_mode_and_the_primary_colour_are_kept_and_an_old_file_without_them_still_l
     })
     .unwrap();
     let back = load(&path);
-    assert_eq!((back.mode.as_deref(), back.primary, back.theme.as_deref()), (Some("system"), Some([2, 133, 247]), Some("lathe Dark")));
+    assert_eq!((back.mode.as_deref(), back.primary, back.theme.as_deref()), (Some("system"), Some([2, 133, 247]), Some("atelier Dark")));
     update(&path, |s| s.primary = None).unwrap();
     assert_eq!(load(&path).primary, None, "back to the default");
 }
@@ -89,7 +89,7 @@ fn the_mode_and_the_primary_colour_are_kept_and_an_old_file_without_them_still_l
 #[test]
 fn the_open_sessions_come_back() {
     let path = scratch("open");
-    let here = Location::Local { path: "/work/lathe".into() };
+    let here = Location::Local { path: "/work/atelier".into() };
     update(&path, |s| {
         s.open = vec![
             OpenSession { location: here.clone(), id: "s1".into(), title: "Fix the lease".into() },
@@ -106,7 +106,7 @@ fn the_open_sessions_come_back() {
 
 #[test]
 fn the_task_rules_the_reader_turned_off_are_kept_and_an_old_file_has_none() {
-    let old: Settings = serde_json::from_str("{\"theme\":\"lathe Light\"}").unwrap();
+    let old: Settings = serde_json::from_str("{\"theme\":\"atelier Light\"}").unwrap();
     assert!(old.task_rules_off.is_empty(), "a file from before the rules loads");
     let kept = Settings { task_rules_off: vec!["merge".into()], ..Settings::default() };
     let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
@@ -120,7 +120,7 @@ fn the_design_choice_is_kept_and_an_old_file_has_none() {
     let kept = Settings { design_tabs: Some(1), ..Settings::default() };
     let round: Settings = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
     assert_eq!(round.design_tabs, Some(1));
-    // A file an older lathe wrote, with the toggle choice in it, still reads and keeps the key as it is.
+    // A file an older atelier wrote, with the toggle choice in it, still reads and keeps the key as it is.
     let older: Settings = serde_json::from_str(r#"{"design_toggle": 3, "design_tabs": 2}"#).unwrap();
     assert_eq!(older.design_tabs, Some(2));
     assert_eq!(older.other.get("design_toggle"), Some(&serde_json::json!(3)));

@@ -23,9 +23,9 @@ use gpui_kit::{
     div, prelude::FluentBuilder, 
 };
 use beui::scale::px;
-use lathe_agents::session::Backend;
-use lathe_forge::{Forge, PullRef};
-use lathe_project::Project;
+use atelier_agents::session::Backend;
+use atelier_forge::{Forge, PullRef};
+use atelier_project::Project;
 
 use crate::ship::{
     branch,
@@ -144,7 +144,7 @@ impl ShipStrip {
     pub fn new(project: Arc<dyn Project>, backend: Arc<dyn Backend>, model: Option<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let message = cx.new(|cx| TextareaState::new(window, cx).auto_grow(3, 10).placeholder("What this commit does"));
         let new_branch = cx.new(|cx| InputState::new(window, cx).placeholder("fix/what-it-does"));
-        let forge: Arc<dyn Forge> = Arc::new(lathe_forge::github::GitHub::new(project.clone()));
+        let forge: Arc<dyn Forge> = Arc::new(atelier_forge::github::GitHub::new(project.clone()));
         Self {
             project,
             backend,

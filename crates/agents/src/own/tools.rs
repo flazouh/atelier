@@ -3,7 +3,7 @@
 //! A tool never panics on bad input: it returns an error the model can read and fix.
 use std::fmt::Write as _;
 
-use lathe_project::{Project, host_path};
+use atelier_project::{Project, host_path};
 use serde_json::{Value, json};
 
 use super::message::{Cancel, ToolDef};
@@ -113,7 +113,7 @@ pub(crate) fn project_path<'a>(ctx: &ToolContext<'_>, input: &'a Value, key: &st
 pub(crate) fn make_parent(ctx: &ToolContext<'_>, path: &str) -> Result<(), String> {
     let Some((parent, _)) = path.rsplit_once('/') else { return Ok(()) };
     let target = host_path(ctx.project.root(), parent).map_err(|e| e.to_string())?;
-    let command = lathe_project::Command::new("mkdir").args(["-p", "--"]).args([target.to_string_lossy().into_owned()]);
+    let command = atelier_project::Command::new("mkdir").args(["-p", "--"]).args([target.to_string_lossy().into_owned()]);
     let mut process = ctx.project.spawn(&command).map_err(|e| format!("cannot make the folder: {e}"))?;
     drop(std::mem::replace(&mut process.stdin, Box::new(std::io::sink())));
     match process.control.wait() {

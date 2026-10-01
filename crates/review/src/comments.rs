@@ -1,6 +1,6 @@
 //! The user's comments on rows of the review. A comment keeps the lines it was written on, quoted, so it
 //! still makes sense when the file moves on, and it becomes part of the next message to the agent.
-use lathe_agents::session::Attachment;
+use atelier_agents::session::Attachment;
 
 use crate::merged::{Anchor, Side};
 

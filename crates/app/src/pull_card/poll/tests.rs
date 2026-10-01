@@ -1,5 +1,5 @@
 use std::time::Duration;
-use lathe_forge::ForgeError;
+use atelier_forge::ForgeError;
 use super::*;
 const S: fn(u64) -> Duration = Duration::from_secs;
 /// Running checks are read often, settled ones less, and a merged or closed pull request not again.

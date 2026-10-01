@@ -1,7 +1,7 @@
 //! `git status --porcelain=v2 -z` as git prints it, and the snapshot on a real repository.
 use std::{fs, path::Path, process::Command, sync::Arc};
 
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
 use super::{head_files, parse_status, snapshot};
 

@@ -99,7 +99,7 @@ fn a_watch_reports_a_write_and_a_removal_in_batches() {
         }
     }
     assert!(seen.iter().any(|c| c.path == "a.txt" && c.kind != ChangeKind::Removed), "the write is reported: {seen:?}");
-    assert!(seen.iter().all(|c| c.path != "noise.log" && !c.path.ends_with(".lathe-save")), "ignored and temporary files are not: {seen:?}");
+    assert!(seen.iter().all(|c| c.path != "noise.log" && !c.path.ends_with(".atelier-save")), "ignored and temporary files are not: {seen:?}");
     fs::remove_file(p.root().join("a.txt")).unwrap();
     let removed = rx.recv_timeout(Duration::from_secs(3)).unwrap();
     assert!(removed.contains(&Change { path: "a.txt".into(), kind: ChangeKind::Removed }), "{removed:?}");
@@ -121,7 +121,7 @@ fn a_spawned_process_talks_over_its_pipes() {
     sleeper.control.kill().unwrap();
     sleeper.control.wait().unwrap();
     assert!(!sleeper.control.running());
-    assert!(p.spawn(&Command::new("lathe-no-such-program")).is_err());
+    assert!(p.spawn(&Command::new("atelier-no-such-program")).is_err());
 }
 
 #[test]
@@ -244,13 +244,13 @@ fn a_tilde_is_the_home_folder_and_a_relative_path_is_refused() {
 #[test]
 fn a_project_keeps_its_tasks_in_its_data_folder() {
     let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().join("lathe");
+    let root = dir.path().join("atelier");
     fs::create_dir(&root).unwrap();
     let data = tempfile::tempdir().unwrap();
     let project = LocalProject::open(&root).unwrap().with_data_dir(data.path());
     let tracker = project.tracker().unwrap();
-    let task = tracker.create(&lathe_tracker::NewTask::titled("Keep tasks"), "alex").unwrap();
-    assert!(task.key.starts_with("LAT-"), "{}", task.key);
+    let task = tracker.create(&atelier_tracker::NewTask::titled("Keep tasks"), "alex").unwrap();
+    assert!(task.key.starts_with("ATE-"), "{}", task.key);
     assert!(project.data_path().unwrap().join(crate::TRACKER_FILE).exists());
     assert!(std::sync::Arc::ptr_eq(&tracker, &project.tracker().unwrap()), "each ask gets the same store");
     let again = LocalProject::open(&root).unwrap().with_data_dir(data.path());

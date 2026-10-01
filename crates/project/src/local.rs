@@ -14,7 +14,7 @@ use ignore::{WalkBuilder, gitignore::Gitignore};
 use notify::{EventKind, RecursiveMode, Watcher};
 use regex::RegexBuilder;
 
-use lathe_tracker::{LocalTracker, Tracker, TrackerError, TrackerResult, prefix_for};
+use atelier_tracker::{LocalTracker, Tracker, TrackerError, TrackerResult, prefix_for};
 
 use crate::{
     Change, ChangeKind, ChangeSink, Command, DataEntry, Entry, GitOutput, Match, Process, Project, Query, Watch,
@@ -25,7 +25,7 @@ use crate::{
 /// file keeps its permissions, so saving a script keeps it runnable.
 pub(crate) fn write_whole(target: &Path, bytes: &[u8]) -> io::Result<()> {
     let name = target.file_name().and_then(|n| n.to_str()).unwrap_or("file");
-    let temporary = target.with_file_name(format!(".{name}.lathe-save"));
+    let temporary = target.with_file_name(format!(".{name}.atelier-save"));
     fs::write(&temporary, bytes)?;
     if let Ok(meta) = fs::metadata(target) {
         fs::set_permissions(&temporary, meta.permissions())?;
@@ -153,7 +153,7 @@ impl Project for LocalProject {
         watcher.watch(&self.root, RecursiveMode::Recursive).map_err(io::Error::other)?;
         let (ignore, _) = Gitignore::new(self.root.join(".gitignore"));
         let root = self.root.clone();
-        thread::Builder::new().name("lathe-watch".into()).spawn(move || {
+        thread::Builder::new().name("atelier-watch".into()).spawn(move || {
             // Ends when the watcher drops with the Watch, which closes the channel.
             while let Ok(first) = rx.recv() {
                 let mut batch = Vec::new();
@@ -169,7 +169,7 @@ impl Project for LocalProject {
                         let Ok(rel) = path.strip_prefix(&root) else { continue };
                         let parts: Vec<&str> = rel.iter().filter_map(|p| p.to_str()).collect();
                         let ignored = ignore.matched_path_or_any_parents(rel, path.is_dir()).is_ignore();
-                        if parts.is_empty() || parts[0] == ".git" || ignored || parts.last().is_some_and(|n| n.ends_with(".lathe-save")) {
+                        if parts.is_empty() || parts[0] == ".git" || ignored || parts.last().is_some_and(|n| n.ends_with(".atelier-save")) {
                             continue;
                         }
                         // A rename or a save that replaces the file reads as a change of it.

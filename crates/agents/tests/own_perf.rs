@@ -1,5 +1,5 @@
 //! The own agent's numbers. Run in release, on the HP:
-//! `cargo test -p lathe-agents --release --test own_perf -- --ignored --nocapture --test-threads=1`
+//! `cargo test -p atelier-agents --release --test own_perf -- --ignored --nocapture --test-threads=1`
 //! Each test prints its median and p95 and fails when the median misses its target.
 use std::{
     io,
@@ -12,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_agents::{
+use atelier_agents::{
     own::{
         Block, Cancel, Delta, Message, Model, ModelError, ModelRequest, OwnAgent, OwnOptions, Reply, StopReason, TokenUsage,
         anthropic::StreamState,
@@ -20,7 +20,7 @@ use lathe_agents::{
     },
     session::{Backend, Command, Event, OpenRequest, PermissionMode},
 };
-use lathe_project::{ChangeSink, Command as Spawn, Entry, GitOutput, LocalProject, Match, Process, Project, Query, Watch};
+use atelier_project::{ChangeSink, Command as Spawn, Entry, GitOutput, LocalProject, Match, Process, Project, Query, Watch};
 use serde_json::json;
 
 const RUNS: usize = 15;
@@ -151,7 +151,7 @@ impl Project for NoRecord {
     fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
         Err(io::Error::new(io::ErrorKind::NotFound, path.to_string()))
     }
-    fn data_list(&self, _: &str) -> io::Result<Vec<lathe_project::DataEntry>> {
+    fn data_list(&self, _: &str) -> io::Result<Vec<atelier_project::DataEntry>> {
         Ok(Vec::new())
     }
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
@@ -173,7 +173,7 @@ fn turn(project: Arc<dyn Project>, calls: usize) -> Duration {
     let agent = OwnAgent::new(Arc::new(Script { calls, at: AtomicUsize::new(0) }), OwnOptions::default());
     let (tx, rx) = mpsc::channel();
     let tx = Mutex::new(tx);
-    let sink: lathe_agents::session::EventSink = Arc::new(move |e| drop(tx.lock().unwrap().send(e)));
+    let sink: atelier_agents::session::EventSink = Arc::new(move |e| drop(tx.lock().unwrap().send(e)));
     let session = agent.open(project, OpenRequest { mode: Some(PermissionMode::Bypass), ..OpenRequest::default() }, sink).unwrap();
     // Wait for Started so the thread is up before the clock starts.
     while !matches!(rx.recv().unwrap(), Event::Started(_)) {}

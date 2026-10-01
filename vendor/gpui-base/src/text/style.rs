@@ -30,7 +30,7 @@ pub struct TextViewStyle {
     is_dark: bool,
 }
 
-/// A table drawn as tiles (lathe patch 19): each cell is its own rounded tile on a fill, 2px from the next, with no
+/// A table drawn as tiles (atelier patch 19): each cell is its own rounded tile on a fill, 2px from the next, with no
 /// border or frame; the header tiles are one step stronger, and a row's tiles brighten while the pointer is on it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TableTiles {

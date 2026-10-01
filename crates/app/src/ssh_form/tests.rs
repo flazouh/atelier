@@ -50,14 +50,14 @@ fn the_host_field_starts_empty_though_the_config_has_hosts(cx: &mut TestAppConte
     assert_eq!(form.read_with(cx, |f, cx| f.host.read(cx).value().to_string()), "", "late hosts do not fill it either");
 }
 
-/// A row of buttons takes one size, and lathe's default is 28 px: Cancel and Connect are as tall as the field.
+/// A row of buttons takes one size, and atelier's default is 28 px: Cancel and Connect are as tall as the field.
 #[gpui_kit::test]
 fn the_buttons_of_the_form_share_one_size_and_the_field_is_as_tall(cx: &mut TestAppContext) {
     let (_, cx) = open(&["phone"], cx);
     let cancel = cx.debug_bounds("ssh-cancel").expect("Cancel is drawn");
     let connect = cx.debug_bounds("ssh-connect").expect("Connect is drawn");
     assert_eq!(cancel.size.height, connect.size.height, "one row, one size");
-    assert_eq!(f32::from(connect.size.height), 28., "lathe default control size");
+    assert_eq!(f32::from(connect.size.height), 28., "atelier default control size");
     let field = cx.debug_bounds("ssh-field").expect("the field is drawn");
     assert_eq!(f32::from(field.size.height), beui::text_input::HEIGHT);
     assert_eq!(beui::text_input::HEIGHT, 28.);

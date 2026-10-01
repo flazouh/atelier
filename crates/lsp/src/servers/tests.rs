@@ -30,7 +30,7 @@ fn every_language_has_exactly_one_server() {
 
 #[test]
 fn a_program_is_found_in_the_first_directory_that_has_it() {
-    let base = std::env::temp_dir().join(format!("lathe-find-{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("atelier-find-{}", std::process::id()));
     let (first, second) = (base.join("a"), base.join("b"));
     for dir in [&first, &second] {
         std::fs::create_dir_all(dir).unwrap();
@@ -55,7 +55,7 @@ fn a_program_is_found_in_the_first_directory_that_has_it() {
 
 #[test]
 fn the_root_is_the_nearest_directory_with_a_marker() {
-    let base = std::env::temp_dir().join(format!("lathe-root-{}", std::process::id()));
+    let base = std::env::temp_dir().join(format!("atelier-root-{}", std::process::id()));
     let file = base.join("app/src/deep/main.go");
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     std::fs::write(base.join("go.mod"), "").unwrap();
@@ -67,7 +67,7 @@ fn the_root_is_the_nearest_directory_with_a_marker() {
 
 /// A pin that misses a platform leaves that platform's users with no server and no way to get one.
 #[test]
-fn every_platform_pin_covers_every_platform_lathe_downloads_for() {
+fn every_platform_pin_covers_every_platform_atelier_downloads_for() {
     let platforms = ["aarch64-apple-darwin", "x86_64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-unknown-linux-gnu"];
     let pins = SERVERS.iter().filter_map(|spec| spec.download.as_ref().map(|d| (spec.name, d))).chain([("node", &NODE)]);
     for (name, download) in pins {

@@ -1,9 +1,9 @@
-//! The seam between lathe and an agent. A backend starts sessions; a session takes commands and
+//! The seam between atelier and an agent. A backend starts sessions; a session takes commands and
 //! pushes events into a sink. Neither says how: a session may hold a process, a socket or a loop that
 //! runs in this process.
 use std::{fmt, sync::Arc};
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 use super::{
     command::{Command, PermissionMode},

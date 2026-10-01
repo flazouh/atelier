@@ -5,7 +5,7 @@ use std::{
     io::{Read, Write},
 };
 
-use lathe_project::{Command, Project};
+use atelier_project::{Command, Project};
 
 /// How many paths one `git hash-object` is given.
 const HASH_BATCH: usize = 200;

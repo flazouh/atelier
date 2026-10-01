@@ -3,7 +3,7 @@
 
 use std::ops::Range;
 
-use lathe_review::{Merged, Side};
+use atelier_review::{Merged, Side};
 
 /// The byte range of `old` to replace, and its replacement, that turn `old` into `new`: everything
 /// between their common start and their common end. The agent writing a file again changes a few

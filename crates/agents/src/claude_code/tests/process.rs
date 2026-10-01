@@ -1,5 +1,5 @@
 //! The live path, against a stand-in `claude`: a shell script that plays back a captured run or
-//! records what lathe writes to it. Only the process is fake; the project, the threads and the
+//! records what atelier writes to it. Only the process is fake; the project, the threads and the
 //! pipes are the real ones.
 use std::{
     path::PathBuf,
@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
 use crate::{
     claude_code::ClaudeCode,
@@ -33,7 +33,7 @@ impl Stand {
         path
     }
 
-    fn project(&self) -> Arc<dyn lathe_project::Project> {
+    fn project(&self) -> Arc<dyn atelier_project::Project> {
         Arc::new(crate::testing::Locked(Arc::new(LocalProject::open(self.dir.path()).unwrap())))
     }
 }
@@ -66,10 +66,10 @@ fn ended(event: &Event) -> bool {
 #[test]
 fn a_program_the_host_lacks_is_reported_as_missing() {
     let stand = Stand::new();
-    let backend = ClaudeCode::with_program("/nonexistent/lathe-test-claude");
+    let backend = ClaudeCode::with_program("/nonexistent/atelier-test-claude");
     let (sink, _) = channel();
     match backend.open(stand.project(), OpenRequest::default(), sink) {
-        Err(SessionError::Missing { program }) => assert!(program.contains("lathe-test-claude")),
+        Err(SessionError::Missing { program }) => assert!(program.contains("atelier-test-claude")),
         Err(other) => panic!("wrong error: {other}"),
         Ok(_) => panic!("a missing program started"),
     }

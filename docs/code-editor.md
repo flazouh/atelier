@@ -8,9 +8,9 @@ from memory.
 
 ## What already exists, and what we add
 
-gpui-base and gpui-component ship the hard parts, so lathe reskins them rather than rewriting:
+gpui-base and gpui-component ship the hard parts, so atelier reskins them rather than rewriting:
 
-| Need | Where it lives | What lathe does |
+| Need | Where it lives | What atelier does |
 |---|---|---|
 | Editing, selection, undo, IME | `gpui_base::input` (`EditorState`, 9.4k lines) | Reuse. |
 | Syntax highlighting | `gpui-component/tree-sitter-*` features | Turn on the languages, restyle the token colors. |
@@ -21,7 +21,7 @@ gpui-base and gpui-component ship the hard parts, so lathe reskins them rather t
 
 ## What the live server taught us
 
-`cargo run -p lathe-lsp --example probe -- <root> <file>` prints a server's traffic. Two facts came out
+`cargo run -p atelier-lsp --example probe -- <root> <file>` prints a server's traffic. Two facts came out
 of it, and both are now handled:
 
 - rust-analyzer publishes twice for one document version: an empty set while it indexes, then the real
@@ -152,28 +152,28 @@ locations, each with its line's text for display.
   read loop answers every server request itself, because the worker may be blocked on tsgo's answer.
   When the worker answered, the first question after startup waited out the 60s timeout.
 - tsgo refuses a diagnostic pull that carries `"identifier": null`, which `lsp-types` 0.97 writes for
-  an unset field, so lathe sends its own params with only the document.
+  an unset field, so atelier sends its own params with only the document.
 - gopls and tsgo count columns in UTF-16; rust-analyzer takes UTF-32. The worker covers both, and the live tests
   put an emoji before the call to prove the conversion.
 
-**Proof.** A live test per server, skipped when its program is missing unless `LATHE_REQUIRE_LSP` names
-it (`LATHE_REQUIRE_LSP=rust,typescript,python,go`): from a call, definition lands on the declaration;
+**Proof.** A live test per server, skipped when its program is missing unless `ATELIER_REQUIRE_LSP` names
+it (`ATELIER_REQUIRE_LSP=rust,typescript,python,go`): from a call, definition lands on the declaration;
 on the declaration, the fallback lands on the call; a type error is reported; hover names the symbol.
 The gallery's Editor story has a tab per language with a fixture project on disk.
 
 ## Stage E: servers come with the app
 
-A user installs lathe and nothing else. When a file's server is missing, lathe downloads it once,
+A user installs atelier and nothing else. When a file's server is missing, atelier downloads it once,
 as Zed does, and every later start uses that copy.
 
 **Order.** A server the user installed wins, so their version and their settings apply. Then the
-copy lathe already downloaded. Then a download. `LATHE_OFFLINE=1` stops at the second step, and the
+copy atelier already downloaded. Then a download. `ATELIER_OFFLINE=1` stops at the second step, and the
 status line shows the install hint as before.
 
-**Where.** `~/Library/Application Support/lathe/servers` on macOS, `$XDG_DATA_HOME/lathe/servers`
-(else `~/.local/share/lathe/servers`) on Linux, or `LATHE_SERVERS_DIR`. Each download lives in
+**Where.** `~/Library/Application Support/atelier/servers` on macOS, `$XDG_DATA_HOME/atelier/servers`
+(else `~/.local/share/atelier/servers`) on Linux, or `ATELIER_SERVERS_DIR`. Each download lives in
 `<name>/<version>/`. It is unpacked in a staging folder beside it and renamed into place only after
-its checksum matched, so a folder that exists is complete, and two lathes racing both end up using it.
+its checksum matched, so a folder that exists is complete, and two ateliers racing both end up using it.
 
 **What, pinned in the registry.** Every file has a fixed version and a SHA-256 taken when it was
 pinned; a file that does not match is deleted and the server reports it as a failed download.
@@ -183,10 +183,10 @@ pinned; a file that does not match is deleted and the server reports it as a fai
 | `rust-analyzer` | the `.gz` binary for the platform from its GitHub release | the binary |
 | `tsgo` | the platform's `@typescript/typescript-<platform>` npm tarball | `lib/tsc --lsp --stdio` |
 | `ty` | the platform's tarball from its GitHub release | `ty server` |
-| `gopls` | `go install` with `GOBIN` in lathe's folder | the binary; needs Go, which a Go project has |
+| `gopls` | `go install` with `GOBIN` in atelier's folder | the binary; needs Go, which a Go project has |
 | `jdtls` | not downloaded yet: it needs a Java runtime too | the install hint |
 
-- A user's `tsc` on the PATH is most often TypeScript 5, which has no `--lsp`, so lathe looks for
+- A user's `tsc` on the PATH is most often TypeScript 5, which has no `--lsp`, so atelier looks for
   `tsgo`, the name the native preview installed it under, and otherwise downloads TypeScript 7.
 - No server needs Node.js now. The Node.js pin and the npm install path stay for a future npm server.
 - Downloads use the system's `curl`, `tar` and `gzip`, which macOS and Linux both ship. The checksum is
@@ -199,7 +199,7 @@ pinned; a file that does not match is deleted and the server reports it as a fai
 **Proof.** Unit tests serve fixtures from `file://` URLs: a binary and a Node server install and run,
 a wrong checksum leaves nothing behind, a finished copy is used without any download, offline stops
 before the network, and a server on the search path wins. A live test, run when
-`LATHE_TEST_DOWNLOADS=1`, downloads the real rust-analyzer, tsgo, ty and gopls into an empty folder
+`ATELIER_TEST_DOWNLOADS=1`, downloads the real rust-analyzer, tsgo, ty and gopls into an empty folder
 and runs every live check on each. It searches only Go's own folder for `go`, never a shared one such
 as `~/.local/bin`, which would hold installed servers.
 
@@ -213,7 +213,7 @@ The numbers and targets are in [performance.md](performance.md).
   clippy, the gallery
   build, and the tests of the patched `vendor/gpui-base`, which the workspace excludes.
 - Gallery stories "Hunks" and "Editor", captured on `hp-agent` in both themes.
-- Stage C: `LATHE_REQUIRE_LSP=1 cargo test -p lathe-lsp --test rust_analyzer` on a box with the server,
+- Stage C: `ATELIER_REQUIRE_LSP=1 cargo test -p atelier-lsp --test rust_analyzer` on a box with the server,
   so a missing server fails rather than skipping. Passed on `hp-agent` against rust-analyzer 1.98.1.
 - The Editor story, driven on `hp-agent`: Check reported "2 problems, first: mismatched types, expected
   `u32`, found `&str`" and the editor underlined the range; Go to definition on `width()` answered

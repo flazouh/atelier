@@ -3,19 +3,19 @@ use gpui_kit::{TestAppContext, px, size};
 use super::*;
 
 #[gpui_kit::test]
-fn the_first_launch_shows_the_mark_and_one_line_about_what_lathe_is_above_the_buttons(cx: &mut TestAppContext) {
+fn the_first_launch_shows_the_mark_and_one_line_about_what_atelier_is_above_the_buttons(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
-    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&lathe_settings::Settings::default(), cx));
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&atelier_settings::Settings::default(), cx));
     cx.simulate_resize(size(px(1200.), px(800.)));
     for _ in 0..3 {
         cx.run_until_parked();
         shell.update(cx, |_, cx| cx.notify());
     }
-    let mark = cx.debug_bounds("lathe-mark").expect("the mark is drawn");
+    let mark = cx.debug_bounds("atelier-mark").expect("the mark is drawn");
     let line = cx.debug_bounds("first-launch-line").expect("the line is drawn");
     let button = cx.debug_bounds("open-folder").or_else(|| cx.debug_bounds("open-folder-button"));
     assert_eq!((f32::from(mark.size.width), f32::from(mark.size.height)), (40., 40.));
@@ -23,7 +23,7 @@ fn the_first_launch_shows_the_mark_and_one_line_about_what_lathe_is_above_the_bu
     if let Some(button) = button {
         assert!(line.bottom() <= button.top(), "the line is above the buttons");
     }
-    assert!(WHAT_LATHE_IS.split_whitespace().count() <= 20, "one short line");
+    assert!(WHAT_ATELIER_IS.split_whitespace().count() <= 20, "one short line");
 }
 /// Quit has a key, Command-Q on the Mac and Control-Q elsewhere.
 #[gpui_kit::test]
@@ -44,7 +44,7 @@ fn open_shell(cx: &mut TestAppContext) -> (Entity<Shell>, &mut gpui_kit::VisualT
         beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
-    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&lathe_settings::Settings::default(), cx));
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&atelier_settings::Settings::default(), cx));
     cx.simulate_resize(size(px(1200.), px(800.)));
     (shell, cx)
 }
@@ -148,7 +148,7 @@ fn the_tasks_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
     assert!(lost.is_empty(), "{chord} did not reach Tasks {lost:?}");
 }
 
-/// K1, for the whole table: every lathe chord bound with no context is on the dispatch path from each place
+/// K1, for the whole table: every atelier chord bound with no context is on the dispatch path from each place
 /// the focus can be, so no pane and no lost focus eats it.
 #[gpui_kit::test]
 fn every_global_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
@@ -162,7 +162,7 @@ fn every_global_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext)
         let map = cx.key_bindings();
         let map = map.borrow();
         map.bindings()
-            .filter(|b| b.predicate().is_none() && b.action().name().starts_with("lathe::"))
+            .filter(|b| b.predicate().is_none() && b.action().name().starts_with("atelier::"))
             .map(|b| (b.keystrokes().iter().map(|k| k.inner().unparse()).collect::<Vec<_>>().join(" "), b.action().boxed_clone()))
             .collect()
     });
@@ -383,7 +383,7 @@ fn a_window_opens_on_the_view_it_closed_on(cx: &mut TestAppContext) {
         gpui_kit::init(cx);
         beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
     });
-    let saved = lathe_settings::Settings { view: Some("files".into()), ..Default::default() };
+    let saved = atelier_settings::Settings { view: Some("files".into()), ..Default::default() };
     let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&saved, cx));
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Files);
     assert_eq!(ShellView::from_words(Some("sessions")), ShellView::Sessions);
@@ -425,7 +425,7 @@ fn going_back_to_sessions_puts_the_caret_in_the_composer(cx: &mut TestAppContext
 /// ends the run folds to one line of words, and a press on it opens the calls.
 #[gpui_kit::test]
 fn a_long_run_of_tool_calls_is_capped_while_live_and_folds_after(cx: &mut TestAppContext) {
-    use lathe_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolOutput, ToolStatus, TurnEnd, TurnOutcome};
+    use atelier_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolOutput, ToolStatus, TurnEnd, TurnOutcome};
     let (shell, cx, _dir) = with_a_session(cx, 1600.);
     let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
     let tool = |n: usize| {
@@ -525,7 +525,7 @@ fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) 
 fn an_archived_session_leaves_the_list_until_the_filter_asks(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
-    project.update(cx, |p, _| p.past = vec![lathe_agents::session::SessionSummary { id: lathe_agents::session::SessionId::new("old-1"), title: "an old idea".into(), updated: Some(5) }]);
+    project.update(cx, |p, _| p.past = vec![atelier_agents::session::SessionSummary { id: atelier_agents::session::SessionId::new("old-1"), title: "an old idea".into(), updated: Some(5) }]);
     shell.update(cx, |s, cx| s.sync(cx));
     let titles = |cx: &mut gpui_kit::VisualTestContext| {
         shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).projects().iter().flat_map(|p| p.sessions.iter().map(|x| x.title.to_string())).collect::<Vec<_>>())
@@ -636,7 +636,7 @@ fn the_zoom_keys_scale_every_size_together(cx: &mut TestAppContext) {
 /// that message and lets go of the end (so "Latest" shows), and "Latest" takes hold of the end again.
 #[gpui_kit::test]
 fn a_long_conversation_has_a_rail_and_a_latest_button(cx: &mut TestAppContext) {
-    use lathe_agents::session::{BlockId, Event};
+    use atelier_agents::session::{BlockId, Event};
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
     assert!(cx.debug_bounds("message-rail").is_none(), "no rail before there is something to scroll");

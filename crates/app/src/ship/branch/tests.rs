@@ -22,7 +22,7 @@ fn clone() -> (tempfile::TempDir, std::path::PathBuf, Arc<dyn Project>) {
     git(&work, &["commit", "-qm", "start"]);
     git(&work, &["push", "-q", "origin", "main"]);
     git(&work, &["remote", "set-head", "origin", "main"]);
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&work).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&work).unwrap());
     (top, work, project)
 }
 

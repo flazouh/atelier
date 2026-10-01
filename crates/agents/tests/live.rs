@@ -1,20 +1,20 @@
 //! Runs the real `claude` (2.1.284 or later, logged in) through the backend, end to end: a turn, a
 //! permission question answered, an interrupt, a resume, the session list and the history. It costs a
 //! few cents and needs a network, so it is ignored unless asked for:
-//! `cargo test -p lathe-agents --test live -- --ignored --nocapture`
+//! `cargo test -p atelier-agents --test live -- --ignored --nocapture`
 use std::{
     sync::{Arc, Mutex, mpsc},
     time::{Duration, Instant},
 };
 
-use lathe_agents::{
+use atelier_agents::{
     claude_code::ClaudeCode,
     session::{
         Backend, ChoiceKind, Command, EndReason, Event, EventSink, OpenRequest, PermissionMode, Session, SessionId,
         TurnOutcome,
     },
 };
-use lathe_project::{LocalProject, Project};
+use atelier_project::{LocalProject, Project};
 
 const WAIT: Duration = Duration::from_secs(120);
 

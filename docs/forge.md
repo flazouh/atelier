@@ -1,6 +1,6 @@
 # The forge
 
-lathe reads and changes pull requests through one interface of its own, `Forge` (`crates/forge`). It
+atelier reads and changes pull requests through one interface of its own, `Forge` (`crates/forge`). It
 speaks GitQuiet's words (`docs/glossary.md`): a Court, a Remark, a Thread, an Unsent Comment, a Last
 Review Point. Nothing above the trait names GitHub. `github` is the first implementation.
 
@@ -30,11 +30,11 @@ reader opens it.
 Types are plain data: `Pull`, `PullSummary`, `Thread`, `Comment`, `Check`, `Job`, `MergeSettings` and
 the rest in `model/`. `Involved.shelf` is `None` for a pull request the reader is only assigned to or
 mentioned in. A comment held in the reader's review has `unsent: true`; the word "pending" is GitHub's and
-lathe does not use it.
+atelier does not use it.
 
 Errors are `ForgeError`, worded for a person: `ToolMissing`, `NotSignedIn`, `Offline`, `RateLimited`,
 `NotFound`, `Denied`, `Rejected` (the forge's own reason, such as a merge with conflicts), `UnknownRemote`
-and `Unexpected` (an answer lathe could not read, with what was wrong).
+and `Unexpected` (an answer atelier could not read, with what was wrong).
 
 ### What the UI gets without new types
 
@@ -86,19 +86,19 @@ never leads the app to open a second pull request. GitHub asks `pullRequests(hea
 Requests run `gh api --include --method M path [--input -]` through `Project::spawn`. A remote project
 uses its host's `gh` and its sign-in, like every other process.
 
-`gh` adds the token itself. It never passes through lathe, so lathe has no token to store, log or print.
-This differs from reading `gh auth token`, on purpose: the best place for a secret is a place lathe never
+`gh` adds the token itself. It never passes through atelier, so atelier has no token to store, log or print.
+This differs from reading `gh auth token`, on purpose: the best place for a secret is a place atelier never
 sees it. `--include` puts the status line and headers before the body, so a failure keeps its body and a
 rate limit shows its reset.
 
-| What `gh` does | lathe says |
+| What `gh` does | atelier says |
 | --- | --- |
 | Not installed on the host | `ToolMissing { tool: "gh" }` |
 | A 401 (the token no longer works), or exit 4, or stderr with `gh auth login` or `Bad credentials` | `NotSignedIn` |
 | No reply and stderr with `connection refused`, `no such host`, `check your internet connection`, `i/o timeout`, `network is unreachable` or `tls handshake` | `Offline` |
 | No reply and any other stderr | `Unexpected`, with the last line `gh` wrote |
 
-`Project::spawn` keeps the last 64 KB of the process's stderr (`Control::stderr()`), and lathe reads `gh`'s
+`Project::spawn` keeps the last 64 KB of the process's stderr (`Control::stderr()`), and atelier reads `gh`'s
 own words from it. The cases are tests on stderr captured from `gh` 2.101 (`tests/fixtures/gh_stderr/`).
 `Control::wait` returns with the stderr complete.
 
@@ -171,7 +171,7 @@ list on a busy account.
 - Unit tests hold the retry, rate limit, pagination, `gh` output parsing, time and URL rules.
 - `tests/replay.rs` replays answers recorded from GitHub for `oven-sh/bun#44169` (a public merged pull
   request with five threads, five remarks, thirteen checks). Recorded with `tests/live.rs`:
-  `LATHE_FORGE_RECORD=crates/forge/tests/fixtures/github cargo test -p lathe-forge --test live -- --ignored`.
+  `ATELIER_FORGE_RECORD=crates/forge/tests/fixtures/github cargo test -p atelier-forge --test live -- --ignored`.
   Recording refuses any request that is not a query or a GET. The recorded answers are bent to reach the
   cases the one pull request lacks: a draft, a conflict, a queue, several pages.
 - The working set is tested on hand-made answers, since a recording would hold the private pull requests of
@@ -197,10 +197,10 @@ list on a busy account.
   an unlanded one.
 
 ## Live write QA
-`crates/forge/tests/live_writes.rs` runs the write calls once on one scratch repository, `flazouh/lathe-qa-scratch`
-(private), through the real `gh`, and only when `LATHE_REQUIRE_FORGE=1`:
+`crates/forge/tests/live_writes.rs` runs the write calls once on one scratch repository, `flazouh/atelier-qa-scratch`
+(private), through the real `gh`, and only when `ATELIER_REQUIRE_FORGE=1`:
 
-    LATHE_REQUIRE_FORGE=1 cargo test -p lathe-forge --test live_writes -- --ignored --nocapture
+    ATELIER_REQUIRE_FORGE=1 cargo test -p atelier-forge --test live_writes -- --ignored --nocapture
 
 It writes to no other repository. It merges one pull request there, with Alex's leave for that repository only.
 A drop guard closes its pull requests, deletes its branches and removes its files from `main`, even when a step
@@ -209,7 +209,7 @@ fails. Run on 2026-09-30 on the HP (the repository is on the free plan: no merge
 | Call | Result |
 | --- | --- |
 | `create_pull` (draft), `update_pull` ready | ok; the draft became open |
-| `delete_branch` on an open pull request | refused by lathe before any write, as designed |
+| `delete_branch` on an open pull request | refused by atelier before any write, as designed |
 | `update_branch` with a head that had moved | refused by GitHub: "head sha didn't match the current head ref." |
 | `update_branch` (merge) after `main` moved | ok; the head moved (f768158 to 5bd46a4) |
 | `cancel_auto_merge` with no merge when ready on | GitHub answered ok |

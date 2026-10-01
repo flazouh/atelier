@@ -12,7 +12,7 @@ use std::{
     time::Duration,
 };
 
-use lathe_tracker::{
+use atelier_tracker::{
     Activity, Entry, Event, NewTask, Patch, Query, StopFlag, Subscription, Task, TaskId, Tracker, TrackerError, TrackerResult,
 };
 

@@ -14,8 +14,8 @@ use gpui_kit::{
     Window, div, 
 };
 use beui::scale::px;
-use lathe_forge::{Check, Forge, Pull, PullRef, PullUpdate, present};
-use lathe_pr_view::actions::{Ask, ask};
+use atelier_forge::{Check, Forge, Pull, PullRef, PullUpdate, present};
+use atelier_pr_view::actions::{Ask, ask};
 mod poll;
 mod watch;
 use watch::PullWatch;

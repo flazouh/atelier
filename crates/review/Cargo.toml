@@ -1,5 +1,5 @@
 [package]
-name = "lathe-review"
+name = "atelier-review"
 description = "Reviewing what an agent did: the text of each file before its turn, the hunks after, and the comments to send back."
 version.workspace = true
 edition.workspace = true
@@ -9,8 +9,8 @@ license.workspace = true
 [dependencies]
 beui.workspace = true
 imara-diff = "0.2"
-lathe-agents.workspace = true
-lathe-project.workspace = true
+atelier-agents.workspace = true
+atelier-project.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

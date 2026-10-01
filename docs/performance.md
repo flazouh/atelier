@@ -1,6 +1,6 @@
 # Performance
 
-Every path lathe adds gets a number here: the median and p95 of 20 runs, release, on the HP, against a
+Every path atelier adds gets a number here: the median and p95 of 20 runs, release, on the HP, against a
 target. Nothing runs disk, network, process or parse work on the UI thread.
 
 ## Syntax colours and the editor
@@ -120,7 +120,7 @@ frames then take 33 ms whatever the code does. The story counts a frame "over" w
 
 ## Themes
 
-Loading every theme at start (`themes::all()`: lathe's two files parsed, eight VS Code files
+Loading every theme at start (`themes::all()`: atelier's two files parsed, eight VS Code files
 imported), once, before the first window opens. Load average 0.16:
 
     cargo test --release -p beui --test theme_bench -- --ignored --nocapture
@@ -147,7 +147,7 @@ What runs when an agent streams. Parsing and mapping run on the session's reader
 thread. The UI thread only drains a queue once a frame. Machine and method as above; the load average
 was 5.7 (the HP is shared). Each number is the median and p95 of 15 runs.
 
-    cargo test --release -p lathe-agents --test perf -- --ignored --nocapture --test-threads=1
+    cargo test --release -p atelier-agents --test perf -- --ignored --nocapture --test-threads=1
 
 The input is the captured runs in `crates/agents/tests/fixtures/claude_code`, repeated to fill 10 MB.
 
@@ -165,11 +165,11 @@ The input is the captured runs in `crates/agents/tests/fixtures/claude_code`, re
 - A live session, on the HP: the reader and writer threads sleep on the pipes. A `send` only queues a
   line. It never waits for the agent.
 ## The forge
-What runs when lathe reads GitHub. Every call runs off the UI thread. The cases below run on answers held
-in memory, so they measure lathe's own work (the request, the JSON, the mapping) and not the network.
+What runs when atelier reads GitHub. Every call runs off the UI thread. The cases below run on answers held
+in memory, so they measure atelier's own work (the request, the JSON, the mapping) and not the network.
 Machine and method as above; load average 1.8, 20 runs.
 
-    cargo test -p lathe-forge --release --test perf -- --ignored --nocapture --test-threads=1
+    cargo test -p atelier-forge --release --test perf -- --ignored --nocapture --test-threads=1
 
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
@@ -180,7 +180,7 @@ Machine and method as above; load average 1.8, 20 runs.
 The 5,000 comments are the recorded 1.2 KB comment, so the payload is larger than most real ones. Before
 the parser stopped copying each page's subtree, the same case took 84 ms at a load average of 16.
 
-Live, against GitHub through `gh` on the HP (`cargo test -p lathe-forge --test live -- --ignored
+Live, against GitHub through `gh` on the HP (`cargo test -p atelier-forge --test live -- --ignored
 --nocapture`, one run each, so not medians):
 
 | Case | Time |
@@ -195,7 +195,7 @@ row would cut it; that is open.
 
 ## The app
 
-The `lathe` binary on the HP under Xvfb (Mesa's software Vulkan), release. The load average came
+The `atelier` binary on the HP under Xvfb (Mesa's software Vulkan), release. The load average came
 from alex-31's builds running at the same time.
 
 | Case | Target | Median | Worst | Runs | Load | Result |
@@ -204,9 +204,9 @@ from alex-31's builds running at the same time.
 | Listing 10,000 files (`Project::list`, a .gitignore, 2,000 ignored) | < 200 ms | 9.79 ms | 10.43 ms (p95) | 20 | 3.7 | Passes |
 | The app's tree of 10,000 files: listing and building the rows model | < 200 ms | 11 ms | 13 ms | 7 | 14 | Passes |
 
-    cargo test --release -p lathe-project --test list_bench -- --ignored --nocapture
-    LATHE_TIMINGS=1 target/release/lathe <folder>     # prints the first frame's time
-    target/release/lathe /tmp/qa-10k                    # the status line says "listed in N ms"
+    cargo test --release -p atelier-project --test list_bench -- --ignored --nocapture
+    ATELIER_TIMINGS=1 target/release/atelier <folder>     # prints the first frame's time
+    target/release/atelier /tmp/qa-10k                    # the status line says "listed in N ms"
 
 - The listing and the tree build run on a background thread. The tree draws as a virtual list, so
   only the rows on screen lay out.
@@ -217,7 +217,7 @@ from alex-31's builds running at the same time.
 What runs when a turn ends and when the reader works on it. All of it runs off the UI thread. Machine and
 method as above; load average 4.4, 15 runs (7 for the disk case).
 
-    cargo test -p lathe-review --release --test perf -- --ignored --nocapture --test-threads=1
+    cargo test -p atelier-review --release --test perf -- --ignored --nocapture --test-threads=1
 
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
@@ -291,9 +291,9 @@ So the HP's spikes were load.
 
 ## Our own agent
 `crates/agents/tests/own_perf.rs`, release, on the HP (shared; the load average was 24). Each number is the
-median and p95 of 15 runs. No network: the model is a scripted stand-in, so the numbers are lathe's own work.
+median and p95 of 15 runs. No network: the model is a scripted stand-in, so the numbers are atelier's own work.
 
-    cargo test -p lathe-agents --release --test own_perf -- --ignored --nocapture --test-threads=1
+    cargo test -p atelier-agents --release --test own_perf -- --ignored --nocapture --test-threads=1
 
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
@@ -312,12 +312,12 @@ median and p95 of 15 runs. No network: the model is a scripted stand-in, so the 
 ## Remote projects
 
 `RemoteProject` over a real `ssh` from the HP to itself (`hp-agent`, loopback through sshd), the
-release lathe-remote, `/tmp/qa-lathe` (1,009 files). Load average 9 to 11. Three runs of 20
+release atelier-remote, `/tmp/qa-atelier` (1,009 files). Load average 9 to 11. Three runs of 20
 samples each. The LAN row is alex-9c's run from Alex's Mac to the HP over Wi-Fi, a clone of
 1,150 files, the same bench.
 
-    LATHE_REMOTE_DIR=… LATHE_TEST_SSH_HOST=hp-agent LATHE_TEST_SSH_ROOT=/tmp/qa-lathe \
-        cargo test --release -p lathe-remote --test over_ssh -- --ignored --nocapture remote_costs
+    ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=hp-agent ATELIER_TEST_SSH_ROOT=/tmp/qa-atelier \
+        cargo test --release -p atelier-remote --test over_ssh -- --ignored --nocapture remote_costs
 
 | Case | Target | Result | Passes |
 | --- | --- | --- | --- |
@@ -334,11 +334,11 @@ samples each. The LAN row is alex-9c's run from Alex's Mac to the HP over Wi-Fi,
 
 A 2,000-message session (a synthetic transcript in claude's own format, 1,000 questions and 1,000
 answers of about 380 characters) opened from the sidebar, then scrolled with the wheel for 700 frames,
-in the release app under Xvfb at 1400×860, the panel 480 px wide. `LATHE_FRAMES=1` times each frame's
+in the release app under Xvfb at 1400×860, the panel 480 px wide. `ATELIER_FRAMES=1` times each frame's
 layout and paint of the whole window on the CPU; the GPU work is not counted. Load average 4.8 to 6.5
 from alex-31's builds.
 
-    LATHE_FRAMES=1 target/release/lathe /tmp/qa-long     # then open the session and scroll
+    ATELIER_FRAMES=1 target/release/atelier /tmp/qa-long     # then open the session and scroll
 
 | Overdraw | Frame median | p95 | Worst | Over 8.3 ms | Layout median |
 | --- | --- | --- | --- | --- | --- |
@@ -350,7 +350,7 @@ from alex-31's builds.
   session's rows. The HP renders in software, so a Mac should be faster; alex-9c can run the same line
   there.
 - Folding the 2,000 events and the first draw: 0.9 ms and 0.8 ms in the unit bench
-  (`cargo test --release -p lathe-app -- --ignored --nocapture a_long_session`), which shapes no text.
+  (`cargo test --release -p atelier-app -- --ignored --nocapture a_long_session`), which shapes no text.
 - A stream costs one repaint a frame: the queue wakes the session once per batch.
 ## The pull request view
 The gallery's "Pull request view" story on a large pull request: 300 changed files, 5,000 comments (1,000
@@ -374,7 +374,7 @@ more than three comments shows its first and its last in the diff, and the model
 the diff: with the threads and the rail both off, layout is 0.9 ms; the rail costs about 2 ms and the
 threads under the rows about 2 ms when every file has three.
 Open to first paint from the local cache, in the view's own timeline (`PullView::timeline`, printed at
-the end of the run) and in the ignored test `cargo test --release -p lathe-pr-view perf -- --ignored
+the end of the run) and in the ignored test `cargo test --release -p atelier-pr-view perf -- --ignored
 --nocapture`, which makes the same pull request on disk:
 | Step, from the view being made | Test (release, HP) | Story run |
 | --- | --- | --- |
@@ -399,12 +399,12 @@ the cold open costs about the cache, and 419 ms on the Mac is that, not a slow w
 ## Review in the app
 
 A real turn of 200 files (claude ran `sed -i 1s/value/amount/ src/*.rs` over 199 small Rust files and
-one of 20,000 lines), then the review, in the release app under Xvfb at 1440×900. `LATHE_TIMINGS=1`
+one of 20,000 lines), then the review, in the release app under Xvfb at 1440×900. `ATELIER_TIMINGS=1`
 prints each open and each whole-file decision: the pane's own work, how long after the press the frame
-that shows it began, and that frame's layout and paint (`LATHE_FRAMES=1`). The load average was 23 to 27
+that shows it began, and that frame's layout and paint (`ATELIER_FRAMES=1`). The load average was 23 to 27
 from other builds on the HP.
 
-    LATHE_TIMINGS=1 LATHE_FRAMES=1 target/release/lathe ~/qa/big    # then Review, Escape, and ⌃⇧↵
+    ATELIER_TIMINGS=1 ATELIER_FRAMES=1 target/release/atelier ~/qa/big    # then Review, Escape, and ⌃⇧↵
 
 | Case | Target | Median | p95 or worst | Runs | Result |
 | --- | --- | --- | --- | --- | --- |
@@ -443,9 +443,9 @@ number says nothing about the component; the Mac number is the one to read.
 ## Commit
 
 A commit of 200 changed files from a review (`crates/app/src/ship/commit.rs`), release, on the HP at a load
-average of 39 to 48 from other builds; over ssh to the HP itself through lathe-remote.
+average of 39 to 48 from other builds; over ssh to the HP itself through atelier-remote.
 
-    LATHE_REMOTE_DIR=… LATHE_TEST_SSH_HOST=hp-agent cargo test --release -p lathe-app -- --ignored --nocapture commit_of_200_files
+    ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=hp-agent cargo test --release -p atelier-app -- --ignored --nocapture commit_of_200_files
 
 | Case | Median | Worst | Runs |
 | --- | --- | --- | --- |
@@ -456,15 +456,15 @@ average of 39 to 48 from other builds; over ssh to the HP itself through lathe-r
 
 - Over ssh each git call is a round trip, so the count of calls is what costs.
 - The first version over ssh also ran the host out of open files: each ended process kept its pipes
-  for 30 s. lathe-remote now closes them at once (cebc3d8).
+  for 30 s. atelier-remote now closes them at once (cebc3d8).
 
 ## Pass after the UX work (2026-09-30)
 
 Release build at 0234352, under Xvfb at 1440×900 on the HP, drawn by Mesa's llvmpipe (software). Other
 builds ran at the same time: the load average was 45 to 80 on 12 cores. CPU is read from `/proc/<pid>/stat`
-over the stated span; frames from `LATHE_FRAMES=each`, one line per frame with its layout and paint.
+over the stated span; frames from `ATELIER_FRAMES=each`, one line per frame with its layout and paint.
 
-    LATHE_TIMINGS=1 LATHE_FRAMES=each target/release/lathe ~/qa/d1
+    ATELIER_TIMINGS=1 ATELIER_FRAMES=each target/release/atelier ~/qa/d1
 
 ### Idle: nothing changes, the pointer is still
 
@@ -537,7 +537,7 @@ over the stated span; frames from `LATHE_FRAMES=each`, one line per frame with i
 ## View cache (2026-09-30)
 
 `plans/view-cache.md`, on the HP (release, llvmpipe, load 36 to 104 from other builds), d1 with 3 sessions
-restored, `LATHE_FRAMES=each`, which now names each part of a frame. Median/p95 ms of layout and paint.
+restored, `ATELIER_FRAMES=each`, which now names each part of a frame. Median/p95 ms of layout and paint.
 
 | Case, part | Before | After |
 | --- | --- | --- |

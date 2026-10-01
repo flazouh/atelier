@@ -5,9 +5,9 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use lathe_forge::Forge;
-use lathe_lsp::Workers;
-use lathe_project::Project;
+use atelier_forge::Forge;
+use atelier_lsp::Workers;
+use atelier_project::Project;
 
 use crate::{
     git::PrGit,
@@ -24,7 +24,7 @@ pub struct PrConfig {
     pub read_only: bool,
     /// The folder on the project's host for the cache repositories and the head checkouts. Absolute, or
     /// starting with `~/`. Empty (the default): the `pr-view` folder of the project's data folder, where the
-    /// project has one, and `~/.local/share/lathe/pr` where it has not (an older lathe kept it there, and what
+    /// project has one, and `~/.local/share/atelier/pr` where it has not (an older atelier kept it there, and what
     /// is there is moved on first use).
     pub remote_data: String,
     /// The folder on this machine for the reviewed-state database and the snapshots.
@@ -37,7 +37,7 @@ pub struct PrConfig {
     pub list_refresh: Duration,
     /// The one repository the list holds, for a project's own pane; `None` for the reader's whole
     /// working set, on its Courts.
-    pub repo: Option<lathe_forge::RepoRef>,
+    pub repo: Option<atelier_forge::RepoRef>,
     /// Where to fetch pull requests from, when it is not the project's own remote for the repository.
     /// For a mirror, or a test.
     pub fetch_url: Option<String>,
@@ -59,7 +59,7 @@ impl PrConfig {
     }
 
     /// Only `repo`'s pull requests in the list.
-    pub fn repo(mut self, repo: lathe_forge::RepoRef) -> Self {
+    pub fn repo(mut self, repo: atelier_forge::RepoRef) -> Self {
         self.repo = Some(repo);
         self
     }

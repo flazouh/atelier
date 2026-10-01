@@ -1,4 +1,4 @@
-use lathe_agents::session::{BlockId, Item};
+use atelier_agents::session::{BlockId, Item};
 
 use super::*;
 

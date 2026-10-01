@@ -10,7 +10,7 @@ use gpui_kit::{
     AppContext, Context, EventEmitter, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, StatefulInteractiveElement, Styled, Task, Window, div,
     prelude::FluentBuilder, px,
 };
-use lathe_forge::{Forge, ForgeError, Involved, PullRef};
+use atelier_forge::{Forge, ForgeError, Involved, PullRef};
 
 use crate::{
     list::ListModel,
@@ -163,7 +163,7 @@ impl PullList {
     }
 }
 
-fn read_involved(forge: &dyn Forge, scope: Option<&lathe_forge::RepoRef>) -> Result<Vec<Involved>, ForgeError> {
+fn read_involved(forge: &dyn Forge, scope: Option<&atelier_forge::RepoRef>) -> Result<Vec<Involved>, ForgeError> {
     match scope {
         Some(repo) => forge.involved_in(repo),
         None => forge.involved(),

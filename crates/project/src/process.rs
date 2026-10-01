@@ -74,7 +74,7 @@ impl Tail {
     pub fn follow(stream: impl Read + Send + 'static) -> Self {
         let tail = Self::default();
         let keep = tail.clone();
-        let reader = thread::Builder::new().name("lathe-stderr".into()).spawn(move || {
+        let reader = thread::Builder::new().name("atelier-stderr".into()).spawn(move || {
             let mut stream = stream;
             let mut chunk = [0u8; 4096];
             while let Ok(n) = stream.read(&mut chunk) {

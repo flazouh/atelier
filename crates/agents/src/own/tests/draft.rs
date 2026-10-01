@@ -31,7 +31,7 @@ impl Model for Canned {
 fn a_draft_is_one_request_with_no_tools() {
     let model = Arc::new(Canned { asked: Mutex::default() });
     let agent = OwnAgent::new(model.clone(), OwnOptions::default());
-    let project = lathe_project::LocalProject::open(tempfile::tempdir().unwrap().path()).unwrap();
+    let project = atelier_project::LocalProject::open(tempfile::tempdir().unwrap().path()).unwrap();
     assert_eq!(agent.draft(&project, "Name this branch.", Some("m")).unwrap(), "Release the lease on exit");
     assert_eq!(*model.asked.lock().unwrap(), [("m".to_string(), 0, "Name this branch.".to_string())]);
 }

@@ -502,7 +502,7 @@ fn an_agent_with_no_key_says_what_to_set_when_a_session_opens() {
         }
     }
     let dir = tempfile::tempdir().unwrap();
-    let project: std::sync::Arc<dyn lathe_project::Project> = std::sync::Arc::new(lathe_project::LocalProject::open(dir.path()).unwrap());
+    let project: std::sync::Arc<dyn atelier_project::Project> = std::sync::Arc::new(atelier_project::LocalProject::open(dir.path()).unwrap());
     let error = agent.open(project, OpenRequest::default(), std::sync::Arc::new(|_| {})).err().expect("no key");
     assert!(error.to_string().contains("ANTHROPIC_API_KEY"), "{error}");
 }
@@ -515,6 +515,6 @@ fn the_backend_says_what_it_can_do() {
     assert!(!caps.subagents && !caps.todos, "no subagents yet");
     assert_eq!(caps.models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-4-5"]);
     assert!(caps.permission_modes.contains(&PermissionMode::Plan) && caps.permission_modes.contains(&PermissionMode::Bypass));
-    assert_eq!(rig.agent.name(), "lathe");
+    assert_eq!(rig.agent.name(), "atelier");
     let _ = (&rig as &Rig, RequestId::new("x"), FakeServer::start(vec![]));
 }

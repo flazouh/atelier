@@ -5,8 +5,8 @@ fn a_host_is_named_as_builds_are() {
     assert_eq!(Platform::from_uname("Linux x86_64").unwrap().name(), "linux-x86_64");
     assert_eq!(Platform::from_uname("Darwin arm64\n").unwrap().name(), "darwin-aarch64");
     assert_eq!(Platform::from_uname(""), None);
-    assert_eq!(remote_binary("0.1.0", "abc123"), ".cache/lathe/remote/0.1.0-abc123/lathe-remote");
-    assert_eq!(short_hash(b"lathe").len(), 12);
+    assert_eq!(remote_binary("0.1.0", "abc123"), ".cache/atelier/remote/0.1.0-abc123/atelier-remote");
+    assert_eq!(short_hash(b"atelier").len(), 12);
     assert_ne!(short_hash(b"one build"), short_hash(b"another"), "a new build gets its own folder");
 }
 
@@ -21,7 +21,7 @@ fn the_config_offers_named_hosts_not_patterns() {
 #[test]
 fn the_helper_is_looked_for_without_setup() {
     let linux = Platform { system: "linux".into(), arch: "x86_64".into() };
-    let exe = std::path::Path::new("/Applications/lathe.app/Contents/MacOS/lathe");
+    let exe = std::path::Path::new("/Applications/atelier.app/Contents/MacOS/atelier");
     let home = std::path::Path::new("/Users/a");
     let found: Vec<String> = candidates(exe, &linux, Some(std::path::Path::new("/dev/remote")), Some(home), false)
         .into_iter()
@@ -30,14 +30,14 @@ fn the_helper_is_looked_for_without_setup() {
     assert_eq!(
         found,
         [
-            "/dev/remote/linux-x86_64/lathe-remote",
-            "/Applications/lathe.app/Contents/MacOS/remote/linux-x86_64/lathe-remote",
-            "/Applications/lathe.app/Contents/Resources/remote/linux-x86_64/lathe-remote",
-            "/Users/a/.cache/lathe/remote-builds/linux-x86_64/lathe-remote",
+            "/dev/remote/linux-x86_64/atelier-remote",
+            "/Applications/atelier.app/Contents/MacOS/remote/linux-x86_64/atelier-remote",
+            "/Applications/atelier.app/Contents/Resources/remote/linux-x86_64/atelier-remote",
+            "/Users/a/.cache/atelier/remote-builds/linux-x86_64/atelier-remote",
         ]
     );
-    let here = candidates(std::path::Path::new("/opt/lathe/lathe"), &linux, None, None, true);
-    assert!(here.contains(&std::path::PathBuf::from("/opt/lathe/lathe-remote")), "a host of the app's own kind takes the copy beside it: {here:?}");
+    let here = candidates(std::path::Path::new("/opt/atelier/atelier"), &linux, None, None, true);
+    assert!(here.contains(&std::path::PathBuf::from("/opt/atelier/atelier-remote")), "a host of the app's own kind takes the copy beside it: {here:?}");
 }
 /// With none found, the words say what is missing and what to do, with no setting to know about.
 #[test]
@@ -45,24 +45,24 @@ fn no_helper_says_what_to_do() {
     let linux = Platform { system: "linux".into(), arch: "x86_64".into() };
     let words = missing_words("hp-agent", &linux);
     assert!(words.contains("hp-agent") && words.contains("Linux x86_64"), "{words}");
-    assert!(!words.contains("LATHE_REMOTE_DIR"), "{words}");
+    assert!(!words.contains("ATELIER_REMOTE_DIR"), "{words}");
     assert!(words.contains("tools/build-remote.sh"), "{words}");
 }
 /// A helper's protocol reads from the stamp in its bytes, with no need to run it, since it may be built
 /// for another machine.
 #[test]
 fn a_helper_says_its_protocol_in_its_bytes() {
-    assert_eq!(speaks(b"\x7fELF..lathe-remote-protocol:4;..."), Some(4));
-    assert_eq!(speaks(b"lathe-remote-protocol:12;"), Some(12));
+    assert_eq!(speaks(b"\x7fELF..atelier-remote-protocol:4;..."), Some(4));
+    assert_eq!(speaks(b"atelier-remote-protocol:12;"), Some(12));
     assert_eq!(speaks(b"an old helper with no stamp"), None);
-    assert_eq!(crate::protocol::STAMP, format!("lathe-remote-protocol:{};", crate::protocol::VERSION).as_bytes(), "the stamp names this protocol");
+    assert_eq!(crate::protocol::STAMP, format!("atelier-remote-protocol:{};", crate::protocol::VERSION).as_bytes(), "the stamp names this protocol");
 }
 /// The search skips a helper of another protocol and takes the next one that matches.
 #[test]
 fn the_search_skips_a_helper_of_another_protocol() {
     let dir = tempfile::tempdir().unwrap();
     let (old, new) = (dir.path().join("old"), dir.path().join("new"));
-    std::fs::write(&old, b"lathe-remote-protocol:1;").unwrap();
+    std::fs::write(&old, b"atelier-remote-protocol:1;").unwrap();
     std::fs::write(&new, crate::protocol::STAMP).unwrap();
     let missing = dir.path().join("missing");
     assert_eq!(first_matching(&[missing, old.clone(), new.clone()]), Some(new));
@@ -74,22 +74,22 @@ fn the_version_names_the_protocol() {
     assert_eq!(version_line(), format!("{VERSION} protocol {}", crate::protocol::VERSION));
 }
 
-/// A20: a helper in a real Mac bundle, at Contents/Resources/remote/<platform>/lathe-remote, is found from the
-/// app at Contents/MacOS/lathe, and a stale copy earlier in the order is passed over.
+/// A20: a helper in a real Mac bundle, at Contents/Resources/remote/<platform>/atelier-remote, is found from the
+/// app at Contents/MacOS/atelier, and a stale copy earlier in the order is passed over.
 #[test]
 fn a_helper_in_the_mac_bundle_is_found() {
     let linux = Platform { system: "linux".into(), arch: "x86_64".into() };
-    let root = std::env::temp_dir().join(format!("lathe-bundle-{}", std::process::id()));
-    let contents = root.join("lathe.app/Contents");
+    let root = std::env::temp_dir().join(format!("atelier-bundle-{}", std::process::id()));
+    let contents = root.join("atelier.app/Contents");
     let put = |path: std::path::PathBuf, bytes: &[u8]| {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, bytes).unwrap();
     };
-    let current = format!("ELF lathe-remote-protocol:{};", crate::protocol::VERSION);
-    let bundled = contents.join("Resources/remote/linux-x86_64/lathe-remote");
+    let current = format!("ELF atelier-remote-protocol:{};", crate::protocol::VERSION);
+    let bundled = contents.join("Resources/remote/linux-x86_64/atelier-remote");
     put(bundled.clone(), current.as_bytes());
-    put(contents.join("MacOS/remote/linux-x86_64/lathe-remote"), b"ELF lathe-remote-protocol:0;");
-    let exe = contents.join("MacOS/lathe");
+    put(contents.join("MacOS/remote/linux-x86_64/atelier-remote"), b"ELF atelier-remote-protocol:0;");
+    let exe = contents.join("MacOS/atelier");
     let found = first_matching(&candidates(&exe, &linux, None, None, false));
     std::fs::remove_dir_all(&root).ok();
     assert_eq!(found, Some(bundled));

@@ -95,7 +95,7 @@ impl<M: InputModeKind> InputBaseState<M> {
         cx.notify()
     }
 
-    /// lathe patch: [`Self::vertical_target`], except that with no row left to move to it lands on
+    /// atelier patch: [`Self::vertical_target`], except that with no row left to move to it lands on
     /// the very start (up) or end (down) of the text, as Zed does.
     pub(super) fn vertical_target_or_edge(
         &self,
@@ -255,7 +255,7 @@ impl<M: InputModeKind> InputBaseState<M> {
                 let (effective, anchor, affinity) = if sel.is_empty() || !collapse {
                     (
                         sel.cursor_offset(),
-                        // lathe patch: a caret placed by `set_selected_range` has no anchor, and
+                        // atelier patch: a caret placed by `set_selected_range` has no anchor, and
                         // without one the move landed in column 0. Its own column is the goal.
                         sel.column_anchor.or_else(|| s.preferred_column_for(sel.cursor_offset())),
                         s.line_end_affinity_for(sel),

@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Mutex,
 };
-use lathe_forge::*;
+use atelier_forge::*;
 
 #[derive(Default)]
 pub struct FakeForge {
@@ -105,7 +105,7 @@ pub fn pushed_branch() -> PathBuf {
 }
 
 /// The scratch repository's address, as the fixture's origin has it.
-pub const SCRATCH_URL: &str = "https://github.com/flazouh/lathe-qa-scratch.git";
+pub const SCRATCH_URL: &str = "https://github.com/flazouh/atelier-qa-scratch.git";
 
 /// The bare remote behind `work`'s origin.
 pub fn bare_of(work: &Path) -> PathBuf {

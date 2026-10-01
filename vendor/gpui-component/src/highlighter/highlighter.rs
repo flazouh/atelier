@@ -1121,7 +1121,7 @@ impl SyntaxHighlighter {
     }
 }
 
-/// lathe patch 3: a language's queries, compiled once for the whole process. Compiling Rust's takes
+/// atelier patch 3: a language's queries, compiled once for the whole process. Compiling Rust's takes
 /// about 50 ms, and every new highlighter needed them: each editor that opened, and each `set_value`,
 /// which drops the editor's highlighter. The queries never change after they are built, so every
 /// highlighter of the language shares them, on any thread.

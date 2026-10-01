@@ -1,10 +1,10 @@
 //! The sidebar's layout as the settings file keeps it: the mapping between [`beui::sidebar_layout::SidebarLayout`] and
-//! the settings' [`lathe_settings::SidebarSaved`] and mode. The one place that knows how the layout is stored.
+//! the settings' [`atelier_settings::SidebarSaved`] and mode. The one place that knows how the layout is stored.
 use beui::{
     sidebar_layout::{BadgeShow, SidebarLayout},
     sidebar_model::ListMode,
 };
-use lathe_settings::{Settings, SidebarSaved};
+use atelier_settings::{Settings, SidebarSaved};
 
 /// The layout the settings kept, with the defaults for what they did not. The filter always starts as Active.
 pub fn from_settings(settings: &Settings) -> SidebarLayout {

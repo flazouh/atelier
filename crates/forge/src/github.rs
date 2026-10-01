@@ -15,7 +15,7 @@ mod write;
 
 use std::sync::Arc;
 
-use lathe_project::Project;
+use atelier_project::Project;
 use serde_json::{Value, json};
 
 pub use gh_cli::GhCli;

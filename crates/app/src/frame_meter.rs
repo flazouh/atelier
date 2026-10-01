@@ -1,7 +1,7 @@
-//! `LATHE_FRAMES=1`: how long each frame's layout and paint take on the CPU, over the whole window,
+//! `ATELIER_FRAMES=1`: how long each frame's layout and paint take on the CPU, over the whole window,
 //! reported every 300 frames as a median, a p95, a worst and a count over 8 ms (120 Hz). The window's
 //! root is wrapped in [`Timed`]; paint here is building the scene, which the GPU draws later.
-//! `LATHE_FRAMES=each` also prints one line per frame, `frame <unix ms> <cpu ms>`, to count the frames of an
+//! `ATELIER_FRAMES=each` also prints one line per frame, `frame <unix ms> <cpu ms>`, to count the frames of an
 //! idle screen or to take one animation's median and p95.
 
 use std::{
@@ -23,16 +23,16 @@ thread_local! {
     static LAST: std::cell::Cell<Duration> = const { std::cell::Cell::new(Duration::ZERO) };
 }
 
-/// The last frame's layout and paint on the CPU; zero without `LATHE_FRAMES=1`.
+/// The last frame's layout and paint on the CPU; zero without `ATELIER_FRAMES=1`.
 pub fn last_frame() -> Duration {
     LAST.with(std::cell::Cell::get)
 }
 
 pub fn enabled() -> bool {
-    mode(std::env::var("LATHE_FRAMES").ok().as_deref()) != Mode::Off
+    mode(std::env::var("ATELIER_FRAMES").ok().as_deref()) != Mode::Off
 }
 
-/// What `LATHE_FRAMES` asks for.
+/// What `ATELIER_FRAMES` asks for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Off,
@@ -52,7 +52,7 @@ pub fn mode(value: Option<&str>) -> Mode {
 
 fn each() -> bool {
     static EACH: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *EACH.get_or_init(|| mode(std::env::var("LATHE_FRAMES").ok().as_deref()) == Mode::Each)
+    *EACH.get_or_init(|| mode(std::env::var("ATELIER_FRAMES").ok().as_deref()) == Mode::Each)
 }
 
 #[derive(Default)]
@@ -80,7 +80,7 @@ pub fn add_part(meter: &Rc<RefCell<Meter>>, name: &'static str, spent: Duration)
     meter.borrow_mut().add_part(name, spent);
 }
 
-/// One frame's line under `LATHE_FRAMES=each`: when, the whole frame, then each part, in ms.
+/// One frame's line under `ATELIER_FRAMES=each`: when, the whole frame, then each part, in ms.
 pub fn each_line(at_ms: u128, frame: Duration, parts: &[(&'static str, Duration)]) -> String {
     let ms = |d: Duration| d.as_secs_f64() * 1000.;
     let mut line = format!("frame {at_ms} {:.2}", ms(frame));

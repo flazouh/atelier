@@ -42,7 +42,7 @@ pub struct TextViewStyle {
     /// on a single line — columns then never shrink and the table scrolls as
     /// soon as the content is wider than the frame.
     pub table_cell: StyleRefinement,
-    /// Draw tables as tiles, one rounded tile for each cell with no frame or border (lathe patch 19).
+    /// Draw tables as tiles, one rounded tile for each cell with no frame or border (atelier patch 19).
     pub table_tiles: Option<gpui_base::text::TableTiles>,
     /// The highlight style for inline code.
     ///

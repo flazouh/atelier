@@ -6,7 +6,7 @@
 //! one repaint, so a fast stream costs a repaint a frame. Only the rows whose content changed are
 //! measured again (`list_diff`), so the list keeps its scroll while text streams.
 //!
-//! Each turn is tracked for review (`lathe-review`): the turn's `begin` (a git snapshot) runs on a
+//! Each turn is tracked for review (`atelier-review`): the turn's `begin` (a git snapshot) runs on a
 //! background task before the message goes to the agent; every event then passes the tracker on the
 //! agent's own thread, as it arrives, so a file is read before the tool that names it writes it; and the
 //! turn's end `finish`es it there too. The panel shows the turn's changed files after its last row.
@@ -23,15 +23,15 @@ use std::{collections::HashMap, time::Instant};
 use beui::{PromptInput, PromptInputEvent, PromptModel};
 use gpui_kit::{AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString, Subscription, Task, Window, };
 use beui::scale::px;
-use lathe_agents::{
+use atelier_agents::{
     registry::Agent,
     session::{
         Answer, ChoiceKind, Command, Conversation, Event, EventQueue, Item, OpenRequest, PermissionMode, Session,
         SessionError, SessionId,
     },
 };
-use lathe_project::Project;
-use lathe_review::{TurnReview, TurnTracker};
+use atelier_project::Project;
+use atelier_review::{TurnReview, TurnTracker};
 use std::sync::Mutex;
 
 use crate::{
@@ -61,7 +61,7 @@ pub enum SessionEvent {
     /// The reader named it: the name is kept across launches.
     Renamed,
     /// The reader pressed the session's pull request card.
-    ShowPull(lathe_forge::PullRef),
+    ShowPull(atelier_forge::PullRef),
     /// A turn ended, or the history loaded: the agent's text is whole, and its #N can be looked up.
     TextSettled,
     /// Something the tasks linked to this session should hear.
@@ -157,14 +157,14 @@ pub struct AgentSession {
     /// The activity groups the reader opened, by the index of their first item.
     pub opened_groups: std::collections::HashSet<usize>,
     /// What the project adds to the `/` list, and the agent's own commands once it has said them.
-    project_commands: Vec<lathe_agents::commands::CommandInfo>,
+    project_commands: Vec<atelier_agents::commands::CommandInfo>,
     agent_commands: Vec<String>,
     _lists: Task<()>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
     _renaming: Option<Subscription>,
     /// When each thinking block began, for its live "Thinking for 12s".
-    pub thinking_since: HashMap<lathe_agents::session::BlockId, Instant>,
+    pub thinking_since: HashMap<atelier_agents::session::BlockId, Instant>,
     _composer: Subscription,
     _pump: Task<()>,
     _start: Task<()>,
@@ -216,7 +216,7 @@ impl AgentSession {
             .iter()
             .map(|m| {
                 let model = PromptModel::new(m.id.clone(), m.label.clone());
-                match lathe_agents::registry::model_mark(&m.id) {
+                match atelier_agents::registry::model_mark(&m.id) {
                     Some(mark) => model.mark(mark),
                     None => model,
                 }
@@ -319,16 +319,16 @@ impl AgentSession {
         });
     }
 
-    /// Gives the composer the `/` list: lathe's, the project's and the agent's own.
+    /// Gives the composer the `/` list: atelier's, the project's and the agent's own.
     fn offer_commands(&mut self, cx: &mut Context<Self>) {
         let items = composer_lists::commands(self.project_commands.clone(), &self.agent_commands)
             .into_iter()
             .map(|c| beui::command_item::CommandItem {
                 name: c.name.into(),
                 source: match c.source {
-                    lathe_agents::commands::CommandSource::Agent => beui::command_item::CommandSource::Agent,
-                    lathe_agents::commands::CommandSource::Lathe => beui::command_item::CommandSource::Lathe,
-                    lathe_agents::commands::CommandSource::Skill => beui::command_item::CommandSource::Skill,
+                    atelier_agents::commands::CommandSource::Agent => beui::command_item::CommandSource::Agent,
+                    atelier_agents::commands::CommandSource::Atelier => beui::command_item::CommandSource::Atelier,
+                    atelier_agents::commands::CommandSource::Skill => beui::command_item::CommandSource::Skill,
                 },
                 summary: c.summary.into(),
                 args_hint: c.args_hint.map(Into::into),
@@ -337,12 +337,12 @@ impl AgentSession {
         self.composer.update(cx, |c, cx| c.set_commands(items, cx));
     }
 
-    /// A `/` command the reader chose: lathe's own runs here, any other goes to the agent as its text.
+    /// A `/` command the reader chose: atelier's own runs here, any other goes to the agent as its text.
     fn run_command(&mut self, name: &str, args: &str, cx: &mut Context<Self>) {
         match name {
-            "files" if composer_lists::lathe_runs(name) => cx.emit(SessionEvent::ShowFiles),
-            "tasks" if composer_lists::lathe_runs(name) => cx.emit(SessionEvent::ShowTasks),
-            "review" if composer_lists::lathe_runs(name) => cx.emit(SessionEvent::Review { turn: None, path: None }),
+            "files" if composer_lists::atelier_runs(name) => cx.emit(SessionEvent::ShowFiles),
+            "tasks" if composer_lists::atelier_runs(name) => cx.emit(SessionEvent::ShowTasks),
+            "review" if composer_lists::atelier_runs(name) => cx.emit(SessionEvent::Review { turn: None, path: None }),
             _ => self.send(composer_lists::agent_text(name, args), cx),
         }
     }
@@ -408,7 +408,7 @@ impl AgentSession {
 
     /// The sink the agent gets: each event passes the turn's tracker first, on the agent's thread, then
     /// goes to the queue. The turn's end finishes the tracker there, before its event reaches the UI.
-    fn tracking_sink(&self) -> lathe_agents::session::EventSink {
+    fn tracking_sink(&self) -> atelier_agents::session::EventSink {
         let (queue, tracker, finished, project) = (self.queue.sink(), self.tracker.clone(), self.finished.clone(), self.project.clone());
         Arc::new(move |event: Event| {
             {
@@ -457,12 +457,12 @@ impl AgentSession {
                     }
                 }
                 Event::TurnEnded(end) => {
-                    let ok = matches!(end.outcome, lathe_agents::session::TurnOutcome::Completed);
+                    let ok = matches!(end.outcome, atelier_agents::session::TurnOutcome::Completed);
                     cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::TurnEnded { ok }));
                 }
                 Event::Ended(end) => {
                     self.session = None;
-                    if let lathe_agents::session::EndReason::Exited { stderr, .. } = end
+                    if let atelier_agents::session::EndReason::Exited { stderr, .. } = end
                         && !stderr.trim().is_empty()
                         && matches!(self.status, SessionStatus::Failed(_))
                     {
@@ -633,7 +633,7 @@ impl AgentSession {
     }
 
     /// Answers a waiting question with the choice of `kind` it offers.
-    pub fn answer(&mut self, request: &lathe_agents::session::RequestId, kind: ChoiceKind, cx: &mut Context<Self>) {
+    pub fn answer(&mut self, request: &atelier_agents::session::RequestId, kind: ChoiceKind, cx: &mut Context<Self>) {
         let choice = self.conversation.items().iter().find_map(|item| match item {
             Item::Permission { request: r, answer: Answer::Asking } if r.id == *request => {
                 r.choices.iter().find(|c| c.kind == kind).map(|c| c.id.clone())
@@ -678,21 +678,21 @@ impl AgentSession {
     }
 
     /// The session opened `reference`, or its branch had it: it is kept, and its card shows.
-    pub fn set_pull(&mut self, reference: lathe_forge::PullRef, cx: &mut Context<Self>) {
+    pub fn set_pull(&mut self, reference: atelier_forge::PullRef, cx: &mut Context<Self>) {
         self.reviews.pull = Some(reference.clone());
         self.save_review(cx);
         self.show_card(reference, cx);
     }
 
-    fn show_card(&mut self, reference: lathe_forge::PullRef, cx: &mut Context<Self>) {
+    fn show_card(&mut self, reference: atelier_forge::PullRef, cx: &mut Context<Self>) {
         if self.pull_card.as_ref().is_some_and(|c| *c.read(cx).reference() == reference) {
             return;
         }
         // Tests never reach a forge: their cards read an empty one.
         #[cfg(test)]
-        let forge: Arc<dyn lathe_forge::Forge> = Arc::new(lathe_pr_view::fixture::FixtureForge::new());
+        let forge: Arc<dyn atelier_forge::Forge> = Arc::new(atelier_pr_view::fixture::FixtureForge::new());
         #[cfg(not(test))]
-        let forge: Arc<dyn lathe_forge::Forge> = Arc::new(lathe_forge::github::GitHub::new(self.project.clone()));
+        let forge: Arc<dyn atelier_forge::Forge> = Arc::new(atelier_forge::github::GitHub::new(self.project.clone()));
         let card = cx.new(|cx| crate::pull_card::PullCard::new(reference, forge, cx));
         self._pull_card = Some(cx.subscribe(&card, |_, _, event: &crate::pull_card::CardEvent, cx| match event {
             crate::pull_card::CardEvent::Show(reference) => cx.emit(SessionEvent::ShowPull(reference.clone())),

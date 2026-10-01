@@ -1,7 +1,7 @@
 //! How soon the card reads the pull request again: often while checks run, less once they settle, never
 //! after a merge or a close. A failure backs off, and a rate limit waits as long as the forge says.
 use std::time::Duration;
-use lathe_forge::ForgeError;
+use atelier_forge::ForgeError;
 
 /// While checks run.
 pub const RUNNING: Duration = Duration::from_secs(10);

@@ -3,7 +3,7 @@
 //! it from a background task.
 use std::thread;
 
-use lathe_forge::{Forge, ForgeResult, PullRef};
+use atelier_forge::{Forge, ForgeResult, PullRef};
 
 use crate::data::{Part, PartKind};
 

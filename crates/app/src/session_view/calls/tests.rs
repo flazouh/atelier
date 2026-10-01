@@ -1,5 +1,5 @@
 use serde_json::Value;
-use lathe_agents::session::{Answer, Call, ChoiceKind, Item, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
+use atelier_agents::session::{Answer, Call, ChoiceKind, Item, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
 use super::*;
 fn tool(id: &str) -> Item {
     let call = ToolCall { id: ToolId::new(id), name: "Edit".into(), kind: ToolKind::Edit, input: Value::Null, file: None, parent: None, status: ToolStatus::Running };

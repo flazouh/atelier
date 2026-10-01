@@ -10,20 +10,20 @@ use std::{
     time::Duration,
 };
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 use crate::{LspError, LspWorker, Store, Unavailable, find_root, language_id, server_for};
 
 /// Why a file has no server, in words the status line can show as they are.
 #[derive(Debug)]
 pub enum NoServer {
-    /// lathe knows no language for the file's extension.
+    /// atelier knows no language for the file's extension.
     UnknownLanguage(String),
     /// The language has no server in the registry.
     NoServerFor(&'static str),
-    /// The server is known but its program is not installed, and lathe cannot download it.
+    /// The server is known but its program is not installed, and atelier cannot download it.
     NotInstalled { server: &'static str, install: &'static str },
-    /// lathe tried to download the server and could not.
+    /// atelier tried to download the server and could not.
     DownloadFailed { server: &'static str, reason: String },
     /// The program ran but the handshake failed.
     Failed { server: &'static str, error: LspError },
@@ -41,7 +41,7 @@ impl fmt::Display for NoServer {
     }
 }
 
-/// Every server lathe has started, by (server name, project root).
+/// Every server atelier has started, by (server name, project root).
 pub struct Workers {
     /// Where the servers start: the project they serve.
     project: Arc<dyn Project>,

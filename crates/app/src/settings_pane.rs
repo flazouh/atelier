@@ -2,7 +2,7 @@
 //! theme, light, dark or the system's, and the primary colour: the fill of the main button, and the accent and the
 //! selection wash too (see `beui::theme::with_pick`). Agents lists the agents this build can start and the models
 //! each offers. Tasks holds the rules that move a task by itself. Keys lists the review's key table, read only for
-//! now. A change applies at once, to every window, and is kept in `lathe-settings`. Escape closes the page, and so
+//! now. A change applies at once, to every window, and is kept in `atelier-settings`. Escape closes the page, and so
 //! does the Back button in the title bar.
 use beui::{
     ActiveTheme, ColorSelector, Kbd, Segment, Segmented, Swatch,
@@ -98,7 +98,7 @@ pub struct SettingsPane {
     /// `"default"` or the name of one of [`PRIMARIES`].
     primary: SharedString,
     /// Which task rules move a task by themselves.
-    rules: lathe_tracker::RuleSet,
+    rules: atelier_tracker::RuleSet,
     section: Section,
     /// The sidebar's look, as this page edits it.
     look: SidebarLayout,
@@ -159,13 +159,13 @@ impl Focusable for SettingsPane {
 }
 
 impl SettingsPane {
-    pub fn new(saved: &lathe_settings::Settings, agents: Vec<AgentRow>, cx: &mut Context<Self>) -> Self {
+    pub fn new(saved: &atelier_settings::Settings, agents: Vec<AgentRow>, cx: &mut Context<Self>) -> Self {
         let mode = saved.mode.as_deref().and_then(Mode::from_key).unwrap_or(Mode::System);
         let primary = saved
             .primary
             .and_then(|bytes| PRIMARIES.iter().find(|(_, b, _)| *b == bytes))
             .map_or("default", |(name, _, _)| *name);
-        let rules = lathe_tracker::RuleSet::from_disabled(saved.task_rules_off.iter().map(String::as_str));
+        let rules = atelier_tracker::RuleSet::from_disabled(saved.task_rules_off.iter().map(String::as_str));
         Self {
             focus: cx.focus_handle(),
             agents,
@@ -197,7 +197,7 @@ impl SettingsPane {
         cx.notify();
     }
 
-    fn set_rule(&mut self, rule: lathe_tracker::Rule, on: bool, cx: &mut Context<Self>) {
+    fn set_rule(&mut self, rule: atelier_tracker::Rule, on: bool, cx: &mut Context<Self>) {
         self.rules.set(rule, on);
         let off: Vec<String> = self.rules.disabled().into_iter().map(String::from).collect();
         save(cx, move |s| s.task_rules_off = off);
@@ -213,19 +213,19 @@ impl SettingsPane {
 }
 
 /// The name a test finds a rule's switch by.
-pub(crate) fn rule_switch(rule: lathe_tracker::Rule) -> &'static str {
+pub(crate) fn rule_switch(rule: atelier_tracker::Rule) -> &'static str {
     match rule {
-        lathe_tracker::Rule::SessionStartMovesToInProgress => "rule-session-start",
-        lathe_tracker::Rule::AgentFinishMovesToInReview => "rule-agent-finish",
-        lathe_tracker::Rule::MergeMovesToDone => "rule-merge",
-        lathe_tracker::Rule::SessionResumeMovesToInProgress => "rule-session-resume",
+        atelier_tracker::Rule::SessionStartMovesToInProgress => "rule-session-start",
+        atelier_tracker::Rule::AgentFinishMovesToInReview => "rule-agent-finish",
+        atelier_tracker::Rule::MergeMovesToDone => "rule-merge",
+        atelier_tracker::Rule::SessionResumeMovesToInProgress => "rule-session-resume",
     }
 }
 /// Keeps a change, off the UI thread.
-fn save(cx: &mut gpui_kit::App, change: impl FnOnce(&mut lathe_settings::Settings) + Send + 'static) {
-    if let Some(path) = lathe_settings::path() {
+fn save(cx: &mut gpui_kit::App, change: impl FnOnce(&mut atelier_settings::Settings) + Send + 'static) {
+    if let Some(path) = atelier_settings::path() {
         cx.background_spawn(async move {
-            if let Err(error) = lathe_settings::update(&path, change) {
+            if let Err(error) = atelier_settings::update(&path, change) {
                 eprintln!("could not save the settings: {error}");
             }
         })
@@ -369,7 +369,7 @@ impl Render for SettingsPane {
                 .child(row("Sessions shown for each project", numbers("sidebar-fold", &FOLD_CHOICES, look.fold_after, &["fold-3", "fold-5", "fold-8", "fold-12"], fold_pane, |l, n| l.fold_after = n)))
                 .child(row("Earlier sessions shown in Priority", numbers("sidebar-earlier", &EARLIER_CHOICES, look.earlier_shown, &["earlier-5", "earlier-8", "earlier-12", "earlier-20"], earlier_pane, |l, n| l.earlier_shown = n)))
         };
-        let tasks = div().flex().flex_col().children(lathe_tracker::Rule::ALL.into_iter().map(|rule| {
+        let tasks = div().flex().flex_col().children(atelier_tracker::Rule::ALL.into_iter().map(|rule| {
             let pane = this.clone();
             row(
                 rule.words(),

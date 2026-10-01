@@ -1,6 +1,6 @@
 //! The pull request's git, through the project. A pull request's commits, files and file texts come from
 //! git, not from the forge: the forge lists the changed files, but only git has the text of both sides. The
-//! objects come from a **cache repository** lathe keeps per forge repository, made with `git clone --bare
+//! objects come from a **cache repository** atelier keeps per forge repository, made with `git clone --bare
 //! --shared` from the project (so it borrows the project's objects) and fed by `git fetch` of
 //! `refs/pull/N/head`. The project's own refs and working tree are never touched. The language server
 //! needs real files, so a **checkout** of the head, made with `git archive`, sits beside the cache. Never
@@ -16,8 +16,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_forge::{Change, Pull, PullRef, RepoRef};
-use lathe_project::{Command, Project};
+use atelier_forge::{Change, Pull, PullRef, RepoRef};
+use atelier_project::{Command, Project};
 
 /// How long a fetch may take before it is given up.
 const FETCH_TIMEOUT: Duration = Duration::from_secs(900);
@@ -142,15 +142,15 @@ pub struct Prepared {
 }
 
 /// git for one project.
-/// Where an older lathe kept the cache and the checkouts.
-pub const LEGACY_DATA: &str = "~/.local/share/lathe/pr";
+/// Where an older atelier kept the cache and the checkouts.
+pub const LEGACY_DATA: &str = "~/.local/share/atelier/pr";
 
 pub struct PrGit {
     project: Arc<dyn Project>,
     /// The folder for caches and checkouts as it was given: absolute, or starting with `~/` or `$HOME/`. Empty:
     /// the `pr-view` folder of the project's data folder when the project has one, else [`LEGACY_DATA`].
     given: String,
-    /// Where an older lathe kept the cache and the checkouts, moved into the data folder on first use.
+    /// Where an older atelier kept the cache and the checkouts, moved into the data folder on first use.
     legacy: String,
     /// The same, absolute, once the host has been asked for its home. Asking starts a process, so it waits
     /// for the first use, which is on a background thread.
@@ -175,7 +175,7 @@ impl PrGit {
         Self { project, given: data.to_string(), legacy: LEGACY_DATA.to_string(), data: std::sync::OnceLock::new(), remote: None, busy: std::sync::Mutex::new(()) }
     }
 
-    /// The folder an older lathe used, in place of [`LEGACY_DATA`]: for a test.
+    /// The folder an older atelier used, in place of [`LEGACY_DATA`]: for a test.
     pub fn with_legacy(mut self, folder: impl Into<String>) -> Self {
         self.legacy = folder.into();
         self
@@ -215,7 +215,7 @@ impl PrGit {
             .clone()
     }
 
-    /// Moves the folder an older lathe used to `target`, when there is one and the target is not there yet. One
+    /// Moves the folder an older atelier used to `target`, when there is one and the target is not there yet. One
     /// rename on the host, so the cache and the checkouts come whole. A failure leaves both as they are: the
     /// next open makes a new cache.
     fn move_legacy(&self, target: &str) {
@@ -353,9 +353,9 @@ impl PrGit {
         if !self.has_commit(&cache, &head) || !base_known {
             let url = self.fetch_url(repo)?;
             let number = pull.reference.number;
-            let mut specs = vec![format!("+refs/pull/{number}/head:refs/lathe/pr/{number}/head")];
+            let mut specs = vec![format!("+refs/pull/{number}/head:refs/atelier/pr/{number}/head")];
             if !base_known {
-                specs.push(format!("+refs/heads/{base_branch}:refs/lathe/base/{base_branch}"));
+                specs.push(format!("+refs/heads/{base_branch}:refs/atelier/base/{base_branch}"));
             }
             let mut args = vec!["--git-dir", cache.as_str(), "fetch", "--no-tags", "--quiet", "--", url.as_str()];
             args.extend(specs.iter().map(String::as_str));
@@ -371,7 +371,7 @@ impl PrGit {
         let tip = match base_sha.filter(|b| self.has_commit(&cache, b)) {
             Some(sha) => sha,
             None => {
-                let name = format!("refs/lathe/base/{base_branch}");
+                let name = format!("refs/atelier/base/{base_branch}");
                 Self::text(&self.cached(&cache, "read the base branch", &["rev-parse", "--verify", &name])?)
             }
         };
@@ -474,7 +474,7 @@ impl PrGit {
         let cache = self.cache_path(&reference.repo)?;
         let number = reference.number.to_string();
         let script = "rm -rf \"$1\" \"$1.sha\"\n\
-                      if [ -d \"$2\" ]; then git --git-dir \"$2\" update-ref -d \"refs/lathe/pr/$3/head\" 2>/dev/null; fi\n\
+                      if [ -d \"$2\" ]; then git --git-dir \"$2\" update-ref -d \"refs/atelier/pr/$3/head\" 2>/dev/null; fi\n\
                       exit 0";
         self.sh(script, &[&dir, &cache, &number])?;
         Ok(())

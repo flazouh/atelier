@@ -10,7 +10,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use lathe_project::{ChangeSink, Command, GitOutput, Match, Process, Project, Query, Watch};
+use atelier_project::{ChangeSink, Command, GitOutput, Match, Process, Project, Query, Watch};
 
 static SPAWN: Mutex<()> = Mutex::new(());
 
@@ -35,7 +35,7 @@ impl Project for Locked {
         self.0.root()
     }
 
-    fn list(&self) -> io::Result<Vec<lathe_project::Entry>> {
+    fn list(&self) -> io::Result<Vec<atelier_project::Entry>> {
         self.0.list()
     }
 
@@ -59,7 +59,7 @@ impl Project for Locked {
         self.0.data_write(path, bytes)
     }
 
-    fn data_list(&self, prefix: &str) -> io::Result<Vec<lathe_project::DataEntry>> {
+    fn data_list(&self, prefix: &str) -> io::Result<Vec<atelier_project::DataEntry>> {
         self.0.data_list(prefix)
     }
 

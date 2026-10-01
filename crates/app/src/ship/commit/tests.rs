@@ -23,7 +23,7 @@ fn repo(files: &[(&str, &str)]) -> (tempfile::TempDir, Arc<dyn Project>) {
         git(dir.path(), &["add", "-A"]);
         git(dir.path(), &["commit", "-qm", "start"]);
     }
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(dir.path()).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(dir.path()).unwrap());
     (dir, project)
 }
 
@@ -84,9 +84,9 @@ fn nothing_kept_is_no_commit() {
     assert!(matches!(commit(project.as_ref(), &[], "x"), Err(CommitError::Nothing)));
 }
 
-/// What a commit of 200 changed files costs, on a local project and, with LATHE_TEST_SSH_HOST (and
-/// LATHE_REMOTE_DIR), over ssh to that host. docs/performance.md, "Commit".
-///     cargo test --release -p lathe-app -- --ignored --nocapture commit_of_200_files
+/// What a commit of 200 changed files costs, on a local project and, with ATELIER_TEST_SSH_HOST (and
+/// ATELIER_REMOTE_DIR), over ssh to that host. docs/performance.md, "Commit".
+///     cargo test --release -p atelier-app -- --ignored --nocapture commit_of_200_files
 #[test]
 #[ignore]
 fn commit_of_200_files() {
@@ -108,9 +108,9 @@ fn commit_of_200_files() {
     let (_dir, project) = repo(&refs);
     let (median, worst) = time(project.as_ref(), 5);
     println!("local, 200 files: median {median:.0} ms, worst {worst:.0} ms (5 runs)");
-    if let Ok(host) = std::env::var("LATHE_TEST_SSH_HOST") {
+    if let Ok(host) = std::env::var("ATELIER_TEST_SSH_HOST") {
         let (dir, _) = repo(&refs);
-        let remote = lathe_remote::ssh::connect(&host, &dir.path().display().to_string(), &|_| {}).unwrap_or_else(|e| panic!("no connection: {e}"));
+        let remote = atelier_remote::ssh::connect(&host, &dir.path().display().to_string(), &|_| {}).unwrap_or_else(|e| panic!("no connection: {e}"));
         let (median, worst) = time(&remote, 3);
         println!("over ssh to {host}, 200 files: median {median:.0} ms, worst {worst:.0} ms (3 runs)");
     }

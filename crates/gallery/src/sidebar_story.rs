@@ -11,7 +11,7 @@ use beui::{
 use gpui_kit::{
     AppContext, Context, Entity, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Window, div, px,
 };
-use lathe_agents::claude;
+use atelier_agents::claude;
 
 pub mod run;
 use run::Run;
@@ -27,9 +27,9 @@ fn session(id: &str, title: &str, look: &AgentLook, status: SessionStatus, minut
 
 fn sample(other: &AgentLook) -> Vec<ProjectData> {
     let claude = claude::look();
-    let lathe = ProjectData {
-        id: "lathe".into(),
-        name: "lathe".into(),
+    let atelier = ProjectData {
+        id: "atelier".into(),
+        name: "atelier".into(),
         location: Location::Local,
         connection: Connection::Connected,
         branch: Some("main".into()),
@@ -74,7 +74,7 @@ fn sample(other: &AgentLook) -> Vec<ProjectData> {
         badge: Default::default(),
         sessions: vec![],
     };
-    vec![lathe, api, infra]
+    vec![atelier, api, infra]
 }
 
 /// `projects` projects of `sessions` sessions, in all the statuses.

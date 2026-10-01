@@ -1,4 +1,4 @@
-use lathe_forge::{Change, PullState, Verdict};
+use atelier_forge::{Change, PullState, Verdict};
 
 use crate::{
     fixture::sample,
@@ -55,7 +55,7 @@ fn a_remark_carries_its_author_and_first_words() {
 fn what_the_reader_said_comes_from_the_opinions() {
     let mut pull = sample::pull(&sample::reference(1), "abcd");
     assert_eq!(stated_verdict(&pull, "alex"), None);
-    pull.opinions = vec![lathe_forge::Opinion { reviewer: "ada".into(), verdict: Verdict::Approve }, lathe_forge::Opinion { reviewer: "alex".into(), verdict: Verdict::RequestChanges }];
+    pull.opinions = vec![atelier_forge::Opinion { reviewer: "ada".into(), verdict: Verdict::Approve }, atelier_forge::Opinion { reviewer: "alex".into(), verdict: Verdict::RequestChanges }];
     assert_eq!(stated_verdict(&pull, "alex"), Some((Decision::ChangesRequested, true)));
     assert_eq!(stated_verdict(&pull, "nobody"), None);
     pull.state = PullState::Merged;

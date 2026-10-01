@@ -242,7 +242,7 @@ pub trait InputModeKind: sealed::Sealed + Sized + 'static {
         _cx: &mut gpui::Context<InputBaseState<Self>>,
     ) {
     }
-    /// lathe patch: drops the Cmd-hover definition underline once Cmd is let go.
+    /// atelier patch: drops the Cmd-hover definition underline once Cmd is let go.
     fn clear_hover_definition(
         _state: &mut InputBaseState<Self>,
         _cx: &mut gpui::Context<InputBaseState<Self>>,

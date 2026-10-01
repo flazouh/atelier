@@ -1,4 +1,4 @@
-use lathe_settings::{Location, OpenSession};
+use atelier_settings::{Location, OpenSession};
 use super::*;
 fn open(place: &str, id: &str) -> OpenSession {
     OpenSession { location: Location::Local { path: place.into() }, id: id.into(), title: format!("Session {id}") }

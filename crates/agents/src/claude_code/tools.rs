@@ -75,7 +75,7 @@ pub(super) fn starts_subagent(name: &str) -> bool {
     matches!(name, "Agent" | "Task")
 }
 
-/// The tools that write the todo list. lathe shows the list, not the calls.
+/// The tools that write the todo list. atelier shows the list, not the calls.
 #[derive(Clone, Copy)]
 pub(super) enum TodoTool {
     /// `TodoWrite` sends the whole list.

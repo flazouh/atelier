@@ -8,7 +8,7 @@ use beui::{
     task_model::{Activity, Assignee, Label, Priority, SessionLink, TaskData, TaskStatus},
 };
 use gpui_kit::SharedString;
-use lathe_tracker as tracker;
+use atelier_tracker as tracker;
 
 pub fn status_of(status: tracker::Status) -> TaskStatus {
     match status {
@@ -58,7 +58,7 @@ pub fn label_of(name: &str) -> Label {
     Label::new(name.to_string(), tone)
 }
 
-/// The look an agent wears, by its name. `neutral` is for an agent lathe has no look for.
+/// The look an agent wears, by its name. `neutral` is for an agent atelier has no look for.
 pub type Looks<'a> = &'a dyn Fn(&str) -> AgentLook;
 
 pub fn assignee_of(assignee: &tracker::Assignee, looks: Looks) -> Assignee {

@@ -1,4 +1,4 @@
-use lathe_forge::{Change, CheckStatus, Conclusion, ForgeError, JobRef, RepoRef};
+use atelier_forge::{Change, CheckStatus, Conclusion, ForgeError, JobRef, RepoRef};
 
 use crate::{
     Part, PartKind, PullData,
@@ -124,7 +124,7 @@ fn a_file_brought_in_stays_open_when_the_list_changes() {
 #[test]
 fn until_git_answers_the_forges_file_list_stands_in() {
     let reference = sample::reference(2);
-    let files = vec![lathe_forge::ChangedFile { path: "x.rs".into(), additions: 1, deletions: 0, change: Change::Added }];
+    let files = vec![atelier_forge::ChangedFile { path: "x.rs".into(), additions: 1, deletions: 0, change: Change::Added }];
     let mut model = PrModel::new(reference.clone(), "alex", PullData::new(reference));
     assert!(!model.ready() && model.files().is_empty());
     model.apply_part(Part::Files(files), 5);
@@ -167,7 +167,7 @@ fn the_rail_reads_the_data_the_way_the_parts_want_it() {
     assert_eq!(remarks.len(), 1);
     assert_eq!(model.unsent(), 0);
     assert!(!model.in_review());
-    model.data.held = vec![lathe_forge::HeldComment { thread: lathe_forge::ThreadId("h".into()), comment: sample::comment("h", "alex", "x", 1), path: "a.rs".into(), line: Some(1) }];
+    model.data.held = vec![atelier_forge::HeldComment { thread: atelier_forge::ThreadId("h".into()), comment: sample::comment("h", "alex", "x", 1), path: "a.rs".into(), line: Some(1) }];
     assert!((model.unsent(), model.in_review()) == (1, true));
     assert!(!model.mine(), "the fixture's author is Rui");
     assert!(model.merge_facts(&[]).is_some());
@@ -185,7 +185,7 @@ fn failing_jobs_are_read_a_few_at_a_time_and_only_once() {
         })
         .collect();
     assert_eq!(model.jobs_to_read(8).len(), 8);
-    model.jobs.insert(1, crate::checks::JobLog { job: lathe_forge::Job { reference: JobRef { repo, id: 1 }, name: "x".into(), status: CheckStatus::Done, conclusion: None, run_id: 1, attempt: 1, steps: Vec::new() }, log: String::new() });
+    model.jobs.insert(1, crate::checks::JobLog { job: atelier_forge::Job { reference: JobRef { repo, id: 1 }, name: "x".into(), status: CheckStatus::Done, conclusion: None, run_id: 1, attempt: 1, steps: Vec::new() }, log: String::new() });
     let next: Vec<u64> = model.jobs_to_read(8).iter().map(|j| j.id).collect();
     assert!(!next.contains(&1) && next.len() == 8 && next[0] == 2);
     let _ = Commit { sha: String::new(), title: String::new(), author: String::new(), at: 0 };

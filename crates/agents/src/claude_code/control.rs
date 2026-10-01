@@ -1,4 +1,4 @@
-//! The lines lathe writes to `claude`'s stdin. Each is one JSON object; the caller adds the line end.
+//! The lines atelier writes to `claude`'s stdin. Each is one JSON object; the caller adds the line end.
 use serde_json::{Value, json};
 
 use crate::session::{Attachment, PermissionMode, message_text};

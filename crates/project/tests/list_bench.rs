@@ -1,10 +1,10 @@
 //! What listing a large project costs: 10,000 files in 500 folders, with a .gitignore, as
 //! `Project::list` walks it for the app's tree, on a background thread. Target: under 200 ms.
-//!     cargo test --release -p lathe-project --test list_bench -- --ignored --nocapture
+//!     cargo test --release -p atelier-project --test list_bench -- --ignored --nocapture
 
 use std::time::{Duration, Instant};
 
-use lathe_project::{LocalProject, Project};
+use atelier_project::{LocalProject, Project};
 
 #[test]
 #[ignore]

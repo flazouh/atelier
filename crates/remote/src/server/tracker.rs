@@ -1,6 +1,6 @@
 //! The host's side of a tracker call: one call of the trait on the store the project keeps there.
 
-use lathe_tracker::{Tracker, TrackerResult};
+use atelier_tracker::{Tracker, TrackerResult};
 
 use crate::protocol::tracker::{TrackerCall, TrackerReply};
 

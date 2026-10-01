@@ -164,7 +164,7 @@ mod tests {
     }
 }
 
-/// lathe patch: the next place `query` occurs after `from`, wrapping to the top, that no selection
+/// atelier patch: the next place `query` occurs after `from`, wrapping to the top, that no selection
 /// in `taken` already covers. `whole_word` skips a match with a word character on either side, as
 /// Zed does when the search began from a bare caret.
 pub(super) fn next_occurrence(
@@ -190,7 +190,7 @@ pub(super) fn next_occurrence(
     after.chain(before).find(|&start| fits(start)).map(|start| start..start + query.len())
 }
 
-/// lathe patch: the word a caret at `offset` stands in or just after, as Zed picks it. A caret after
+/// atelier patch: the word a caret at `offset` stands in or just after, as Zed picks it. A caret after
 /// the last letter of a word takes that word, not the space or newline that follows.
 pub(super) fn word_at_caret(text: &str, offset: usize) -> Option<Range<usize>> {
     let is_word = |c: char| c.is_alphanumeric() || c == '_';
@@ -200,7 +200,7 @@ pub(super) fn word_at_caret(text: &str, offset: usize) -> Option<Range<usize>> {
 }
 
 impl<M: InputModeKind> InputBaseState<M> {
-    /// lathe patch: Zed's select next occurrence. From a bare caret it selects the word there; from
+    /// atelier patch: Zed's select next occurrence. From a bare caret it selects the word there; from
     /// a selection it adds one more selection at the next match of its text.
     pub(super) fn select_next_occurrence(
         &mut self,

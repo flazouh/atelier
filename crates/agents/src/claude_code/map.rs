@@ -1,4 +1,4 @@
-//! `claude`'s lines to lathe's events. The mapper keeps what one session needs between lines: which
+//! `claude`'s lines to atelier's events. The mapper keeps what one session needs between lines: which
 //! blocks stream, which tools run, the todo list, the questions waiting for an answer. It reads no
 //! clock and touches no process: the caller passes the time with each line.
 use std::{
@@ -30,7 +30,7 @@ enum Open {
     Tool { id: ToolId, json: String, targeted: bool },
 }
 
-/// A question `claude` asked and lathe has not answered.
+/// A question `claude` asked and atelier has not answered.
 struct Asked {
     input: Value,
     suggestions: Option<Value>,
@@ -44,7 +44,7 @@ pub struct Mapper {
     open: HashMap<u32, Open>,
     /// Calls announced and not finished.
     running: HashSet<ToolId>,
-    /// Calls whose result lathe swallows: todo edits and subagent starts.
+    /// Calls whose result atelier swallows: todo edits and subagent starts.
     hidden: HashSet<ToolId>,
     subagents: HashSet<ToolId>,
     /// Shell commands that run on after their call returned (`run_in_background`), until `claude` says
@@ -65,13 +65,13 @@ impl Mapper {
         Self::default()
     }
 
-    /// lathe sent a user message: a turn is open until `claude` reports its result.
+    /// atelier sent a user message: a turn is open until `claude` reports its result.
     pub fn user_sent(&mut self) {
         self.turn_open = true;
     }
 
     /// Reads one line of `claude`'s stdout. A line that is not JSON gives a warning; a line of a
-    /// kind lathe does not know gives nothing.
+    /// kind atelier does not know gives nothing.
     pub fn line(&mut self, line: &str, now: Instant) -> Vec<Event> {
         let line = line.trim();
         if line.is_empty() {
@@ -162,7 +162,7 @@ impl Mapper {
         self.background.clear();
         events
     }
-    /// The event for a session lathe closed on purpose: it ends, and nothing else fails.
+    /// The event for a session atelier closed on purpose: it ends, and nothing else fails.
     pub fn closed(&mut self) -> Vec<Event> {
         if std::mem::replace(&mut self.ended, true) { Vec::new() } else { vec![Event::Ended(EndReason::Closed)] }
     }
@@ -331,7 +331,7 @@ impl Mapper {
         }
     }
 
-    /// A user message that did not come from lathe: history. `claude` also writes a line for an
+    /// A user message that did not come from atelier: history. `claude` also writes a line for an
     /// interrupt and for a subagent's prompt; neither is something the user said.
     fn user_text(&mut self, text: String, from_subagent: bool) -> Vec<Event> {
         if from_subagent || text.starts_with("[Request interrupted") || text.trim().is_empty() {
@@ -549,7 +549,7 @@ fn flatten(content: &Value) -> String {
 }
 
 /// `claude` keeps an output it finds too large in a file and puts a preview and the path in the
-/// result. lathe passes both on. An output that is large and not kept is cut to its head.
+/// result. atelier passes both on. An output that is large and not kept is cut to its head.
 fn tool_output(text: &str, is_error: bool) -> ToolOutput {
     const OPEN: &str = "<persisted-output>";
     const SAVED: &str = "Full output saved to: ";

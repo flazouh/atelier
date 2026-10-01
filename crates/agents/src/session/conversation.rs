@@ -112,7 +112,7 @@ impl Conversation {
         self.items.iter().filter(|item| matches!(item, Item::Subagent { status: SubagentStatus::Running, .. })).count()
     }
 
-    /// lathe sent a message: it shows at once and a turn opens.
+    /// atelier sent a message: it shows at once and a turn opens.
     pub fn user_sent(&mut self, text: impl Into<String>) {
         self.items.push(Item::User { text: text.into() });
         self.working = true;

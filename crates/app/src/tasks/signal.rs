@@ -1,6 +1,6 @@
 //! What a session tells its tasks. The session says three things (it started, a turn ended, the reader
 //! replied); this turns each into the tracker's `Signal`, which the rules read. Pure.
-use lathe_tracker::{PrLink, SessionLink, Signal};
+use atelier_tracker::{PrLink, SessionLink, Signal};
 
 /// Who made a commit or opened a pull request from the review: the person at the keys.
 const READER: &str = "you";

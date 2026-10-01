@@ -1,5 +1,5 @@
 //! Which tool calls run at once, which wait for an answer, and which never run. Pure: the mode, what the
-//! call does, and the rules the reader added decide. This is lathe's own logic; no backend supplies it.
+//! call does, and the rules the reader added decide. This is atelier's own logic; no backend supplies it.
 use std::collections::HashSet;
 
 use super::tools::Access;

@@ -4,7 +4,7 @@
 //! draw in an active window reads at once.
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use gpui_kit::{App, AppContext, Context, Entity, Global, Task, WeakEntity};
-use lathe_forge::{Check, CheckStatus, Forge, ForgeError, Pull, PullRef, PullState};
+use atelier_forge::{Check, CheckStatus, Forge, ForgeError, Pull, PullRef, PullState};
 use super::poll::{Seen, next_delay};
 
 pub struct PullWatch {

@@ -2,7 +2,7 @@
 //! card with the real editor and the inline review's hunks. One turn, or the whole session, by the
 //! bar's switch.
 //!
-//! Each file is a `lathe_review::Merged`, the source of truth: the editor holds its text, a decision
+//! Each file is a `atelier_review::Merged`, the source of truth: the editor holds its text, a decision
 //! calls `decide`, the reader's typing calls `edited`. The file on disk is `Merged::current()`: the pane
 //! writes it through the Project at once after a decision, and a moment after the reader stops typing.
 //! When the agent writes a file under review again (a later turn), the watch reports it; the pane reads
@@ -31,9 +31,9 @@ use gpui_kit::{
     div, prelude::FluentBuilder, 
 };
 use beui::scale::px;
-use lathe_editor::EditorSession;
-use lathe_project::Project;
-use lathe_review::{Content, FileReview, Merged};
+use atelier_editor::EditorSession;
+use atelier_project::Project;
+use atelier_review::{Content, FileReview, Merged};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
@@ -148,7 +148,7 @@ pub enum PaneEvent {
     /// The strip made a commit or a branch, so the branch and its changes are to be read again.
     GitChanged,
     /// The reader asked to see this pull request.
-    ShowPull(lathe_forge::PullRef),
+    ShowPull(atelier_forge::PullRef),
 }
 
 impl EventEmitter<PaneEvent> for ReviewPane {}
@@ -376,7 +376,7 @@ impl ReviewPane {
 
     /// The pull request the session's record keeps.
     #[cfg(test)]
-    pub fn session_pull(&self, cx: &gpui_kit::App) -> Option<lathe_forge::PullRef> {
+    pub fn session_pull(&self, cx: &gpui_kit::App) -> Option<atelier_forge::PullRef> {
         self.session.read(cx).reviews.pull.clone()
     }
 
@@ -896,12 +896,12 @@ fn focus_once_painted(handle: FocusHandle, frames: usize, window: &mut Window, c
     }
 }
 
-/// With `LATHE_TIMINGS=1`, prints what an action cost: its own `work`, how long after `since` the frame
+/// With `ATELIER_TIMINGS=1`, prints what an action cost: its own `work`, how long after `since` the frame
 /// that shows it began (the wait for the display), and that frame's layout and paint (with
-/// `LATHE_FRAMES=1`). A next-frame callback runs as a frame begins, before it is drawn, so the frame's
+/// `ATELIER_FRAMES=1`). A next-frame callback runs as a frame begins, before it is drawn, so the frame's
 /// cost is read at the start of the one after it.
 fn timing(window: &Window, what: String, since: Instant, work: Duration) {
-    if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
+    if std::env::var("ATELIER_TIMINGS").is_ok_and(|v| v == "1") {
         let ms = |d: Duration| d.as_secs_f64() * 1000.;
         window.on_next_frame(move |window, _| {
             let began = since.elapsed();
@@ -916,7 +916,7 @@ fn timing(window: &Window, what: String, since: Instant, work: Duration) {
 /// The list the tree and the walk take: each file's path, `+a -r` and change.
 fn changed_of(files: &[PaneFile]) -> Vec<ChangedFile> {
     let reviews: Vec<FileReview> = files.iter().map(|f| f.review.clone()).collect();
-    lathe_review::present::changed_files(&reviews)
+    atelier_review::present::changed_files(&reviews)
 }
 
 /// The files of `scope`, with what the reader decided before where the session kept it.

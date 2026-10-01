@@ -1,4 +1,4 @@
-//! The coding agents lathe can drive, and their marks, as acepe keeps them: Claude Code, Codex, Cursor,
+//! The coding agents atelier can drive, and their marks, as acepe keeps them: Claude Code, Codex, Cursor,
 //! Grok, opencode, and Custom, which takes beui's monogram.
 
 use beui::BrandMark;

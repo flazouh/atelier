@@ -1,5 +1,5 @@
 [package]
-name = "lathe-pr-view"
+name = "atelier-pr-view"
 description = "The pull request view on real data: the list of pull requests, and one pull request with its checks, conversation, files and diff, over the forge and the project's git."
 version.workspace = true
 edition.workspace = true
@@ -9,11 +9,11 @@ license.workspace = true
 [dependencies]
 gpui-kit.workspace = true
 beui.workspace = true
-lathe-editor.workspace = true
-lathe-forge.workspace = true
-lathe-lsp.workspace = true
-lathe-project.workspace = true
-lathe-review.workspace = true
+atelier-editor.workspace = true
+atelier-forge.workspace = true
+atelier-lsp.workspace = true
+atelier-project.workspace = true
+atelier-review.workspace = true
 futures-channel = "0.3"
 futures-util = "0.3"
 lsp-types = "0.97"

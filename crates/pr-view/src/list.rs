@@ -1,10 +1,10 @@
 //! The list of pull requests without a window: the reader's working set filed into Courts, and what the
-//! list says about itself (when it was read, why it could not be). Filing is `lathe_forge::file_courts`;
-//! the words for each row are `lathe_forge::present::court_item`.
+//! list says about itself (when it was read, why it could not be). Filing is `atelier_forge::file_courts`;
+//! the words for each row are `atelier_forge::present::court_item`.
 use std::collections::HashMap;
 
 use beui::{PrChipData, court::CourtItem};
-use lathe_forge::{Court, Filed, ForgeError, Involved, PullRef, file_courts, present};
+use atelier_forge::{Court, Filed, ForgeError, Involved, PullRef, file_courts, present};
 
 #[derive(Default)]
 pub struct ListModel {
@@ -75,18 +75,18 @@ impl ListModel {
             .iter()
             .flat_map(|(_, rows)| rows)
             .map(|f| &f.involved.summary.brief)
-            .filter(|b| matches!(b.state, lathe_forge::PullState::Merged | lathe_forge::PullState::Closed))
+            .filter(|b| matches!(b.state, atelier_forge::PullState::Merged | atelier_forge::PullState::Closed))
             .map(|b| b.reference.clone())
             .collect()
     }
 
     /// The pull requests that are open, for a checkout cleanup: a closed one's checkout can go.
-    pub fn open_numbers(&self, repo: &lathe_forge::RepoRef) -> Vec<u64> {
+    pub fn open_numbers(&self, repo: &atelier_forge::RepoRef) -> Vec<u64> {
         self.filed
             .iter()
             .flat_map(|(_, rows)| rows)
             .map(|f| &f.involved.summary.brief)
-            .filter(|b| b.reference.repo == *repo && matches!(b.state, lathe_forge::PullState::Open | lathe_forge::PullState::Draft))
+            .filter(|b| b.reference.repo == *repo && matches!(b.state, atelier_forge::PullState::Open | atelier_forge::PullState::Draft))
             .map(|b| b.reference.number)
             .collect()
     }

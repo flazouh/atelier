@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use lathe_agents::session::{BlockId, Call, Item, SubagentStatus, ToolCall, ToolId, ToolKind, ToolStatus};
+use atelier_agents::session::{BlockId, Call, Item, SubagentStatus, ToolCall, ToolId, ToolKind, ToolStatus};
 
 use super::*;
 
@@ -25,7 +25,7 @@ fn thinking_time_and_tool_calls_are_counted() {
 fn one_tool_is_singular_and_a_subagent_counts_its_calls() {
     assert_eq!(summary(&[tool("a"), tool("b")], 0, 1, &|_| true), "1 tool call");
     let sub = Item::Subagent {
-        subagent: lathe_agents::session::Subagent { id: ToolId::new("s"), kind: None, task: "t".into(), model: None },
+        subagent: atelier_agents::session::Subagent { id: ToolId::new("s"), kind: None, task: "t".into(), model: None },
         status: SubagentStatus::Done,
         activity: None,
         summary: None,

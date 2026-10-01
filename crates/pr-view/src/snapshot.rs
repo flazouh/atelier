@@ -1,13 +1,13 @@
 //! A pull request kept on disk, so the next open draws from it at once and the forge only brings what
 //! changed. One JSON file per pull request in the app's data folder, written whole through a temporary
-//! name. A file that does not read (a newer or older lathe wrote it, or the disk lost a byte) is a miss,
+//! name. A file that does not read (a newer or older atelier wrote it, or the disk lost a byte) is a miss,
 //! never an error.
 use std::{
     fs, io,
     path::{Path, PathBuf},
 };
 
-use lathe_forge::PullRef;
+use atelier_forge::PullRef;
 
 use crate::data::PullData;
 
@@ -70,7 +70,7 @@ pub struct ListSnapshot {
 struct ListEnvelope {
     version: u32,
     fetched_at: u64,
-    items: Vec<lathe_forge::Involved>,
+    items: Vec<atelier_forge::Involved>,
 }
 
 impl ListSnapshot {
@@ -79,7 +79,7 @@ impl ListSnapshot {
     }
 
     /// The cache of the whole working set, or of one repository's part, each in a file of its own.
-    pub fn scoped(dir: impl Into<PathBuf>, repo: Option<&lathe_forge::RepoRef>) -> Self {
+    pub fn scoped(dir: impl Into<PathBuf>, repo: Option<&atelier_forge::RepoRef>) -> Self {
         let name = match repo {
             Some(repo) => format!("involved-{}-{}-{}.json", repo.host, repo.owner, repo.name),
             None => "involved.json".into(),
@@ -92,12 +92,12 @@ impl ListSnapshot {
     }
 
     /// The items and when they were read, or `None`.
-    pub fn load(&self) -> Option<(Vec<lathe_forge::Involved>, u64)> {
+    pub fn load(&self) -> Option<(Vec<atelier_forge::Involved>, u64)> {
         let envelope: ListEnvelope = serde_json::from_slice(&fs::read(&self.file).ok()?).ok()?;
         (envelope.version == VERSION).then_some((envelope.items, envelope.fetched_at))
     }
 
-    pub fn save(&self, items: &[lathe_forge::Involved], fetched_at: u64) -> io::Result<()> {
+    pub fn save(&self, items: &[atelier_forge::Involved], fetched_at: u64) -> io::Result<()> {
         if let Some(dir) = self.file.parent() {
             fs::create_dir_all(dir)?;
         }

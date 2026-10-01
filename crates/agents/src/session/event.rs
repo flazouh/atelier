@@ -169,7 +169,7 @@ pub struct TurnEnd {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EndReason {
-    /// lathe closed the session.
+    /// atelier closed the session.
     Closed,
     /// The agent's process ended. `code` is `None` when a signal ended it; `stderr` is the last lines it
     /// wrote, which say why when it stopped early.
@@ -189,7 +189,7 @@ pub struct Started {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     Started(Started),
-    /// A user message the session did not receive from lathe: history, or another client.
+    /// A user message the session did not receive from atelier: history, or another client.
     UserMessage { text: String },
     /// Assistant text, streamed. Deltas of one block arrive in order.
     Text { block: BlockId, delta: String },

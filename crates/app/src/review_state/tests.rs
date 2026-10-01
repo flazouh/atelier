@@ -1,4 +1,4 @@
-use lathe_review::FileReview;
+use atelier_review::FileReview;
 
 use super::*;
 
@@ -25,8 +25,8 @@ fn a_review_comes_back_from_its_record() {
     state.committed.insert((Scope::Turn(0), "a.txt".into()), "b89cbbe".into());
     state.approvals.insert("toolu_1".into(), Approval::AlwaysAllowed);
     state.last_activity = Some(1_790_700_000);
-    let scratch = lathe_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "lathe-qa-scratch".into() };
-    state.pull = Some(lathe_forge::PullRef { repo: scratch, number: 7 });
+    let scratch = atelier_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "atelier-qa-scratch".into() };
+    state.pull = Some(atelier_forge::PullRef { repo: scratch, number: 7 });
 
     let json = serde_json::to_string(&state.record()).unwrap();
     let back = ReviewState::from_record(serde_json::from_str(&json).unwrap());

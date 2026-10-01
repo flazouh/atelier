@@ -1,6 +1,6 @@
-//! Runs the Forge write calls on GitHub once, on one scratch repository, `flazouh/lathe-qa-scratch`, through the
-//! real `gh`. Ignored by default, and it does nothing unless `LATHE_REQUIRE_FORGE=1`:
-//!   LATHE_REQUIRE_FORGE=1 cargo test -p lathe-forge --test live_writes -- --ignored --nocapture
+//! Runs the Forge write calls on GitHub once, on one scratch repository, `flazouh/atelier-qa-scratch`, through the
+//! real `gh`. Ignored by default, and it does nothing unless `ATELIER_REQUIRE_FORGE=1`:
+//!   ATELIER_REQUIRE_FORGE=1 cargo test -p atelier-forge --test live_writes -- --ignored --nocapture
 //! It writes to no other repository. Each step is reported on stderr as `ok`, `refused as expected` or `not
 //! tested: why`. It makes a branch and a pull request, marks it ready, brings a newer base into it, turns merge when ready
 //! on and off where the repository allows it, leaves the queue when it has one, refuses to delete the branch of an open
@@ -8,13 +8,13 @@
 //! deleted and the files it put on `main` removed. A drop guard does the cleanup even when a step fails.
 use std::{path::Path, process::Command, sync::Arc, time::Duration};
 
-use lathe_forge::{
+use atelier_forge::{
     Forge, ForgeError, MergeMethod, MergeRequest, NewPull, PullRef, PullState, PullUpdate, RepoRef, UpdateMethod,
     github::GitHub,
 };
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
-const REPO: (&str, &str) = ("flazouh", "lathe-qa-scratch");
+const REPO: (&str, &str) = ("flazouh", "atelier-qa-scratch");
 
 fn sh(dir: &Path, program: &str, args: &[&str]) -> String {
     let out = Command::new(program).args(args).current_dir(dir).output().unwrap_or_else(|e| panic!("{program}: {e}"));
@@ -75,10 +75,10 @@ impl Drop for Cleanup<'_> {
 }
 
 #[test]
-#[ignore = "writes to the scratch repository flazouh/lathe-qa-scratch through the real gh"]
+#[ignore = "writes to the scratch repository flazouh/atelier-qa-scratch through the real gh"]
 fn the_write_calls_run_once_on_the_scratch_repository() {
-    if std::env::var("LATHE_REQUIRE_FORGE").as_deref() != Ok("1") {
-        eprintln!("skipped: set LATHE_REQUIRE_FORGE=1 to write to the scratch repository");
+    if std::env::var("ATELIER_REQUIRE_FORGE").as_deref() != Ok("1") {
+        eprintln!("skipped: set ATELIER_REQUIRE_FORGE=1 to write to the scratch repository");
         return;
     }
     let work = tempfile::tempdir().unwrap();
@@ -86,12 +86,12 @@ fn the_write_calls_run_once_on_the_scratch_repository() {
     sh(work.path(), "gh", &["repo", "clone", &format!("{}/{}", REPO.0, REPO.1), dir.to_str().unwrap()]);
     // Pushes use gh's credentials, for this clone only: no global git setting is changed.
     git(&dir, &["config", "credential.helper", "!gh auth git-credential"]);
-    git(&dir, &["config", "user.name", "lathe qa"]);
+    git(&dir, &["config", "user.name", "atelier qa"]);
     git(&dir, &["config", "user.email", "qa@example.invalid"]);
     // An empty repository has no main yet: make one, with a file that stays.
     if git(&dir, &["branch", "--show-current"]).is_empty() || Command::new("git").args(["rev-parse", "--verify", "-q", "origin/main"]).current_dir(&dir).status().map(|s| !s.success()).unwrap_or(true) {
         git(&dir, &["checkout", "-q", "-B", "main"]);
-        std::fs::write(dir.join("README.md"), "A scratch repository for lathe's QA.\n").unwrap();
+        std::fs::write(dir.join("README.md"), "A scratch repository for atelier's QA.\n").unwrap();
         git(&dir, &["add", "-A"]);
         git(&dir, &["commit", "-q", "-m", "Start"]);
         git(&dir, &["push", "-q", "-u", "origin", "main"]);
@@ -118,7 +118,7 @@ fn the_write_calls_run_once_on_the_scratch_repository() {
     git(&dir, &["push", "-q", "-u", "origin", &branch]);
     cleanup.branches.push(branch.clone());
     git(&dir, &["checkout", "-q", "main"]);
-    let new = NewPull { title: format!("QA {id}: write calls"), body: "Made by lathe's live QA. It closes itself.".into(), base: "main".into(), head: branch.clone(), draft: true };
+    let new = NewPull { title: format!("QA {id}: write calls"), body: "Made by atelier's live QA. It closes itself.".into(), base: "main".into(), head: branch.clone(), draft: true };
     let pull = forge.create_pull(&repo, &new).unwrap();
     cleanup.pulls.push(pull.clone());
     eprintln!("ok                    create_pull #{}", pull.number);
@@ -205,7 +205,7 @@ fn the_write_calls_run_once_on_the_scratch_repository() {
     git(&dir, &["push", "-q", "-u", "origin", &other]);
     cleanup.branches.push(other.clone());
     git(&dir, &["checkout", "-q", "main"]);
-    let second = forge.create_pull(&repo, &NewPull { title: format!("QA {id}: closed"), body: "Made by lathe's live QA.".into(), base: "main".into(), head: other.clone(), draft: false }).unwrap();
+    let second = forge.create_pull(&repo, &NewPull { title: format!("QA {id}: closed"), body: "Made by atelier's live QA.".into(), base: "main".into(), head: other.clone(), draft: false }).unwrap();
     cleanup.pulls.push(second.clone());
     step("update_pull closed", || forge.update_pull(&second, &PullUpdate { closed: Some(true), ..Default::default() }));
     assert_eq!(forge.pull(&second).unwrap().state, PullState::Closed);

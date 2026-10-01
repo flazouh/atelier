@@ -1,5 +1,5 @@
 [package]
-name = "lathe-tracker"
+name = "atelier-tracker"
 description = "The tasks behind a project: a neutral Tracker interface, the local SQLite tracker, and the rules that move a task along."
 version.workspace = true
 edition.workspace = true

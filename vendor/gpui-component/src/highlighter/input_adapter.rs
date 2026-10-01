@@ -58,7 +58,7 @@ impl InputHighlighter for TreeSitterInputHighlighter {
         self.inner.borrow().language().clone()
     }
 
-    /// lathe patch: the UI thread only applies the edit, which moves the old colours with the
+    /// atelier patch: the UI thread only applies the edit, which moves the old colours with the
     /// text. Every parse, whatever the text's size, runs on a background thread, one at a time;
     /// keystrokes during it coalesce into one next parse, and a result for an older text is dropped.
     fn update(

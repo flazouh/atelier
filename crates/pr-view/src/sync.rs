@@ -5,7 +5,7 @@
 //! further apart after failures, with a rate limit obeyed. Nothing here draws or blocks the UI.
 use std::time::Duration;
 
-use lathe_forge::{Forge, ForgeError, PullRef, PullState};
+use atelier_forge::{Forge, ForgeError, PullRef, PullState};
 
 use crate::{
     data::{Part, PartKind, PullData},

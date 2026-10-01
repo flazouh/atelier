@@ -1,13 +1,13 @@
 //! What the composer's `/` and `@` lists hold, read from the project off the UI thread: its skills and
 //! command files, and its files.
 
-use lathe_agents::commands::{CommandInfo, CommandSource, command_file_from, lathe_commands, merge, skill_from};
-use lathe_project::Project;
+use atelier_agents::commands::{CommandInfo, CommandSource, command_file_from, atelier_commands, merge, skill_from};
+use atelier_project::Project;
 
 /// The most files `@` offers: past this, a huge repository would cost more than the list is worth.
 const MOST_FILES: usize = 20_000;
 
-/// The lathe commands that do something today. A command lathe lists but cannot run yet stays out.
+/// The atelier commands that do something today. A command atelier lists but cannot run yet stays out.
 const RUNNING: [&str; 3] = ["files", "tasks", "review"];
 
 /// What the project holds for the lists.
@@ -46,15 +46,15 @@ fn read_text(project: &dyn Project, path: &str) -> Option<String> {
     String::from_utf8(project.read(path).ok()?).ok()
 }
 
-/// The list the composer offers: lathe's running commands, the project's, then the agent's own.
+/// The list the composer offers: atelier's running commands, the project's, then the agent's own.
 pub fn commands(project: Vec<CommandInfo>, agent: &[String]) -> Vec<CommandInfo> {
-    let lathe = lathe_commands().into_iter().filter(|c| RUNNING.contains(&c.name.as_str())).collect();
-    merge(lathe, project, agent)
+    let atelier = atelier_commands().into_iter().filter(|c| RUNNING.contains(&c.name.as_str())).collect();
+    merge(atelier, project, agent)
 }
 
-/// Whether lathe runs `name` itself, rather than the agent.
-pub fn lathe_runs(name: &str) -> bool {
-    lathe_commands().iter().any(|c| c.name == name && c.source == CommandSource::Lathe)
+/// Whether atelier runs `name` itself, rather than the agent.
+pub fn atelier_runs(name: &str) -> bool {
+    atelier_commands().iter().any(|c| c.name == name && c.source == CommandSource::Atelier)
 }
 
 /// The text the agent gets for a command it runs: `/name args`.

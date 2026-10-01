@@ -1,4 +1,4 @@
-//! The forge behind a project: where its pull requests, reviews and checks live. [`Forge`] is lathe's
+//! The forge behind a project: where its pull requests, reviews and checks live. [`Forge`] is atelier's
 //! own interface to one, in GitQuiet's words (`docs/glossary.md`); nothing above it names GitHub.
 //! [`github`] is the first implementation. `docs/forge.md` says how the two fit.
 mod court;

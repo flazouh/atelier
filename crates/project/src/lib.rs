@@ -1,4 +1,4 @@
-//! The Project interface: everything lathe does to a project's files, processes and git goes through
+//! The Project interface: everything atelier does to a project's files, processes and git goes through
 //! [`Project`], so the same app works on a folder on this machine ([`LocalProject`]) and on one over
 //! SSH (M1b), with no code above the trait that knows which.
 //!
@@ -12,7 +12,7 @@ use std::{
     sync::Arc,
 };
 
-use lathe_tracker::{Tracker, TrackerError, TrackerResult};
+use atelier_tracker::{Tracker, TrackerError, TrackerResult};
 
 use serde::{Deserialize, Serialize};
 
@@ -167,7 +167,7 @@ pub trait Project: Send + Sync {
     fn host(&self) -> Option<&str> {
         None
     }
-    /// A file of the project's data folder: lathe's own data about this project, on the project's
+    /// A file of the project's data folder: atelier's own data about this project, on the project's
     /// host and outside the repository (`data.rs`). Paths are relative to that folder; `..` and
     /// absolute paths are refused, as in `read` and `write`.
     fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {

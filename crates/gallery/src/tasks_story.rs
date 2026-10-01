@@ -17,7 +17,7 @@ use beui::{
 use gpui_kit::{
     AppContext, Context, Entity, Focusable, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Window, div, px,
 };
-use lathe_agents::claude;
+use atelier_agents::claude;
 
 mod fixture;
 use fixture::{BASE, ME, labels, people, tasks};

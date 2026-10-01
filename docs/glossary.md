@@ -1,10 +1,10 @@
 # Glossary
 
-lathe's own words, and the ones it keeps from GitQuiet. Code uses the same names.
+atelier's own words, and the ones it keeps from GitQuiet. Code uses the same names.
 
 ## The app
 
-- **Project** (`Project`): a folder lathe works in, wherever it lives. Everything lathe does to its
+- **Project** (`Project`): a folder atelier works in, wherever it lives. Everything atelier does to its
   files, processes and git goes through this one interface.
 - **Local project** (`LocalProject`): a project in a folder on this machine. A remote project (M1b)
   lives on an SSH host.
@@ -40,7 +40,7 @@ lathe's own words, and the ones it keeps from GitQuiet. Code uses the same names
 
 ## Themes
 
-- **Family**: the themes that are one design in light and dark, such as lathe or Catppuccin.
+- **Family**: the themes that are one design in light and dark, such as atelier or Catppuccin.
 - **Raise**: move a colour's lightness until it reaches a contrast target against the page: 4.5:1
   for text, 3:1 for marks.
 - **Mark**: a status colour on an icon or a dot, not on text, held to 3:1.

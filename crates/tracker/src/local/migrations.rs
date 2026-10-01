@@ -64,7 +64,7 @@ pub fn run(conn: &mut Connection) -> TrackerResult<()> {
     let version: usize = conn.pragma_query_value(None, "user_version", |r| r.get(0))?;
     if version > CURRENT {
         return Err(TrackerError::Storage(format!(
-            "this task database is version {version}, and this lathe knows up to {CURRENT}: update lathe"
+            "this task database is version {version}, and this atelier knows up to {CURRENT}: update atelier"
         )));
     }
     for (index, step) in STEPS.iter().enumerate().skip(version) {

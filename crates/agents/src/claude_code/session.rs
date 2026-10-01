@@ -11,7 +11,7 @@ use std::{
     time::Instant,
 };
 
-use lathe_project::{Control, Process};
+use atelier_project::{Control, Process};
 
 use super::{control, map::Mapper};
 use crate::{
@@ -48,7 +48,7 @@ impl ClaudeSession {
                 events.into_iter().for_each(|event| sink_in(event));
             }
             let code = lock(&control_in).wait().ok().flatten();
-            // A session lathe closed says so itself, in `drop`, without waiting for this thread.
+            // A session atelier closed says so itself, in `drop`, without waiting for this thread.
             if closing_in.load(Ordering::SeqCst) {
                 return;
             }
@@ -62,7 +62,7 @@ impl ClaudeSession {
     }
 
     fn request_id(&self) -> String {
-        format!("lathe-{}", self.next_request.fetch_add(1, Ordering::Relaxed))
+        format!("atelier-{}", self.next_request.fetch_add(1, Ordering::Relaxed))
     }
 
     fn write(&self, line: String) -> Result<(), SessionError> {

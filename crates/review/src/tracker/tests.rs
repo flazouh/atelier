@@ -1,11 +1,11 @@
 //! The tracker on real git repositories and real files, through the project, and on a captured run.
 use std::{fs, path::Path, process::Command, sync::Arc};
 
-use lathe_agents::{
+use atelier_agents::{
     claude_code::Mapper,
     session::{Event, PermissionRequest, ToolCall, ToolId, ToolKind, ToolStatus},
 };
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 use tempfile::TempDir;
 
 use super::TurnTracker;
@@ -141,7 +141,7 @@ fn a_file_the_call_names_only_in_its_permission_question_is_taken_too() {
         parent: None,
         status: ToolStatus::Pending,
     };
-    let ask = PermissionRequest { id: lathe_agents::session::RequestId::new("r"), call, reason: None, choices: vec![] };
+    let ask = PermissionRequest { id: atelier_agents::session::RequestId::new("r"), call, reason: None, choices: vec![] };
     tracker.observe(repo.project.as_ref(), &Event::Permission(ask));
     repo.write("a.txt", "y\n");
     assert_eq!(repo.files(tracker)[0].before.as_deref(), Some("x\n"));

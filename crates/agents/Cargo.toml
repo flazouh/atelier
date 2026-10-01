@@ -1,6 +1,6 @@
 [package]
-name = "lathe-agents"
-description = "Agents in lathe: their session model and backends, and each one's look for beui: Claude's spark, colours, and wording."
+name = "atelier-agents"
+description = "Agents in atelier: their session model and backends, and each one's look for beui: Claude's spark, colours, and wording."
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
@@ -9,7 +9,7 @@ license.workspace = true
 [dependencies]
 gpui-kit.workspace = true
 beui.workspace = true
-lathe-project.workspace = true
+atelier-project.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }

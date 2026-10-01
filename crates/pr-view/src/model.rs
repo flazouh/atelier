@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use beui::{CheckRun, RemarkSummary, ReviewProgress, ThreadSummary, conversation::open_first, file_tree::FileTree, merge::MergeFacts, review::step};
 use gpui_kit::SharedString;
-use lathe_forge::{ForgeError, Pull, PullRef, PullState};
+use atelier_forge::{ForgeError, Pull, PullRef, PullState};
 
 use crate::{
     base::{Base, BaseChoice},
@@ -296,7 +296,7 @@ impl PrModel {
 
     /// The threads in the order the conversation list shows them: open first, each group in its own order.
     /// The list reports a press by its place in this order.
-    pub fn threads_in_list_order(&self) -> Vec<&lathe_forge::Thread> {
+    pub fn threads_in_list_order(&self) -> Vec<&atelier_forge::Thread> {
         let (resolved, open): (Vec<_>, Vec<_>) = self.data.threads.iter().partition(|t| t.resolved);
         open.into_iter().chain(resolved).collect()
     }
@@ -304,7 +304,7 @@ impl PrModel {
     /// What merging needs. `conflicting` are the files the reader found in a local merge, when known.
     pub fn merge_facts(&self, conflicting: &[String]) -> Option<MergeFacts> {
         let pull = self.pull()?;
-        Some(lathe_forge::present::merge_facts(pull, Some(&self.data.checks), conflicting))
+        Some(atelier_forge::present::merge_facts(pull, Some(&self.data.checks), conflicting))
     }
 
     /// Comments written in an open review and not sent.
@@ -326,7 +326,7 @@ impl PrModel {
     }
 
     /// The failing checks whose jobs have not been read yet, at most `max`.
-    pub fn jobs_to_read(&self, max: usize) -> Vec<lathe_forge::JobRef> {
+    pub fn jobs_to_read(&self, max: usize) -> Vec<atelier_forge::JobRef> {
         self.data.checks.iter().filter_map(crate::checks::wants_log).filter(|j| !self.jobs.contains_key(&j.id)).take(max).cloned().collect()
     }
 }

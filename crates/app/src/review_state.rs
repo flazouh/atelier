@@ -3,15 +3,15 @@
 //! in the project's data folder with the session (`review/<session id>.json`), so a session resumed after
 //! a restart opens its review as it was left.
 //!
-//! lathe-review's types are not serializable, so the record holds what rebuilds them: each file's texts
+//! atelier-review's types are not serializable, so the record holds what rebuilds them: each file's texts
 //! before and after its turn, each decided file's baseline and current text (`Merged::diff` gives the
 //! hunks still to decide), each mark with the file's version (a mark on a file that changed since stays
 //! expired), and each comment's anchor.
 
 use std::collections::HashMap;
 
-use lathe_agents::session::Attachment;
-use lathe_review::{Anchor, Change, Comments, Content, FileReview, Merged, ReviewComment, Reviewed, SessionReview, Side, TurnReview};
+use atelier_agents::session::Attachment;
+use atelier_review::{Anchor, Change, Comments, Content, FileReview, Merged, ReviewComment, Reviewed, SessionReview, Side, TurnReview};
 use serde::{Deserialize, Serialize};
 
 use crate::review_pane::Scope;
@@ -36,8 +36,8 @@ pub enum Approval {
 }
 
 impl Approval {
-    pub fn of(kind: lathe_agents::session::ChoiceKind) -> Self {
-        use lathe_agents::session::ChoiceKind;
+    pub fn of(kind: atelier_agents::session::ChoiceKind) -> Self {
+        use atelier_agents::session::ChoiceKind;
         match kind {
             ChoiceKind::Allow => Self::Approved,
             ChoiceKind::AllowAlways => Self::AlwaysAllowed,
@@ -56,7 +56,7 @@ pub struct ReviewState {
     /// The files whose decisions went into a commit, by scope and path: the commit's short id.
     pub committed: HashMap<(Scope, String), String>,
     /// The pull request the session opened, if it opened one.
-    pub pull: Option<lathe_forge::PullRef>,
+    pub pull: Option<atelier_forge::PullRef>,
     /// The reader's answer to each call's approval, by the call's id.
     pub approvals: HashMap<String, Approval>,
     /// When the agent last worked in the session, in seconds since the epoch: a resume writes to the
@@ -183,7 +183,7 @@ pub struct Record {
     committed: Vec<(ScopeRecord, String, String)>,
     /// Missing from records written before pull requests were kept.
     #[serde(default)]
-    pull: Option<lathe_forge::PullRef>,
+    pull: Option<atelier_forge::PullRef>,
     /// Missing from records written before approvals were kept.
     #[serde(default)]
     approvals: Vec<(String, Approval)>,

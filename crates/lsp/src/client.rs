@@ -27,7 +27,7 @@ use lsp_types::{
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
-use lathe_project::{Command, Control, Project};
+use atelier_project::{Command, Control, Project};
 
 use crate::framing::{read_message, write_message};
 
@@ -450,7 +450,7 @@ fn classify(message: &Value) -> Routed {
             params: message.get("params").cloned().unwrap_or(Value::Null),
         };
     }
-    // Replies answer lathe's own requests, which it numbers.
+    // Replies answer atelier's own requests, which it numbers.
     if let Some(id) = message.get("id").and_then(Value::as_i64) {
         if let Some(error) = message.get("error") {
             let code = error.get("code").and_then(Value::as_i64).unwrap_or(0);
@@ -538,7 +538,7 @@ pub fn uri_to_path(uri: &Uri) -> Option<PathBuf> {
 /// JSON-RPC's code for a method the receiver does not implement.
 pub const METHOD_NOT_FOUND: i64 = -32601;
 
-/// What lathe answers to a request a server sends. A server that asks for settings gets none, so it
+/// What atelier answers to a request a server sends. A server that asks for settings gets none, so it
 /// uses its defaults; one that registers a capability or a progress token is told yes; one that asks
 /// for the workspace folders gets the one root. Anything else is not implemented, which a server must
 /// accept rather than hang on an answer that never comes.
@@ -556,6 +556,6 @@ pub fn answer_for(method: &str, params: &Value, root: &Path) -> Result<Value, (i
             let name = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
             Ok(json!([{ "uri": uri.as_str(), "name": name }]))
         }
-        other => Err((METHOD_NOT_FOUND, format!("lathe does not implement {other}"))),
+        other => Err((METHOD_NOT_FOUND, format!("atelier does not implement {other}"))),
     }
 }

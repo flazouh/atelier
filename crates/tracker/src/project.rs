@@ -17,7 +17,7 @@ impl ProjectKey {
         }
     }
 
-    /// The last part of the path: "lathe" for "/Users/alex/code/lathe".
+    /// The last part of the path: "atelier" for "/Users/alex/code/atelier".
     pub fn folder(&self) -> &str {
         let (Self::Local { path } | Self::Ssh { path, .. }) = self;
         trim_slash(path).rsplit('/').find(|part| !part.is_empty()).unwrap_or("project")
@@ -48,7 +48,7 @@ fn fnv1a(bytes: &[u8]) -> u64 {
 }
 
 /// The prefix of short ids from a project's name: its first three letters or digits, in capitals.
-/// "lathe" gives "LAT", "api-server" gives "API", and a name with none gives "TSK".
+/// "atelier" gives "ATE", "api-server" gives "API", and a name with none gives "TSK".
 pub fn prefix_for(name: &str) -> String {
     let prefix: String = name.chars().filter(char::is_ascii_alphanumeric).take(3).collect::<String>().to_uppercase();
     if prefix.is_empty() { "TSK".to_string() } else { prefix }

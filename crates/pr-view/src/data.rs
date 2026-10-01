@@ -1,6 +1,6 @@
 //! One pull request as the reader has it so far. The forge answers in parts, so a screen can draw the
 //! header while the files are still coming, and a part that fails does not take the others with it.
-use lathe_forge::{ChangedFile, Check, ForgeError, HeldComment, Pull, PullRef, Remark, Thread};
+use atelier_forge::{ChangedFile, Check, ForgeError, HeldComment, Pull, PullRef, Remark, Thread};
 use serde::{Deserialize, Serialize};
 
 /// Everything read about a pull request. A field is empty until its part arrives; [`PullData::has`] says

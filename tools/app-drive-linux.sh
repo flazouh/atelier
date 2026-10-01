@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# Drives the lathe app on a headless Linux box and screenshots or records it: the screen is the
+# Drives the atelier app on a headless Linux box and screenshots or records it: the screen is the
 # window's size, so the window sits at 0,0 and the xdotool script's coordinates are the window's.
-# Build first: cargo build -p lathe-app.
+# Build first: cargo build -p atelier-app.
 # Usage: tools/app-drive-linux.sh "<folders, or ->" "<theme>" <width>x<height> out.png|out.mp4 ["<shell script>"]
 # "-" opens no folder, for the start screen; several folders, split by spaces, open as several projects. The run keeps its own settings file, with that theme,
-# unless LATHE_SETTINGS names one (light or dark sets its `mode`). APP_WAIT=<seconds> sets how long it runs before the script.
+# unless ATELIER_SETTINGS names one (light or dark sets its `mode`). APP_WAIT=<seconds> sets how long it runs before the script.
 set -euo pipefail
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
 DISPLAY_NUM=:${APP_DISPLAY:-79}
-if [ -z "${LATHE_SETTINGS:-}" ]; then
-  export LATHE_SETTINGS=$(mktemp -d)/settings.json
-  printf '{"mode": "%s"}' "$2" >"$LATHE_SETTINGS"
+if [ -z "${ATELIER_SETTINGS:-}" ]; then
+  export ATELIER_SETTINGS=$(mktemp -d)/settings.json
+  printf '{"mode": "%s"}' "$2" >"$ATELIER_SETTINGS"
 fi
-Xvfb "$DISPLAY_NUM" -screen 0 "${3}x24" -nolisten tcp >/tmp/lathe-xvfb.log 2>&1 &
+Xvfb "$DISPLAY_NUM" -screen 0 "${3}x24" -nolisten tcp >/tmp/atelier-xvfb.log 2>&1 &
 XVFB=$!
 trap 'kill $APP $XVFB 2>/dev/null || true' EXIT
 sleep 1
 FOLDER=()
 if [ "$1" != "-" ]; then read -r -a FOLDER <<<"$1"; fi
-DISPLAY=$DISPLAY_NUM WAYLAND_DISPLAY= LATHE_SIZE=$3 LATHE_TIMINGS=1 "$TARGET/debug/lathe" "${FOLDER[@]}" >/tmp/lathe-app.log 2>&1 &
+DISPLAY=$DISPLAY_NUM WAYLAND_DISPLAY= ATELIER_SIZE=$3 ATELIER_TIMINGS=1 "$TARGET/debug/atelier" "${FOLDER[@]}" >/tmp/atelier-app.log 2>&1 &
 APP=$!
 sleep "${APP_WAIT:-6}"
 export DISPLAY=$DISPLAY_NUM

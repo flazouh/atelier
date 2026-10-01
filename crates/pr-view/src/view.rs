@@ -27,9 +27,9 @@ use gpui_kit::{
     component::input::EditorState,
     div,
 };
-use lathe_editor::{EditorSession, Elsewhere, Jump};
-use lathe_forge::{ForgeError, MergeOutcome, NewLine, PullRef, PullState, Side, ThreadId, Verdict};
-use lathe_lsp::canonical;
+use atelier_editor::{EditorSession, Elsewhere, Jump};
+use atelier_forge::{ForgeError, MergeOutcome, NewLine, PullRef, PullState, Side, ThreadId, Verdict};
+use atelier_lsp::canonical;
 use lsp_types::Position;
 
 use crate::{
@@ -206,7 +206,7 @@ impl PullView {
         let editor = beui::CodeEditor::state("", "", window, cx);
         let composer = cx.new(|cx| CommentComposer::new("On this pull request", me, window, cx));
         let verdict = cx.new(|cx| VerdictBox::new("", false, window, cx));
-        let facts = lathe_forge::present::merge_facts(&crate::fixture::sample::pull(&reference, ""), None, &[]);
+        let facts = atelier_forge::present::merge_facts(&crate::fixture::sample::pull(&reference, ""), None, &[]);
         let choice = beui::merge::first_choice(&facts, None);
         let merge = cx.new(|cx| MergeBox::new(facts, choice, "", "", window, cx));
         let subscriptions = vec![
@@ -959,7 +959,7 @@ impl PullView {
 
     /// Sends a change to the forge in the background. `words` is what the notice says while it is on its
     /// way. A read-only view sends nothing and says so.
-    fn write(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn lathe_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) -> Option<Task<Result<String, ForgeError>>> {
+    fn write(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn atelier_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) -> Option<Task<Result<String, ForgeError>>> {
         if self.model.read_only {
             self.notice = Some("Read-only: nothing was sent.".into());
             cx.notify();
@@ -972,7 +972,7 @@ impl PullView {
     }
 
     /// Runs a write to its end and takes the answer in as a message.
-    pub(crate) fn write_and_report(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn lathe_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) {
+    pub(crate) fn write_and_report(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn atelier_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) {
         let Some(task) = self.write(words, cx, send) else { return };
         let tx = self.tx.clone();
         cx.spawn(async move |_, _| {
@@ -1033,7 +1033,7 @@ impl PullView {
                 MergeOutcome::WillMergeWhenReady => "It will merge when it is ready.".to_string(),
                 MergeOutcome::Queued => "Added to the merge queue.".to_string(),
             }),
-            Ask::Ready => forge.update_pull(reference, &lathe_forge::PullUpdate { ready: Some(true), ..Default::default() }).map(|()| "Ready for review.".to_string()),
+            Ask::Ready => forge.update_pull(reference, &atelier_forge::PullUpdate { ready: Some(true), ..Default::default() }).map(|()| "Ready for review.".to_string()),
             Ask::UpdateBranch { method, expected_head } => forge.update_branch(reference, method, &expected_head).map(|()| "The branch is up to date.".to_string()),
             Ask::CancelAutoMerge => forge.cancel_auto_merge(reference).map(|()| "Merge when ready is off.".to_string()),
             Ask::Dequeue => forge.dequeue(reference).map(|()| "Out of the merge queue.".to_string()),
@@ -1288,6 +1288,6 @@ impl PullView {
 }
 
 /// A job that has been asked for and not read, so the same job is not asked for twice.
-fn placeholder_job(job: &lathe_forge::JobRef) -> lathe_forge::Job {
-    lathe_forge::Job { reference: job.clone(), name: String::new(), status: lathe_forge::CheckStatus::Queued, conclusion: None, run_id: 0, attempt: 1, steps: Vec::new() }
+fn placeholder_job(job: &atelier_forge::JobRef) -> atelier_forge::Job {
+    atelier_forge::Job { reference: job.clone(), name: String::new(), status: atelier_forge::CheckStatus::Queued, conclusion: None, run_id: 0, attempt: 1, steps: Vec::new() }
 }

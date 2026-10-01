@@ -26,8 +26,8 @@ use gpui_kit::{
     div, prelude::FluentBuilder, 
 };
 use beui::scale::px;
-use lathe_project::LocalProject;
-use lathe_settings::Location;
+use atelier_project::LocalProject;
+use atelier_settings::Location;
 
 use std::collections::BTreeMap;
 mod fit;
@@ -53,7 +53,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(atelier, [ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -61,13 +61,13 @@ pub const TITLE_BAR: f32 = 38.;
 const NOTICE_FOR: std::time::Duration = std::time::Duration::from_secs(5);
 const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else { 12. };
 
-/// Where the shell keeps what it saves. A test writes only where `LATHE_SETTINGS` points, never the
+/// Where the shell keeps what it saves. A test writes only where `ATELIER_SETTINGS` points, never the
 /// reader's own settings.
 fn settings_path() -> Option<std::path::PathBuf> {
-    if cfg!(test) && std::env::var_os("LATHE_SETTINGS").is_none() {
+    if cfg!(test) && std::env::var_os("ATELIER_SETTINGS").is_none() {
         return None;
     }
-    lathe_settings::path()
+    atelier_settings::path()
 }
 
 /// How often the sidebar's ages are brought up to date.
@@ -132,7 +132,7 @@ pub struct Shell {
     badges: agents_view::Badges,
     /// "Choose an icon…", while it is open: the chooser, the project's place, and its events.
     icon: Option<(Entity<beui::icon_picker::IconPicker>, SharedString, Subscription)>,
-    /// With `LATHE_FRAMES=1`, times every frame.
+    /// With `ATELIER_FRAMES=1`, times every frame.
     meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
     /// The sidebar's and the right pane's widths as the reader dragged them; the window's width may
     /// show them narrower (`fit::widths`).
@@ -145,13 +145,13 @@ pub struct Shell {
     /// The right pane's width before a review widened it, to give back when the review closes.
     before_review: Option<f32>,
     /// Sessions open at the last quit, waiting for their project to open.
-    restoring: Vec<lathe_settings::OpenSession>,
+    restoring: Vec<atelier_settings::OpenSession>,
     /// Projects being opened: until they all arrive, a saved session may still find its project.
     opening: usize,
     /// The session in front at the last quit, by the agent's id.
     front: Option<String>,
     /// The open sessions and the one in front as the settings file has them, to write only a change.
-    saved_open: (Vec<lathe_settings::OpenSession>, Option<String>),
+    saved_open: (Vec<atelier_settings::OpenSession>, Option<String>),
     _subscriptions: Vec<Subscription>,
     /// Each open session's panel view, by the session's entity.
     panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
@@ -178,7 +178,7 @@ const REVIEW_WIDTH: f32 = 860.;
 const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::panel_layout::GAP + 4.;
 
 impl Shell {
-    pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
+    pub fn new(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Self {
         // The zoom the reader left it at.
         beui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
         let agents_sidebar = cx.new(Sidebar::new);
@@ -299,7 +299,7 @@ impl Shell {
             for session in &p.sessions {
                 let s = session.read(cx);
                 if let Some(id) = &s.id {
-                    open.push(lathe_settings::OpenSession { location: p.location.clone(), id: id.as_str().to_string(), title: s.shown_title().to_string() });
+                    open.push(atelier_settings::OpenSession { location: p.location.clone(), id: id.as_str().to_string(), title: s.shown_title().to_string() });
                 }
             }
         }
@@ -311,7 +311,7 @@ impl Shell {
         self.saved_open = now.clone();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
-                if let Err(error) = lathe_settings::update(&path, |s| (s.open, s.front) = now) {
+                if let Err(error) = atelier_settings::update(&path, |s| (s.open, s.front) = now) {
                     eprintln!("could not keep the open sessions: {error}");
                 }
             })
@@ -321,7 +321,7 @@ impl Shell {
 
     /// The sessions open at the last quit: each opens again when its project opens. With `open_projects`
     /// (no folder named at launch), their projects open too; else only the named ones do.
-    pub fn restore(&mut self, open: Vec<lathe_settings::OpenSession>, front: Option<String>, open_projects: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn restore(&mut self, open: Vec<atelier_settings::OpenSession>, front: Option<String>, open_projects: bool, window: &mut Window, cx: &mut Context<Self>) {
         let places = restore::locations(&open);
         (self.restoring, self.front) = (open, front);
         if !open_projects {
@@ -340,7 +340,7 @@ impl Shell {
     fn reopen(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.projects.get(at).cloned() else { return };
         let location = project.read(cx).location.clone();
-        let mine: Vec<lathe_settings::OpenSession> = restore::of(&self.restoring, &location).into_iter().cloned().collect();
+        let mine: Vec<atelier_settings::OpenSession> = restore::of(&self.restoring, &location).into_iter().cloned().collect();
         if mine.is_empty() {
             return;
         }
@@ -352,7 +352,7 @@ impl Shell {
         }
         let mut shown = None;
         for saved in mine {
-            let id = lathe_agents::session::SessionId::new(saved.id.clone());
+            let id = atelier_agents::session::SessionId::new(saved.id.clone());
             let title = self.names.get(&saved.id).cloned().unwrap_or(saved.title.clone());
             let session = project.update(cx, |p, cx| p.open_session(Some((id, title.into())), window, cx));
             if let Some(name) = self.names.get(&saved.id) {
@@ -524,7 +524,7 @@ impl Shell {
         }
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
-                let result = lathe_settings::update(&path, |s| {
+                let result = atelier_settings::update(&path, |s| {
                     s.archived_sessions.retain(|kept| *kept != id);
                     if archive {
                         s.archived_sessions.push(id.clone());
@@ -545,7 +545,7 @@ impl Shell {
         let kept = beui::scale::set_zoom(to);
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
-                if let Err(error) = lathe_settings::update(&path, |s| s.ui_zoom = Some(kept)) {
+                if let Err(error) = atelier_settings::update(&path, |s| s.ui_zoom = Some(kept)) {
                     eprintln!("could not keep the zoom: {error}");
                 }
             })
@@ -567,7 +567,7 @@ impl Shell {
         let key = layout.mode.key().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
-                if let Err(error) = lathe_settings::update(&path, |s| s.sidebar = Some(key)) {
+                if let Err(error) = atelier_settings::update(&path, |s| s.sidebar = Some(key)) {
                     eprintln!("could not keep the sidebar's mode: {error}");
                 }
             })
@@ -588,14 +588,14 @@ impl Shell {
             PanelsEvent::StateChanged => {
                 self.mark_open_session(cx);
                 let state = self.panels.read(cx).state();
-                let panels = lathe_settings::Panels {
+                let panels = atelier_settings::Panels {
                     single: state.layout == Layout::Single,
                     grouped: state.grouped,
                     widths: state.widths.iter().map(|(id, w)| (id.to_string(), *w)).collect(),
                 };
                 if let Some(path) = settings_path() {
                     cx.background_spawn(async move {
-                        if let Err(error) = lathe_settings::update(&path, |s| s.panels = panels) {
+                        if let Err(error) = atelier_settings::update(&path, |s| s.panels = panels) {
                             eprintln!("could not save the panels: {error}");
                         }
                     })
@@ -628,7 +628,7 @@ impl Shell {
             _ = this.update_in(cx, |this, window, cx| {
                 match opened {
                     Ok(project) => {
-                        let location = Location::Local { path: lathe_project::Project::root(&project).to_path_buf() };
+                        let location = Location::Local { path: atelier_project::Project::root(&project).to_path_buf() };
                         this.add(location, Arc::new(project), window, cx);
                     }
                     Err(error) => this.say(format!("Could not open the folder: {error}"), cx),
@@ -656,8 +656,8 @@ impl Shell {
             cx.notify();
             return;
         }
-        let saved = settings_path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
-        let agents = lathe_agents::registry::agents()
+        let saved = settings_path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
+        let agents = atelier_agents::registry::agents()
             .into_iter()
             .map(|agent| crate::settings_pane::AgentRow {
                 name: agent.name.into(),
@@ -685,7 +685,7 @@ impl Shell {
     fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
         let form = cx.new(|cx| SshForm::new(Vec::new(), window, cx));
         // ~/.ssh/config is read off the UI thread; the form fills its hosts in when it has them.
-        let reading = cx.background_spawn(async { lathe_remote::ssh::known_hosts() });
+        let reading = cx.background_spawn(async { atelier_remote::ssh::known_hosts() });
         let filling = form.downgrade();
         cx.spawn_in(window, async move |_, cx| {
             let hosts = reading.await;
@@ -701,14 +701,14 @@ impl Shell {
         cx.notify();
     }
 
-    /// Opens `path` on `host` over ssh: the host is probed and given lathe-remote if need be, all on
+    /// Opens `path` on `host` over ssh: the host is probed and given atelier-remote if need be, all on
     /// a background thread, and the form, when open, shows each step and any failure.
     pub fn open_remote(&mut self, host: String, path: String, window: &mut Window, cx: &mut Context<Self>) {
         self.opening += 1;
         let (tx, mut steps) = futures_channel::mpsc::unbounded::<String>();
         let connecting = {
             let (host, path) = (host.clone(), path.clone());
-            cx.background_spawn(async move { lathe_remote::ssh::connect(&host, &path, &|line| drop(tx.unbounded_send(line))) })
+            cx.background_spawn(async move { atelier_remote::ssh::connect(&host, &path, &|line| drop(tx.unbounded_send(line))) })
         };
         cx.spawn_in(window, async move |this, cx| {
             use futures_util::StreamExt;
@@ -754,7 +754,7 @@ impl Shell {
         }
     }
 
-    /// `element`, timed as the part `name` under `LATHE_FRAMES`.
+    /// `element`, timed as the part `name` under `ATELIER_FRAMES`.
     fn part(&self, name: &'static str, element: AnyElement) -> AnyElement {
         match self.meter.clone() {
             Some(meter) => crate::frame_meter::Part { name, child: element, meter }.into_any_element(),
@@ -864,7 +864,7 @@ impl Shell {
         let words = self.view.words().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
-                if let Err(error) = lathe_settings::update(&path, |s| s.view = Some(words)) {
+                if let Err(error) = atelier_settings::update(&path, |s| s.view = Some(words)) {
                     eprintln!("could not keep the view: {error}");
                 }
             })
@@ -882,7 +882,7 @@ impl Shell {
         cx.notify();
     }
 
-    fn add(&mut self, location: Location, project: Arc<dyn lathe_project::Project>, window: &mut Window, cx: &mut Context<Self>) {
+    fn add(&mut self, location: Location, project: Arc<dyn atelier_project::Project>, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(i) = self.projects.iter().position(|p| p.read(cx).location == location) {
             self.active = i;
             cx.notify();
@@ -956,7 +956,7 @@ impl Shell {
                 let (id, name) = (id.0.clone(), name.to_string());
                 if let Some(path) = settings_path() {
                     cx.background_spawn(async move {
-                        if let Err(error) = lathe_settings::update(&path, |s| drop(s.session_names.insert(id, name))) {
+                        if let Err(error) = atelier_settings::update(&path, |s| drop(s.session_names.insert(id, name))) {
                             eprintln!("could not save the name: {error}");
                         }
                     })
@@ -976,12 +976,12 @@ impl Shell {
 
     /// Puts `location` first in the recent list, here and in the settings file.
     fn remember(&mut self, location: Location, cx: &mut Context<Self>) {
-        let mut settings = lathe_settings::Settings { recent: std::mem::take(&mut self.recent), ..Default::default() };
+        let mut settings = atelier_settings::Settings { recent: std::mem::take(&mut self.recent), ..Default::default() };
         settings.opened(location.clone());
         self.recent = settings.recent;
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
-                if let Err(error) = lathe_settings::update(&path, |s| s.opened(location)) {
+                if let Err(error) = atelier_settings::update(&path, |s| s.opened(location)) {
                     eprintln!("could not remember the project: {error}");
                 }
             })
@@ -1144,7 +1144,7 @@ impl Shell {
                     let (dir, source) = (dir.clone(), source.clone());
                     async move {
                         match source {
-                            FolderSource::Local => lathe_project::read_local_dir(&dir),
+                            FolderSource::Local => atelier_project::read_local_dir(&dir),
                             FolderSource::Remote { project, .. } => project.read_dir(&dir),
                         }
                     }
@@ -1160,7 +1160,7 @@ impl Shell {
                 // The picker stays until the folder opens: a folder that will not open is said in the picker, with
                 // the path as the reader typed it.
                 match &source {
-                    FolderSource::Local => match lathe_project::expand_home(path) {
+                    FolderSource::Local => match atelier_project::expand_home(path) {
                         Some(target) => {
                             let opening = cx.background_spawn(async move { LocalProject::open(target) });
                             let picker = picker.downgrade();
@@ -1169,7 +1169,7 @@ impl Shell {
                                 _ = this.update_in(cx, |this, window, cx| match opened {
                                     Ok(project) => {
                                         this.close_folder_picker(window, cx);
-                                        let location = Location::Local { path: lathe_project::Project::root(&project).to_path_buf() };
+                                        let location = Location::Local { path: atelier_project::Project::root(&project).to_path_buf() };
                                         this.add(location, Arc::new(project), window, cx);
                                     }
                                     Err(error) => {
@@ -1188,7 +1188,7 @@ impl Shell {
                         picker.update(cx, |p, cx| p.working(Some(format!("Opening {path} on {host}…").into()), cx));
                         let connecting = {
                             let (host, path) = (host.clone(), path.clone());
-                            cx.background_spawn(async move { lathe_remote::ssh::connect(&host, &path, &|_| {}) })
+                            cx.background_spawn(async move { atelier_remote::ssh::connect(&host, &path, &|_| {}) })
                         };
                         let picker = picker.downgrade();
                         cx.spawn_in(window, async move |this, cx| {
@@ -1220,7 +1220,7 @@ impl Shell {
         let (tx, mut steps) = futures_channel::mpsc::unbounded::<String>();
         let connecting = {
             let host = host.clone();
-            cx.background_spawn(async move { lathe_remote::ssh::connect_at_home(&host, &|line| drop(tx.unbounded_send(line))) })
+            cx.background_spawn(async move { atelier_remote::ssh::connect_at_home(&host, &|line| drop(tx.unbounded_send(line))) })
         };
         cx.spawn_in(window, async move |this, cx| {
             use futures_util::StreamExt;
@@ -1238,7 +1238,7 @@ impl Shell {
             _ = this.update_in(cx, |this, window, cx| match connected {
                 Ok((project, _home)) => {
                     this.ssh = None;
-                    let project: Arc<dyn lathe_project::Project> = Arc::new(project);
+                    let project: Arc<dyn atelier_project::Project> = Arc::new(project);
                     this.open_folder_picker_over(FolderSource::Remote { host, project }, window, cx);
                 }
                 Err(error) => this.form_phase(Phase::Failed(error.to_string().into()), cx),
@@ -1264,8 +1264,8 @@ impl Shell {
         };
         let paths = tree.file_paths();
         let root = match &project.read(cx).location {
-            lathe_settings::Location::Local { path } => Some(path.clone()),
-            lathe_settings::Location::Ssh { .. } => None,
+            atelier_settings::Location::Local { path } => Some(path.clone()),
+            atelier_settings::Location::Ssh { .. } => None,
         };
         let picker = cx.new(|cx| beui::icon_picker::IconPicker::new(paths, root, window, cx));
         let key = place.clone();
@@ -1295,7 +1295,7 @@ impl Shell {
         let Some(file) = file else {
             self.badges.icons.remove(&key);
             cx.background_spawn(async move {
-                if let Err(error) = lathe_settings::update(&settings, |s| drop(s.project_icons.remove(&key))) {
+                if let Err(error) = atelier_settings::update(&settings, |s| drop(s.project_icons.remove(&key))) {
                     eprintln!("could not save the icon: {error}");
                 }
             })
@@ -1321,7 +1321,7 @@ impl Shell {
                     std::fs::create_dir_all(&folder)?;
                     std::fs::write(&saved, bytes)?;
                     let path = saved.display().to_string();
-                    lathe_settings::update(&settings, |s| drop(s.project_icons.insert(key, path))).map(drop)
+                    atelier_settings::update(&settings, |s| drop(s.project_icons.insert(key, path))).map(drop)
                 })
                 .await;
             _ = this.update(cx, |this, cx| match written {
@@ -1421,7 +1421,7 @@ impl Shell {
         }
         match self.active().and_then(|_| self.back_to_sessions(cx)) {
             Some(back) => back,
-            None => div().font_weight(gpui_kit::FontWeight::MEDIUM).child("lathe").into_any_element(),
+            None => div().font_weight(gpui_kit::FontWeight::MEDIUM).child("atelier").into_any_element(),
         }
     }
 
@@ -1598,9 +1598,9 @@ impl Shell {
                     .flex_col()
                     .gap(px(20.))
                     .w(px(420.))
-                    .child(div().flex().child(beui::LatheMark::new(40.)))
+                    .child(div().flex().child(beui::AtelierMark::new(40.)))
                     .child(div().text_size(TextSize::Lg.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open a project"))
-                    .child(div().debug_selector(|| "first-launch-line".into()).mt(px(-12.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(WHAT_LATHE_IS))
+                    .child(div().debug_selector(|| "first-launch-line".into()).mt(px(-12.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(WHAT_ATELIER_IS))
                     .child(
                         div()
                             .flex()
@@ -1891,8 +1891,8 @@ impl Shell {
     }
 }
 
-/// What the first launch says lathe is, in one line.
-const WHAT_LATHE_IS: &str = "Run coding agents on your code, review every change they make, and commit what you keep.";
+/// What the first launch says atelier is, in one line.
+const WHAT_ATELIER_IS: &str = "Run coding agents on your code, review every change they make, and commit what you keep.";
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1925,8 +1925,8 @@ impl Shell {
             Some(project) => self.panes(&project, window, cx),
         };
         let link_down = self.active().and_then(|p| match &p.read(cx).link {
-            lathe_project::Link::Down(why) => Some((p.read(cx).location.place(), why.clone())),
-            lathe_project::Link::Up => None,
+            atelier_project::Link::Down(why) => Some((p.read(cx).location.place(), why.clone())),
+            atelier_project::Link::Up => None,
         });
         let banner = link_down.map(|(place, why)| {
             div()
@@ -2046,7 +2046,7 @@ impl Shell {
 enum FolderSource {
     Local,
     /// A host's, through a project connected at its home folder.
-    Remote { host: String, project: Arc<dyn lathe_project::Project> },
+    Remote { host: String, project: Arc<dyn atelier_project::Project> },
 }
 
 /// A failure to read or open a folder, as the picker tells it.

@@ -178,7 +178,7 @@ pub struct Fixture {
 
 impl Fixture {
     pub fn write() -> Self {
-        let root = std::env::temp_dir().join("lathe-gallery-pr");
+        let root = std::env::temp_dir().join("atelier-gallery-pr");
         let files = UNCHANGED.iter().copied().chain(CHANGES.iter().map(|c| (c.path, c.head)));
         for (path, text) in files {
             let path = root.join(path);
@@ -187,7 +187,7 @@ impl Fixture {
             }
             let _ = fs::write(&path, text);
         }
-        let root = lathe_lsp::canonical(&root);
+        let root = atelier_lsp::canonical(&root);
         Self { root, changed: CHANGES.iter().map(shown).collect() }
     }
 

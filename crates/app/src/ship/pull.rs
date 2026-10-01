@@ -1,6 +1,6 @@
 //! Opening the pull request: the bases to pick from, the prompt the agent drafts the title and the
 //! body from, and the draft's split into the two. Blocking: call it off the UI thread.
-use lathe_project::Project;
+use atelier_project::Project;
 
 use crate::ship::{branch, commit::git, drafts};
 

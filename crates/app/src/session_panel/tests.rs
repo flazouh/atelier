@@ -1,5 +1,5 @@
 use gpui_kit::{TestAppContext, px, size};
-use lathe_agents::session::{BlockId, Event};
+use atelier_agents::session::{BlockId, Event};
 
 use super::*;
 use crate::fake_agent::{ended, start};

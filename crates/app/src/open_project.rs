@@ -20,16 +20,16 @@ use gpui_kit::{
     base::input::{InputEvent, Position},
     component::input::EditorState,
 };
-use lathe_editor::{ASK, EditorSession, Elsewhere, Jump, READY};
-use lathe_pr_view::{
+use atelier_editor::{ASK, EditorSession, Elsewhere, Jump, READY};
+use atelier_pr_view::{
     hub::{PrEvent, PrHub},
     list_view::ListEvent,
 };
-use lathe_lsp::{Store, Workers};
-use lathe_project::{Change, ChangeKind, Link, Project, Watch};
-use lathe_settings::Location;
+use atelier_lsp::{Store, Workers};
+use atelier_project::{Change, ChangeKind, Link, Project, Watch};
+use atelier_settings::Location;
 
-use lathe_agents::{registry::Agent, session::{SessionId, SessionSummary}};
+use atelier_agents::{registry::Agent, session::{SessionId, SessionSummary}};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
@@ -153,9 +153,9 @@ pub struct OpenProject {
     /// What the reader asked the right pane for last.
     right_asked: front::Front,
     /// A pull request to show once the pull request view has mounted.
-    pending_pull: Option<lathe_forge::PullRef>,
+    pending_pull: Option<atelier_forge::PullRef>,
     /// The project's own repository on its forge, from the origin remote; `None` when it has none.
-    repo: Option<lathe_forge::RepoRef>,
+    repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
     list_rows: Vec<beui::PrChipData>,
@@ -165,7 +165,7 @@ pub struct OpenProject {
     /// When each number was last asked about, so it is not asked again for a while.
     asked: HashMap<u64, std::time::Instant>,
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
-    chip_forge: Option<std::sync::Arc<dyn lathe_forge::Forge>>,
+    chip_forge: Option<std::sync::Arc<dyn atelier_forge::Forge>>,
     opening_pulls: Task<()>,
     /// The tasks hearing of sessions, one at a time and in order.
     task_signals: Task<()>,
@@ -210,7 +210,7 @@ impl OpenProject {
             link: Link::Up,
             tabs: Tabs::default(),
             buffers: HashMap::new(),
-            agent: lathe_agents::registry::agents().remove(0),
+            agent: atelier_agents::registry::agents().remove(0),
             sessions: Vec::new(),
             past: Vec::new(),
             _session_events: Vec::new(),
@@ -325,7 +325,7 @@ impl OpenProject {
                     return this.look_up_chips(texts, cx);
                 }
                 SessionEvent::ChooseAgent(backend) => {
-                    if let Some(agent) = lathe_agents::registry::by_backend(backend) {
+                    if let Some(agent) = atelier_agents::registry::by_backend(backend) {
                         this.choose_agent(&session.read(cx).key.clone(), agent, window, cx);
                     }
                     return;
@@ -409,7 +409,7 @@ impl OpenProject {
         let project = self.project.clone();
         let remote = cx.background_spawn(async move { project.git(&["remote", "get-url", "origin"]) });
         cx.spawn(async move |this, cx| {
-            let repo = remote.await.ok().filter(|out| out.ok()).and_then(|out| lathe_forge::RepoRef::from_remote(out.stdout.trim()));
+            let repo = remote.await.ok().filter(|out| out.ok()).and_then(|out| atelier_forge::RepoRef::from_remote(out.stdout.trim()));
             _ = this.update(cx, |this, cx| this.set_repo(repo, cx));
         })
         .detach();
@@ -468,7 +468,7 @@ impl OpenProject {
             return cx.emit(ProjectEvent::Said(NO_FORGE_REMOTE.into()));
         };
         let (project, workers) = (self.project.clone(), self.workers.clone());
-        let Some(local) = lathe_settings::path().and_then(|p| p.parent().map(std::path::Path::to_path_buf)) else {
+        let Some(local) = atelier_settings::path().and_then(|p| p.parent().map(std::path::Path::to_path_buf)) else {
             return cx.emit(ProjectEvent::Said("Pull requests need a data folder on this machine".into()));
         };
         cx.emit(ProjectEvent::Said("Reading pull requests…".into()));
@@ -495,7 +495,7 @@ impl OpenProject {
         // A pull request that reads as merged for the first time in this run tells its tasks.
         for row in rows.iter().filter(|r| r.state == beui::pr::PrState::Merged) {
             if self.merged_told.insert(row.number) {
-                self.send_signal(lathe_tracker::Signal::PrMerged { number: row.number, by: "github".into() }, cx);
+                self.send_signal(atelier_tracker::Signal::PrMerged { number: row.number, by: "github".into() }, cx);
             }
         }
         self.list_rows = rows;
@@ -503,7 +503,7 @@ impl OpenProject {
     }
 
     /// The project's own repository, once the origin remote is read.
-    pub fn set_repo(&mut self, repo: Option<lathe_forge::RepoRef>, cx: &mut Context<Self>) {
+    pub fn set_repo(&mut self, repo: Option<atelier_forge::RepoRef>, cx: &mut Context<Self>) {
         self.repo = repo;
         self.refresh_chips(cx);
     }
@@ -511,7 +511,7 @@ impl OpenProject {
     /// The chips from the list and the repository. The list notifies on a hover or a tick, so the
     /// sessions hear only of chips that changed.
     fn refresh_chips(&mut self, cx: &mut Context<Self>) {
-        let slug = self.repo.as_ref().map(lathe_forge::RepoRef::slug);
+        let slug = self.repo.as_ref().map(atelier_forge::RepoRef::slug);
         let chips = chips::merged(pulls::chips_of(self.list_rows.iter().cloned(), slug.as_deref()), &self.looked_up);
         if *self.pr_chips == chips {
             return;
@@ -534,7 +534,7 @@ impl OpenProject {
 
     /// The forge the chip lookups ask, in place of GitHub through gh.
     #[cfg(test)]
-    pub fn set_chip_forge(&mut self, forge: std::sync::Arc<dyn lathe_forge::Forge>) {
+    pub fn set_chip_forge(&mut self, forge: std::sync::Arc<dyn atelier_forge::Forge>) {
         self.chip_forge = Some(forge);
     }
 
@@ -558,12 +558,12 @@ impl OpenProject {
             .get_or_insert_with(|| {
                 // Tests never reach a forge: their lookups ask an empty one.
                 #[cfg(test)]
-                let forge: std::sync::Arc<dyn lathe_forge::Forge> = {
+                let forge: std::sync::Arc<dyn atelier_forge::Forge> = {
                     drop(project);
-                    std::sync::Arc::new(lathe_pr_view::fixture::FixtureForge::new())
+                    std::sync::Arc::new(atelier_pr_view::fixture::FixtureForge::new())
                 };
                 #[cfg(not(test))]
-                let forge: std::sync::Arc<dyn lathe_forge::Forge> = std::sync::Arc::new(lathe_forge::github::GitHub::new(project));
+                let forge: std::sync::Arc<dyn atelier_forge::Forge> = std::sync::Arc::new(atelier_forge::github::GitHub::new(project));
                 forge
             })
             .clone();
@@ -577,7 +577,7 @@ impl OpenProject {
             let Ok(found) = found else { return };
             _ = this.update(cx, |this, cx| {
                 for (number, brief) in numbers.into_iter().zip(found) {
-                    this.looked_up.insert(number, brief.as_ref().map(lathe_forge::present::chip));
+                    this.looked_up.insert(number, brief.as_ref().map(atelier_forge::present::chip));
                 }
                 this.refresh_chips(cx);
             });
@@ -668,7 +668,7 @@ impl OpenProject {
     }
 
     /// Lets the rules hear of `signal`, one after the other.
-    fn send_signal(&mut self, signal: lathe_tracker::Signal, cx: &mut Context<Self>) {
+    fn send_signal(&mut self, signal: atelier_tracker::Signal, cx: &mut Context<Self>) {
         // The tracker of the pane if it is open. Else the project has one only if it kept a file: a session of
         // a project that never used tasks makes none.
         let (open, project) = (self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()), self.project.clone());
@@ -679,7 +679,7 @@ impl OpenProject {
             let handled = cx
                 .background_spawn(async move {
                     let Some(tracker) = find_tracker(open, &project) else { return Ok(Vec::new()) };
-                    lathe_tracker::handle(tracker.as_ref(), &crate::tasks::rules(), &signal)
+                    atelier_tracker::handle(tracker.as_ref(), &crate::tasks::rules(), &signal)
                 })
                 .await;
             this.update(cx, |this, cx| {
@@ -696,16 +696,16 @@ impl OpenProject {
 
     /// Starts a session for a task: the task gets the project's agent if it has no assignee, the session
     /// opens with the task as its first message, and the two are linked when the agent says its id.
-    pub fn start_from_task(&mut self, id: lathe_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn start_from_task(&mut self, id: atelier_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(tracker) = self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()) else { return };
         let agent = self.agent.name.to_string();
         let reading = cx.background_spawn(async move {
-            let task = tracker.get(&id)?.ok_or_else(|| lathe_tracker::TrackerError::NotFound(id.clone()))?;
+            let task = tracker.get(&id)?.ok_or_else(|| atelier_tracker::TrackerError::NotFound(id.clone()))?;
             if task.assignee.is_some() {
-                return lathe_tracker::TrackerResult::Ok(task);
+                return atelier_tracker::TrackerResult::Ok(task);
             }
-            let patch = lathe_tracker::Patch { assignee: Some(Some(lathe_tracker::Assignee::Agent(agent))), ..Default::default() };
-            tracker.update(&id, &patch, "lathe")
+            let patch = atelier_tracker::Patch { assignee: Some(Some(atelier_tracker::Assignee::Agent(agent))), ..Default::default() };
+            tracker.update(&id, &patch, "atelier")
         });
         cx.spawn_in(window, async move |this, cx| {
             let result = reading.await;
@@ -718,7 +718,7 @@ impl OpenProject {
         .detach();
     }
 
-    fn begin_session_for(&mut self, task: lathe_tracker::Task, window: &mut Window, cx: &mut Context<Self>) {
+    fn begin_session_for(&mut self, task: atelier_tracker::Task, window: &mut Window, cx: &mut Context<Self>) {
         let session = self.open_session(None, window, cx);
         let text = crate::tasks::map::first_message(&task);
         let reference = crate::tasks::TaskRef { id: task.id.clone(), key: task.key.clone().into() };
@@ -733,7 +733,7 @@ impl OpenProject {
     }
 
     /// Shows one task in the Tasks pane, opening the pane first when it is not there.
-    pub fn show_task(&mut self, id: lathe_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn show_task(&mut self, id: atelier_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
         if self.tasks.as_ref().is_none_or(|t| !t.shown) || self.front() != front::Front::Tasks {
             if self.tasks.is_some() {
                 self.right_asked = front::Front::Tasks;
@@ -757,7 +757,7 @@ impl OpenProject {
     }
 
     /// Shows `reference` in the pull request view, mounting the view first when it is not yet there.
-    pub fn show_pull(&mut self, reference: lathe_forge::PullRef, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn show_pull(&mut self, reference: atelier_forge::PullRef, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(pulls) = &mut self.pulls {
             pulls.shown = true;
             self.right_asked = front::Front::Pulls;
@@ -771,7 +771,7 @@ impl OpenProject {
         self.toggle_pulls(window, cx);
     }
 
-    fn mount_pulls(&mut self, services: std::sync::Arc<lathe_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
+    fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
         let hub = cx.new(|cx| PrHub::with_services(services, cx));
         let _events = cx.subscribe_in(&hub, window, |this, _, event: &PrEvent, window, cx| match event {
             // A file at the pull request's head opens in the editor, as it is in this project.
@@ -793,7 +793,7 @@ impl OpenProject {
         });
         // What the list holds is what an agent's `#N` can name.
         let _chips = cx.observe(&list, |this, list, cx| {
-            let rows = list.read(cx).model().rows(lathe_pr_view::services::now()).into_iter().map(|row| row.pr).collect();
+            let rows = list.read(cx).model().rows(atelier_pr_view::services::now()).into_iter().map(|row| row.pr).collect();
             this.set_list_rows(rows, cx);
         });
         if let Some(reference) = self.pending_pull.take() {
@@ -908,7 +908,7 @@ impl OpenProject {
     }
 
     /// A dirty tab's file changed: it says so only when the file holds something other than what the
-    /// tab last saved, so the watch reporting lathe's own write is no news.
+    /// tab last saved, so the watch reporting atelier's own write is no news.
     fn check_disk(&mut self, path: String, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let read = {
@@ -1183,12 +1183,12 @@ mod past;
 
 /// The tracker of a project for a session's sake: the pane's if it is open. Else the project has one only if
 /// it kept a store, so a session of a project that never used tasks makes none. Blocking.
-fn find_tracker(open: Option<Arc<dyn lathe_tracker::Tracker>>, project: &Arc<dyn Project>) -> Option<Arc<dyn lathe_tracker::Tracker>> {
+fn find_tracker(open: Option<Arc<dyn atelier_tracker::Tracker>>, project: &Arc<dyn Project>) -> Option<Arc<dyn atelier_tracker::Tracker>> {
     if open.is_some() {
         return open;
     }
     // The data folder says whether the project kept a store, on this machine or on its host.
-    let kept = project.data_list("").is_ok_and(|entries| entries.iter().any(|e| e.path == lathe_project::TRACKER_FILE));
+    let kept = project.data_list("").is_ok_and(|entries| entries.iter().any(|e| e.path == atelier_project::TRACKER_FILE));
     if kept { project.tracker().ok() } else { None }
 }
 #[cfg(test)]

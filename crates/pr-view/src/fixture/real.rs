@@ -3,8 +3,8 @@
 //! would for a checkout. Nothing is ever written: use it with `PrConfig::read_only(true)`.
 use std::{path::Path, process::Command, sync::Arc};
 
-use lathe_forge::{Forge, PullRef, RepoRef, github::GitHub};
-use lathe_project::{LocalProject, Project};
+use atelier_forge::{Forge, PullRef, RepoRef, github::GitHub};
+use atelier_project::{LocalProject, Project};
 
 /// `owner/name#number`, on github.com.
 pub fn parse(spec: &str) -> Result<PullRef, String> {

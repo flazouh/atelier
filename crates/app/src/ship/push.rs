@@ -1,7 +1,7 @@
 //! Pushing the branch to `origin`, and pulling with a rebase when the remote moved on. Never forced.
 //! Git never waits on a login prompt: with none, a push that needs one fails and says so. Blocking:
 //! call it off the UI thread.
-use lathe_project::{Command, Project};
+use atelier_project::{Command, Project};
 
 use crate::ship::commit::run;
 
@@ -129,7 +129,7 @@ pub fn push(project: &dyn Project, branch: &str) -> Result<(), PushError> {
 }
 
 /// The stash entry's message when the reader sets their edits aside for a rebase.
-pub const ENTRY_NAME: &str = "lathe: edits set aside to pull and rebase";
+pub const ENTRY_NAME: &str = "atelier: edits set aside to pull and rebase";
 
 /// What a pull and rebase did.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

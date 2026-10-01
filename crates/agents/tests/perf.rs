@@ -1,9 +1,9 @@
 //! The agent path's numbers, against the targets in `docs/performance.md`. Run in release, on the HP:
-//! `cargo test -p lathe-agents --release --test perf -- --ignored --nocapture`
+//! `cargo test -p atelier-agents --release --test perf -- --ignored --nocapture`
 //! Each test prints its median and p95 and fails when the median misses its target.
 use std::time::{Duration, Instant};
 
-use lathe_agents::{
+use atelier_agents::{
     claude_code::Mapper,
     session::{BlockId, Event, EventQueue},
 };

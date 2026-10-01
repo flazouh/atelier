@@ -14,7 +14,7 @@
 
 use std::io::{Read, Write};
 
-use lathe_project::{Command, Project};
+use atelier_project::{Command, Project};
 
 use crate::ship::kept::Kept;
 
@@ -119,7 +119,7 @@ pub(crate) fn commit_with(project: &dyn Project, kept: &[Kept], message: &str, b
     if kept.is_empty() {
         return Err(CommitError::Nothing);
     }
-    let index_path = step(git(project, &["rev-parse", "--git-path", "lathe-commit-index"], None, None))?;
+    let index_path = step(git(project, &["rev-parse", "--git-path", "atelier-commit-index"], None, None))?;
     let index_path = match std::path::Path::new(index_path.trim()) {
         path if path.is_absolute() => path.to_path_buf(),
         path => project.root().join(path),

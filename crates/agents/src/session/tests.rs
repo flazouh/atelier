@@ -3,11 +3,11 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
 use super::{fake::FakeBackend, *};
 
-fn project() -> Arc<dyn lathe_project::Project> {
+fn project() -> Arc<dyn atelier_project::Project> {
     Arc::new(LocalProject::open(std::env::temp_dir()).expect("the temp folder opens"))
 }
 
@@ -300,8 +300,8 @@ mod attachments {
     fn a_session_receives_the_attachments_the_message_carried() {
         let backend = fake::FakeBackend::new(vec![vec![]]);
         let sink: EventSink = std::sync::Arc::new(|_| {});
-        let project: std::sync::Arc<dyn lathe_project::Project> =
-            std::sync::Arc::new(lathe_project::LocalProject::open(std::env::temp_dir()).unwrap());
+        let project: std::sync::Arc<dyn atelier_project::Project> =
+            std::sync::Arc::new(atelier_project::LocalProject::open(std::env::temp_dir()).unwrap());
         let session = backend.open(project, OpenRequest::default(), sink).unwrap();
         let file = Attachment::File { path: "a".into() };
         session.send(Command::Send { text: "look".into(), attachments: vec![file.clone()] }).unwrap();

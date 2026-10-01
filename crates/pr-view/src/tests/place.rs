@@ -1,4 +1,4 @@
-use lathe_forge::{Change, Side};
+use atelier_forge::{Change, Side};
 
 use crate::{
     diff::FileView,
@@ -13,7 +13,7 @@ fn view() -> FileView {
     FileView::build(&entry, &Blob::Text("one\ntwo\nthree\n".into()), &Blob::Text("one\nTWO\nthree\n".into()))
 }
 
-fn thread(id: &str, path: &str, line: Option<u32>, side: Side) -> lathe_forge::Thread {
+fn thread(id: &str, path: &str, line: Option<u32>, side: Side) -> atelier_forge::Thread {
     let mut t = sample::thread(id, path, line.unwrap_or(0), vec![sample::comment("c", "Ada", "x", 1)]);
     t.line = line;
     t.side = side;

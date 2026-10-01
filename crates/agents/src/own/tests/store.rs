@@ -10,11 +10,11 @@ use crate::{
 };
 
 /// A project on a temporary folder, with its data folder in another.
-fn project() -> (tempfile::TempDir, tempfile::TempDir, std::sync::Arc<dyn lathe_project::Project>) {
+fn project() -> (tempfile::TempDir, tempfile::TempDir, std::sync::Arc<dyn atelier_project::Project>) {
     let dir = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
-    let local = lathe_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
-    let project: std::sync::Arc<dyn lathe_project::Project> = std::sync::Arc::new(crate::testing::Locked(std::sync::Arc::new(local)));
+    let local = atelier_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    let project: std::sync::Arc<dyn atelier_project::Project> = std::sync::Arc::new(crate::testing::Locked(std::sync::Arc::new(local)));
     (dir, data, project)
 }
 
@@ -121,7 +121,7 @@ fn a_session_writes_its_record_into_the_data_folder_and_nothing_into_the_project
     assert_eq!((meta.title.as_str(), meta.model.as_str()), ("record me", "claude-opus-5-5"));
     assert!(meta.updated > 0);
     assert!(!lines.contains(super::support::KEY));
-    assert_eq!(std::fs::read_dir(rig.dir.path()).unwrap().count(), 0, "the project folder is as it was: no .lathe");
+    assert_eq!(std::fs::read_dir(rig.dir.path()).unwrap().count(), 0, "the project folder is as it was: no .atelier");
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn git(dir: &std::path::Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
-/// The record lives outside the repository: it is nothing to commit, and lathe touches no git file for it.
+/// The record lives outside the repository: it is nothing to commit, and atelier touches no git file for it.
 #[test]
 fn a_session_in_a_git_repository_leaves_git_status_clean_and_git_alone() {
     let _guard = crate::testing::spawn_lock();
@@ -156,7 +156,7 @@ fn a_session_in_a_git_repository_leaves_git_status_clean_and_git_alone() {
     assert!(!rig.project.data_list("agent/sessions").unwrap().is_empty(), "the record was written");
     assert_eq!(git(rig.dir.path(), &["status", "--porcelain"]), "", "and git does not see it");
     assert_eq!(std::fs::read(rig.dir.path().join(".git/info/exclude")).unwrap_or_default(), before, "the exclude file is untouched");
-    assert!(!rig.dir.path().join(".lathe").exists());
+    assert!(!rig.dir.path().join(".atelier").exists());
 }
 
 #[test]
@@ -168,9 +168,9 @@ fn a_project_that_is_not_a_git_repository_gets_no_git_folder_and_no_error() {
     assert!(!events.iter().any(|e| matches!(e, Event::Warning(_))));
 }
 
-/// What an older lathe left in the project.
+/// What an older atelier left in the project.
 fn legacy(dir: &std::path::Path, id: &str, title: &str, updated: u64, text: &str) {
-    let base = dir.join(".lathe/agent/sessions");
+    let base = dir.join(".atelier/agent/sessions");
     std::fs::create_dir_all(&base).unwrap();
     let line = serde_json::to_string(&Message::user(text)).unwrap();
     std::fs::write(base.join(format!("{id}.jsonl")), format!("{line}\n")).unwrap();
@@ -186,7 +186,7 @@ fn an_old_record_in_the_project_moves_to_the_data_folder_when_the_list_is_read()
     let titles: Vec<_> = list.iter().map(|s| s.title.as_str()).collect();
     assert_eq!(titles, ["the old one", "the older one"], "the order is the time in the meta, not the time of the move");
     assert!(project.data_read("agent/sessions/own-old.jsonl").is_ok() && project.data_read("agent/sessions/own-old.meta").is_ok());
-    assert!(!dir.path().join(".lathe").exists(), "what was moved is gone from the project, and so are its empty folders");
+    assert!(!dir.path().join(".atelier").exists(), "what was moved is gone from the project, and so are its empty folders");
     let (loaded, messages) = store::load(project.as_ref(), "own-old").unwrap();
     assert_eq!((loaded.title.as_str(), messages.len()), ("the old one", 1));
     assert_eq!(store::migrate(project.as_ref()), Ok(0), "asked again there is nothing to move");
@@ -210,15 +210,15 @@ fn a_session_that_is_in_both_places_keeps_the_data_folders_copy() {
     let (loaded, messages) = store::load(project.as_ref(), "own-both").unwrap();
     assert_eq!(loaded.title, "newer, in the data folder");
     assert_eq!(messages, vec![Message::user("new")]);
-    assert!(!dir.path().join(".lathe").exists());
+    assert!(!dir.path().join(".atelier").exists());
 }
 
 #[test]
 fn a_half_written_old_record_is_left_where_it_is() {
     let (dir, _data, project) = project();
     legacy(dir.path(), "own-half", "half", 1, "x");
-    std::fs::remove_file(dir.path().join(".lathe/agent/sessions/own-half.jsonl")).unwrap();
+    std::fs::remove_file(dir.path().join(".atelier/agent/sessions/own-half.jsonl")).unwrap();
     assert_eq!(store::migrate(project.as_ref()), Ok(0), "no messages, no session moved");
     assert!(store::list(project.as_ref()).unwrap().is_empty());
-    assert!(dir.path().join(".lathe/agent/sessions/own-half.meta").exists(), "and nothing of it was removed");
+    assert!(dir.path().join(".atelier/agent/sessions/own-half.meta").exists(), "and nothing of it was removed");
 }

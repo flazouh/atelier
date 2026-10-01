@@ -37,8 +37,8 @@ fn a_model_id_maps_to_its_lab() {
 }
 
 #[test]
-fn lathes_own_agent_is_offered_with_a_monogram() {
-    let own = agents().into_iter().find(|a| a.name == "lathe").expect("lathe's own agent is offered");
+fn ateliers_own_agent_is_offered_with_a_monogram() {
+    let own = agents().into_iter().find(|a| a.name == "atelier").expect("atelier's own agent is offered");
     assert!(own.mark.is_none(), "it takes the monogram");
-    assert!(by_backend(own.backend.name()).is_some_and(|a| a.name == "lathe"));
+    assert!(by_backend(own.backend.name()).is_some_and(|a| a.name == "atelier"));
 }

@@ -14,7 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_project::Project;
+use atelier_project::Project;
 use serde_json::Value;
 
 use super::{
@@ -118,7 +118,7 @@ pub(super) fn open(
         save_warned: false,
     };
     thread::Builder::new()
-        .name("lathe-own-agent".into())
+        .name("atelier-own-agent".into())
         .spawn(move || runner.run())
         .map_err(|e| SessionError::Start(e.to_string()))?;
     Ok(Box::new(Handle { tx, shared }))

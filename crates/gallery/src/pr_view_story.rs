@@ -1,16 +1,16 @@
-//! The "Pull request view" story: the real view (`lathe-pr-view`) on a real git repository and an
+//! The "Pull request view" story: the real view (`atelier-pr-view`) on a real git repository and an
 //! in-memory forge. The repository is made on disk when the story opens: a small crate "relay" on main, and
 //! pull request 3344 with six commits, fetched into a cache and read by git the way a project's would be.
 //! The forge holds its threads, remarks and checks (one failing job with its log), the reader's last
 //! review, and a working set for the list. Writes go to the in-memory forge and nowhere else.
 //!
 //! `PRV_VIEW=list` opens the list first; the default opens the pull request. `PRV_LSP=1` starts the language
-//! servers on the head's checkout (rust-analyzer, downloaded once unless `LATHE_OFFLINE` is set).
+//! servers on the head's checkout (rust-analyzer, downloaded once unless `ATELIER_OFFLINE` is set).
 //! `PRV_BIG=1` opens a large pull request (`PRV_FILES`, `PRV_COMMENTS`); `GALLERY_SCROLL=1` measures frames on it.
 //! `PRV_REAL=owner/name#number` reads a real pull request through `gh`, read only (`PRV_ME` names the reader).
 use beui::ActiveTheme;
 use gpui_kit::{AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window, div};
-use lathe_pr_view::{
+use atelier_pr_view::{
     fixture::{big::Big, real::Real, relay::Relay},
     hub::{PrEvent, PrHub},
     services::PrConfig,
@@ -37,11 +37,11 @@ pub struct PrViewStory {
 impl PrViewStory {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let measuring = std::env::var("GALLERY_SCROLL").is_ok_and(|v| v == "1");
-        let local = std::env::temp_dir().join("lathe-gallery-pr-view");
+        let local = std::env::temp_dir().join("atelier-gallery-pr-view");
         let number = |name: &str, or: usize| std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(or);
         let (hub, keep, reference) = if let Ok(spec) = std::env::var("PRV_REAL") {
             // A real pull request, read only: PRV_REAL=owner/name#number.
-            let real = Real::open(&spec, &std::env::temp_dir().join("lathe-pr-view-qa")).expect("the pull request opens");
+            let real = Real::open(&spec, &std::env::temp_dir().join("atelier-pr-view-qa")).expect("the pull request opens");
             let me = std::env::var("PRV_ME").unwrap_or_else(|_| "alex".into());
             let config = PrConfig::new(me, &local).read_only(true);
             let hub = cx.new(|cx| PrHub::new(real.project.clone(), real.forge.clone(), config, cx).expect("the caches open"));

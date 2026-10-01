@@ -56,7 +56,7 @@ fn the_marks_survive_a_restart_and_odd_paths_are_safe() {
 }
 
 #[test]
-fn a_database_from_a_newer_lathe_is_refused() {
+fn a_database_from_a_newer_atelier_is_refused() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("pr.sqlite");
     drop(Reviewed::open(&path).unwrap());

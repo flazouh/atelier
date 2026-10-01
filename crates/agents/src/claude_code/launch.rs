@@ -1,5 +1,5 @@
-//! The command line that starts `claude` as a session lathe can drive.
-use lathe_project::Command;
+//! The command line that starts `claude` as a session atelier can drive.
+use atelier_project::Command;
 
 use super::control::mode_name;
 use crate::session::{OpenRequest, PermissionMode};
@@ -27,7 +27,7 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
         "stream-json",
         "--verbose",
         "--include-partial-messages",
-        // Permission questions come to lathe as `control_request` lines, not to a terminal. `host`
+        // Permission questions come to atelier as `control_request` lines, not to a terminal. `host`
         // alone denies them; the tool flag (hidden from `--help`) makes `claude` ask over stdio.
         "--permission-prompts",
         "host",

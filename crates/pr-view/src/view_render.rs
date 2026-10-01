@@ -11,7 +11,7 @@ use gpui_kit::{
     Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, SharedString, StatefulInteractiveElement, Styled, Window, div,
     prelude::FluentBuilder, px,
 };
-use lathe_forge::{ForgeError, PullState};
+use atelier_forge::{ForgeError, PullState};
 
 use crate::{
     data::PartKind,
@@ -131,8 +131,8 @@ impl PullView {
         let unsent = self.model.unsent();
         let this = cx.entity().downgrade();
         let (weak_open, weak_reply, weak_resolve, weak_send) = (this.clone(), this.clone(), this.clone(), this.clone());
-        let listed: Vec<&lathe_forge::Thread> = self.model.threads_in_list_order().into_iter().take(self.page.0).collect();
-        let ordered: Vec<lathe_forge::ThreadId> = listed.iter().map(|t| t.id.clone()).collect();
+        let listed: Vec<&atelier_forge::Thread> = self.model.threads_in_list_order().into_iter().take(self.page.0).collect();
+        let ordered: Vec<atelier_forge::ThreadId> = listed.iter().map(|t| t.id.clone()).collect();
         let (for_open, for_reply, for_resolve) = (ordered.clone(), ordered.clone(), ordered);
         let paths: Vec<String> = listed.iter().map(|t| t.path.clone()).collect();
         let (more_threads, more_remarks) = (this.clone(), this.clone());
@@ -430,7 +430,7 @@ mod fold_tests {
 
     #[test]
     fn a_short_description_needs_no_fold_button_and_a_long_one_does() {
-        assert!(!body_needs_fold("A QA pull request for the lathe pull request view. It adds add, sub and div, and a README line. Safe to close."));
+        assert!(!body_needs_fold("A QA pull request for the atelier pull request view. It adds add, sub and div, and a README line. Safe to close."));
         assert!(body_needs_fold(&"A line of the description.\n".repeat(7)));
         assert!(body_needs_fold(&"word ".repeat(200)));
     }

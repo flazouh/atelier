@@ -120,7 +120,7 @@ impl InputBaseState<EditorMode> {
             self.go_to_definition(&location, window, cx);
             return;
         }
-        // lathe patch: with no Cmd-hover answer for the caret, ask the provider, as F12 does in
+        // atelier patch: with no Cmd-hover answer for the caret, ask the provider, as F12 does in
         // Zed. It used to do nothing unless the pointer had hovered the symbol first.
         let Some(provider) = self.extras.lsp.definition_provider.clone() else {
             return;

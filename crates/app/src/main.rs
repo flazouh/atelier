@@ -1,7 +1,7 @@
-//! lathe, the app. `lathe [folder…]` opens the window, with each folder named as a project in it;
-//! `ssh://host/path` names a folder on an SSH host (`ssh://hp-agent/~/code/lathe`).
+//! atelier, the app. `atelier [folder…]` opens the window, with each folder named as a project in it;
+//! `ssh://host/path` names a folder on an SSH host (`ssh://hp-agent/~/code/atelier`).
 //!
-//! `LATHE_TIMINGS=1` prints when the first frame showed, counted from the start of the process.
+//! `ATELIER_TIMINGS=1` prints when the first frame showed, counted from the start of the process.
 
 use std::path::PathBuf;
 
@@ -53,10 +53,10 @@ fn main() {
     exit_log::install();
     let started = timings::mark_start();
     // Read before the event loop starts, so the UI thread never waits on the disk.
-    let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
+    let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
     let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let folders: Vec<Opening> = folders.into_iter().map(Opening::from).collect();
-    gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
+    gpui_kit::application().with_assets(atelier_agents::Assets).run(move |cx| {
         beui::init(cx);
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
@@ -71,7 +71,7 @@ fn main() {
         if let Some(mode) = saved.mode.as_deref().and_then(settings_pane::Mode::from_key) {
             mode.apply(cx);
         }
-        let (w, h) = std::env::var("LATHE_SIZE")
+        let (w, h) = std::env::var("ATELIER_SIZE")
             .ok()
             .and_then(|v| v.split_once('x').and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))))
             .unwrap_or((1280., 820.));
@@ -80,7 +80,7 @@ fn main() {
             // The narrowest width the layout keeps readable (docs/app.md, "Window widths").
             window_min_size: Some(size(px(640.), px(480.))),
             titlebar: Some(TitlebarOptions {
-                title: Some("lathe".into()),
+                title: Some("atelier".into()),
                 appears_transparent: true,
                 traffic_light_position: Some(point(px(14.), px(12.))),
             }),
@@ -127,7 +127,7 @@ fn main() {
                 .detach();
                 false
             });
-            if std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1") {
+            if std::env::var("ATELIER_TIMINGS").is_ok_and(|v| v == "1") {
                 window.on_next_frame(move |_, _| eprintln!("first frame after {:.1} ms", started.elapsed().as_secs_f64() * 1000.));
             }
             // gpui-component inputs need its Root at the top of the window.
@@ -136,8 +136,8 @@ fn main() {
         .expect("open the window");
         // The app menu holds Quit, as every desktop app's does; where there is no app menu, this does nothing.
         cx.set_menus([gpui_kit::Menu {
-            name: "lathe".into(),
-            items: vec![gpui_kit::MenuItem::action("Quit lathe", shell::Quit)],
+            name: "atelier".into(),
+            items: vec![gpui_kit::MenuItem::action("Quit atelier", shell::Quit)],
             disabled: false,
         }]);
         // The last window closing ends the app, and says so: on Linux nothing else would end it.

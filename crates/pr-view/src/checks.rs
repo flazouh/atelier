@@ -10,7 +10,7 @@ use beui::{
     checks_panel::CheckState as UiState,
 };
 use gpui_kit::SharedString;
-use lathe_forge::{Check, CheckStatus, Conclusion, Job, JobRef};
+use atelier_forge::{Check, CheckStatus, Conclusion, Job, JobRef};
 
 /// A check in the panel's words. Cancelled, timed out, action required and stale count as failing, as
 /// they do for the merge (`present::merge_facts`).

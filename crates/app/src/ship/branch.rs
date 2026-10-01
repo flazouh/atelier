@@ -1,7 +1,7 @@
 //! The branch a commit lands on: the one checked out, unless it is the repository's default branch,
 //! where the review asks for a new one first. Blocking: call it off the UI thread.
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 /// The branch checked out, or `None` when HEAD is detached.
 pub fn current(project: &dyn Project) -> Option<String> {
@@ -58,7 +58,7 @@ pub(crate) fn commit_on_new_with<T>(
     back: impl FnOnce(&str) -> Result<(), String>,
 ) -> Result<T, String> {
     let git = |args: &[&str]| project.git(args).map_err(|e| e.to_string());
-    let words = |out: lathe_project::GitOutput| out.stderr.trim().to_string();
+    let words = |out: atelier_project::GitOutput| out.stderr.trim().to_string();
     if !git(&["check-ref-format", "--branch", name])?.ok() {
         return Err(format!("{name} is not a branch name git takes"));
     }

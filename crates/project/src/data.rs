@@ -1,8 +1,8 @@
-//! A project's data folder: lathe's own files about a project, such as its agents' sessions and its
+//! A project's data folder: atelier's own files about a project, such as its agents' sessions and its
 //! reviews, on the project's host and outside the repository, so they never show in `git status`.
-//! `<data>/lathe/projects/<folder>-<hash of the root>/`, where `<data>` is the platform's data folder
+//! `<data>/atelier/projects/<folder>-<hash of the root>/`, where `<data>` is the platform's data folder
 //! (`~/Library/Application Support` on macOS, `$XDG_DATA_HOME` or `~/.local/share` elsewhere), or
-//! `LATHE_DATA_DIR`. The same root always gets the same folder.
+//! `ATELIER_DATA_DIR`. The same root always gets the same folder.
 
 use std::{
     fs, io,
@@ -32,9 +32,9 @@ impl DataFolder {
     pub fn for_root(root: &Path, data_dir: Option<&Path>) -> Option<Self> {
         let data = match data_dir {
             Some(dir) => dir.to_path_buf(),
-            None => match std::env::var_os("LATHE_DATA_DIR") {
+            None => match std::env::var_os("ATELIER_DATA_DIR") {
                 Some(dir) => PathBuf::from(dir),
-                None => dirs::data_dir()?.join("lathe"),
+                None => dirs::data_dir()?.join("atelier"),
             },
         };
         let name = root.to_string_lossy();

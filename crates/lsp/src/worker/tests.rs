@@ -125,7 +125,7 @@ fn only_the_newest_question_of_each_kind_per_document_runs() {
 
 #[test]
 fn a_path_is_canonical_and_a_missing_file_keeps_its_path() {
-    let dir = std::env::temp_dir().join(format!("lathe-canonical-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("atelier-canonical-{}", std::process::id()));
     std::fs::create_dir_all(dir.join("a")).unwrap();
     std::fs::write(dir.join("a/x.rs"), "").unwrap();
     assert_eq!(canonical(&dir.join("a/../a/x.rs")), std::fs::canonicalize(dir.join("a/x.rs")).unwrap());

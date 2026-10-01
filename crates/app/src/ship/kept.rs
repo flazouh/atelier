@@ -2,7 +2,7 @@
 //! accepted and the edits they made in them (`Merged::baseline`). Undecided and rejected hunks stay out.
 //! Pure.
 
-use lathe_review::{FileReview, Merged};
+use atelier_review::{FileReview, Merged};
 
 /// One file's part of a commit: its new text, or `None` when the file goes.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use lathe_tracker::{Event, Priority, Status, Task, TaskId};
+use atelier_tracker::{Event, Priority, Status, Task, TaskId};
 
 use super::changes;
 

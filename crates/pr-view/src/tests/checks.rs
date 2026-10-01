@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use beui::{checks_panel::{CheckState as Ui, fault}, };
-use lathe_forge::{CheckStatus, Conclusion, Job, JobRef, RepoRef, Step};
+use atelier_forge::{CheckStatus, Conclusion, Job, JobRef, RepoRef, Step};
 
 use crate::{
     checks::{JobLog, check_runs, split_log, state_of, steps, wants_log},
@@ -142,7 +142,7 @@ fn the_recorded_log_of_a_real_job_splits_into_the_steps_the_runner_reported() {
 #[test]
 fn a_job_that_failed_in_a_run_that_succeeded_was_allowed_to_fail() {
     use crate::checks::tolerated_or;
-    use lathe_forge::RunInfo;
+    use atelier_forge::RunInfo;
     let run = |suite| Some(RunInfo { id: 1, workflow: "ci".into(), number: 3, event: "push".into(), suite });
     let mut allowed = sample::check("flaky", CheckStatus::Done, Some(Conclusion::Failure));
     allowed.run = run(Some(Conclusion::Success));
@@ -161,7 +161,7 @@ fn a_job_that_failed_in_a_run_that_succeeded_was_allowed_to_fail() {
 
 #[test]
 fn a_tolerated_job_still_has_its_fault_read_and_shown_apart() {
-    use lathe_forge::RunInfo;
+    use atelier_forge::RunInfo;
     let mut allowed = sample::check("flaky", CheckStatus::Done, Some(Conclusion::Failure));
     allowed.job = Some(JobRef { repo: RepoRef::new("github.com", "o", "r"), id: 7 });
     allowed.run = Some(RunInfo { id: 1, workflow: "ci".into(), number: 3, event: "push".into(), suite: Some(Conclusion::Success) });

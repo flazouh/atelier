@@ -3,8 +3,8 @@ use beui::{
     task_edit::Change,
     task_model::{Assignee, Label, Priority, TaskStatus},
 };
-use lathe_tracker as tracker;
-use lathe_tracker::Tracker as _;
+use atelier_tracker as tracker;
+use atelier_tracker::Tracker as _;
 
 use super::map::*;
 
@@ -94,7 +94,7 @@ fn the_first_message_names_the_task_and_carries_its_words() {
 
 #[test]
 fn a_local_projects_tasks_stay_in_its_data_folder_across_opens() {
-    use lathe_project::{LocalProject, Project};
+    use atelier_project::{LocalProject, Project};
     let root = tempfile::tempdir().unwrap();
     let data = tempfile::tempdir().unwrap();
     let project = LocalProject::open(root.path()).unwrap().with_data_dir(data.path());
@@ -104,7 +104,7 @@ fn a_local_projects_tasks_stay_in_its_data_folder_across_opens() {
     let again = LocalProject::open(root.path()).unwrap().with_data_dir(data.path()).tracker().unwrap();
     let tasks = again.list(&tracker::Query::default()).unwrap();
     assert_eq!(tasks.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(), ["Keep me"]);
-    assert!(!root.path().join(lathe_project::TRACKER_FILE).exists(), "nothing in the repository");
+    assert!(!root.path().join(atelier_project::TRACKER_FILE).exists(), "nothing in the repository");
 }
 
 #[test]

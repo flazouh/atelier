@@ -1,8 +1,8 @@
 use super::*;
 
 fn workers() -> Workers {
-    let store = Store::new(std::env::temp_dir().join("lathe-pool-tests"), vec![], true);
-    let project = std::sync::Arc::new(lathe_project::LocalProject::open("/").unwrap());
+    let store = Store::new(std::env::temp_dir().join("atelier-pool-tests"), vec![], true);
+    let project = std::sync::Arc::new(atelier_project::LocalProject::open("/").unwrap());
     Workers::new(project, store, Duration::from_secs(1), Duration::from_secs(1))
 }
 
@@ -17,7 +17,7 @@ fn a_known_server_that_is_missing_names_its_install_command() {
     // Nobody installs a program by this name, so the lookup fails the same way on every machine.
     let spec = crate::ServerSpec {
         name: "nothing",
-        program: "lathe-no-such-language-server",
+        program: "atelier-no-such-language-server",
         args: &[],
         language_ids: &[],
         root_markers: &[],

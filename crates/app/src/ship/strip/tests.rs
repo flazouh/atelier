@@ -20,7 +20,7 @@ fn the_strip_commits_the_accepted_hunk_on_a_drafted_branch(cx: &mut TestAppConte
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n3\n4\n5\n6\nSEVEN\n8\n").unwrap()));
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
     cx.run_until_parked();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), Some("a.txt"), window, cx)));
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
@@ -67,7 +67,7 @@ fn the_strip_makes_the_first_commit_of_a_new_repository(cx: &mut TestAppContext)
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n").unwrap()));
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
     cx.run_until_parked();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
@@ -103,7 +103,7 @@ fn a_commit_from_the_pane_marks_its_files_committed(cx: &mut TestAppContext) {
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n").unwrap()));
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
     cx.run_until_parked();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     let told = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let heard = told.clone();
@@ -148,7 +148,7 @@ fn opened_strip(cx: &mut TestAppContext, prepare: impl FnOnce(&std::path::Path))
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n").unwrap()));
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
     cx.run_until_parked();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
@@ -342,7 +342,7 @@ fn commit_with_nothing_accepted_offers_accept_all(cx: &mut TestAppContext) {
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n").unwrap()));
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
     cx.run_until_parked();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     cx.update(|window, cx| pane.update(cx, |p, cx| p.open_ship(window, cx)));
@@ -369,7 +369,7 @@ fn the_draft_names_the_task_and_the_commit_tells_it(cx: &mut TestAppContext) {
     fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "1\nTWO\n").unwrap()));
     cx.update(|_, cx| {
         session.update(cx, |s, cx| {
-            s.task = Some(crate::tasks::TaskRef { id: lathe_tracker::TaskId::from("1"), key: "LAT-42".into() });
+            s.task = Some(crate::tasks::TaskRef { id: atelier_tracker::TaskId::from("1"), key: "LAT-42".into() });
             s.send("edit".into(), cx)
         })
     });
@@ -383,7 +383,7 @@ fn the_draft_names_the_task_and_the_commit_tells_it(cx: &mut TestAppContext) {
             }
         })
     });
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap());
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());

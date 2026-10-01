@@ -45,9 +45,9 @@ pub fn last_window_closed() {
 #[cfg(unix)]
 fn words(signal: c_int) -> &'static [u8] {
     match signal {
-        libc::SIGTERM => b"exit on SIGTERM: something asked lathe to stop\n",
-        libc::SIGINT => b"exit on SIGINT: Ctrl+C where lathe was started\n",
-        libc::SIGHUP => b"exit on SIGHUP: the terminal or the session that started lathe went\n",
+        libc::SIGTERM => b"exit on SIGTERM: something asked atelier to stop\n",
+        libc::SIGINT => b"exit on SIGINT: Ctrl+C where atelier was started\n",
+        libc::SIGHUP => b"exit on SIGHUP: the terminal or the session that started atelier went\n",
         libc::SIGQUIT => b"exit on SIGQUIT\n",
         _ => b"exit on a signal\n",
     }

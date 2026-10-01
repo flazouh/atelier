@@ -1,4 +1,4 @@
-use lathe_forge::Change;
+use atelier_forge::Change;
 
 use crate::{
     diff::{Content, FileView, LineMap},

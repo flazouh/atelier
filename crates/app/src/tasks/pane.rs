@@ -19,7 +19,7 @@ use gpui_kit::{
     SharedString, Styled, Subscription, Window, canvas, div, prelude::FluentBuilder, 
 };
 use beui::scale::px;
-use lathe_tracker::{Entry, Patch, Query, Task, TaskId, Tracker, TrackerResult};
+use atelier_tracker::{Entry, Patch, Query, Task, TaskId, Tracker, TrackerResult};
 
 use super::map;
 
@@ -161,7 +161,7 @@ impl TasksPane {
 
     /// Opens the project's tracker, off the UI thread (a project over SSH asks its host), and shows the
     /// tasks when it is open.
-    pub fn open_from(&mut self, project: Arc<dyn lathe_project::Project>, cx: &mut Context<Self>) {
+    pub fn open_from(&mut self, project: Arc<dyn atelier_project::Project>, cx: &mut Context<Self>) {
         let opening = cx.background_spawn(async move { project.tracker() });
         cx.spawn(async move |this, cx| {
             let opened = opening.await.map_err(|error| SharedString::from(error.to_string()));
@@ -175,7 +175,7 @@ impl TasksPane {
         match &tracker {
             Ok(tracker) => {
                 // The watch wakes the pane from its own thread, which the test scheduler rejects; the
-                // subscription itself is tested in lathe-tracker and lathe-remote.
+                // subscription itself is tested in atelier-tracker and atelier-remote.
                 if !cfg!(test) {
                     self._watch = Some(Self::watch(tracker.clone(), cx));
                 }

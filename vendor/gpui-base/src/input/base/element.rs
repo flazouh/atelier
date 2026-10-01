@@ -395,7 +395,7 @@ struct FoldIconLayout {
     line_number_hitbox: Hitbox,
     /// List of (display_row, is_folded, icon_element) pairs for each fold candidate
     icons: Vec<(usize, bool, gpui::AnyElement)>,
-    /// lathe patch: the `⋯` chip after each folded line, which unfolds it on a click.
+    /// atelier patch: the `⋯` chip after each folded line, which unfolds it on a click.
     placeholders: Vec<gpui::AnyElement>,
 }
 
@@ -727,7 +727,7 @@ impl<M: InputModeKind> TextElement<M> {
             let line_size = line.size(line_height);
             let line_wrap_width = line_size.width;
 
-            // lathe patch: a row block or a row gap above the row moves its highlight down with it.
+            // atelier patch: a row block or a row gap above the row moves its highlight down with it.
             let line_origin = point(px(0.), offset_y + last_layout.gap_above(*buffer_line));
 
             let line_cursor_start = line.position_for_index(
@@ -992,7 +992,7 @@ impl<M: InputModeKind> TextElement<M> {
 
         // Display rows are uniformly `line_height` tall, so the visible window maps
         // directly to a display-row range.
-        // lathe patch: row blocks and row gaps push rows down, so a row that sits `gaps` above the
+        // atelier patch: row blocks and row gaps push rows down, so a row that sits `gaps` above the
         // top by row count alone may still show. Lay those out too.
         let viewport_top = (-scroll_top - gaps).max(px(0.));
         let viewport_bottom = (-scroll_top).max(px(0.)) + input_height;
@@ -1267,7 +1267,7 @@ impl<M: InputModeKind> TextElement<M> {
                         buffer_line,
                         is_folded,
                         display_row: buffer_line,
-                        // lathe patch: a row block or a row gap above the row moves its chevron too.
+                        // atelier patch: a row block or a row gap above the row moves its chevron too.
                         offset_y: offset_y + last_layout.gap_above(buffer_line),
                         line_end: is_folded
                             .then(|| line.position_for_index(line.len(), last_layout, false))
@@ -1361,7 +1361,7 @@ impl<M: InputModeKind> TextElement<M> {
             icon_layout
                 .icons
                 .push((info.display_row, info.is_folded, icon));
-            // lathe patch: a folded line ends in a `⋯` chip, as in Zed, so the hidden rows are
+            // atelier patch: a folded line ends in a `⋯` chip, as in Zed, so the hidden rows are
             // visible in the text and not only in the gutter. A click on it unfolds them.
             if let Some(end) = info.line_end {
                 let muted = self.state.read(cx).editor_style.muted_foreground;
@@ -1402,7 +1402,7 @@ impl<M: InputModeKind> TextElement<M> {
         icon_layout
     }
 
-    /// lathe patch: lays out each row widget at its row's right end, centred on the row, from the
+    /// atelier patch: lays out each row widget at its row's right end, centred on the row, from the
     /// same layout the text uses. A row scrolled out of view or folded away gets none.
     fn layout_row_widgets(
         &self,
@@ -1434,7 +1434,7 @@ impl<M: InputModeKind> TextElement<M> {
             .collect()
     }
 
-    /// lathe patch: lays out each row block at the text's width, to learn how tall its gap is. A
+    /// atelier patch: lays out each row block at the text's width, to learn how tall its gap is. A
     /// block on a row that is folded away gets no gap. Each one blocks the pointer, so a press in it
     /// never reaches the text under it.
     fn measure_row_blocks(&self, width: Pixels, window: &mut Window, cx: &mut App) -> Vec<(usize, AnyElement, Pixels)> {
@@ -1456,7 +1456,7 @@ impl<M: InputModeKind> TextElement<M> {
             .collect()
     }
 
-    /// lathe patch: puts each measured row block under its row, left-aligned with the text. A block
+    /// atelier patch: puts each measured row block under its row, left-aligned with the text. A block
     /// whose row is scrolled out of view is not drawn; its gap still counts.
     fn place_row_blocks(
         blocks: Vec<(usize, AnyElement, Pixels)>,
@@ -1485,7 +1485,7 @@ impl<M: InputModeKind> TextElement<M> {
             .collect()
     }
 
-    /// lathe patch: lays out the gutter widget at the gutter's left edge, centred on the hovered row.
+    /// atelier patch: lays out the gutter widget at the gutter's left edge, centred on the hovered row.
     fn layout_gutter_widget(
         &self,
         gutter_x: Pixels,
@@ -1837,13 +1837,13 @@ pub(super) struct PrepaintState {
     bounds: Bounds<Pixels>,
     /// Fold icon layout data
     fold_icon_layout: FoldIconLayout,
-    /// lathe patch: the owner's row widgets, laid out for this frame.
+    /// atelier patch: the owner's row widgets, laid out for this frame.
     row_widgets: Vec<AnyElement>,
-    /// lathe patch: the owner's row blocks, laid out for this frame.
+    /// atelier patch: the owner's row blocks, laid out for this frame.
     row_blocks: Vec<AnyElement>,
-    /// lathe patch: the owner's gutter widget on the hovered row, laid out for this frame.
+    /// atelier patch: the owner's gutter widget on the hovered row, laid out for this frame.
     gutter_widget: Option<AnyElement>,
-    /// lathe patch: the text area, right of the gutter, where the pointer is an I-beam.
+    /// atelier patch: the text area, right of the gutter, where the pointer is an I-beam.
     text_hitbox: Hitbox,
     // Inline completion rendering data
     /// Shaped ghost lines to paint after cursor row (completion lines 2+)
@@ -2031,7 +2031,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
         }
 
         let line_height = window.line_height();
-        // lathe patch: each row block, laid out at the text's width to learn its height.
+        // atelier patch: each row block, laid out at the text's width to learn its height.
         let text_width = bounds.size.width - line_number_width - RIGHT_MARGIN;
         let row_blocks = self.measure_row_blocks(text_width, window, cx);
         let blocks_height = row_blocks.iter().fold(px(0.), |sum, (_, _, height)| sum + *height);
@@ -2226,7 +2226,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             },
             (total_wrapped_lines as f32 * line_height
                 + empty_bottom_height.max(ghost_lines_height)
-                // lathe patch: the text scrolls past every row block.
+                // atelier patch: the text scrolls past every row block.
                 + blocks_height)
             .max(bounds.size.height),
         );
@@ -2363,7 +2363,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             HitboxBehavior::Normal,
         );
         let hitbox = window.insert_hitbox(input_bounds, HitboxBehavior::Normal);
-        // lathe patch: after the editor's hitboxes, so a block's own hitbox is on top of them.
+        // atelier patch: after the editor's hitboxes, so a block's own hitbox is on top of them.
         let row_blocks = Self::place_row_blocks(row_blocks, &bounds, &last_layout, window, cx);
         let gutter_widget = self.layout_gutter_widget(original_x, &bounds, &last_layout, window, cx);
 
@@ -2403,7 +2403,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
         window: &mut Window,
         cx: &mut App,
     ) {
-        // lathe patch: the I-beam belongs to the text, and the gutter keeps the arrow, as in Zed.
+        // atelier patch: the I-beam belongs to the text, and the gutter keeps the arrow, as in Zed.
         // Everything painted after this sets its own pointer over them: fold chevrons, the fold
         // chip, an owner's row widgets, a Cmd-hovered link.
         if !self.state.read(cx).disabled {
@@ -2488,7 +2488,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             px(0.)
         };
 
-        // lathe patch: the owner's row washes, under the text. The gutter covers its part below, so
+        // atelier patch: the owner's row washes, under the text. The gutter covers its part below, so
         // they are painted there again after it.
         let ghost = prepaint.current_row.map(|row| (row, prepaint.ghost_lines_height));
         let row_rects = prepaint.last_layout.row_rects(ghost);
@@ -2647,7 +2647,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             }
         }
 
-        // lathe patch: the owner's covers, over the text. The gutter gets its own pass below.
+        // atelier patch: the owner's covers, over the text. The gutter gets its own pass below.
         fill_rows(&row_covers, input_bounds.origin.x, bounds.size.width, false, window);
 
         // Paint blinking cursors (shared blink state for all carets)
@@ -2713,7 +2713,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             }
         }
 
-        // lathe patch: the covers again, over the line numbers.
+        // atelier patch: the covers again, over the line numbers.
         if prepaint.line_numbers.is_some() {
             let gutter_bounds = editor_gutter_bounds(
                 input_bounds,
@@ -2731,7 +2731,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             window,
             cx,
         );
-        // lathe patch: with a gutter widget, follow the row under the pointer. Over a row block the
+        // atelier patch: with a gutter widget, follow the row under the pointer. Over a row block the
         // editor is not hovered, so the widget goes, as it does when the pointer leaves.
         if self.state.read(cx).gutter_widget().is_some() {
             let (hitbox, state) = (prepaint.hitbox.clone(), self.state.clone());
@@ -2742,7 +2742,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 }
             });
         }
-        // lathe patch: row widgets sit above the text and stay inside the editor.
+        // atelier patch: row widgets sit above the text and stay inside the editor.
         window.with_content_mask(Some(gpui::ContentMask { bounds: input_bounds }), |window| {
             for widget in prepaint.row_widgets.iter_mut() {
                 widget.paint(window, cx);
@@ -2772,7 +2772,7 @@ impl<M: InputModeKind> Element for TextElement<M> {
             state.update_scroll_offset(Some(prepaint.cursor_scroll_offset), cx);
             state.deferred_scroll_offset = None;
             state.layout_stale = false;
-            // A caret set before this layout is revealed now that the layout is of its text (lathe
+            // A caret set before this layout is revealed now that the layout is of its text (atelier
             // patch 17). The target goes straight to the scroll handle: a deferred one would wait for
             // a frame nothing has asked for yet.
             if let Some(offset) = state.reveal_after_layout.take() {

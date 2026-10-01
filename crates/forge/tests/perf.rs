@@ -1,12 +1,12 @@
 //! The forge path's numbers, against the targets in `docs/performance.md`. Everything here runs on
-//! answers held in memory, so it measures lathe's own work (building the request, reading the JSON,
+//! answers held in memory, so it measures atelier's own work (building the request, reading the JSON,
 //! mapping to the model) and not the network. Run in release, on the HP:
-//!   cargo test -p lathe-forge --release --test perf -- --ignored --nocapture --test-threads=1
+//!   cargo test -p atelier-forge --release --test perf -- --ignored --nocapture --test-threads=1
 mod support;
 
 use std::time::{Duration, Instant};
 
-use lathe_forge::{
+use atelier_forge::{
     Forge, Involved, PullBrief, PullRef, PullState, PullSummary, RepoRef, ReviewDecision, Shelf, file_courts,
     github::testing::Fixtures, present,
 };
@@ -130,7 +130,7 @@ fn involved(n: u64) -> Involved {
             deletions: 2,
             comments: 3,
             review: if n.is_multiple_of(3) { ReviewDecision::NotRequired } else { ReviewDecision::Required },
-            checks: Some(lathe_forge::CheckCounts { passed: 5, failed: n.is_multiple_of(5) as u32, running: n.is_multiple_of(7) as u32 }),
+            checks: Some(atelier_forge::CheckCounts { passed: 5, failed: n.is_multiple_of(5) as u32, running: n.is_multiple_of(7) as u32 }),
         },
         shelf: Some(shelf),
     }

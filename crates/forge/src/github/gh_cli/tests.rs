@@ -2,7 +2,7 @@
 //! `gh` 2.101: a reply with `--include`, exit 4 when signed out, exit 1 with nothing when offline.
 use std::{os::unix::fs::PermissionsExt, path::PathBuf, sync::Arc};
 
-use lathe_project::LocalProject;
+use atelier_project::LocalProject;
 
 use super::{GhCli, classify, parse_reply};
 use crate::github::transport::{Request, Transport, TransportError};
@@ -105,7 +105,7 @@ fn ghs_real_messages_tell_signed_out_offline_and_the_rest_apart() {
 fn stand_in_saying(stderr: &str, code: i32) -> (tempfile::TempDir, GhCli) {
     // The words ride in the script itself, so no second file is left behind.
     let words = if stderr.ends_with('\n') || stderr.is_empty() { stderr.to_string() } else { format!("{stderr}\n") };
-    stand_in(&format!("cat >&2 <<'LATHE_STDERR_END'\n{words}LATHE_STDERR_END\nexit {code}"))
+    stand_in(&format!("cat >&2 <<'ATELIER_STDERR_END'\n{words}ATELIER_STDERR_END\nexit {code}"))
 }
 #[test]
 fn exit_four_and_a_sign_in_message_mean_signed_out() {
@@ -129,7 +129,7 @@ fn a_failure_of_another_kind_keeps_the_last_line_gh_wrote() {
 fn a_gh_that_is_not_installed_is_reported_as_missing() {
     let dir = tempfile::tempdir().unwrap();
     let project = Arc::new(LocalProject::open(dir.path()).unwrap());
-    let cli = GhCli::new(project).with_program("/nonexistent/gh-for-lathe-tests");
+    let cli = GhCli::new(project).with_program("/nonexistent/gh-for-atelier-tests");
     assert_eq!(cli.send(&get("x")).err().unwrap(), TransportError::ToolMissing);
 }
 

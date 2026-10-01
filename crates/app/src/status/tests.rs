@@ -1,4 +1,4 @@
-use lathe_agents::session::{PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus, TurnEnd};
+use atelier_agents::session::{PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus, TurnEnd};
 
 use super::*;
 

@@ -1,6 +1,6 @@
 //! The commands a composer offers after `/`, from three sources, as neutral data: the agent's own (its
-//! init lists them), lathe's own, and the project's skills (`.claude/skills/*/SKILL.md`) and command files
-//! (`.claude/commands/*.md`). A command lathe runs itself is lathe's even when the agent lists it too:
+//! init lists them), atelier's own, and the project's skills (`.claude/skills/*/SKILL.md`) and command files
+//! (`.claude/commands/*.md`). A command atelier runs itself is atelier's even when the agent lists it too:
 //! the agent runs headless and cannot run `/login`, for one.
 
 /// Where a command comes from.
@@ -8,8 +8,8 @@
 pub enum CommandSource {
     /// The agent's own: sent to it as `/name args`.
     Agent,
-    /// Lathe runs it.
-    Lathe,
+    /// Atelier runs it.
+    Atelier,
     /// A skill or a command file of the project: sent to the agent.
     Skill,
 }
@@ -31,16 +31,16 @@ impl CommandInfo {
     }
 }
 
-/// The commands lathe runs itself.
-pub fn lathe_commands() -> Vec<CommandInfo> {
-    use CommandSource::Lathe;
+/// The commands atelier runs itself.
+pub fn atelier_commands() -> Vec<CommandInfo> {
+    use CommandSource::Atelier;
     vec![
-        CommandInfo::new("goal", Lathe, "Set what this session is for, or show it", Some("<the goal>")),
-        CommandInfo::new("clear-goal", Lathe, "Clear this session's goal", None),
-        CommandInfo::new("login", Lathe, "Sign in to the agent, in a terminal", None),
-        CommandInfo::new("review", Lathe, "Review this session's changes", None),
-        CommandInfo::new("tasks", Lathe, "Show the project's tasks", None),
-        CommandInfo::new("files", Lathe, "Show the Files view", None),
+        CommandInfo::new("goal", Atelier, "Set what this session is for, or show it", Some("<the goal>")),
+        CommandInfo::new("clear-goal", Atelier, "Clear this session's goal", None),
+        CommandInfo::new("login", Atelier, "Sign in to the agent, in a terminal", None),
+        CommandInfo::new("review", Atelier, "Review this session's changes", None),
+        CommandInfo::new("tasks", Atelier, "Show the project's tasks", None),
+        CommandInfo::new("files", Atelier, "Show the Files view", None),
     ]
 }
 
@@ -75,11 +75,11 @@ pub fn command_file_from(path: &str, text: &str) -> Option<CommandInfo> {
     Some(CommandInfo::new(name, CommandSource::Skill, summary, None))
 }
 
-/// One list, each name once: lathe's first, then the project's, then the agent's own. The agent's list
+/// One list, each name once: atelier's first, then the project's, then the agent's own. The agent's list
 /// holds the project's skills and commands too; those show as the project's.
-pub fn merge(lathe: Vec<CommandInfo>, project: Vec<CommandInfo>, agent: &[String]) -> Vec<CommandInfo> {
+pub fn merge(atelier: Vec<CommandInfo>, project: Vec<CommandInfo>, agent: &[String]) -> Vec<CommandInfo> {
     let mut all: Vec<CommandInfo> = Vec::new();
-    for command in lathe.into_iter().chain(project) {
+    for command in atelier.into_iter().chain(project) {
         if !all.iter().any(|c| c.name == command.name) {
             all.push(command);
         }

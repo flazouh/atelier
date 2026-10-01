@@ -1,5 +1,5 @@
 use gpui_kit::TestAppContext;
-use lathe_agents::session::{Choice, ChoiceId, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
+use atelier_agents::session::{Choice, ChoiceId, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
 
 use super::*;
 use crate::fake_agent::{ended, git_project, git_project_in, start, start_in};
@@ -59,7 +59,7 @@ fn a_failed_start_is_retried_by_the_next_message(cx: &mut TestAppContext) {
 /// Streaming text joins into one row, and only the rows that changed are measured again.
 #[gpui_kit::test]
 fn a_stream_folds_into_one_row(cx: &mut TestAppContext) {
-    let block = lathe_agents::session::BlockId(1);
+    let block = atelier_agents::session::BlockId(1);
     let turn = (0..50).map(|i| Event::Text { block, delta: format!("word{i} ") }).chain([ended()]).collect();
     let (session, _, cx) = start(cx, vec![turn], false);
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("talk".into(), cx)));
@@ -75,8 +75,8 @@ fn a_stream_folds_into_one_row(cx: &mut TestAppContext) {
 /// What a long session costs: 2,000 messages (the reader's and the agent's, and a tool call every
 /// tenth) folded and drawn in the panel, then scrolled a frame at a time. The harness shapes no text
 /// (GPUI's `NoopTextSystem`) and paints no pixels, so this is the fold's and the list's own cost; the
-/// real frame is the app's, under `LATHE_FRAMES=1` (docs/performance.md, "Agent sessions in the app").
-///     cargo test --release -p lathe-app -- --ignored --nocapture a_long_session_scrolls
+/// real frame is the app's, under `ATELIER_FRAMES=1` (docs/performance.md, "Agent sessions in the app").
+///     cargo test --release -p atelier-app -- --ignored --nocapture a_long_session_scrolls
 #[gpui_kit::test]
 #[ignore]
 fn a_long_session_scrolls_under_a_frame(cx: &mut TestAppContext) {
@@ -84,7 +84,7 @@ fn a_long_session_scrolls_under_a_frame(cx: &mut TestAppContext) {
     let mut turn = Vec::new();
     for i in 0..1000u64 {
         turn.push(Event::UserMessage { text: format!("Question {i}: what does this part of the relay do when the client goes away?") });
-        turn.push(Event::Text { block: lathe_agents::session::BlockId(i), delta: format!("Answer {i}. {}", "It detaches the byte stream, so a second write does nothing. ".repeat(3)) });
+        turn.push(Event::Text { block: atelier_agents::session::BlockId(i), delta: format!("Answer {i}. {}", "It detaches the byte stream, so a second write does nothing. ".repeat(3)) });
         if i % 10 == 0 {
             let call = ToolCall { id: ToolId::new(format!("t{i}")), name: "Read".into(), kind: ToolKind::Read, input: serde_json::json!({}), file: Some("src/relay.rs".into()), parent: None, status: ToolStatus::Done };
             turn.push(Event::ToolStarted(call));
@@ -130,7 +130,7 @@ fn a_long_session_scrolls_under_a_frame(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_turn_ends_with_its_changed_files_after_its_rows(cx: &mut TestAppContext) {
     let dir = git_project(&[("a.txt", "one\n"), ("b.txt", "keep\n")]);
-    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![Event::Text { block: lathe_agents::session::BlockId(1), delta: "done".into() }, ended()]], false);
+    let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![Event::Text { block: atelier_agents::session::BlockId(1), delta: "done".into() }, ended()]], false);
     let root = dir.clone();
     fake.work.lock().unwrap().push(Box::new(move || {
         std::fs::write(root.join("a.txt"), "one\ntwo\n").unwrap();
@@ -204,7 +204,7 @@ fn a_name_the_reader_gave_stays(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_session_cut_off_mid_turn_keeps_its_last_activity(cx: &mut TestAppContext) {
     let dir = git_project(&[("a.txt", "one\n")]);
-    let working = lathe_agents::session::Event::Text { block: lathe_agents::session::BlockId(0), delta: "working".into() };
+    let working = atelier_agents::session::Event::Text { block: atelier_agents::session::BlockId(0), delta: "working".into() };
     let (session, _fake, cx) = start_in(cx, dir.clone(), vec![vec![working]], false);
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
     cx.run_until_parked();
@@ -224,8 +224,8 @@ fn a_session_cut_off_mid_turn_keeps_its_last_activity(cx: &mut TestAppContext) {
     });
 }
 
-/// The composer's lists come from the project: lathe's running commands, its skills and command files,
-/// and its tracked files. A lathe command that does nothing yet is not offered.
+/// The composer's lists come from the project: atelier's running commands, its skills and command files,
+/// and its tracked files. A atelier command that does nothing yet is not offered.
 #[gpui_kit::test]
 fn the_composer_offers_the_projects_commands_and_files(cx: &mut TestAppContext) {
     let dir = crate::test_dirs::path();
@@ -244,13 +244,13 @@ fn the_composer_offers_the_projects_commands_and_files(cx: &mut TestAppContext) 
     for name in ["files", "tasks", "review", "ship", "tidy"] {
         assert!(names.iter().any(|n| n == name), "{name} is offered: {names:?}");
     }
-    assert!(!names.iter().any(|n| n == "goal" || n == "login"), "a command lathe cannot run yet is not offered: {names:?}");
+    assert!(!names.iter().any(|n| n == "goal" || n == "login"), "a command atelier cannot run yet is not offered: {names:?}");
     assert!(files.iter().any(|f| f == "a.txt") && files.iter().any(|f| f == "src.rs"), "the tracked files are offered: {files:?}");
 }
 
-/// A `/` command from the list: lathe's own runs in lathe, any other goes to the agent as its text.
+/// A `/` command from the list: atelier's own runs in atelier, any other goes to the agent as its text.
 #[gpui_kit::test]
-fn a_command_runs_in_lathe_or_goes_to_the_agent_as_text(cx: &mut TestAppContext) {
+fn a_command_runs_in_atelier_or_goes_to_the_agent_as_text(cx: &mut TestAppContext) {
     let (session, fake, cx) = start(cx, vec![vec![ended()]], false);
     let heard = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let log = heard.clone();
@@ -263,7 +263,7 @@ fn a_command_runs_in_lathe_or_goes_to_the_agent_as_text(cx: &mut TestAppContext)
         });
     });
     let kinds = heard.borrow().clone();
-    assert_eq!(kinds.len(), 3, "lathe's three commands each told the app");
+    assert_eq!(kinds.len(), 3, "atelier's three commands each told the app");
     assert!(fake.received.lock().unwrap().is_empty(), "and none reached the agent");
     cx.update(|_, cx| session.update(cx, |s, cx| s.run_command("compact", "now", cx)));
     cx.run_until_parked();
@@ -283,14 +283,14 @@ fn started_tool(id: &str) -> Event {
 }
 
 fn finished_tool(id: &str) -> Event {
-    Event::ToolFinished { id: ToolId::new(id), output: lathe_agents::session::ToolOutput { text: "ok".into(), truncated: false, full_at: None, is_error: false } }
+    Event::ToolFinished { id: ToolId::new(id), output: atelier_agents::session::ToolOutput { text: "ok".into(), truncated: false, full_at: None, is_error: false } }
 }
 
 /// The agent's work in a turn is one group: live and open while the agent works with nothing after it,
 /// folded to its words once the turn is over, and a press opens it again.
 #[gpui_kit::test]
 fn a_run_of_work_is_one_group_that_folds_when_the_turn_ends(cx: &mut TestAppContext) {
-    let block = lathe_agents::session::BlockId(1);
+    let block = atelier_agents::session::BlockId(1);
     let work = vec![
         Event::Thinking { block, delta: "hm".into() },
         Event::ThinkingDone { block, took: std::time::Duration::from_secs(3) },
@@ -308,7 +308,7 @@ fn a_run_of_work_is_one_group_that_folds_when_the_turn_ends(cx: &mut TestAppCont
     });
     assert_eq!(shown, [list_diff::Row::Item(0), list_diff::Row::Activity { from: 1, to: 4 }], "the user's message, then one group");
     assert!(live && open, "the agent still works: the group is live and open");
-    fake.turns.lock().unwrap().push(vec![Event::Text { block: lathe_agents::session::BlockId(2), delta: "done".into() }, ended()]);
+    fake.turns.lock().unwrap().push(vec![Event::Text { block: atelier_agents::session::BlockId(2), delta: "done".into() }, ended()]);
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("more".into(), cx)));
     cx.run_until_parked();
     let (shown, folded) = cx.update(|_, cx| {

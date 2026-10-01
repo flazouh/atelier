@@ -11,7 +11,7 @@ use beui::{
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
     CodeEditor, Decision, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
 };
-use lathe_agents::claude::{self, SparkState};
+use atelier_agents::claude::{self, SparkState};
 use std::time::{Duration, Instant};
 
 
@@ -439,7 +439,7 @@ impl Gallery {
                     .pb(px(12.))
                     .text_size(TextSize::Sm.font_size())
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child("beui for lathe"),
+                    .child("beui for atelier"),
             )
             // The list scrolls, so the theme picker at the foot stays in view in a short window.
             .child(div().id("stories").flex().flex_col().gap(px(2.)).flex_1().min_h_0().overflow_y_scroll().children(Story::ALL.into_iter().map(|story| {
@@ -917,7 +917,7 @@ fn tools() -> impl IntoElement {
                                 "}\n\nfn main() {\n    println!(\"{}\", add(2, 3));\n}\n",
                                 "}\n\nfn subtract(a: i32, b: i32) -> i32 {\n    a - b\n}\n\nfn main() {\n    println!(\"{}\", add(2, 3));\n    println!(\"{}\", subtract(5, 2));\n}\n",
                             ))
-                            .parameter("file_path", "/tmp/lathe-ux/scratch/src/main.rs")
+                            .parameter("file_path", "/tmp/atelier-ux/scratch/src/main.rs")
                             .on_approve(|_, _, _| {})
                             .on_always_allow(|_, _, _| {})
                             .on_deny(|_, _, _| {}),
@@ -1157,9 +1157,9 @@ fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoEl
 fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
     beui::theme_picker::theme_picker("theme", theme, |picked, cx| {
         let name = picked.name.to_string();
-        if let Some(path) = lathe_settings::path() {
+        if let Some(path) = atelier_settings::path() {
             cx.background_spawn(async move {
-                if let Err(error) = lathe_settings::update(&path, |s| s.theme = Some(name)) {
+                if let Err(error) = atelier_settings::update(&path, |s| s.theme = Some(name)) {
                     eprintln!("could not save the theme: {error}");
                 }
             })
@@ -1169,10 +1169,10 @@ fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
 }
 
 /// The theme to start in: `GALLERY_THEME`, then the one saved last time; `None` follows the system.
-fn starting_theme(saved: &lathe_settings::Settings) -> Option<beui::Theme> {
+fn starting_theme(saved: &atelier_settings::Settings) -> Option<beui::Theme> {
     let by_name = |name: &str| match name {
-        "light" => Some(beui::themes::lathe(Appearance::Light).clone()),
-        "dark" => Some(beui::themes::lathe(Appearance::Dark).clone()),
+        "light" => Some(beui::themes::atelier(Appearance::Light).clone()),
+        "dark" => Some(beui::themes::atelier(Appearance::Dark).clone()),
         name => beui::themes::named(name).cloned(),
     };
     match std::env::var("GALLERY_THEME") {
@@ -1186,8 +1186,8 @@ fn starting_theme(saved: &lathe_settings::Settings) -> Option<beui::Theme> {
 
 fn main() {
     // Read before the event loop starts, so the UI thread never waits on the disk.
-    let saved = lathe_settings::path().map(|p| lathe_settings::load(&p)).unwrap_or_default();
-    gpui_kit::application().with_assets(lathe_agents::Assets).run(move |cx| {
+    let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
+    gpui_kit::application().with_assets(atelier_agents::Assets).run(move |cx| {
         beui::init(cx);
         if let Some(theme) = starting_theme(&saved) {
             beui::theme::set_theme(theme, cx);

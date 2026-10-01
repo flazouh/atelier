@@ -1,4 +1,4 @@
-//! GitHub's GraphQL answers, as far as lathe reads them. Every field a query may leave out is an
+//! GitHub's GraphQL answers, as far as atelier reads them. Every field a query may leave out is an
 //! `Option` or a default, so a missing one is a value, not a failed parse.
 use serde::Deserialize;
 

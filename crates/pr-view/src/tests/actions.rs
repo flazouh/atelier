@@ -1,8 +1,8 @@
 use beui::merge::{Action, Choice, MergeMethod as Ui, UpdateWay};
-use lathe_forge::{MergeMethod, MergeRequest, UpdateMethod};
+use atelier_forge::{MergeMethod, MergeRequest, UpdateMethod};
 
 use crate::{actions::{Ask, ask}, notes::compose, PartKind};
-use lathe_forge::ForgeError;
+use atelier_forge::ForgeError;
 
 fn choice(method: Ui) -> Choice {
     Choice { method, auto: false, delete_branch: true }

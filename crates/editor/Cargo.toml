@@ -1,5 +1,5 @@
 [package]
-name = "lathe-editor"
+name = "atelier-editor"
 description = "A file's editor wired to its language server: definitions, uses, hover cards and problems."
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ license.workspace = true
 [dependencies]
 gpui-kit.workspace = true
 beui.workspace = true
-lathe-lsp.workspace = true
+atelier-lsp.workspace = true
 lsp-types = "0.97"
 futures-channel = "0.3"
 futures-util = "0.3"

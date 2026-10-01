@@ -1,4 +1,4 @@
-use lathe_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
+use atelier_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
 use serde_json::json;
 
 use super::*;

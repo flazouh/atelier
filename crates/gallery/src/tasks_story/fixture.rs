@@ -59,10 +59,10 @@ impl Lcg {
 fn pr(number: u64, state: PrState, title: &str) -> PrChipData {
     PrChipData {
         number,
-        repo: "flazouh/lathe".into(),
+        repo: "flazouh/atelier".into(),
         title: title.to_string().into(),
         state,
-        url: format!("https://github.com/flazouh/lathe/pull/{number}").into(),
+        url: format!("https://github.com/flazouh/atelier/pull/{number}").into(),
     }
 }
 
@@ -93,7 +93,7 @@ pub fn tasks(count: usize, claude: &AgentLook, other: &AgentLook) -> Vec<TaskDat
                 task.labels.push(label);
             }
         }
-        task.project = Some("lathe".into());
+        task.project = Some("atelier".into());
         let age = (rng.next(90) as u64 + 1) * 3600 * (1 + rng.next(4) as u64);
         task.created_at = BASE - age - 86_400;
         task.updated_at = BASE - age;

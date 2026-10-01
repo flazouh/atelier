@@ -15,7 +15,7 @@ use gpui_kit::{
     AnyElement, Context, ElementId, Entity, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement,
     Styled, div, px,
 };
-use lathe_agents::claude;
+use atelier_agents::claude;
 
 use super::{DIFF, Gallery, PromptInput, REPLY, TEST_OUTPUT, thinking_for};
 use crate::agent_parts::{PR_TEXT, changed_files, pr_3344, resolve_pr, running_card, strip_rows};
@@ -71,7 +71,7 @@ fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> E
             "s-push",
             ToolApproval::new("s-push", "git push origin main")
                 .description("Push the fix so CI can run the full test suite.")
-                .parameter("Directory", "~/Documents/lathe")
+                .parameter("Directory", "~/Documents/atelier")
                 .default_open(true)
                 .on_approve(|_, _, _| {})
                 .on_always_allow(|_, _, _| {})

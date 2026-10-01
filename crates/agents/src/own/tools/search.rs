@@ -1,4 +1,4 @@
-use lathe_project::Query;
+use atelier_project::Query;
 use serde_json::{Value, json};
 
 use super::{Access, Tool, ToolContext, ToolResult, cap, object, MAX_RESULT};

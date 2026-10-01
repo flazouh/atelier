@@ -1,7 +1,7 @@
 //! The one line under the header of the rail: the most pressing thing to tell. What is being sent or
 //! what just changed comes first, then a part that could not be read, then a problem with git, then a
 //! note about the diff's base.
-use lathe_forge::ForgeError;
+use atelier_forge::ForgeError;
 
 use crate::data::PartKind;
 

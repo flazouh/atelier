@@ -13,9 +13,9 @@ use beui::{
     sidebar_model::{Badge, Connection, Location as RowLocation, ProjectData, SessionData},
 };
 use gpui_kit::{App, Entity, SharedString};
-use lathe_agents::session::SessionId;
-use lathe_project::Link;
-use lathe_settings::Location;
+use atelier_agents::session::SessionId;
+use atelier_project::Link;
+use atelier_settings::Location;
 
 use crate::{agent_session::AgentSession, open_project::OpenProject};
 
@@ -58,7 +58,7 @@ pub struct Badges {
     pub icons: BTreeMap<String, String>,
 }
 impl Badges {
-    pub fn saved(settings: &lathe_settings::Settings) -> Self {
+    pub fn saved(settings: &atelier_settings::Settings) -> Self {
         Self { colors: settings.project_colors.clone(), icons: settings.project_icons.clone() }
     }
 }

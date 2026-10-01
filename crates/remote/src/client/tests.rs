@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use lathe_project::{ChangeKind, Command, Link, Project, Query};
+use atelier_project::{ChangeKind, Command, Link, Project, Query};
 
 use super::*;
 
@@ -79,7 +79,7 @@ fn files_search_and_git_answer_as_they_do_locally() {
     let dir = folder(&[("src/a.rs", "fn detach() {}\n"), (".gitignore", "target/\n"), ("target/x", "")]);
     let (_host, dial) = host();
     let remote = connect(&dir, dial);
-    let local = lathe_project::LocalProject::open(dir.path()).unwrap();
+    let local = atelier_project::LocalProject::open(dir.path()).unwrap();
     assert_eq!(remote.root(), local.root());
     assert_eq!(remote.list().unwrap(), local.list().unwrap());
     remote.write("src/b.rs", b"fn b() {}\n").unwrap();
@@ -115,7 +115,7 @@ fn a_process_on_the_host_talks_over_its_pipes() {
     assert!(sleeper.control.running());
     sleeper.control.kill().unwrap();
     sleeper.control.wait().unwrap();
-    assert!(remote.spawn(&Command::new("lathe-no-such-program")).is_err());
+    assert!(remote.spawn(&Command::new("atelier-no-such-program")).is_err());
     drop((cat.control, failing.control, sleeper.control));
     assert!(lock(&remote.shared.processes).is_empty(), "a process is forgotten once its control is gone");
 }
@@ -225,7 +225,7 @@ fn a_remote_project_names_its_data_folder_on_the_host() {
     let data = tempfile::tempdir().unwrap();
     let (_host, dial) = host_with_data(Some(data.path().to_path_buf()));
     let remote = connect(&dir, dial);
-    let local = lathe_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    let local = atelier_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
     assert_eq!(remote.data_path(), local.data_path());
     assert!(remote.data_path().is_some_and(|p| p.starts_with(data.path())));
 }
@@ -240,7 +240,7 @@ fn ended_processes_give_back_their_pipes() {
     let remote = connect(&dir, dial);
     let open_files = || std::fs::read_dir("/proc/self/fd").unwrap().count();
     let run = || {
-        let mut p = remote.spawn(&lathe_project::Command::new("true")).unwrap();
+        let mut p = remote.spawn(&atelier_project::Command::new("true")).unwrap();
         drop(p.stdin);
         let mut out = Vec::new();
         std::io::Read::read_to_end(&mut p.stdout, &mut out).unwrap();
@@ -263,7 +263,7 @@ fn a_remote_project_lists_a_folder_of_its_host_even_outside_the_project() {
     let dir = folder(&[("src/a.rs", "a"), ("notes.txt", "n")]);
     let (_host, dial) = host_with_data(None);
     let remote = connect(&dir, dial);
-    let local = lathe_project::LocalProject::open(dir.path()).unwrap();
+    let local = atelier_project::LocalProject::open(dir.path()).unwrap();
     let parent = dir.path().parent().unwrap().to_str().unwrap();
     let at = dir.path().to_str().unwrap();
     assert_eq!(remote.read_dir(at).unwrap(), local.read_dir(at).unwrap(), "the same answer as on the host");
@@ -296,17 +296,17 @@ fn helper_saying(words: &'static str) -> Dial {
 }
 
 #[test]
-fn an_old_helper_says_update_lathe_and_no_protocol_numbers() {
+fn an_old_helper_says_update_atelier_and_no_protocol_numbers() {
     let dir = folder(&[("a.txt", "a")]);
-    let dial = helper_saying("the app speaks version 5, this lathe-remote 4");
+    let dial = helper_saying("the app speaks version 5, this atelier-remote 4");
     let error = RemoteProject::connect("test", dir.path().display().to_string(), dial, Timeouts::default()).err().unwrap();
     let words = error.to_string();
-    assert!(words.contains("update lathe on this host"), "{words}");
+    assert!(words.contains("update atelier on this host"), "{words}");
     assert!(!words.chars().any(|c| c.is_ascii_digit()), "{words}");
 }
 
 #[test]
-fn a_helper_tells_an_older_app_to_update_lathe() {
+fn a_helper_tells_an_older_app_to_update_atelier() {
     let dir = folder(&[("a.txt", "a")]);
     let (host_reader, mut app_writer) = io::pipe().unwrap();
     let (mut app_reader, host_writer) = io::pipe().unwrap();
@@ -314,13 +314,13 @@ fn a_helper_tells_an_older_app_to_update_lathe() {
     let hello = Call::Hello { version: VERSION - 1, root: dir.path().display().to_string() };
     write_frame(&mut app_writer, &Frame::Request { id: 1, call: hello }).unwrap();
     let Some(Frame::Response { result: Err(failure), .. }) = read_frame(&mut app_reader).unwrap() else { panic!("a refusal") };
-    assert!(failure.message.contains("update lathe"), "{}", failure.message);
+    assert!(failure.message.contains("update atelier"), "{}", failure.message);
     assert!(!failure.message.chars().any(|c| c.is_ascii_digit()), "{}", failure.message);
 }
 
 #[test]
 fn a_remote_project_keeps_its_tasks_on_the_host() {
-    use lathe_tracker::{Entry as Log, NewTask, Patch, PrLink, Query as Tasks, SessionLink, Status};
+    use atelier_tracker::{Entry as Log, NewTask, Patch, PrLink, Query as Tasks, SessionLink, Status};
     let dir = folder(&[("a.txt", "a")]);
     let data = tempfile::tempdir().unwrap();
     let (_host, dial) = host_with_data(Some(data.path().to_path_buf()));
@@ -340,22 +340,22 @@ fn a_remote_project_keeps_its_tasks_on_the_host() {
     assert_eq!(tracker.list(&Tasks::default()).unwrap().len(), 2);
     assert!(tracker.activity(&task.id).unwrap().len() >= 3);
     assert_eq!(tracker.get(&two[0].id).unwrap().map(|t| t.title), Some("Two".to_string()));
-    let missing = lathe_tracker::TaskId("no-such".into());
-    assert_eq!(tracker.update(&missing, &Patch::status(Status::Done), "alex"), Err(lathe_tracker::TrackerError::NotFound(missing)));
+    let missing = atelier_tracker::TaskId("no-such".into());
+    assert_eq!(tracker.update(&missing, &Patch::status(Status::Done), "alex"), Err(atelier_tracker::TrackerError::NotFound(missing)));
     // The store is the host's own file, in the project's data folder there.
-    let on_host = lathe_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    let on_host = atelier_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
     assert_eq!(on_host.tracker().unwrap().get(&task.id).unwrap().map(|t| t.status), Some(Status::InProgress));
 }
 
 #[test]
 fn a_remote_tracker_hears_of_tasks_changed_elsewhere() {
-    use lathe_tracker::{Event as Told, NewTask, Patch, Status};
+    use atelier_tracker::{Event as Told, NewTask, Patch, Status};
     let dir = folder(&[("a.txt", "a")]);
     let data = tempfile::tempdir().unwrap();
     let (_host, dial) = host_with_data(Some(data.path().to_path_buf()));
     let remote = connect(&dir, dial).poll_tasks_every(Duration::from_millis(50));
     let events = remote.tracker().unwrap().subscribe();
-    let on_host = lathe_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
+    let on_host = atelier_project::LocalProject::open(dir.path()).unwrap().with_data_dir(data.path());
     let elsewhere = on_host.tracker().unwrap();
     let task = elsewhere.create(&NewTask::titled("Made on the host"), "someone").unwrap();
     match events.recv_timeout(Duration::from_secs(5)).unwrap() {

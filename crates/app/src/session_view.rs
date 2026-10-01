@@ -26,7 +26,7 @@ use gpui_kit::{
     Styled, Window, div, list, prelude::FluentBuilder, 
 };
 use beui::scale::px;
-use lathe_agents::session::{Answer, Call, ChoiceKind, Item, SubagentStatus, TodoStatus, ToolStatus};
+use atelier_agents::session::{Answer, Call, ChoiceKind, Item, SubagentStatus, TodoStatus, ToolStatus};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
@@ -46,12 +46,12 @@ fn row_status(status: ToolStatus) -> RowToolStatus {
 fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
     let about = summary::summary(call, |path| beui::tool_preview::relative_path(path, root).to_string());
     let icon = match about.kind {
-        lathe_agents::session::ToolKind::Shell => IconName::Terminal,
-        lathe_agents::session::ToolKind::Read => IconName::Description,
-        lathe_agents::session::ToolKind::Edit | lathe_agents::session::ToolKind::Write => IconName::Edit,
-        lathe_agents::session::ToolKind::Search => IconName::Search,
-        lathe_agents::session::ToolKind::Fetch => IconName::Public,
-        lathe_agents::session::ToolKind::Other => IconName::Build,
+        atelier_agents::session::ToolKind::Shell => IconName::Terminal,
+        atelier_agents::session::ToolKind::Read => IconName::Description,
+        atelier_agents::session::ToolKind::Edit | atelier_agents::session::ToolKind::Write => IconName::Edit,
+        atelier_agents::session::ToolKind::Search => IconName::Search,
+        atelier_agents::session::ToolKind::Fetch => IconName::Public,
+        atelier_agents::session::ToolKind::Other => IconName::Build,
     };
     let mut row = ToolRow::new(id, SharedString::from(about.title)).icon(icon).status(row_status(call.call.status));
     if let Some(detail) = about.detail {
@@ -88,7 +88,7 @@ fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
 /// name opens it in the editor.
 fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElement {
     let s = session.read(cx);
-    let Some(files) = s.reviews.turns.turns().get(turn).map(|t| lathe_review::present::changed_files(t.files())) else {
+    let Some(files) = s.reviews.turns.turns().get(turn).map(|t| atelier_review::present::changed_files(t.files())) else {
         return div().into_any_element();
     };
     let (review, open) = (session.clone(), session.clone());
@@ -208,7 +208,7 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
                 .calls(calls.iter().enumerate().map(|(n, c)| tool_row(id(&format!("sub-call-{n}")), c, &root, None)).collect());
             if let Some(model) = &subagent.model {
                 card = card.model(model.clone());
-                if let Some(mark) = lathe_agents::registry::model_mark(model) {
+                if let Some(mark) = atelier_agents::registry::model_mark(model) {
                     card = card.model_mark(mark);
                 }
             }
@@ -467,7 +467,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
 
 /// The agents this build can start, as a picker a new session shows until its first message.
 fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
-    let agents = lathe_agents::registry::agents();
+    let agents = atelier_agents::registry::agents();
     if agents.len() < 2 {
         return None;
     }

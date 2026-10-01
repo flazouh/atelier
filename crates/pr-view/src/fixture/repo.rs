@@ -7,8 +7,8 @@ use std::{
     sync::Arc,
 };
 
-use lathe_forge::{Pull, PullRef};
-use lathe_project::{LocalProject, Project};
+use atelier_forge::{Pull, PullRef};
+use atelier_project::{LocalProject, Project};
 
 use crate::{fixture::sample, git::PrGit};
 
@@ -47,7 +47,7 @@ impl Repo {
     /// `files` are on main.
     pub fn new(files: &[(&str, &str)]) -> Self {
         static COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-        let dir = std::env::temp_dir().join(format!("lathe-pr-view-{}-{}", std::process::id(), COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)));
+        let dir = std::env::temp_dir().join(format!("atelier-pr-view-{}-{}", std::process::id(), COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let root = std::fs::canonicalize(&dir).unwrap();

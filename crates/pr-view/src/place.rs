@@ -2,7 +2,7 @@
 //! row that holds its line in the head; one on the old side under the row that holds its line in the base.
 //! A thread on the whole file, or one whose code has changed since (outdated: it has no line now), has no
 //! row, and the view lists them above the code instead.
-use lathe_forge::{Side, Thread};
+use atelier_forge::{Side, Thread};
 
 use crate::diff::FileView;
 

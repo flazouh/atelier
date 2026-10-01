@@ -1,7 +1,7 @@
 //! Files' texts in HEAD, all in one `git cat-file --batch` (each git call is a round trip on a remote
 //! project): what the commit list counts against, and the diff a draft is made from. Blocking.
 
-use lathe_project::Project;
+use atelier_project::Project;
 
 use crate::ship::commit::git;
 

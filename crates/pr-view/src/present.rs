@@ -6,7 +6,7 @@ use beui::{
     verdict::Decision,
 };
 use gpui_kit::SharedString;
-use lathe_forge::{Change, Comment, Pull, Remark, Thread, Verdict, time};
+use atelier_forge::{Change, Comment, Pull, Remark, Thread, Verdict, time};
 
 use crate::git::{Commit, FileEntry};
 
@@ -31,7 +31,7 @@ pub fn changed_files(entries: &[FileEntry]) -> Vec<ChangedFile> {
 }
 
 /// The changed files the forge listed, for the moment before git has answered.
-pub fn forge_files(files: &[lathe_forge::ChangedFile]) -> Vec<ChangedFile> {
+pub fn forge_files(files: &[atelier_forge::ChangedFile]) -> Vec<ChangedFile> {
     files.iter().map(|f| ChangedFile::new(f.path.clone(), f.additions as usize, f.deletions as usize).change(file_change(f.change, None))).collect()
 }
 

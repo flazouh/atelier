@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use lathe_forge::{Change, ChangedFile, CheckStatus, Conclusion, Forge, ForgeError};
+use atelier_forge::{Change, ChangedFile, CheckStatus, Conclusion, Forge, ForgeError};
 
 use crate::{
     Part, PartKind, PullData,
@@ -12,7 +12,7 @@ fn files() -> Vec<ChangedFile> {
     vec![ChangedFile { path: "src/a.rs".into(), additions: 3, deletions: 1, change: Change::Modified }]
 }
 
-fn forge() -> (FixtureForge, lathe_forge::PullRef) {
+fn forge() -> (FixtureForge, atelier_forge::PullRef) {
     let mut data = sample::data(7, "abc123", files());
     data.checks = vec![sample::check("linux", CheckStatus::Done, Some(Conclusion::Success))];
     data.threads = vec![sample::thread("T1", "src/a.rs", 2, vec![sample::comment("c1", "Ada", "Why?", 100)])];
@@ -21,7 +21,7 @@ fn forge() -> (FixtureForge, lathe_forge::PullRef) {
     (FixtureForge::new().with_pull(data), reference)
 }
 
-fn collect(forge: &dyn Forge, reference: &lathe_forge::PullRef, kinds: &[PartKind]) -> Vec<Part> {
+fn collect(forge: &dyn Forge, reference: &atelier_forge::PullRef, kinds: &[PartKind]) -> Vec<Part> {
     let parts = Mutex::new(Vec::new());
     load_parts(forge, reference, kinds, &|p| parts.lock().unwrap().push(p));
     parts.into_inner().unwrap()
@@ -84,27 +84,27 @@ fn the_reads_run_at_once_not_one_after_another() {
         };
     }
     impl Forge for Slow {
-        slow!(self, repository(u: &str) -> lathe_forge::ForgeResult<lathe_forge::Repository>);
-        slow!(self, pull(r: &lathe_forge::PullRef) -> lathe_forge::ForgeResult<lathe_forge::Pull>);
-        slow!(self, files(r: &lathe_forge::PullRef) -> lathe_forge::ForgeResult<Vec<ChangedFile>>);
-        slow!(self, threads(r: &lathe_forge::PullRef) -> lathe_forge::ForgeResult<Vec<lathe_forge::Thread>>);
-        slow!(self, remarks(r: &lathe_forge::PullRef) -> lathe_forge::ForgeResult<Vec<lathe_forge::Remark>>);
-        slow!(self, checks(r: &lathe_forge::PullRef) -> lathe_forge::ForgeResult<Vec<lathe_forge::Check>>);
-        slow!(self, job(j: &lathe_forge::JobRef) -> lathe_forge::ForgeResult<lathe_forge::Job>);
-        slow!(self, job_log(j: &lathe_forge::JobRef) -> lathe_forge::ForgeResult<String>);
-        slow!(self, last_review_point(r: &lathe_forge::PullRef) -> lathe_forge::ForgeResult<Option<String>>);
-        slow!(self, involved() -> lathe_forge::ForgeResult<Vec<lathe_forge::Involved>>);
-        slow!(self, briefs(r: &lathe_forge::RepoRef, n: &[u64]) -> lathe_forge::ForgeResult<Vec<Option<lathe_forge::PullBrief>>>);
-        slow!(self, create_pull(r: &lathe_forge::RepoRef, n: &lathe_forge::NewPull) -> lathe_forge::ForgeResult<lathe_forge::PullRef>);
-        slow!(self, update_pull(r: &lathe_forge::PullRef, u: &lathe_forge::PullUpdate) -> lathe_forge::ForgeResult<()>);
-        slow!(self, merge(r: &lathe_forge::PullRef, m: &lathe_forge::MergeRequest) -> lathe_forge::ForgeResult<lathe_forge::MergeOutcome>);
-        slow!(self, request_review(r: &lathe_forge::PullRef, v: &[lathe_forge::Reviewer]) -> lathe_forge::ForgeResult<()>);
-        slow!(self, comment(r: &lathe_forge::PullRef, b: &str) -> lathe_forge::ForgeResult<lathe_forge::Comment>);
-        slow!(self, hold_comment(r: &lathe_forge::PullRef, c: &lathe_forge::NewLine) -> lathe_forge::ForgeResult<lathe_forge::HeldComment>);
-        slow!(self, held_comments(r: &lathe_forge::PullRef) -> lathe_forge::ForgeResult<Vec<lathe_forge::HeldComment>>);
-        slow!(self, submit_review(r: &lathe_forge::PullRef, v: lathe_forge::Verdict, b: &str) -> lathe_forge::ForgeResult<()>);
-        slow!(self, reply(t: &lathe_forge::ThreadId, b: &str) -> lathe_forge::ForgeResult<lathe_forge::Comment>);
-        slow!(self, resolve(t: &lathe_forge::ThreadId, r: bool) -> lathe_forge::ForgeResult<()>);
+        slow!(self, repository(u: &str) -> atelier_forge::ForgeResult<atelier_forge::Repository>);
+        slow!(self, pull(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<atelier_forge::Pull>);
+        slow!(self, files(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<Vec<ChangedFile>>);
+        slow!(self, threads(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<Vec<atelier_forge::Thread>>);
+        slow!(self, remarks(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<Vec<atelier_forge::Remark>>);
+        slow!(self, checks(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<Vec<atelier_forge::Check>>);
+        slow!(self, job(j: &atelier_forge::JobRef) -> atelier_forge::ForgeResult<atelier_forge::Job>);
+        slow!(self, job_log(j: &atelier_forge::JobRef) -> atelier_forge::ForgeResult<String>);
+        slow!(self, last_review_point(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<Option<String>>);
+        slow!(self, involved() -> atelier_forge::ForgeResult<Vec<atelier_forge::Involved>>);
+        slow!(self, briefs(r: &atelier_forge::RepoRef, n: &[u64]) -> atelier_forge::ForgeResult<Vec<Option<atelier_forge::PullBrief>>>);
+        slow!(self, create_pull(r: &atelier_forge::RepoRef, n: &atelier_forge::NewPull) -> atelier_forge::ForgeResult<atelier_forge::PullRef>);
+        slow!(self, update_pull(r: &atelier_forge::PullRef, u: &atelier_forge::PullUpdate) -> atelier_forge::ForgeResult<()>);
+        slow!(self, merge(r: &atelier_forge::PullRef, m: &atelier_forge::MergeRequest) -> atelier_forge::ForgeResult<atelier_forge::MergeOutcome>);
+        slow!(self, request_review(r: &atelier_forge::PullRef, v: &[atelier_forge::Reviewer]) -> atelier_forge::ForgeResult<()>);
+        slow!(self, comment(r: &atelier_forge::PullRef, b: &str) -> atelier_forge::ForgeResult<atelier_forge::Comment>);
+        slow!(self, hold_comment(r: &atelier_forge::PullRef, c: &atelier_forge::NewLine) -> atelier_forge::ForgeResult<atelier_forge::HeldComment>);
+        slow!(self, held_comments(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<Vec<atelier_forge::HeldComment>>);
+        slow!(self, submit_review(r: &atelier_forge::PullRef, v: atelier_forge::Verdict, b: &str) -> atelier_forge::ForgeResult<()>);
+        slow!(self, reply(t: &atelier_forge::ThreadId, b: &str) -> atelier_forge::ForgeResult<atelier_forge::Comment>);
+        slow!(self, resolve(t: &atelier_forge::ThreadId, r: bool) -> atelier_forge::ForgeResult<()>);
     }
     let (inner, reference) = forge();
     let slow = Slow(inner);
@@ -117,8 +117,8 @@ fn the_reads_run_at_once_not_one_after_another() {
 #[test]
 fn writes_change_what_the_fixture_reads_back() {
     let (forge, reference) = forge();
-    forge.reply(&lathe_forge::ThreadId("T1".into()), "Because.").unwrap();
-    forge.resolve(&lathe_forge::ThreadId("T1".into()), true).unwrap();
+    forge.reply(&atelier_forge::ThreadId("T1".into()), "Because.").unwrap();
+    forge.resolve(&atelier_forge::ThreadId("T1".into()), true).unwrap();
     forge.comment(&reference, "Thanks").unwrap();
     let data = forge.data(&reference).unwrap();
     assert_eq!(data.threads[0].comments.len(), 2);
@@ -126,5 +126,5 @@ fn writes_change_what_the_fixture_reads_back() {
     assert_eq!(data.remarks.len(), 2);
     assert_eq!(forge.writes().len(), 3);
     assert!(matches!(forge.writes()[0], Write::Reply { .. }));
-    assert!(forge.reply(&lathe_forge::ThreadId("nope".into()), "x").is_err());
+    assert!(forge.reply(&atelier_forge::ThreadId("nope".into()), "x").is_err());
 }

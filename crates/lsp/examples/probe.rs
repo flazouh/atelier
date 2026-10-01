@@ -1,11 +1,11 @@
 //! Prints everything a language server says about one file, so a wiring problem can be seen rather
 //! than guessed at.
 //!
-//! Usage: cargo run -p lathe-lsp --example probe -- <root> <file> [seconds]
+//! Usage: cargo run -p atelier-lsp --example probe -- <root> <file> [seconds]
 
 use std::{path::PathBuf, time::Duration};
 
-use lathe_lsp::{LspClient, ServerMessage};
+use atelier_lsp::{LspClient, ServerMessage};
 
 fn main() {
     let mut args = std::env::args().skip(1);
@@ -14,7 +14,7 @@ fn main() {
     let seconds: u64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(30);
     let text = std::fs::read_to_string(&file).expect("the file reads");
 
-    let project = lathe_project::LocalProject::open(&root).expect("the root is a folder");
+    let project = atelier_project::LocalProject::open(&root).expect("the root is a folder");
     let (mut client, init) = LspClient::spawn(&project, std::path::Path::new("rust-analyzer"), &[], &root, None, Duration::from_secs(60))
         .expect("rust-analyzer starts");
     println!("server: {:?}", init.server_info.map(|i| i.name));

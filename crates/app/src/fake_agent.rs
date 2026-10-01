@@ -7,10 +7,10 @@ use std::{
 };
 
 use gpui_kit::{AppContext, Entity, TestAppContext, VisualTestContext};
-use lathe_agents::session::{
+use atelier_agents::session::{
     Backend, Capabilities, Command, Event, EventSink, OpenRequest, Session, SessionError, SessionId, Started, TurnEnd, TurnOutcome,
 };
-use lathe_project::Project;
+use atelier_project::Project;
 
 use crate::agent_session::AgentSession;
 
@@ -87,8 +87,8 @@ pub fn start_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, f
     let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(fail_first), work: Mutex::default() });
     // Its data folder is the test's own, never this machine's.
     let data = crate::test_dirs::path();
-    let project: Arc<dyn Project> = Arc::new(lathe_project::LocalProject::open(&dir).unwrap().with_data_dir(&data));
-    let mut agent = lathe_agents::registry::agents().remove(0);
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap().with_data_dir(&data));
+    let mut agent = atelier_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(fake.clone()));
     let mut made = None;
     let (_root, cx) = cx.add_window_view(|window, cx| {
@@ -133,17 +133,17 @@ pub fn git_project_in(dir: PathBuf, files: &[(&str, &str)]) -> PathBuf {
 }
 
 /// An agent named `name` on a fake backend, for a test that starts a session itself.
-pub fn fake_agent(name: &'static str) -> lathe_agents::registry::Agent {
+pub fn fake_agent(name: &'static str) -> atelier_agents::registry::Agent {
     let fake = Arc::new(Fake { turns: Mutex::default(), received: Arc::default(), fail_first: Mutex::new(false), work: Mutex::default() });
-    let mut agent = lathe_agents::registry::agents().remove(0);
+    let mut agent = atelier_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(fake));
     agent.name = name;
     agent
 }
 /// An agent named `name` on a fake backend that plays `turns`, one for each message, and that backend.
-pub fn scripted_agent(name: &'static str, turns: Vec<Vec<Event>>) -> (lathe_agents::registry::Agent, Arc<Fake>) {
+pub fn scripted_agent(name: &'static str, turns: Vec<Vec<Event>>) -> (atelier_agents::registry::Agent, Arc<Fake>) {
     let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(false), work: Mutex::default() });
-    let mut agent = lathe_agents::registry::agents().remove(0);
+    let mut agent = atelier_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(fake.clone()));
     agent.name = name;
     (agent, fake)

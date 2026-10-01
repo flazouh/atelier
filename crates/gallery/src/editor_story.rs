@@ -10,7 +10,7 @@ use gpui_kit::{
     StatefulInteractiveElement, Styled, Window, component::input::EditorState, div, prelude::FluentBuilder, px,
 };
 
-use lathe_editor::{EditorSession, file_name, go_to_definition};
+use atelier_editor::{EditorSession, file_name, go_to_definition};
 
 use crate::{Gallery, workers::workers};
 
@@ -27,7 +27,7 @@ struct Fixture {
 const FIXTURES: &[Fixture] = &[
     Fixture {
         label: "Rust",
-        project: &[("Cargo.toml", "[package]\nname = \"lathe-gallery\"\nversion = \"0.1.0\"\nedition = \"2021\"\n")],
+        project: &[("Cargo.toml", "[package]\nname = \"atelier-gallery\"\nversion = \"0.1.0\"\nedition = \"2021\"\n")],
         file: "src/lib.rs",
         text: SAMPLE_RUST,
     },
@@ -79,7 +79,7 @@ impl EditorTabs {
         let tabs = FIXTURES
             .iter()
             .map(|fixture| {
-                let dir = std::env::temp_dir().join(format!("lathe-gallery-{}", fixture.label.to_lowercase()));
+                let dir = std::env::temp_dir().join(format!("atelier-gallery-{}", fixture.label.to_lowercase()));
                 for (name, text) in fixture.project {
                     write(&dir.join(name), text);
                 }
@@ -176,7 +176,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
                 .gap(px(8.))
                 .text_size(TextSize::Xs.font_size())
                 .child(div().font_family(MONO_FONT_FAMILY).child(tab.shown))
-                .child(Badge::new(lathe_lsp::language_id(&tab.path).unwrap_or("text")))
+                .child(Badge::new(atelier_lsp::language_id(&tab.path).unwrap_or("text")))
                 .child(div().flex_1())
                 .child(Button::new("lsp-check").label("Check").size(ButtonSize::Sm).on_click(check))
                 .child(
@@ -202,7 +202,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
 
 /// The uses of a symbol, one row each: where it is, then its line. A click moves the caret there.
 fn references_list(
-    references: &[lathe_lsp::Target],
+    references: &[atelier_lsp::Target],
     session: &Entity<EditorSession>,
     cx: &mut Context<Gallery>,
 ) -> impl IntoElement {

@@ -1,5 +1,5 @@
 use std::{path::Path, process::Command as Git, sync::Arc};
-use lathe_project::{LocalProject, Project};
+use atelier_project::{LocalProject, Project};
 use super::*;
 fn git(dir: &Path, args: &[&str]) -> String {
     let out = Git::new("git").args(["-c", "user.name=q", "-c", "user.email=q@q", "-c", "commit.gpgsign=false"]).args(args).current_dir(dir).output().unwrap();

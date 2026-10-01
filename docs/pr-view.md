@@ -1,6 +1,6 @@
 # The pull request view
 
-`crates/pr-view` (`lathe-pr-view`) is the pull request view on real data: the list of pull requests, and
+`crates/pr-view` (`atelier-pr-view`) is the pull request view on real data: the list of pull requests, and
 one pull request with its description, checks, conversation, verdict, merge box, commits, tree and diff.
 The parts are beui's (`docs/review.md`, `docs/inline-review.md`). The data is the forge's (`docs/forge.md`)
 and git's. This crate joins them.
@@ -21,15 +21,15 @@ and git's. This crate joins them.
 | `hub.set_linked_session`, `hub.forget_checkout`, `hub.close` | The app links a session, drops a checkout, goes back. |
 
 `read_only(true)` sends nothing: every write says "Read-only: nothing was sent." The app supplies
-`Workers` (`lathe_lsp`) if it wants language servers; without them the diff has no lookups.
+`Workers` (`atelier_lsp`) if it wants language servers; without them the diff has no lookups.
 
 ## Where the bytes come from
 
 Never the reader's checkout. Each forge repository gets a bare cache, `git clone --bare --shared` from the
 project, in `<project data folder>/pr-view` (`Project::data_path`; git runs where the code is). A project that has
-no data path, a remote one for now, uses `remote_data` (default `~/.local/share/lathe/pr`). What an older lathe
+no data path, a remote one for now, uses `remote_data` (default `~/.local/share/atelier/pr`). What an older atelier
 kept in that default folder is moved into the data folder, whole, the first time a pull request is opened. The cache
-fetches `refs/pull/N/head` into `refs/lathe/pr/N/head` and the base branch into `refs/lathe/base/<branch>`.
+fetches `refs/pull/N/head` into `refs/atelier/pr/N/head` and the base branch into `refs/atelier/base/<branch>`.
 The base of the diff is the merge base of the forge's `baseRefOid` and the head. Files come from
 `git diff`, blobs from one `git cat-file --batch`. Every call goes through `Project::spawn` with an
 argument list (no shell text), `GIT_TERMINAL_PROMPT=0` and `LC_ALL=C`, so SSH projects work the same way.

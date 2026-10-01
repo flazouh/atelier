@@ -1,4 +1,4 @@
-//! `LATHE_TIMINGS=1`: when the first frame showed, and when the first frame with the restored project and
+//! `ATELIER_TIMINGS=1`: when the first frame showed, and when the first frame with the restored project and
 //! session showed, both counted from the start of the process.
 
 use std::{
@@ -18,5 +18,5 @@ pub fn since_start() -> Duration {
 }
 
 pub fn enabled() -> bool {
-    std::env::var("LATHE_TIMINGS").is_ok_and(|v| v == "1")
+    std::env::var("ATELIER_TIMINGS").is_ok_and(|v| v == "1")
 }

@@ -3,7 +3,7 @@
 //! looks elsewhere, Idle once they look, and Failed when the session ends badly. Pure.
 
 use beui::session_status::{Need, SessionStatus, short_reason};
-use lathe_agents::session::{EndReason, Event, TurnOutcome};
+use atelier_agents::session::{EndReason, Event, TurnOutcome};
 
 /// The status after `event`, from `now`. `seen` says the reader is looking at this session.
 pub fn after(now: &SessionStatus, event: &Event, seen: bool) -> SessionStatus {

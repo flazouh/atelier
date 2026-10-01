@@ -1,4 +1,4 @@
-use lathe_agents::session::{Attachment, message_text};
+use atelier_agents::session::{Attachment, message_text};
 
 use super::Comments;
 use crate::merged::{Anchor, Merged, Side};

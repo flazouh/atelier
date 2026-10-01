@@ -1,5 +1,5 @@
 use serde_json::json;
-use lathe_agents::session::{ToolCall, ToolId, ToolKind, ToolStatus};
+use atelier_agents::session::{ToolCall, ToolId, ToolKind, ToolStatus};
 use beui::tool_preview::{TextEdit, ToolPreview};
 use super::*;
 fn call(name: &str, input: serde_json::Value) -> ToolCall {

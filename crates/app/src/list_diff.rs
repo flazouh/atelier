@@ -4,7 +4,7 @@
 
 use std::ops::Range;
 
-use lathe_agents::session::{Answer, Item, SubagentStatus, ToolStatus};
+use atelier_agents::session::{Answer, Item, SubagentStatus, ToolStatus};
 
 /// What a row draws, in a few numbers: equal fingerprints draw the same row.
 pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
