@@ -122,7 +122,7 @@ setup (see `crates/remote/src/ssh.rs`, `candidates`).
    signs the app ad hoc (`codesign -s -`). It needs no network beyond what cargo needs.
 3. Run it with `open target/bundle/atelier.app`, or copy it to `/Applications`.
 
-The icon is `tools/mac/atelier-1024.png`, drawn from beui's `AtelierMark` by `tools/mac/make-icon.sh`
+The icon is `tools/mac/atelier.icon`, compiled by Xcode's `actool`: beui's "A" on a square that follows the light and dark appearance on macOS 26. A Mac without Xcode gets `tools/mac/atelier-1024.png`, the dark look, drawn by `tools/mac/make-icon.sh`
 (ImageMagick, run only when the mark changes). Ad hoc signing opens the app on the Mac that built it.
 Another Mac shows the Gatekeeper warning until you allow the app.
 

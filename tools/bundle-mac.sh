@@ -7,8 +7,9 @@
 # machine with `tools/build-remote.sh` (see docs/app.md, "Build the Mac app"). If a file named
 # <that path>.sha256 sits beside it, the script checks the hash first.
 #
-# The script needs no network beyond what cargo needs to fetch crates. The icon comes from
-# tools/mac/atelier-1024.png, so the Mac needs only the tools macOS ships (sips, iconutil, codesign).
+# The script needs no network beyond what cargo needs to fetch crates. With Xcode, the icon is
+# tools/mac/atelier.icon, which follows the light and dark appearance on macOS 26. Without it, the icon is
+# tools/mac/atelier-1024.png, the dark look, so the Mac needs only the tools macOS ships (sips, iconutil, codesign).
 # The app is signed ad hoc (`codesign -s -`), so it opens on the Mac that built it with no warning.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -56,14 +57,26 @@ cp "$exe" "$app/Contents/MacOS/atelier"
 cp "$remote" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
 chmod +x "$app/Contents/MacOS/atelier" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
 
-# The icon: the 1024 PNG at each size the icns wants.
-icons=$(mktemp -d)/atelier.iconset
-mkdir -p "$icons"
-for size in 16 32 128 256 512; do
-  sips -z "$size" "$size" tools/mac/atelier-1024.png --out "$icons/icon_${size}x${size}.png" >/dev/null
-  sips -z "$((size * 2))" "$((size * 2))" tools/mac/atelier-1024.png --out "$icons/icon_${size}x${size}@2x.png" >/dev/null
-done
-iconutil -c icns "$icons" -o "$app/Contents/Resources/atelier.icns"
+# The icon. actool compiles atelier.icon to Assets.car, with a light, a dark and a tinted look, and to
+# atelier.icns for a macOS before 26. The "A" is beui's mark, at 640 of the 1024 points.
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+if xcrun --find actool >/dev/null 2>&1; then
+  cp -R tools/mac/atelier.icon "$work/atelier.icon"
+  mkdir -p "$work/atelier.icon/Assets"
+  sed 's/<svg /<svg width="640" height="437" /' crates/beui/assets/atelier-mark.svg > "$work/atelier.icon/Assets/mark.svg"
+  xcrun actool "$work/atelier.icon" --compile "$app/Contents/Resources" --app-icon atelier \
+    --enable-on-demand-resources NO --development-region en --target-device mac --platform macosx \
+    --minimum-deployment-target 13.0 --output-partial-info-plist "$work/icon.plist" >/dev/null
+else
+  icons="$work/atelier.iconset"
+  mkdir -p "$icons"
+  for size in 16 32 128 256 512; do
+    sips -z "$size" "$size" tools/mac/atelier-1024.png --out "$icons/icon_${size}x${size}.png" >/dev/null
+    sips -z "$((size * 2))" "$((size * 2))" tools/mac/atelier-1024.png --out "$icons/icon_${size}x${size}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$icons" -o "$app/Contents/Resources/atelier.icns"
+fi
 
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +88,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>dev.atelier.app</string>
   <key>CFBundleExecutable</key><string>atelier</string>
   <key>CFBundleIconFile</key><string>atelier</string>
+  <key>CFBundleIconName</key><string>atelier</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${version}</string>
   <key>CFBundleVersion</key><string>${version}</string>
