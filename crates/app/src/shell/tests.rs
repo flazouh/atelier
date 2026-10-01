@@ -517,7 +517,7 @@ fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) 
     let archived = cx.debug_bounds("filter-archived").unwrap();
     cx.simulate_click(archived.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    assert_eq!(shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).options().filter), beui::sidebar_filter::SessionFilter::Archived);
+    assert_eq!(shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).layout().filter), beui::sidebar_filter::SessionFilter::Archived);
 }
 
 /// An archived session leaves the list until the Archived or All filter asks for it, and comes back when taken out.
@@ -588,4 +588,22 @@ fn the_sidebar_switches_between_projects_and_the_priority_list(cx: &mut TestAppC
     cx.simulate_click(projects.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("section-Earlier").is_none() && cx.debug_bounds("row-project").is_none(), "back by project");
+}
+
+/// The Settings page changes the sidebar's look and the sidebar keeps the mode and the filter the head chose.
+#[gpui_kit::test]
+fn a_look_from_settings_reaches_the_sidebar_and_keeps_the_heads_choices(cx: &mut TestAppContext) {
+    use beui::{sidebar_layout::{BadgeShow, SidebarLayout}, sidebar_model::ListMode};
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    shell.update(cx, |s, cx| s.agents_sidebar.update(cx, |sb, cx| sb.choose_mode(ListMode::Priority, cx)));
+    let look = SidebarLayout { project_badge: BadgeShow::Never, show_time: false, ..Default::default() };
+    shell.update_in(cx, |s, window, cx| {
+        s.open_settings(&OpenSettings, window, cx);
+        let pane = s.settings.as_ref().unwrap().0.clone();
+        pane.update(cx, |_, cx| cx.emit(crate::settings_pane::SettingsEvent::Sidebar(look)));
+    });
+    settle(&shell, cx);
+    let layout = shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).layout());
+    assert_eq!((layout.project_badge, layout.show_time), (BadgeShow::Never, false));
+    assert_eq!(layout.mode, ListMode::Priority, "the head's mode stays");
 }

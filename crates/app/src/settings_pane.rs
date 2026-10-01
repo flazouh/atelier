@@ -6,6 +6,7 @@
 //! does the Back button in the title bar.
 use beui::{
     ActiveTheme, ColorSelector, Kbd, Segment, Segmented, Swatch,
+    sidebar_layout::{BadgeShow, EARLIER_CHOICES, FOLD_CHOICES, SidebarLayout},
     keys,
     theme::{Appearance, can_be_primary, follow_system, set_appearance, set_pick},
     theme_picker::theme_picker,
@@ -85,6 +86,8 @@ pub struct AgentRow {
 
 pub enum SettingsEvent {
     Close,
+    /// The sidebar's look changed (what a row shows, how much folds): the new layout, whose mode and filter the shell ignores.
+    Sidebar(SidebarLayout),
 }
 
 pub struct SettingsPane {
@@ -96,23 +99,27 @@ pub struct SettingsPane {
     /// Which task rules move a task by themselves.
     rules: lathe_tracker::RuleSet,
     section: Section,
+    /// The sidebar's look, as this page edits it.
+    look: SidebarLayout,
 }
 
 /// The sections of the page, in the order the list at its left shows them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Section {
     Appearance,
+    Sidebar,
     Agents,
     Tasks,
     Keys,
 }
 
 impl Section {
-    pub const ALL: [Section; 4] = [Section::Appearance, Section::Agents, Section::Tasks, Section::Keys];
+    pub const ALL: [Section; 5] = [Section::Appearance, Section::Sidebar, Section::Agents, Section::Tasks, Section::Keys];
 
     pub fn words(self) -> &'static str {
         match self {
             Section::Appearance => "Appearance",
+            Section::Sidebar => "Sidebar",
             Section::Agents => "Agents",
             Section::Tasks => "Tasks",
             Section::Keys => "Keys",
@@ -123,6 +130,7 @@ impl Section {
     pub fn gist(self) -> &'static str {
         match self {
             Section::Appearance => "The theme, light or dark, and the colour of the main button.",
+            Section::Sidebar => "What a session row shows, and how many sessions the sidebar shows before it folds the rest.",
             Section::Agents => "The agents this build can start, and the models each offers.",
             Section::Tasks => "What moves a task by itself. Every move shows in its activity, and you can move it back.",
             Section::Keys => "The keys of the review. They cannot be changed yet.",
@@ -133,6 +141,7 @@ impl Section {
     pub fn entry(self) -> &'static str {
         match self {
             Section::Appearance => "section-appearance",
+            Section::Sidebar => "section-sidebar",
             Section::Agents => "section-agents",
             Section::Tasks => "section-tasks",
             Section::Keys => "section-keys",
@@ -163,6 +172,7 @@ impl SettingsPane {
             primary: primary.into(),
             rules,
             section: Section::Appearance,
+            look: crate::sidebar_layout::from_settings(saved),
         }
     }
 
@@ -177,6 +187,15 @@ impl SettingsPane {
         self.section = section;
         cx.notify();
     }
+    /// Changes the sidebar's look: kept in the settings and applied at once.
+    pub(crate) fn change_look(&mut self, change: impl FnOnce(&mut SidebarLayout), cx: &mut Context<Self>) {
+        change(&mut self.look);
+        let saved = crate::sidebar_layout::saved_look(&self.look);
+        save(cx, move |s| s.sidebar_layout = saved);
+        cx.emit(SettingsEvent::Sidebar(self.look));
+        cx.notify();
+    }
+
     fn set_rule(&mut self, rule: lathe_tracker::Rule, on: bool, cx: &mut Context<Self>) {
         self.rules.set(rule, on);
         let off: Vec<String> = self.rules.disabled().into_iter().map(String::from).collect();
@@ -299,6 +318,56 @@ impl Render for SettingsPane {
                     .child(div().pb(px(12.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The main button's fill, and the highlight and the selection. A colour that no text reads on is not offered."))
                     .child(picker),
             );
+        let sidebar = {
+            let look = self.look;
+            let (badge_pane, time_pane, icon_pane, fold_pane, earlier_pane) = (this.clone(), this.clone(), this.clone(), this.clone(), this.clone());
+            let numbers = |id: &'static str, choices: &'static [usize], current: usize, names: &'static [&'static str], pane: gpui_kit::WeakEntity<SettingsPane>, set: fn(&mut SidebarLayout, usize)| {
+                Segmented::new(id, choices.iter().zip(names).map(|(n, name)| Segment::new(n.to_string()).debug_name(name)), choices.iter().position(|c| *c == current).unwrap_or(0))
+                    .on_change(move |i, _, cx| {
+                        pane.update(cx, |p, cx| p.change_look(|l| set(l, choices[i]), cx)).ok();
+                    })
+                    .into_any_element()
+            };
+            div()
+                .flex()
+                .flex_col()
+                .child(row(
+                    "Project badge on rows",
+                    Segmented::new(
+                        "sidebar-badge",
+                        BadgeShow::ALL.iter().map(|b| Segment::new(b.words()).debug_name(match b {
+                            BadgeShow::Auto => "badge-auto",
+                            BadgeShow::Always => "badge-always",
+                            BadgeShow::Never => "badge-never",
+                        })),
+                        BadgeShow::ALL.iter().position(|b| *b == look.project_badge).unwrap_or(0),
+                    )
+                    .on_change(move |i, _, cx| {
+                        badge_pane.update(cx, |p, cx| p.change_look(|l| l.project_badge = BadgeShow::ALL[i], cx)).ok();
+                    })
+                    .into_any_element(),
+                ))
+                .child(row(
+                    "Time on rows",
+                    beui::Switch::new("sidebar-time", look.show_time)
+                        .debug_name("sidebar-time")
+                        .on_change(move |on, _, cx| {
+                            time_pane.update(cx, |p, cx| p.change_look(|l| l.show_time = on, cx)).ok();
+                        })
+                        .into_any_element(),
+                ))
+                .child(row(
+                    "Agent icon on rows",
+                    beui::Switch::new("sidebar-icon", look.show_agent_icon)
+                        .debug_name("sidebar-icon")
+                        .on_change(move |on, _, cx| {
+                            icon_pane.update(cx, |p, cx| p.change_look(|l| l.show_agent_icon = on, cx)).ok();
+                        })
+                        .into_any_element(),
+                ))
+                .child(row("Sessions shown for each project", numbers("sidebar-fold", &FOLD_CHOICES, look.fold_after, &["fold-3", "fold-5", "fold-8", "fold-12"], fold_pane, |l, n| l.fold_after = n)))
+                .child(row("Earlier sessions shown in Priority", numbers("sidebar-earlier", &EARLIER_CHOICES, look.earlier_shown, &["earlier-5", "earlier-8", "earlier-12", "earlier-20"], earlier_pane, |l, n| l.earlier_shown = n)))
+        };
         let tasks = div().flex().flex_col().children(lathe_tracker::Rule::ALL.into_iter().map(|rule| {
             let pane = this.clone();
             row(
@@ -319,6 +388,7 @@ impl Render for SettingsPane {
         let keys_list = div().flex().flex_col().children(key_rows);
         let body = match self.section {
             Section::Appearance => appearance.into_any_element(),
+            Section::Sidebar => sidebar.into_any_element(),
             Section::Agents => agents.into_any_element(),
             Section::Tasks => tasks.into_any_element(),
             Section::Keys => keys_list.into_any_element(),

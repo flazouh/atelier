@@ -36,6 +36,7 @@ mod session_view;
 mod settings_pane;
 mod ship;
 mod shell;
+mod sidebar_layout;
 mod ssh_form;
 mod status;
 mod tabs;

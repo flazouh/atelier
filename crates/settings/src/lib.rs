@@ -17,6 +17,18 @@ use serde::{Deserialize, Serialize};
 /// How many recent projects the list keeps.
 pub const RECENT_LIMIT: usize = 10;
 
+/// What the Settings page keeps of the sidebar's layout (the mode is `Settings::sidebar`; the filter is not kept).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SidebarSaved {
+    /// "auto", "always" or "never".
+    pub project_badge: Option<String>,
+    pub show_time: Option<bool>,
+    pub show_agent_icon: Option<bool>,
+    pub fold_after: Option<u8>,
+    pub earlier_shown: Option<u8>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -56,6 +68,8 @@ pub struct Settings {
     pub view: Option<String>,
     /// How the sidebar lists sessions: "projects" or "priority".
     pub sidebar: Option<String>,
+    /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
+    pub sidebar_layout: SidebarSaved,
     /// Keys a newer or older lathe wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,

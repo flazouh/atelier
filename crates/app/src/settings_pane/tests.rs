@@ -181,3 +181,30 @@ fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestApp
     pane.update(cx, |p, _| p.rules.set(lathe_tracker::Rule::MergeMovesToDone, true));
     assert!(on(cx, lathe_tracker::Rule::MergeMovesToDone));
 }
+
+/// The Sidebar section holds the layout's knobs; a change reaches the shell as one event and is kept in the settings.
+#[gpui_kit::test]
+fn the_sidebar_section_edits_the_layout_and_says_so_once(cx: &mut TestAppContext) {
+    use beui::sidebar_layout::BadgeShow;
+    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    let heard = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let log = heard.clone();
+    cx.update(|_, cx| {
+        let sub = cx.subscribe(&pane, move |_, event: &SettingsEvent, _| {
+            if let SettingsEvent::Sidebar(look) = event {
+                log.borrow_mut().push(*look);
+            }
+        });
+        std::mem::forget(sub);
+    });
+    click(cx, "section-sidebar");
+    for name in ["badge-auto", "badge-always", "badge-never", "sidebar-time", "sidebar-icon", "fold-3", "fold-12", "earlier-5", "earlier-20"] {
+        assert!(cx.debug_bounds(name).is_some(), "{name} is on the page");
+    }
+    click(cx, "badge-always");
+    click(cx, "fold-12");
+    let looks = heard.borrow().clone();
+    assert_eq!(looks.len(), 2, "one event for each change");
+    assert_eq!((looks[1].project_badge, looks[1].fold_after), (BadgeShow::Always, 12));
+    assert_eq!(pane.read_with(cx, |p, _| p.look.project_badge), BadgeShow::Always);
+}

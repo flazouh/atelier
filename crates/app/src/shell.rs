@@ -174,9 +174,7 @@ const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::
 impl Shell {
     pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
         let agents_sidebar = cx.new(Sidebar::new);
-        agents_sidebar.update(cx, |s, cx| {
-            s.set_options(beui::sidebar_filter::ViewOptions { mode: beui::sidebar_model::ListMode::from_key(saved.sidebar.as_deref()), ..Default::default() }, cx)
-        });
+        agents_sidebar.update(cx, |s, cx| s.set_layout(crate::sidebar_layout::from_settings(saved), cx));
         let panels = cx.new(|cx| {
             let mut panels = AgentPanels::new(cx);
             let layout = if saved.panels.single { Layout::Single } else { Layout::SideBySide };
@@ -430,7 +428,7 @@ impl Shell {
                     }
                 }
             }
-            SidebarEvent::OptionsChanged(options) => self.keep_sidebar_options(*options, cx),
+            SidebarEvent::LayoutChanged(layout) => self.keep_sidebar_layout(*layout, cx),
             SidebarEvent::AddFolder => self.open_folder(&OpenFolder, window, cx),
             SidebarEvent::AddRemote => self.open_ssh_form(&OpenRemote, window, cx),
             SidebarEvent::Archive { session, archive, .. } => self.set_archived(session, *archive, cx),
@@ -535,8 +533,8 @@ impl Shell {
 
     /// Keeps what the sidebar's head chose that outlives the launch: how it lists (the filter starts as Active each
     /// time, so no session is hidden by a choice the reader forgot).
-    fn keep_sidebar_options(&mut self, options: beui::sidebar_filter::ViewOptions, cx: &mut Context<Self>) {
-        let key = options.mode.key().to_string();
+    fn keep_sidebar_layout(&mut self, layout: beui::sidebar_layout::SidebarLayout, cx: &mut Context<Self>) {
+        let key = layout.mode.key().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
                 if let Err(error) = lathe_settings::update(&path, |s| s.sidebar = Some(key)) {
@@ -642,6 +640,11 @@ impl Shell {
                 this.settings = None;
                 window.focus(&this.focus, cx);
                 cx.notify();
+            }
+            // The Settings page changed how the sidebar looks: it takes the look and keeps its own mode and filter.
+            crate::settings_pane::SettingsEvent::Sidebar(look) => {
+                let look = *look;
+                this.agents_sidebar.update(cx, |s, cx| s.set_layout(s.layout().with_look_of(&look), cx));
             }
         });
         pane.read(cx).focus_handle(cx).focus(window, cx);
