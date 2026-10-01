@@ -59,7 +59,7 @@ fn said() -> Item {
 /// Two or more activity items in a row are one group; one alone stays a row; what is said ends a group.
 #[test]
 fn a_run_of_activity_is_one_row_and_a_lone_item_is_not() {
-    use Row::{Activity, Changes, Item as At};
+    use Row::{Activity, Item as At};
     let items = [Item::User { text: "go".into() }, think(), tool("a"), tool("b"), said(), tool("c"), said()];
     assert_eq!(grouped(&items, &|_| true, &[]), [At(0), Activity { from: 1, to: 4 }, At(4), At(5), At(6)]);
 }
@@ -67,7 +67,7 @@ fn a_run_of_activity_is_one_row_and_a_lone_item_is_not() {
 /// A turn's card of changed files ends a group, since it sits between two items.
 #[test]
 fn a_changes_card_ends_a_group() {
-    use Row::{Activity, Changes, Item as At};
+    use Row::{Activity, Changes};
     let items = [think(), tool("a"), tool("b"), tool("c")];
     assert_eq!(grouped(&items, &|_| true, &[(2, 0)]), [Activity { from: 0, to: 2 }, Changes { turn: 0 }, Activity { from: 2, to: 4 }]);
 }
@@ -75,7 +75,7 @@ fn a_changes_card_ends_a_group() {
 /// An item that draws no row (a call waiting on its approval) does not count toward the two.
 #[test]
 fn items_that_draw_nothing_do_not_make_a_group() {
-    use Row::{Activity, Changes, Item as At};
+    use Row::Item as At;
     let items = [tool("a"), tool("b")];
     assert_eq!(grouped(&items, &|ix| ix == 0, &[]), [At(0), At(1)]);
 }
