@@ -31,7 +31,6 @@ use lathe_settings::Location;
 use std::collections::BTreeMap;
 mod fit;
 mod restore;
-mod sidebar_header;
 mod view;
 
 pub use view::{FilesPane, ShellView};
@@ -158,12 +157,6 @@ pub struct Shell {
     layout_menu: bool,
     /// The sessions the reader archived, by the agent's id.
     archived: std::collections::BTreeSet<String>,
-    /// What the sidebar lists.
-    session_filter: beui::sidebar_filter::SessionFilter,
-    filter_menu: bool,
-    add_menu: bool,
-    /// Every project with every session, before the filter: the island and the urgent key count from this.
-    all_projects: Vec<beui::sidebar_model::ProjectData>,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
     session_right: Option<f32>,
     /// The right pane's own view (`right_pane.rs`), cached.
@@ -181,7 +174,9 @@ const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::
 impl Shell {
     pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
         let agents_sidebar = cx.new(Sidebar::new);
-        agents_sidebar.update(cx, |s, cx| s.set_mode(beui::sidebar_model::ListMode::from_key(saved.sidebar.as_deref()), cx));
+        agents_sidebar.update(cx, |s, cx| {
+            s.set_options(beui::sidebar_filter::ViewOptions { mode: beui::sidebar_model::ListMode::from_key(saved.sidebar.as_deref()), ..Default::default() }, cx)
+        });
         let panels = cx.new(|cx| {
             let mut panels = AgentPanels::new(cx);
             let layout = if saved.panels.single { Layout::Single } else { Layout::SideBySide };
@@ -223,10 +218,6 @@ impl Shell {
             files_narrow: FilesPane::default(),
             layout_menu: false,
             archived: saved.archived_sessions.iter().cloned().collect(),
-            session_filter: beui::sidebar_filter::SessionFilter::default(),
-            filter_menu: false,
-            add_menu: false,
-            all_projects: Vec::new(),
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
             _ages: cx.spawn(async move |this, cx| {
@@ -251,7 +242,6 @@ impl Shell {
     /// The sidebar's projects from the sessions as they are now, narrowed by the filter and the box.
     fn push_sidebar(&mut self, cx: &mut Context<Self>) {
         let all = agents_view::sidebar(&self.projects, &self.names, &self.badges, &self.archived, cx);
-        let shown = beui::sidebar_filter::narrow(&all, self.session_filter);
         // Each session carries its project's badge, for the head of its panel.
         let sessions: Vec<(Vec<Entity<AgentSession>>, beui::sidebar_model::Badge)> =
             self.projects.iter().zip(&all).map(|(p, data)| (p.read(cx).sessions.clone(), data.badge.clone())).collect();
@@ -260,9 +250,8 @@ impl Shell {
                 session.update(cx, |s, cx| s.set_badge(badge.clone(), cx));
             }
         }
-        self.all_projects = all;
         let now = agent_session::now();
-        self.agents_sidebar.update(cx, |s, cx| s.set_projects(shown, now, cx));
+        self.agents_sidebar.update(cx, |s, cx| s.set_projects(all, now, cx));
     }
 
     /// Hears the sidebar and the panels. Called once the window exists.
@@ -441,6 +430,9 @@ impl Shell {
                     }
                 }
             }
+            SidebarEvent::OptionsChanged(options) => self.keep_sidebar_options(*options, cx),
+            SidebarEvent::AddFolder => self.open_folder(&OpenFolder, window, cx),
+            SidebarEvent::AddRemote => self.open_ssh_form(&OpenRemote, window, cx),
             SidebarEvent::Archive { session, archive, .. } => self.set_archived(session, *archive, cx),
             SidebarEvent::CopySessionId { session, .. } => match self.agent_id_of(session, cx) {
                 Some(id) => {
@@ -541,10 +533,10 @@ impl Shell {
         self.sync(cx);
     }
 
-    /// Lists the sessions by project, or in one list by priority; the choice is kept for the next launch.
-    fn choose_list_mode(&mut self, mode: beui::sidebar_model::ListMode, cx: &mut Context<Self>) {
-        self.agents_sidebar.update(cx, |s, cx| s.set_mode(mode, cx));
-        let key = mode.key().to_string();
+    /// Keeps what the sidebar's head chose that outlives the launch: how it lists (the filter starts as Active each
+    /// time, so no session is hidden by a choice the reader forgot).
+    fn keep_sidebar_options(&mut self, options: beui::sidebar_filter::ViewOptions, cx: &mut Context<Self>) {
+        let key = options.mode.key().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
                 if let Err(error) = lathe_settings::update(&path, |s| s.sidebar = Some(key)) {
@@ -553,15 +545,6 @@ impl Shell {
             })
             .detach();
         }
-        cx.notify();
-    }
-
-    /// Chooses what the sidebar lists.
-    fn choose_filter(&mut self, filter: beui::sidebar_filter::SessionFilter, cx: &mut Context<Self>) {
-        self.session_filter = filter;
-        self.filter_menu = false;
-        self.push_sidebar(cx);
-        cx.notify();
     }
 
     fn panels_event(&mut self, _: &Entity<AgentPanels>, event: &PanelsEvent, _: &mut Window, cx: &mut Context<Self>) {
@@ -1354,12 +1337,12 @@ impl Shell {
     /// Opens the session that needs the reader most: one waiting for a yes or no, then a question, then one finished and unseen.
     fn open_most_urgent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let sidebar = self.agents_sidebar.clone();
-        let Some((project, session)) = beui::most_urgent(&self.all_projects) else { return };
+        let Some((project, session)) = beui::most_urgent(self.agents_sidebar.read(cx).all_projects()) else { return };
         self.sidebar_event(&sidebar, &SidebarEvent::Open { project, session }, window, cx);
     }
 
     fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let counts = beui::counts_of(&self.all_projects);
+        let counts = beui::counts_of(self.agents_sidebar.read(cx).all_projects());
         let this = cx.entity().downgrade();
         div()
             .id("title-bar")
@@ -1625,13 +1608,12 @@ impl Shell {
     }
 
     /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
-    fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn sidebar(&self, _cx: &mut Context<Self>) -> impl IntoElement {
         // The projects and their sessions; the files are the Files view's.
         div()
             .flex()
             .flex_col()
             .size_full()
-            .child(self.sidebar_header(cx))
             .child(div().flex_1().min_h_0().child(crate::view_cache::draw(&self.agents_sidebar)))
     }
 
