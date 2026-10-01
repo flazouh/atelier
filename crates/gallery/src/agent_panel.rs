@@ -36,8 +36,8 @@ pub const SESSION_LEN: usize = 12;
 /// own list, so each still enters on its own.
 fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> EntranceList {
     let tools = [
-        ("s-read", ToolCall::new("s-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
-        ("s-grep", ToolCall::new("s-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
+        ("s-read", ToolCall::new("s-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done).flat()),
+        ("s-grep", ToolCall::new("s-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done).flat()),
     ];
     let tools = tools.into_iter().take(shown.saturating_sub(1)).fold(
         EntranceList::new(ElementId::NamedInteger("session-tools".into(), replay as u64), div().flex().flex_col()),
@@ -78,7 +78,7 @@ fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> E
                 .on_deny(|_, _, _| {})
                 .into_any_element(),
         ),
-        ("s-think", Thinking::new("s-think", claude::look(), thinking_for(started, 18)).elapsed("18s").tokens(3_400).subagents(2).into_any_element()),
+        ("s-think", Thinking::new("s-think", claude::look(), thinking_for(started, 18)).loading(claude::loading_strips()).elapsed("18s").tokens(3_400).subagents(2).into_any_element()),
     ];
     // The two reads share one row of this list, so once both show it holds one item fewer.
     let rows = if shown >= 3 { shown - 1 } else { shown };

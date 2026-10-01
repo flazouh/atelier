@@ -43,6 +43,37 @@ fn row_status(status: ToolStatus) -> RowToolStatus {
 
 /// The row of `call`: what it is about (the command, the file, the pattern, with an icon for its kind), its paths
 /// relative to `root`, and the mark its answered approval left.
+/// Reading and searching show as flat rows, close together, not as cards.
+fn is_lookup(kind: atelier_agents::session::ToolKind) -> bool {
+    matches!(kind, atelier_agents::session::ToolKind::Read | atelier_agents::session::ToolKind::Search)
+}
+
+/// How much room an item takes in the list: a flat row (reading, searching), a card, or prose.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Block {
+    Flat,
+    Card,
+    Prose,
+}
+
+fn block_of(item: &Item) -> Block {
+    match item {
+        Item::Tool(call) if is_lookup(summary::summary(call, |path| path.to_string()).kind) => Block::Flat,
+        Item::Tool(_) | Item::Subagent { .. } | Item::Permission { .. } => Block::Card,
+        _ => Block::Prose,
+    }
+}
+
+/// The space between a block and the one after it. Two flat rows stack close, and so do cards, as the cards above the
+/// composer do ([`atelier_ui::STACK_GAP`]); next to prose, or at the end, it is `default`.
+fn gap_between(above: Block, below: Option<Block>, default: f32) -> f32 {
+    match (above, below) {
+        (Block::Flat, Some(Block::Flat)) => 2.,
+        (Block::Flat | Block::Card, Some(Block::Flat | Block::Card)) => atelier_ui::STACK_GAP,
+        _ => default,
+    }
+}
+
 fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
     let about = summary::summary(call, |path| atelier_ui::tool_preview::relative_path(path, root).to_string());
     let icon = match about.kind {
@@ -54,6 +85,9 @@ fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: O
         atelier_agents::session::ToolKind::Other => IconName::Build,
     };
     let mut row = ToolRow::new(id, SharedString::from(about.title)).icon(icon).status(row_status(call.call.status));
+    if is_lookup(about.kind) {
+        row = row.flat();
+    }
     if let Some(detail) = about.detail {
         row = row.tool(detail);
     }
@@ -77,7 +111,7 @@ fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: O
 /// One row of the list: a conversation item, or a turn's changed files.
 fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     match session.read(cx).shown.get(ix).copied() {
-        Some(Row::Item(item)) => item_row(session, item, cx),
+        Some(Row::Item(item)) => item_row(session, item, ix, cx),
         Some(Row::Changes { turn }) => changes_row(session, turn, cx),
         Some(Row::Activity { from, to }) => activity_row(session, from, to, cx),
         None => div().into_any_element(),
@@ -100,10 +134,16 @@ fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElem
     div().px(px(16.)).pb(px(14.)).child(card).into_any_element()
 }
 
-/// One item of the conversation, in its row's padding.
-fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
+/// One item of the conversation, in its row's padding. `row` is its place in the list: what follows it sets the room below.
+fn item_row(session: &Entity<AgentSession>, ix: usize, row: usize, cx: &App) -> AnyElement {
+    let s = session.read(cx);
+    let next = match s.shown.get(row + 1).copied() {
+        Some(Row::Item(next)) => Some(block_of(&s.conversation.items()[next])),
+        _ => None,
+    };
+    let below = gap_between(block_of(&s.conversation.items()[ix]), next, 14.);
     match item_body(session, ix, cx) {
-        Some(body) => div().px(px(16.)).pb(px(14.)).child(body).into_any_element(),
+        Some(body) => div().px(px(16.)).pb(px(below)).child(body).into_any_element(),
         None => div().into_any_element(),
     }
 }
@@ -118,9 +158,22 @@ fn activity_row(session: &Entity<AgentSession>, from: usize, to: usize, cx: &App
     let visible = |ix: usize| calls::shows(items, ix);
     let (live, open) = (s.group_is_live(to), s.group_is_open(from, to));
     let words = crate::activity::summary(items, from, to, &visible);
-    let bodies: Vec<AnyElement> = if open { (from..to).filter(|&ix| visible(ix)).filter_map(|ix| item_body(session, ix, cx)).collect() } else { Vec::new() };
+    let mut previous = None;
+    let bodies: Vec<AnyElement> = if open {
+        (from..to)
+            .filter(|&ix| visible(ix))
+            .filter_map(|ix| {
+                let body = item_body(session, ix, cx)?;
+                let here = block_of(&items[ix]);
+                let above = previous.replace(here).map_or(0., |above| gap_between(above, Some(here), 8.));
+                Some(div().mt(px(above)).child(body).into_any_element())
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
     let key = s.key.clone();
-    let list = div().flex().flex_col().flex_none().w_full().gap(px(8.)).children(bodies);
+    let list = div().flex().flex_col().flex_none().w_full().children(bodies);
     let body = if live {
         // The end stays in view: the room is filled from its bottom, so what does not fit runs off the top. There is no fade
         // over that edge: the panel behind is a different tone when it is the active one, and a fade of a fixed tone showed
@@ -198,7 +251,9 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
                 None => ThinkingPhase::Thought { seconds: 0 },
             };
             let running = if last { s.conversation.running_subagents() } else { 0 };
-            Thinking::new(id("think"), look, phase).subagents(running).into_any_element()
+            // Claude's spark loads with a different animation each run; another agent's mark is its own.
+            let loading = if look.mark.working == atelier_agents::claude::mark().working { atelier_agents::claude::loading_strips() } else { Vec::new() };
+            Thinking::new(id("think"), look, phase).loading(loading).subagents(running).into_any_element()
         }
         Item::Tool(call) => tool_row(id("tool"), call, &root, calls::mark_kept(items, &call.call.id, &s.reviews.approvals)).into_any_element(),
         Item::Subagent { subagent, status, activity, calls, summary } => {
@@ -461,7 +516,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         .child(header)
         .child(body)
         .children(failure)
-        .child(div().flex().flex_col().gap(px(8.)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).child(composer))
+        .child(div().flex().flex_col().gap(px(atelier_ui::STACK_GAP)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).child(composer))
         .into_any_element()
 }
 

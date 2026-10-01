@@ -67,3 +67,19 @@ fn stop_shows_only_while_a_turn_runs() {
     assert!(!shows_stop(false, &SessionStatus::Working));
     assert!(!shows_stop(false, &SessionStatus::Failed("gone".into())));
 }
+
+#[test]
+fn cards_and_flat_rows_stack_close_and_prose_keeps_its_room() {
+    use atelier_agents::session::ToolKind;
+    assert!(super::is_lookup(ToolKind::Read) && super::is_lookup(ToolKind::Search));
+    assert!(!super::is_lookup(ToolKind::Shell) && !super::is_lookup(ToolKind::Edit) && !super::is_lookup(ToolKind::Fetch));
+    use super::Block::{Card, Flat, Prose};
+    let stack = atelier_ui::STACK_GAP;
+    assert_eq!(super::gap_between(Flat, Some(Flat), 14.), 2.);
+    assert_eq!(super::gap_between(Flat, Some(Card), 14.), stack);
+    assert_eq!(super::gap_between(Card, Some(Flat), 14.), stack);
+    assert_eq!(super::gap_between(Card, Some(Card), 14.), stack);
+    assert_eq!(super::gap_between(Card, Some(Prose), 14.), 14.);
+    assert_eq!(super::gap_between(Prose, Some(Card), 14.), 14.);
+    assert_eq!(super::gap_between(Card, None, 14.), 14.);
+}

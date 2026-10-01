@@ -15,3 +15,12 @@ fn the_spark_thinks_while_claude_works_and_orbits_while_subagents_run() {
     assert_eq!(mark.working, SparkState::Thinking.strip());
     assert_eq!(mark.orbiting, SparkState::Orbiting.strip());
 }
+
+#[test]
+fn the_loading_mark_picks_among_the_sparks_that_loop_while_claude_works() {
+    let strips = loading_strips();
+    assert!(strips.len() > 1);
+    assert!(strips.iter().all(|strip| strip.loops && strip.frames > 1));
+    assert!(strips.contains(&mark().working));
+    assert!(!strips.contains(&mark().orbiting));
+}
