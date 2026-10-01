@@ -27,13 +27,14 @@ pub fn write_script(path: &Path, text: &str) {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
 
-/// Whether process `pid` runs. A zombie, ended but not yet reaped, does not.
+/// Whether process `pid` runs. A zombie, ended but not yet reaped, does not. A test that checks a process
+/// ended needs `ps`, so a missing `ps` stops the test instead of reading as an ended process.
 pub fn alive(pid: &str) -> bool {
-    std::process::Command::new("ps").args(["-o", "stat=", "-p", pid]).output().is_ok_and(|out| {
+    std::process::Command::new("ps").args(["-o", "stat=", "-p", pid]).output().map(|out| {
         let state = String::from_utf8_lossy(&out.stdout);
         let state = state.trim();
         !state.is_empty() && !state.starts_with('Z')
-    })
+    }).expect("`ps` runs")
 }
 
 /// A project whose spawns take the lock. Everything else is the inner project's.

@@ -10,6 +10,7 @@ use std::{
 use atelier_project::LocalProject;
 
 use super::agent;
+use crate::acp::{protocol::Step, session::{Lines, deliver}};
 use crate::{
     acp::Acp,
     session::{Backend, Command, EndReason, Event, EventSink, OpenRequest, SessionError, SessionId, TurnOutcome},
@@ -105,8 +106,8 @@ read l; printf '%s\n' "$l" >> "$log"; echo '{INITIALIZED}'
 read l; printf '%s\n' "$l" >> "$log"; echo '{{"jsonrpc":"2.0","id":1,"result":{{"sessionId":"s1"}}}}'
 read l; printf '%s\n' "$l" >> "$log"
 echo '{{"jsonrpc":"2.0","method":"session/update","params":{{"sessionId":"s1","update":{{"sessionUpdate":"agent_message_chunk","content":{{"type":"text","text":"Hi there"}}}}}}}}'
-echo '{{"jsonrpc":"2.0","id":2,"result":{{"stopReason":"end_turn"}}}}'
 sleep 60 & echo $! > '{}'
+echo '{{"jsonrpc":"2.0","id":2,"result":{{"stopReason":"end_turn"}}}}'
 wait"#,
         log.display(),
         pid.display()
@@ -296,4 +297,12 @@ wait"#,
         std::thread::sleep(Duration::from_millis(50));
     }
     assert!(!crate::testing::alive(&pid), "the agent's child {pid} still runs");
+}
+
+/// A closed session says so to every command, one that writes nothing too, such as an idle interrupt.
+#[test]
+fn a_command_that_writes_nothing_still_fails_on_a_closed_session() {
+    let lines: Lines = Arc::new(Mutex::new(None));
+    let sink: EventSink = Arc::new(|_| {});
+    assert!(matches!(deliver(Step::default(), &lines, &sink), Err(SessionError::Closed)));
 }

@@ -78,8 +78,14 @@ impl Run {
         self
     }
 
+    /// Lets `millis` pass with nothing from the agent.
+    fn wait(&mut self, millis: u64) -> &mut Self {
+        self.ticks += millis;
+        self
+    }
+
     fn command(&mut self, command: Command) -> &mut Self {
-        let step = self.protocol.command(command).expect("the command is taken");
+        let step = self.protocol.command(command, self.start + Duration::from_millis(self.ticks)).expect("the command is taken");
         self.take(step);
         self
     }

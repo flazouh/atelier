@@ -46,7 +46,9 @@ struct Raw {
     /// `Some(Value::Null)` for `"result": null`, which is an answer; `None` when there is no `result`.
     #[serde(default, deserialize_with = "present")]
     result: Option<Value>,
-    error: Option<RpcError>,
+    /// `Some(Value::Null)` for `"error": null`, which is no error object; `None` when there is no `error`.
+    #[serde(default, deserialize_with = "present")]
+    error: Option<Value>,
 }
 
 fn present<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<Value>, D::Error> {
@@ -64,7 +66,10 @@ pub(super) fn parse(line: &str) -> Result<Incoming, String> {
         (None, Some(method)) => Ok(Incoming::Notification { method, params: raw.params }),
         (Some(id), None) => match (raw.result, raw.error) {
             (Some(result), None) => Ok(Incoming::Response { id, outcome: Ok(result) }),
-            (None, Some(error)) => Ok(Incoming::Response { id, outcome: Err(error) }),
+            (None, Some(error)) => match serde_json::from_value::<RpcError>(error) {
+                Ok(error) => Ok(Incoming::Response { id, outcome: Err(error) }),
+                Err(_) => Err("a response whose error is not an error object".into()),
+            },
             _ => Err("a response that is not one result or one error".into()),
         },
         (None, None) => Err("a message with neither an id nor a method".into()),

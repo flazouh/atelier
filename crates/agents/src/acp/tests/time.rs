@@ -39,6 +39,10 @@ fn a_day_or_an_offset_that_does_not_exist_does_not_read() {
         "2026-10-01T00:00:00+99:99",
         "2026-10-01T00:00:00+02:60",
         "2026-10-01T00:00:00+2",
+        "2026-10-01T00:00:00+0:200",
+        "2026-10-01T00:00:00+020",
+        "2026-10-01T00:00:00+02:0",
+        "2026-10-01T00:00:00+02:00:00",
     ] {
         assert_eq!(epoch_seconds(text), None, "{text}");
     }
@@ -47,4 +51,12 @@ fn a_day_or_an_offset_that_does_not_exist_does_not_read() {
 #[test]
 fn a_lowercase_separator_reads() {
     assert_eq!(epoch_seconds("2026-10-01t18:51:00z"), Some(1_790_880_660));
+}
+
+/// ISO 8601 writes an offset as `±hh`, `±hhmm` or `±hh:mm`.
+#[test]
+fn an_offset_of_hours_only_reads() {
+    assert_eq!(epoch_seconds("2026-10-01T20:51:00+02"), Some(1_790_880_660));
+    assert_eq!(epoch_seconds("2026-10-01T13:51:00-05"), Some(1_790_880_660));
+    assert_eq!(epoch_seconds("2026-10-01T20:51:00+0200"), Some(1_790_880_660));
 }
