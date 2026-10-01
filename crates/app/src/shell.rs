@@ -181,6 +181,7 @@ const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::
 impl Shell {
     pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
         let agents_sidebar = cx.new(Sidebar::new);
+        agents_sidebar.update(cx, |s, cx| s.set_mode(beui::sidebar_model::ListMode::from_key(saved.sidebar.as_deref()), cx));
         let panels = cx.new(|cx| {
             let mut panels = AgentPanels::new(cx);
             let layout = if saved.panels.single { Layout::Single } else { Layout::SideBySide };
@@ -538,6 +539,21 @@ impl Shell {
             .detach();
         }
         self.sync(cx);
+    }
+
+    /// Lists the sessions by project, or in one list by priority; the choice is kept for the next launch.
+    fn choose_list_mode(&mut self, mode: beui::sidebar_model::ListMode, cx: &mut Context<Self>) {
+        self.agents_sidebar.update(cx, |s, cx| s.set_mode(mode, cx));
+        let key = mode.key().to_string();
+        if let Some(path) = settings_path() {
+            cx.background_spawn(async move {
+                if let Err(error) = lathe_settings::update(&path, |s| s.sidebar = Some(key)) {
+                    eprintln!("could not keep the sidebar's mode: {error}");
+                }
+            })
+            .detach();
+        }
+        cx.notify();
     }
 
     /// Chooses what the sidebar lists.

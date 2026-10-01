@@ -573,3 +573,19 @@ fn the_sidebar_marks_the_open_session_in_the_single_view_only(cx: &mut TestAppCo
     settle(&shell, cx);
     assert!(!marked(&shell, cx), "back side by side: none");
 }
+
+/// The sidebar lists by project, or in one list by priority with a heading for each section; the switch is in its head.
+#[gpui_kit::test]
+fn the_sidebar_switches_between_projects_and_the_priority_list(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    assert!(cx.debug_bounds("section-Earlier").is_none(), "by project: no headings");
+    let priority = cx.debug_bounds("list-mode-priority").expect("the switch is in the sidebar's head");
+    cx.simulate_click(priority.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("section-Earlier").is_some(), "by priority: the session is under Earlier");
+    assert!(cx.debug_bounds("row-project").is_some(), "and its row wears the project's badge");
+    let projects = cx.debug_bounds("list-mode-projects").unwrap();
+    cx.simulate_click(projects.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("section-Earlier").is_none() && cx.debug_bounds("row-project").is_none(), "back by project");
+}

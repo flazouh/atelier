@@ -40,8 +40,21 @@ impl Shell {
             .into_any_element()
     }
 
+    /// "Projects | Priority": each project with its sessions, or one list of sessions by what they owe the reader.
+    fn list_mode_switch(&self, cx: &mut Context<Self>) -> AnyElement {
+        use beui::sidebar_model::ListMode;
+        let modes = [ListMode::Projects, ListMode::Priority];
+        let current = self.agents_sidebar.read(cx).mode();
+        let this = cx.entity().downgrade();
+        Segmented::new("list-mode", modes.iter().map(|m| Segment::new(m.words()).debug_name(match m {
+            ListMode::Projects => "list-mode-projects",
+            ListMode::Priority => "list-mode-priority",
+        })), modes.iter().position(|m| *m == current).unwrap_or(0))
+        .on_change(move |i, _, cx| drop(this.update(cx, |s, cx| s.choose_list_mode(modes[i], cx))))
+        .into_any_element()
+    }
+
     pub(super) fn sidebar_header(&self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
         let this = cx.entity().downgrade();
         let filter = self.session_filter;
 
@@ -140,7 +153,7 @@ impl Shell {
                     .h(px(36.))
                     .pl(px(16.))
                     .pr(px(8.))
-                    .child(div().text_size(TextSize::Xs.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).text_color(theme.muted_foreground).child("Projects"))
+                    .child(self.list_mode_switch(cx))
                     .child(buttons),
             )
             .into_any_element()

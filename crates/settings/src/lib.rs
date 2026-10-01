@@ -54,6 +54,8 @@ pub struct Settings {
     pub front: Option<String>,
     /// The window's view at quit: "sessions" or "files".
     pub view: Option<String>,
+    /// How the sidebar lists sessions: "projects" or "priority".
+    pub sidebar: Option<String>,
     /// Keys a newer or older lathe wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,

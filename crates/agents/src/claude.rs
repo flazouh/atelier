@@ -21,6 +21,8 @@ pub fn mark() -> Mark {
         working: SparkState::Thinking.strip(),
         orbiting: SparkState::Orbiting.strip(),
         color: color(CLAY),
+        // The fourth frame of the thinking strip is the spark at full size.
+        icon_frame: 3,
     }
 }
 
