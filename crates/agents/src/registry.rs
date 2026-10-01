@@ -57,8 +57,10 @@ pub fn model_mark(model_id: &str) -> Option<BrandMark> {
     model_lab(model_id)?.mark()
 }
 
-/// The agent whose backend is named `backend`, as a session records it.
+/// The agent whose backend is named `backend`, as a session records it. A session recorded when atelier was
+/// named lathe names atelier's own agent "lathe".
 pub fn by_backend(backend: &str) -> Option<Agent> {
+    let backend = if backend == "lathe" { "atelier" } else { backend };
     agents().into_iter().find(|a| a.backend.name() == backend)
 }
 

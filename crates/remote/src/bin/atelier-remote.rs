@@ -10,6 +10,9 @@ fn main() {
         Some("--version") => println!("{}", atelier_remote::ssh::version_line()),
         Some("--stdio") => {
             login_path();
+            if let Err(error) = atelier_project::adopt_old_data(None) {
+                eprintln!("atelier-remote: could not move the data of the version named lathe: {error}");
+            }
             if let Err(error) = atelier_remote::server::serve(std::io::stdin().lock(), std::io::stdout()) {
                 eprintln!("atelier-remote: {error}");
                 std::process::exit(1);

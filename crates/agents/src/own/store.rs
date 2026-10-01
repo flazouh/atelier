@@ -1,7 +1,7 @@
 //! atelier's own record of a session: with no external store, the conversation is kept in the project's data
 //! folder (`Project::data_write`), outside the repository and on the project's host, so it never shows in
-//! `git status`, in `agent/sessions/`. Sessions written by an older atelier into the project's own
-//! `.atelier/agent/sessions/` are moved there the first time the list is read ([`migrate`]).
+//! `git status`, in `agent/sessions/`. Sessions written by an older version (named lathe then) into the
+//! project's own `.lathe/agent/sessions/` are moved there the first time the list is read ([`migrate`]).
 //! Two files per session: `<id>.jsonl` holds one message a line, and `<id>.meta` holds the title and the
 //! time, small enough to read for a list. `history` turns the messages into the events a UI shows.
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -20,8 +20,8 @@ use crate::{
 
 /// Where the record lives, in the data folder.
 pub const DIR: &str = "agent/sessions";
-/// Where an older atelier wrote it, in the project itself.
-const LEGACY_DIR: &str = ".atelier/agent/sessions";
+/// Where an older version, named lathe then, wrote it, in the project itself.
+const LEGACY_DIR: &str = ".lathe/agent/sessions";
 const LIST_LIMIT: usize = 50;
 const TITLE_CHARS: usize = 100;
 
@@ -52,7 +52,7 @@ fn path(id: &str, ext: &str) -> String {
     format!("{DIR}/{id}.{ext}")
 }
 
-/// Moves the record an older atelier left in the project (`.atelier/agent/sessions/`) into the data folder, and
+/// Moves the record an older version left in the project (`.lathe/agent/sessions/`) into the data folder, and
 /// removes what it moved. Once a session is in both places the one in the data folder wins. Gives the number
 /// of sessions moved. A project with nothing to move costs one `ls`.
 pub fn migrate(project: &dyn Project) -> Result<usize, String> {
@@ -82,7 +82,7 @@ pub fn migrate(project: &dyn Project) -> Result<usize, String> {
         moved += usize::from(whole);
     }
     // The folders are left behind empty: take them away, but only while they are empty.
-    let tidy = Command::new("sh").args(["-c", "rmdir -- \"$1\" .atelier/agent .atelier 2>/dev/null; true", "sh", LEGACY_DIR]);
+    let tidy = Command::new("sh").args(["-c", "rmdir -- \"$1\" .lathe/agent .lathe 2>/dev/null; true", "sh", LEGACY_DIR]);
     let _ = subprocess::output(project, &tidy);
     Ok(moved)
 }

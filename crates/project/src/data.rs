@@ -14,6 +14,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::{host_path, local::write_whole};
 
+/// What the platform's data folder holds atelier's data in, and what it held it in when atelier was named lathe.
+const DATA_NAME: &str = "atelier";
+const OLD_DATA_NAME: &str = "lathe";
+
+/// Takes over the data of the version named lathe (`<data>/lathe`: settings, sessions, reviews, tasks) as
+/// atelier's own (`<data>/atelier`), once: only when atelier has none yet. `<data>` is `data_dir`, or the
+/// platform's data folder. Says whether it moved anything. Call it at start, before anything reads the data.
+pub fn adopt_old_data(data_dir: Option<&Path>) -> io::Result<bool> {
+    let Some(data) = data_dir.map(Path::to_path_buf).or_else(dirs::data_dir) else { return Ok(false) };
+    let (old, new) = (data.join(OLD_DATA_NAME), data.join(DATA_NAME));
+    if new.exists() || !old.is_dir() {
+        return Ok(false);
+    }
+    fs::rename(old, new)?;
+    Ok(true)
+}
+
 /// One file in a data folder.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataEntry {
@@ -34,7 +51,7 @@ impl DataFolder {
             Some(dir) => dir.to_path_buf(),
             None => match std::env::var_os("ATELIER_DATA_DIR") {
                 Some(dir) => PathBuf::from(dir),
-                None => dirs::data_dir()?.join("atelier"),
+                None => dirs::data_dir()?.join(DATA_NAME),
             },
         };
         let name = root.to_string_lossy();

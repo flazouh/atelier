@@ -41,4 +41,5 @@ fn ateliers_own_agent_is_offered_with_a_monogram() {
     let own = agents().into_iter().find(|a| a.name == "atelier").expect("atelier's own agent is offered");
     assert!(own.mark.is_none(), "it takes the monogram");
     assert!(by_backend(own.backend.name()).is_some_and(|a| a.name == "atelier"));
+    assert!(by_backend("lathe").is_some_and(|a| a.name == "atelier"), "a session recorded under the old name");
 }

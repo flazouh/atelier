@@ -21,7 +21,7 @@ mod local;
 mod process;
 mod tracker_slot;
 
-pub use data::DataEntry;
+pub use data::{DataEntry, adopt_old_data};
 pub use local::LocalProject;
 pub use process::{Command, Control, Process, STDERR_KEEP, Tail};
 pub use tracker_slot::TrackerSlot;

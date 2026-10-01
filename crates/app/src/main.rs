@@ -52,6 +52,9 @@ mod view_cache;
 fn main() {
     exit_log::install();
     let started = timings::mark_start();
+    if let Err(error) = atelier_project::adopt_old_data(None) {
+        eprintln!("could not move the data of the version named lathe: {error}");
+    }
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
     let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
