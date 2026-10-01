@@ -292,6 +292,14 @@ impl AgentSession {
             _pump,
             _start: Task::ready(()),
         };
+        // The conversation follows the agent's output while the reader is at its end, lets go when they scroll up, and takes
+        // hold again when they come back (beui's message-scroller `followOutput`). The panel is told of each scroll, so its
+        // "Latest" button and its rail keep up.
+        this.list.set_follow_mode(gpui_kit::FollowMode::Tail);
+        let scrolled = cx.entity().downgrade();
+        this.list.set_scroll_handler(move |_, _, cx| {
+            scrolled.update(cx, |_, cx| cx.notify()).ok();
+        });
         this.open(resume.map(|(id, _)| id), true, cx);
         this.read_lists(cx);
         this
@@ -564,7 +572,8 @@ impl AgentSession {
         self.problem = None;
         self.stderr = None;
         self.refresh_rows();
-        self.list.scroll_to_end();
+        // A message sent goes to the end and the follow takes hold again.
+        self.list.set_follow_mode(gpui_kit::FollowMode::Tail);
         // The review comments go with the message, and show resolved once the agent's turn ends.
         let attachments = self.reviews.send_comments();
         if !attachments.is_empty() {

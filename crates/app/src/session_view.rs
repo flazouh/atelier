@@ -14,6 +14,7 @@ use beui::{
     ToolApprovalStatus, ToolCall as ToolRow, ToolStatus as RowToolStatus,
     button::{Button, ButtonVariant},
     changed_files::ChangedFiles,
+    message_rail::MessageRail,
     select::{Select, SelectOption},
     icon::{Icon, IconName},
     session_status::SessionStatus,
@@ -276,14 +277,47 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
     Some(body)
 }
 
-/// The conversation's rows: a list that lays out only the rows on screen. Each row has a test name,
-/// `row-<index>`.
+/// The conversation's rows: a list that lays out only the rows on screen. Each row has a test name, `row-<index>`.
+/// Beside it, as beui's message scroller has: a rail of ticks, one for each message the reader sent, when the
+/// conversation is longer than the panel; and a "Latest" button while the list has let go of the end.
 pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
     let s = session.read(cx);
+    let list_state = s.list.clone();
+    let key = s.key.clone();
+    let overflowing = f32::from(list_state.max_offset_for_scrollbar().y) > 1.;
+    let following = list_state.is_following_tail();
+    let entries = rail::entries(s.conversation.items(), &s.shown);
     let session = session.clone();
-    list(s.list.clone(), move |ix, _, cx| div().debug_selector(move || format!("row-{ix}")).child(row(&session, ix, cx)).into_any_element())
-        .size_full()
-        .into_any_element()
+    let list = list(list_state.clone(), {
+        let session = session.clone();
+        move |ix, _, cx| div().debug_selector(move || format!("row-{ix}")).child(row(&session, ix, cx)).into_any_element()
+    })
+    .size_full();
+    let rail = (overflowing && entries.len() >= 2).then(|| {
+        let rows: Vec<usize> = entries.iter().map(|e| e.1).collect();
+        let active = rail::active(&rows, list_state.logical_scroll_top().item_ix, following);
+        let jump = list_state.clone();
+        MessageRail::new(gpui_kit::ElementId::Name(format!("{key}-rail").into()), entries.into_iter().map(|e| e.0).collect(), active).on_select(
+            move |i, _, _| {
+                // The reader chose a message: the list goes to it and stops following the output.
+                jump.pause_following_tail();
+                jump.scroll_to(gpui_kit::ListOffset { item_ix: rows[i], offset_in_item: px(0.) });
+            },
+        )
+    });
+    let latest = (overflowing && !following).then(|| {
+        let state = list_state.clone();
+        div().absolute().bottom(px(8.)).left_0().right_0().flex().justify_center().child(
+            Button::new(gpui_kit::ElementId::Name(format!("{key}-latest").into()))
+                .debug_name("latest")
+                .icon(IconName::ArrowDownward)
+                .label("Latest")
+                .variant(ButtonVariant::Secondary)
+                .size(beui::ButtonSize::Sm)
+                .on_click(move |_, _, _| state.set_follow_mode(gpui_kit::FollowMode::Tail)),
+        )
+    });
+    div().relative().size_full().child(list).children(rail).children(latest).into_any_element()
 }
 
 /// The panel for `session`, rows and all.
@@ -662,6 +696,7 @@ fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Op
 
 pub(crate) mod calls;
 mod preview;
+mod rail;
 mod summary;
 #[cfg(test)]
 mod tests;

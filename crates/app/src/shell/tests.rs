@@ -631,3 +631,37 @@ fn the_zoom_keys_scale_every_size_together(cx: &mut TestAppContext) {
     assert_eq!(beui::scale::zoom(), 1.);
     assert!((width(cx) - base).abs() < 0.5, "⌘0 puts it back");
 }
+
+/// A long conversation: the rail shows a tick for each message sent, the pointer on a tick shows its card, a press scrolls to
+/// that message and lets go of the end (so "Latest" shows), and "Latest" takes hold of the end again.
+#[gpui_kit::test]
+fn a_long_conversation_has_a_rail_and_a_latest_button(cx: &mut TestAppContext) {
+    use lathe_agents::session::{BlockId, Event};
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
+    assert!(cx.debug_bounds("message-rail").is_none(), "no rail before there is something to scroll");
+    session.update(cx, |s, cx| {
+        for n in 0..30 {
+            s.conversation.user_sent(format!("message number {n}"));
+            s.conversation.apply(&Event::Text { block: BlockId(n), delta: format!("answer to {n}") });
+        }
+        s.refresh_rows();
+        cx.notify();
+    });
+    settle(&shell, cx);
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("message-rail").is_some(), "a long conversation has a rail");
+    assert!(cx.debug_bounds("rail-tick-29").is_some() && cx.debug_bounds("rail-tick-0").is_some(), "a tick for each message");
+    assert!(cx.debug_bounds("latest").is_none(), "following the output: no Latest button");
+    let tick = cx.debug_bounds("rail-tick-3").unwrap();
+    cx.simulate_mouse_move(tick.center(), None, gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("rail-card").is_some(), "the pointer on a tick shows its card");
+    cx.simulate_click(tick.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("latest").is_some(), "a press on a tick lets go of the end, so Latest shows");
+    let latest = cx.debug_bounds("latest").unwrap();
+    cx.simulate_click(latest.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("latest").is_none(), "Latest takes hold of the end again");
+}
