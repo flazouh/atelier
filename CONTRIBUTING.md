@@ -36,6 +36,16 @@ errors, the gallery build, and the tests of the patched copies in `vendor`.
   value. The sidebar's is `SidebarLayout`: the sidebar reads its rows and head from it, the Settings page edits
   it, and `crates/app/src/sidebar_layout.rs` alone maps it to the settings file. A new option is a new field of
   that value, never a constant or a flag elsewhere.
+- Split a module by kind of item, one file per kind. A module with items of more than one kind is a folder (or,
+  at a crate root, `lib.rs`) that holds only its docs, `mod` lines and `pub use` lines. Each kind has one file:
+  - `structs.rs`: structs, with their `impl` blocks.
+  - `types.rs`: enums and type aliases, with their `impl` blocks, and constants.
+  - `traits.rs`: traits (the interfaces), and their blanket `impl` blocks.
+  - `impls.rs`: `impl` blocks for a type that another file of the module defines.
+  - `helpers.rs`: free functions.
+  - `tests.rs`, or `tests/<topic>.rs` when it grows: tests only.
+  An `impl Trait for Type` stays with `Type`. Create a file only when it has something in it. A module with
+  one kind needs no split. The paths other code uses do not change: the root re-exports with `pub use`.
 - One file per concept. No inline `mod tests { ... }`: put tests in `<module>/tests.rs` with
   `#[cfg(test)] mod tests;`.
 - A bug fix comes with a test that fails without it.
