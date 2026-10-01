@@ -1,12 +1,14 @@
-//! The two views of a window, one on screen at a time (`plans/views-and-commands.md`): Sessions (the
+//! The views of a window, one on screen at a time (`plans/views-and-commands.md`): Sessions (the
 //! session list, the agent panels, and the review, the pull requests or the tasks when one is asked for) and
-//! Files (the file tree and the editor).
+//! Files (the file tree and the editor), and Team (every person's agent sessions in lanes).
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ShellView {
     #[default]
     Sessions,
     Files,
+    /// Who is doing what: one lane for each person with their agent sessions.
+    Team,
 }
 
 impl ShellView {
@@ -15,6 +17,7 @@ impl ShellView {
         match self {
             Self::Sessions => "sessions",
             Self::Files => "files",
+            Self::Team => "team",
         }
     }
 
@@ -22,6 +25,7 @@ impl ShellView {
     pub fn from_words(words: Option<&str>) -> Self {
         match words {
             Some("files") => Self::Files,
+            Some("team") => Self::Team,
             _ => Self::Sessions,
         }
     }

@@ -52,7 +52,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [ShowSessions, ShowFiles, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(lathe, [ShowSessions, ShowFiles, ShowTeam, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -77,6 +77,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("secondary-o", OpenFolder, None),
         KeyBinding::new("secondary-1", ShowSessions, None),
         KeyBinding::new("secondary-2", ShowFiles, None),
+        KeyBinding::new("secondary-3", ShowTeam, None),
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("secondary-shift-o", OpenRemote, None),
         KeyBinding::new("secondary-shift-O", OpenRemote, None),
@@ -719,6 +720,29 @@ impl Shell {
         }
     }
 
+    /// The Team view: every person's agent sessions in lanes; a press on a card opens that session in the
+    /// Sessions view.
+    fn team_board(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let (people, sessions) = crate::team_view::data(&self.projects, &self.badges, &crate::team_view::my_name(), cx);
+        let alone = people.len() <= 1;
+        let this = cx.entity().downgrade();
+        beui::team_board::TeamBoard::new("team-board", people, sessions, agent_session::now())
+            .note(alone.then(|| "Only you are here. Teammates and their agents will show in their own lanes.".into()))
+            .on_open(move |key, window, cx| {
+                let key = key.clone();
+                this.update(cx, |shell, cx| shell.open_team_session(&key, window, cx)).ok();
+            })
+            .into_any_element()
+    }
+
+    /// A card of the Team view was pressed: its session comes to the front in the Sessions view.
+    fn open_team_session(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((at, session)) = self.session_by_key(key, cx) else { return };
+        self.view = ShellView::Sessions;
+        self.save_view(cx);
+        self.show_session(at, &session, window, cx);
+    }
+
     /// Keeps the view for the next launch, off the UI thread.
     fn save_view(&self, cx: &mut Context<Self>) {
         let words = self.view.words().to_string();
@@ -1245,10 +1269,10 @@ impl Shell {
     /// Sessions or Files, with their keys.
     fn view_switch(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity();
-        let views = [ShellView::Sessions, ShellView::Files];
+        let views = [ShellView::Sessions, ShellView::Files, ShellView::Team];
         Segmented::new(
             "view-switch",
-            [Segment::new("Sessions").cap(keys::cap("⌘1")), Segment::new("Files").cap(keys::cap("⌘2"))],
+            [Segment::new("Sessions").cap(keys::cap("⌘1")), Segment::new("Files").cap(keys::cap("⌘2")), Segment::new("Team").cap(keys::cap("⌘3"))],
             views.iter().position(|v| *v == self.view).unwrap_or(0),
         )
         .debug_name("view-switch")
@@ -1265,7 +1289,7 @@ impl Shell {
             panel_types::Layout,
             popover::{Hang, Popover},
         };
-        if self.view == ShellView::Files || !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
+        if self.view != ShellView::Sessions || !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
             return None;
         }
         let (layout, grouped) = {
@@ -1565,11 +1589,15 @@ impl Shell {
     fn panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let total = f32::from(window.viewport_size().width);
         let fit = Fit::of(total);
+        if self.view == ShellView::Team {
+            self.session_right = None;
+            return self.team_board(cx);
+        }
         if fit == Fit::Narrow {
             self.session_right = None;
             return match self.view {
                 ShellView::Files => self.narrow_files(project, cx),
-                ShellView::Sessions => self.narrow_panes(project, window, cx),
+                ShellView::Sessions | ShellView::Team => self.narrow_panes(project, window, cx),
             };
         }
         if self.view == ShellView::Files {
@@ -1791,6 +1819,7 @@ impl Shell {
             .on_action(cx.listener(Self::pull_requests_key))
             .on_action(cx.listener(|this, _: &ShowSessions, window, cx| this.show_view(ShellView::Sessions, window, cx)))
             .on_action(cx.listener(|this, _: &ShowFiles, window, cx| this.show_view(ShellView::Files, window, cx)))
+            .on_action(cx.listener(|this, _: &ShowTeam, window, cx| this.show_view(ShellView::Team, window, cx)))
             .on_action(cx.listener(Self::open_tasks_key))
             .on_key_down(cx.listener(Self::key_down))
             .flex()

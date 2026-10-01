@@ -378,3 +378,35 @@ fn a_file_picked_in_a_narrow_tree_shows_in_the_editor(cx: &mut TestAppContext) {
     settle(&shell, cx);
     assert!(cx.debug_bounds("editor-tab-0").is_some(), "the editor shows a.txt");
 }
+
+/// The Team view at `width`: a lane for the reader with each open session as a card, on ⌘3; a press on a
+/// card opens that session in the Sessions view.
+fn team_view_at(cx: &mut TestAppContext, width: f32) {
+    let (shell, cx, _dir) = with_a_session(cx, width);
+    let team = if cfg!(target_os = "macos") { "cmd-3" } else { "ctrl-3" };
+    cx.simulate_keystrokes(team);
+    settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Team, "{team} shows the Team view at {width}");
+    assert!(cx.debug_bounds("sessions-view").is_none() && cx.debug_bounds("files-view").is_none(), "and only it");
+    let name = crate::team_view::my_name();
+    let lane: &'static str = Box::leak(format!("team-lane:{name}").into_boxed_str());
+    assert!(cx.debug_bounds(lane).is_some(), "the reader's lane");
+    assert!(cx.debug_bounds("team-note").is_some(), "alone, the board says so");
+    let card = cx.debug_bounds("team-card:New session").expect("the open session is a card");
+    cx.simulate_click(card.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Sessions, "a press on the card goes to the Sessions view");
+    assert!(cx.debug_bounds(lane).is_none(), "the lanes are gone");
+}
+
+#[gpui_kit::test]
+fn the_team_view_shows_the_readers_sessions_and_a_card_opens_one(cx: &mut TestAppContext) {
+    team_view_at(cx, 1600.);
+    assert_eq!(ShellView::from_words(Some("team")), ShellView::Team);
+    assert_eq!(ShellView::Team.words(), "team");
+}
+
+#[gpui_kit::test]
+fn the_team_view_shows_in_a_narrow_window_too(cx: &mut TestAppContext) {
+    team_view_at(cx, 700.);
+}

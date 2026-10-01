@@ -26,6 +26,7 @@ mod pr_view_story;
 mod motion_story;
 mod tasks_story;
 mod streaming_story;
+mod team_story;
 mod variants_story;
 mod replay_story;
 mod merge_story;
@@ -75,12 +76,13 @@ enum Story {
     Tasks,
     Variants,
     Streaming,
+    Team,
     Motion,
     PullRequestView,
 }
 
 impl Story {
-    const ALL: [Story; 34] = [
+    const ALL: [Story; 35] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -113,6 +115,7 @@ impl Story {
         Story::Tasks,
         Story::Variants,
         Story::Streaming,
+        Story::Team,
         Story::PullRequestView,
         Story::Motion,
     ];
@@ -152,6 +155,7 @@ impl Story {
             Story::Tasks => "Tasks",
             Story::Variants => "Variants",
             Story::Streaming => "Streaming",
+            Story::Team => "Team",
             Story::Motion => "Motion",
         }
     }
@@ -218,6 +222,7 @@ struct Gallery {
     tasks: Option<Entity<tasks_story::TasksStory>>,
     variants: Option<Entity<variants_story::VariantsStory>>,
     streaming: Option<Entity<streaming_story::StreamingStory>>,
+    team: Option<Entity<team_story::TeamStory>>,
     motion: Option<Entity<motion_story::MotionStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
@@ -326,6 +331,7 @@ impl Gallery {
             tasks: None,
             variants: None,
             streaming: None,
+            team: None,
             motion: None,
             agent_panels: None,
             agent_replay: None,
@@ -354,6 +360,9 @@ impl Gallery {
         }
         if self.story == Story::Motion && self.motion.is_none() {
             self.motion = Some(cx.new(|cx| motion_story::MotionStory::new(window, cx)));
+        }
+        if self.story == Story::Team && self.team.is_none() {
+            self.team = Some(cx.new(|cx| team_story::TeamStory::new(window, cx)));
         }
         if self.story == Story::Streaming && self.streaming.is_none() {
             self.streaming = Some(cx.new(|cx| streaming_story::StreamingStory::new(window, cx)));
@@ -487,6 +496,7 @@ impl Gallery {
             Story::Tasks => self.tasks.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Variants => self.variants.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Streaming => self.streaming.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::Team => self.team.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Motion => self.motion.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequestView => self.pr_view.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
