@@ -39,7 +39,6 @@ mod shell;
 mod ssh_form;
 mod status;
 mod tabs;
-mod team_view;
 #[cfg(test)]
 mod test_dirs;
 mod timings;
