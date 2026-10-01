@@ -8,6 +8,6 @@ cd "$(dirname "$0")/../.."
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 sed 's/fill="#000"/fill="#F0EEE6"/' crates/beui/assets/atelier-mark.svg > "$work/a.svg"
-convert -background none -density 1200 "$work/a.svg" -resize 520x "$work/a.png"
+convert -background none -density 1200 "$work/a.svg" -resize 630x "$work/a.png"
 convert -size 1024x1024 xc:none -fill "#141413" -draw "roundrectangle 100,100 924,924 185,185" \
   "$work/a.png" -gravity center -composite tools/mac/atelier-1024.png
