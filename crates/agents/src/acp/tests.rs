@@ -14,6 +14,7 @@ use crate::session::{Command, Event, ModelChoice, OpenRequest, PermissionMode};
 mod map;
 mod process;
 mod protocol;
+mod replay;
 mod rpc;
 mod time;
 

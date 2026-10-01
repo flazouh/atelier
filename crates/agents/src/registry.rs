@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use atelier_ui::{AgentLook, BrandMark};
 
-use crate::{claude, claude_code::ClaudeCode, coding_agents::CodingAgent, labs::Lab, own::OwnAgent, session::Backend};
+use crate::{acp::Acp, claude, claude_code::ClaudeCode, coding_agents::CodingAgent, cursor, labs::Lab, own::OwnAgent, session::Backend};
 
 #[derive(Clone)]
 pub struct Agent {
@@ -29,6 +29,14 @@ pub fn agents() -> Vec<Agent> {
             mark: CodingAgent::ClaudeCode.mark(),
             look: claude::look(),
             lab: Lab::Anthropic,
+        },
+        // Cursor's agent over ACP. Its models come from several labs; each model's mark comes from its id.
+        Agent {
+            backend: Arc::new(Acp::new(cursor::agent())),
+            name: CodingAgent::Cursor.name(),
+            mark: CodingAgent::Cursor.mark(),
+            look: cursor::look(),
+            lab: Lab::Custom,
         },
         // atelier's own agent. With no key set it still shows, and opening it says which to set. The
         // look is a stand-in until atelier has its own.
