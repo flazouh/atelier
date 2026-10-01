@@ -1,5 +1,5 @@
 //! The "Pull request" and "Pull requests" stories, laid out like GitQuiet's pull request and working set
-//! screens (`site/public/store/pull-request.png` and `working-set.png`), in beui's look.
+//! screens (`site/public/store/pull-request.png` and `working-set.png`), in atelier-ui's look.
 //!
 //! The pull request: a left rail (unsent comments, checks, the conversation, the box for the whole pull
 //! request, the verdict, the commits) and a right pane (the seen bar, the changed file tree, and the
@@ -25,7 +25,7 @@
 
 use std::{collections::HashSet, path::PathBuf, rc::Rc};
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, ChangedFile, ChangedFileTree, CheckRun, CheckState, ChecksPanel, CommentComposer, CommentComposerEvent,
     CommitData, CommitsSummary, Comment, ConversationList, Court, CourtItem, CourtList, Filter, Finder, FinderEvent, FinderItem,
     InlineReview, JobStep, LineComment, PrChipData, PrState, RemarkSummary, ReviewBar, ReviewFileHeader, ReviewHandlers,
@@ -184,7 +184,7 @@ pub struct PrStory {
     unsent: usize,
     composer: Entity<CommentComposer>,
     verdict: Entity<VerdictBox>,
-    merge: Entity<beui::MergeBox>,
+    merge: Entity<atelier_ui::MergeBox>,
     _subscriptions: Vec<Subscription>,
     _session: Option<Subscription>,
 }
@@ -193,7 +193,7 @@ impl PrStory {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let fixture = Fixture::write();
         let first = &fixture.changed[0];
-        let editor = beui::CodeEditor::state(first.path, first.text.as_str(), window, cx);
+        let editor = atelier_ui::CodeEditor::state(first.path, first.text.as_str(), window, cx);
         let composer = cx.new(|cx| {
             let mut c = CommentComposer::new("On this pull request", "You", window, cx);
             c.set_text("The abort path reads right to me. Before I approve: is the HEAD case dperrault asked about covered anywhere, or does that want its own test?", window, cx);
@@ -203,15 +203,15 @@ impl PrStory {
         let verdict = cx.new(|cx| VerdictBox::new("f4a97b1c9e2d4f0a", false, window, cx));
         let merge = cx.new(|cx| {
             // As the checks panel shows: linux-x64 is a required check, and it failed.
-            let facts = beui::merge::MergeFacts { checks_failing: 1, ..crate::merge_story::states().remove(0).1 };
-            let choice = beui::merge::first_choice(&facts, None);
-            beui::MergeBox::new(facts, choice, COMMITS[0], PR_BODY, window, cx)
+            let facts = atelier_ui::merge::MergeFacts { checks_failing: 1, ..crate::merge_story::states().remove(0).1 };
+            let choice = atelier_ui::merge::first_choice(&facts, None);
+            atelier_ui::MergeBox::new(facts, choice, COMMITS[0], PR_BODY, window, cx)
         });
         let subs = vec![
-            cx.subscribe_in(&merge, window, |_, merge, event: &beui::MergeBoxEvent, _, cx| {
+            cx.subscribe_in(&merge, window, |_, merge, event: &atelier_ui::MergeBoxEvent, _, cx| {
                 println!("merge: {event:?}");
-                use beui::merge::Action;
-                let beui::MergeBoxEvent::Act { action, choice, .. } = event else { return };
+                use atelier_ui::merge::Action;
+                let atelier_ui::MergeBoxEvent::Act { action, choice, .. } = event else { return };
                 let deleted = match action {
                     Action::Merge(_) | Action::BypassAndMerge(_) => choice.delete_branch,
                     Action::DeleteBranch => true,
@@ -308,7 +308,7 @@ impl PrStory {
                 state.set_cursor_position(position, window, cx);
             }
         });
-        beui::code_editor::set_diagnostics(&self.editor, Vec::new(), cx);
+        atelier_ui::code_editor::set_diagnostics(&self.editor, Vec::new(), cx);
         self.place = place;
         let this = cx.entity().downgrade();
         // gpui-base asks while it updates the editor, and a jump replaces the editor's text, so it waits
@@ -789,9 +789,9 @@ impl Render for PrStory {
         let lookup = self.lookup.as_ref().map(|l| {
             let this = cx.entity().downgrade();
             let finder_focus = gpui_kit::Focusable::focus_handle(&l.finder, cx);
-            beui::popover::Popover::new("pr-story-lookup")
+            atelier_ui::popover::Popover::new("pr-story-lookup")
                 .open(true)
-                .hang(beui::popover::Hang::Centre(52.))
+                .hang(atelier_ui::popover::Hang::Centre(52.))
                 .height(360.)
                 .panel_focus(&finder_focus)
                 .return_focus(&self.focus)

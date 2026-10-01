@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use beui::{InlineHunk, RowMap};
+use atelier_ui::{InlineHunk, RowMap};
 
 /// The files the pull request did not change, at its head. A jump into one opens it Brought In.
 const UNCHANGED: &[(&str, &str)] = &[

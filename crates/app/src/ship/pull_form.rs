@@ -2,7 +2,7 @@
 //! reader edits, the base branch, and whether it opens as a draft. Open (⌘↵) asks the forge off the UI
 //! thread; a refusal keeps the form and says why.
 use std::sync::Arc;
-use beui::{
+use atelier_ui::{
     ActiveTheme, Field, IconName, TextInput,
     button::{Button, ButtonVariant},
     checkbox::Checkbox,
@@ -16,7 +16,7 @@ use gpui_kit::{
     component::input::{InputState, Textarea, TextareaState},
     div, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_agents::session::Backend;
 use atelier_forge::{Forge, NewPull, PullRef, RepoRef};
 use atelier_project::Project;
@@ -351,7 +351,7 @@ impl Render for PullForm {
                                     .label(if opening { "Opening…" } else { self.open_label() })
                                     .focus_handle(self.open_focus.clone())
                                     .variant(ButtonVariant::Primary)
-                                    .cap(beui::keys::cap("⌘↵"))
+                                    .cap(atelier_ui::keys::cap("⌘↵"))
                                     .disabled(opening)
                                     .on_click(move |_, window, cx| drop(open.update(cx, |form, cx| form.submit(window, cx)))),
                             ),

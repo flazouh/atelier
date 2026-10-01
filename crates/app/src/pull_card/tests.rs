@@ -1,5 +1,5 @@
 use std::{sync::Arc, time::Duration};
-use beui::merge::{Action, MergeMethod as UiMethod};
+use atelier_ui::merge::{Action, MergeMethod as UiMethod};
 use gpui_kit::{Entity, TestAppContext};
 use atelier_forge::{CheckStatus, ForgeError, MergeMethod, PullState};
 use atelier_pr_view::fixture::{FixtureForge, Write, sample};
@@ -7,8 +7,8 @@ use super::*;
 fn card(cx: &mut TestAppContext, running: bool) -> (Arc<FixtureForge>, Entity<PullCard>, &mut gpui_kit::VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Dark, cx);
     });
     let mut data = sample::data(7, "abc", Vec::new());
     if running {
@@ -107,7 +107,7 @@ fn a_refusal_shows_the_forges_words(cx: &mut TestAppContext) {
 fn two_cards_on_one_pull_request_read_it_once(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::init(cx);
+        atelier_ui::init(cx);
     });
     let mut data = sample::data(7, "abc", Vec::new());
     data.apply(atelier_pr_view::Part::Checks(vec![sample::check("test", CheckStatus::Running, None)]), sample::NOW);

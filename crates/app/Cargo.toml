@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 gpui-kit.workspace = true
-beui.workspace = true
+atelier-ui.workspace = true
 atelier-agents.workspace = true
 atelier-editor.workspace = true
 atelier-forge.workspace = true

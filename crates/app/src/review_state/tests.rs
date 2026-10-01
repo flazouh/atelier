@@ -14,7 +14,7 @@ fn a_review_comes_back_from_its_record() {
     let a = state.turns.turns()[0].file("a.txt").unwrap().clone();
     // The reader accepted a.txt's first hunk.
     let Content::Text(merged) = &a.content else { panic!("text") };
-    let decided = merged.decide(&merged.hunks()[0].id, beui::Decision::Accept).unwrap();
+    let decided = merged.decide(&merged.hunks()[0].id, atelier_ui::Decision::Accept).unwrap();
     state.decided.insert((Scope::Turn(0), "a.txt".into()), (Some(decided.clone()), Some(decided.current())));
     state.set_reviewed(0, &a, true);
     let anchor = decided.anchor(0..1).unwrap();

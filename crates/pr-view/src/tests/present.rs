@@ -5,7 +5,7 @@ use crate::{
     git::{Commit, FileEntry},
     present::*,
 };
-use beui::{changed_files::FileChange, verdict::Decision};
+use atelier_ui::{changed_files::FileChange, verdict::Decision};
 
 #[test]
 fn files_carry_their_counts_and_what_happened_to_them() {

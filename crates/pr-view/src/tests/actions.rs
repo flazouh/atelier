@@ -1,4 +1,4 @@
-use beui::merge::{Action, Choice, MergeMethod as Ui, UpdateWay};
+use atelier_ui::merge::{Action, Choice, MergeMethod as Ui, UpdateWay};
 use atelier_forge::{MergeMethod, MergeRequest, UpdateMethod};
 
 use crate::{actions::{Ask, ask}, notes::compose, PartKind};

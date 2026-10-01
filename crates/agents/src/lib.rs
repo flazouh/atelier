@@ -1,6 +1,6 @@
 //! Agents in atelier. [`session`] is atelier's own model of an agent session, and [`claude_code`] is a
-//! backend for it. `claude` holds what is particular to Claude for beui (its mark, its colours, its
-//! words), handed over as an [`beui::AgentLook`]; beui itself knows no agent.
+//! backend for it. `claude` holds what is particular to Claude for atelier-ui (its mark, its colours,
+//! its words), handed over as an [`atelier_ui::AgentLook`]; atelier-ui itself knows no agent.
 
 mod assets;
 pub mod claude;

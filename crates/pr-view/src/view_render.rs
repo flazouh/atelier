@@ -1,6 +1,6 @@
 //! How the pull request view draws: a rail on the left, and on the right the seen bar, the tree and the
 //! diff. The layout is the pull request story's (see [`crate::layout`]); the data is the model's.
-use beui::{
+use atelier_ui::{
     Segment, Segmented,
     ActiveTheme, AgentText, Button, ButtonSize, ButtonVariant, ChangedFileTree, ChecksPanel, CommitsSummary, ConversationList, InlineReview, ReviewBar,
     ReviewFileHeader, UnsentComments,

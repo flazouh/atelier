@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use beui::{
+use atelier_ui::{
     ActionSwapButton,
     ActiveTheme, Field,
     button::{Button, ButtonVariant},
@@ -22,7 +22,7 @@ use gpui_kit::{
     component::input::{Input, InputState, Textarea, TextareaState},
     div, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_agents::session::Backend;
 use atelier_forge::{Forge, PullRef};
 use atelier_project::Project;
@@ -589,7 +589,7 @@ impl Render for ShipStrip {
                             .child(Button::new("ship-cancel").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
                                 _ = cancel.update(cx, |strip, cx| strip.cancel(cx));
                             }))
-                            .child(commit_button(if committing { "Committing…" } else { "Commit" }).disabled(committing).cap(beui::keys::cap("⌘↵"))),
+                            .child(commit_button(if committing { "Committing…" } else { "Commit" }).disabled(committing).cap(atelier_ui::keys::cap("⌘↵"))),
                     )
                     .into_any_element()
             }

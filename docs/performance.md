@@ -10,7 +10,7 @@ Syntax colours come from gpui-component's tree-sitter `SyntaxHighlighter` in two
 - The editor drives its own highlighter (gpui-component's `input_adapter.rs`). Its UI thread never
   parses: a keystroke only applies the edit, which moves the old colours with the text, and every
   parse runs on a background thread (`vendor/gpui-component/PATCHES.md`, patch 2).
-- Diffs, code blocks and the pull request view go through `crates/beui/src/syntax.rs`. Every text parses
+- Diffs, code blocks and the pull request view go through atelier-ui's `src/syntax.rs`. Every text parses
   on a background thread too. Each background thread keeps one highlighter per language, because
   building one compiles its queries: about 50 ms for Rust on the HP, against 0.14 ms to parse a
   25-line block with a warm one. While a text parses, its slot keeps the colours of its last text on
@@ -30,7 +30,7 @@ Machine: `hp-agent`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release bui
 `e0e79a4`. The HP is shared with CI runners; this run started at a load average of 5.6 and ended at
 10.3. Each number is the median and p95 of 20 runs.
 
-    cargo test --release -p beui --test highlight_bench -- --ignored --nocapture --test-threads=1
+    cargo test --release --manifest-path ../atelier-ui/Cargo.toml --test highlight_bench -- --ignored --nocapture --test-threads=1
 
 The editor now, at commit `11e1eea` and a load average of 2.1 to 3.9:
 
@@ -87,7 +87,7 @@ of 500 or 5000 rows in a 560 px view on the left, 20 code blocks on the right, a
 frame for 300 frames under Xvfb, at a load average of 12 to 13. "Diff layout" is FileDiff's
 request_layout and prepaint; "diff paint" is building its scene on the CPU.
 
-    DISPLAY=:97 GALLERY_STORY="Highlight load" GALLERY_SCROLL=1 LOAD_DIFF_ROWS=5000 target/release/beui-gallery
+    DISPLAY=:97 GALLERY_STORY="Highlight load" GALLERY_SCROLL=1 LOAD_DIFF_ROWS=5000 target/release/atelier-gallery
 
 | Measure | 500 rows, median | 5000 rows, median | 5000 rows, p95 | 5000 rows, max | Over 8 ms, 5000 rows |
 | --- | --- | --- | --- | --- | --- |
@@ -123,7 +123,7 @@ frames then take 33 ms whatever the code does. The story counts a frame "over" w
 Loading every theme at start (`themes::all()`: atelier's two files parsed, eight VS Code files
 imported), once, before the first window opens. Load average 0.16:
 
-    cargo test --release -p beui --test theme_bench -- --ignored --nocapture
+    cargo test --release --manifest-path ../atelier-ui/Cargo.toml --test theme_bench -- --ignored --nocapture
 
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
@@ -137,7 +137,7 @@ The merge model for one pull request (its blockers, the button and the standing 
 MergeBox and MergeButton each work out on every render. It reads plain facts the app hands over: no
 disk, network or process work. The case is the worst one, every blocker at once. Load average 0.22:
 
-    cargo test --release -p beui --test merge_bench -- --ignored --nocapture
+    cargo test --release --manifest-path ../atelier-ui/Cargo.toml --test merge_bench -- --ignored --nocapture
 
 | Case | Target | Median | p95 | Result |
 | --- | --- | --- | --- | --- |
@@ -238,9 +238,9 @@ HP. The HP draws in software, so a whole frame there is 48 ms whatever the code 
 are our own layout, prepaint and paint, and the layout node count of the first frame. A whole-frame run on
 a Mac needs the window in front (see above).
 
-    GALLERY_STORY=Sidebar GALLERY_SCROLL=1 SIDEBAR_PROJECTS=50 SIDEBAR_SESSIONS=40 target/release/beui-gallery
+    GALLERY_STORY=Sidebar GALLERY_SCROLL=1 SIDEBAR_PROJECTS=50 SIDEBAR_SESSIONS=40 target/release/atelier-gallery
     GALLERY_STORY=Sidebar GALLERY_SCROLL=1 SIDEBAR_PROJECTS=50 SIDEBAR_SESSIONS=40 SIDEBAR_OPEN=1 ...
-    GALLERY_STORY=Panels GALLERY_SCROLL=1 PANELS=12 target/release/beui-gallery
+    GALLERY_STORY=Panels GALLERY_SCROLL=1 PANELS=12 target/release/atelier-gallery
     GALLERY_STORY=Panels GALLERY_SCROLL=1 PANELS=12 GALLERY_SWITCH=1 ...
 
 | Case (300 frames, load average 9) | Target | Layout and prepaint, median | p95 | Paint, median | Layout nodes, first frame |
@@ -262,7 +262,7 @@ frames with a filter are counted apart. The HP draws in software (48 ms a frame 
 the numbers to read are our own layout, prepaint and paint. Load average 14 to 18 during these runs, so the
 worst frames vary from run to run.
 
-    GALLERY_STORY=Tasks GALLERY_SCROLL=1 TASK_COUNT=5000 target/release/beui-gallery
+    GALLERY_STORY=Tasks GALLERY_SCROLL=1 TASK_COUNT=5000 target/release/atelier-gallery
 
 | Case (300 frames) | Target | Layout and prepaint, median | p95 | Paint, median | Layout nodes, most |
 | --- | --- | --- | --- | --- | --- |
@@ -358,7 +358,7 @@ threads of five, spread over the files), real git and an in-memory forge, releas
 in software (about 80 ms a frame whatever the code does), so the numbers to read are our own layout,
 prepaint and paint. The run opens the pull request, waits for the first diff, then draws 300 frames: the
 rail scrolls every frame and every tenth frame goes to the next file.
-    GALLERY_STORY="Pull request view" GALLERY_SCROLL=1 PRV_FILES=300 PRV_COMMENTS=5000 target/release/beui-gallery
+    GALLERY_STORY="Pull request view" GALLERY_SCROLL=1 PRV_FILES=300 PRV_COMMENTS=5000 target/release/atelier-gallery
 | Case (300 frames) | Target | Layout and prepaint, median | p95 | Paint, median | Layout nodes, most |
 | --- | --- | --- | --- | --- | --- |
 | 300 files, 5,000 comments | layout under 8 ms | 3.9 ms | 8.5 to 9.0 ms | 1.6 ms | 220 |
@@ -429,7 +429,7 @@ from other builds on the HP.
 The Motion story (`GALLERY_STORY=Motion MOTION_PART=color-selector`), a release gallery on the Mac (120 Hz), with
 `BEUI_TRACE_MOTION=1` and five real clicks on the colour selector, run by alex-9c on 2026-09-30. The switch prints a line
 for each input the component handles, for the render that starts its animation, and for each render while it runs
-(`crates/beui/src/trace.rs`).
+(atelier-ui's `src/trace.rs`).
 | What | Result |
 | --- | --- |
 | Click to the first render with the new choice | 0.2 to 5.8 ms |
@@ -536,7 +536,7 @@ over the stated span; frames from `ATELIER_FRAMES=each`, one line per frame with
 
 ## View cache (2026-09-30)
 
-`plans/view-cache.md`, on the HP (release, llvmpipe, load 36 to 104 from other builds), d1 with 3 sessions
+The view cache, on the HP (release, llvmpipe, load 36 to 104 from other builds), d1 with 3 sessions
 restored, `ATELIER_FRAMES=each`, which now names each part of a frame. Median/p95 ms of layout and paint.
 
 | Case, part | Before | After |
@@ -552,7 +552,7 @@ restored, `ATELIER_FRAMES=each`, which now names each part of a frame. Median/p9
 - Cached, a panel (whole, or its rows alone) made each caret blink draw a second frame about 130 ms
   later: 40 frames in 10 s against 20, and more CPU than with no cache. In that second frame both panels'
   rows draw again, with no notify from their sessions, no focus change, no geometry notify from the input
-  and no beui frame request. The cause is not found. So `SessionPanel` and `ConversationRows` are views
+  and no atelier-ui frame request. The cause is not found. So `SessionPanel` and `ConversationRows` are views
   that observe their session (tests: the header and the rows follow the session), drawn uncached; caching
   them is one line each once the cause is known.
 - Step 2 is dropped: the status line costs 0.05 ms and reads five sources.

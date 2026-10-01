@@ -20,7 +20,7 @@ use std::{
 
 use futures_channel::{mpsc, oneshot};
 use futures_util::StreamExt;
-use beui::RowMap;
+use atelier_ui::RowMap;
 use gpui_kit::{
     App, AppContext, Context, Entity, SharedString, Subscription, Task, Window,
     base::input::{self, DefinitionProvider, HoverProvider, InputEvent, Rope, RopeExt},
@@ -371,7 +371,7 @@ impl EditorSession {
                         let diagnostics: Vec<Diagnostic> =
                             diagnostics.into_iter().map(|d| Diagnostic { range: rows.range_to_view(d.range), ..d }).collect();
                         this.problems = summary(&diagnostics);
-                        beui::code_editor::set_diagnostics(&this.editor, diagnostics, cx);
+                        atelier_ui::code_editor::set_diagnostics(&this.editor, diagnostics, cx);
                     }
                     Err(LspError::Superseded) => return,
                     Err(error) => this.problems = format!("{error}").into(),

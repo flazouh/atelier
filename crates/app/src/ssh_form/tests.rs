@@ -5,7 +5,7 @@ use super::*;
 fn open<'a>(hosts: &[&str], cx: &'a mut TestAppContext) -> (Entity<SshForm>, &'a mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
     let hosts: Vec<String> = hosts.iter().map(|h| h.to_string()).collect();
@@ -59,6 +59,6 @@ fn the_buttons_of_the_form_share_one_size_and_the_field_is_as_tall(cx: &mut Test
     assert_eq!(cancel.size.height, connect.size.height, "one row, one size");
     assert_eq!(f32::from(connect.size.height), 28., "atelier default control size");
     let field = cx.debug_bounds("ssh-field").expect("the field is drawn");
-    assert_eq!(f32::from(field.size.height), beui::text_input::HEIGHT);
-    assert_eq!(beui::text_input::HEIGHT, 28.);
+    assert_eq!(f32::from(field.size.height), atelier_ui::text_input::HEIGHT);
+    assert_eq!(atelier_ui::text_input::HEIGHT, 28.);
 }

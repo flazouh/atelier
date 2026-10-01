@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use beui::task_model::TaskStatus;
+use atelier_ui::task_model::TaskStatus;
 use gpui_kit::{Entity, TestAppContext, VisualTestContext, px, size};
 use atelier_tracker::{LocalTracker, NewTask, Query, Tracker};
 
@@ -9,8 +9,8 @@ use super::*;
 fn open(width: f32, cx: &mut TestAppContext) -> (Entity<TasksPane>, Arc<LocalTracker>, &mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
     let tracker = Arc::new(LocalTracker::in_memory("LAT").unwrap());
@@ -82,7 +82,7 @@ fn a_wide_pane_can_show_the_board(cx: &mut TestAppContext) {
 fn a_project_with_no_tracker_says_why(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::init(cx);
+        atelier_ui::init(cx);
     });
     let (pane, cx) = cx.add_window_view(|window, cx| {
         let mut pane = TasksPane::new("me", Vec::new(), window, cx);
@@ -271,7 +271,7 @@ fn the_list_has_a_cursor_when_it_opens_so_a_key_works_at_once(cx: &mut TestAppCo
 #[gpui_kit::test]
 fn after_create_the_cursor_is_on_the_new_task(cx: &mut TestAppContext) {
     let (pane, tracker, cx) = open(900., cx);
-    let draft = beui::new_task_model::Draft { title: "Brand new".into(), ..Default::default() };
+    let draft = atelier_ui::new_task_model::Draft { title: "Brand new".into(), ..Default::default() };
     cx.update(|window, cx| pane.update(cx, |p, cx| p.create(&draft, false, window, cx)));
     settle(&pane, cx);
     focus_body(&pane, cx);
@@ -306,7 +306,7 @@ fn after_create_the_board_cursor_is_on_the_new_card(cx: &mut TestAppContext) {
         cx.notify();
     });
     settle(&pane, cx);
-    let draft = beui::new_task_model::Draft { title: "Brand new card".into(), ..Default::default() };
+    let draft = atelier_ui::new_task_model::Draft { title: "Brand new card".into(), ..Default::default() };
     cx.update(|window, cx| pane.update(cx, |p, cx| p.create(&draft, false, window, cx)));
     settle(&pane, cx);
     focus_body(&pane, cx);

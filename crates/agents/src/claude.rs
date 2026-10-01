@@ -2,7 +2,7 @@
 
 pub mod spark;
 
-use beui::{AgentLook, Mark, PhaseLabels, Sprite};
+use atelier_ui::{AgentLook, Mark, PhaseLabels, Sprite};
 use gpui_kit::{ElementId, Hsla, rgb};
 
 pub use spark::SparkState;
@@ -14,7 +14,7 @@ pub const MESSAGE_CLAY: u32 = 0xD77757;
 /// The CLI's `claudeShimmer`: the lighter clay that walks across the label.
 pub const GLIMMER_CLAY: u32 = 0xF59575;
 
-/// The spark as a beui mark: thinking while Claude works, orbiting while subagents run, and the first
+/// The spark as a atelier-ui mark: thinking while Claude works, orbiting while subagents run, and the first
 /// thinking frame at rest, as the desktop app falls back to its static mark.
 pub fn mark() -> Mark {
     Mark {
@@ -32,7 +32,7 @@ pub fn labels() -> PhaseLabels {
     PhaseLabels { waiting: "Waiting for Claude…".into(), ..PhaseLabels::default() }
 }
 
-/// Claude's whole look, for [`beui::Thinking`] and [`beui::SubagentRow`].
+/// Claude's whole look, for [`atelier_ui::Thinking`] and [`atelier_ui::SubagentRow`].
 pub fn look() -> AgentLook {
     AgentLook { mark: mark(), message: color(MESSAGE_CLAY), glimmer: color(GLIMMER_CLAY), labels: labels() }
 }

@@ -1,4 +1,4 @@
-use beui::changed_files::FileChange;
+use atelier_ui::changed_files::FileChange;
 
 use super::{changed_files, hunks};
 use crate::{Change, FileReview};

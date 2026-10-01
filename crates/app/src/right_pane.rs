@@ -1,11 +1,11 @@
 //! The right pane as a view of its own, so it is drawn from its last frame until its project changes
-//! (`plans/view-cache.md`). It shows the front the project names: the review, the pull requests, the tasks,
+//!. It shows the front the project names: the review, the pull requests, the tasks,
 //! or the editor. The review, the hub, the Tasks pane and the editors are entities that redraw themselves; the
 //! rest (the front, the tabs, a buffer's banners) is the project's, which it observes.
 
-use beui::theme::{ActiveTheme, radius};
+use atelier_ui::theme::{ActiveTheme, radius};
 use gpui_kit::{Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window, div, };
-use beui::scale::px;
+use atelier_ui::scale::px;
 
 use crate::{
     editor_pane::editor_pane,

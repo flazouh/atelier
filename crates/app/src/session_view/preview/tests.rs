@@ -1,6 +1,6 @@
 use serde_json::json;
 use atelier_agents::session::{ToolCall, ToolId, ToolKind, ToolStatus};
-use beui::tool_preview::{TextEdit, ToolPreview};
+use atelier_ui::tool_preview::{TextEdit, ToolPreview};
 use super::*;
 fn call(name: &str, input: serde_json::Value) -> ToolCall {
     ToolCall { id: ToolId::new("t"), name: name.into(), kind: ToolKind::Other, input, file: None, parent: None, status: ToolStatus::Pending }

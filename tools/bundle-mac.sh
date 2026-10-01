@@ -58,13 +58,13 @@ cp "$remote" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
 chmod +x "$app/Contents/MacOS/atelier" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
 
 # The icon. actool compiles atelier.icon to Assets.car, with a light, a dark and a tinted look, and to
-# atelier.icns for a macOS before 26. The "A" is beui's mark, at 780 of the 1024 points.
+# atelier.icns for a macOS before 26. The "A" is atelier's mark, at 780 of the 1024 points.
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 if xcrun --find actool >/dev/null 2>&1; then
   cp -R tools/mac/atelier.icon "$work/atelier.icon"
   mkdir -p "$work/atelier.icon/Assets"
-  sed 's/<svg /<svg width="780" height="533" /' crates/beui/assets/atelier-mark.svg > "$work/atelier.icon/Assets/mark.svg"
+  sed 's/<svg /<svg width="780" height="533" /' tools/mac/atelier-mark.svg > "$work/atelier.icon/Assets/mark.svg"
   xcrun actool "$work/atelier.icon" --compile "$app/Contents/Resources" --app-icon atelier \
     --enable-on-demand-resources NO --development-region en --target-device mac --platform macosx \
     --minimum-deployment-target 13.0 --output-partial-info-plist "$work/icon.plist" >/dev/null

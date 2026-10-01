@@ -22,8 +22,8 @@ fn form(cx: &mut TestAppContext, dir: std::path::PathBuf) -> Made<'_> {
 fn form_with(cx: &mut TestAppContext, dir: std::path::PathBuf, set: impl FnOnce(&FakeForge)) -> Made<'_> {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Dark, cx);
     });
     let project: Arc<dyn Project> = Arc::new(LocalProject::open(&dir).unwrap());
     let forge = Arc::new(FakeForge::default());

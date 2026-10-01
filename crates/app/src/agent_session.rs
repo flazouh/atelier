@@ -15,14 +15,14 @@ mod composer_lists;
 
 use std::{sync::Arc, time::SystemTime};
 
-use beui::session_status::SessionStatus;
+use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
 use futures_util::StreamExt;
 use std::{collections::HashMap, time::Instant};
 
-use beui::{PromptInput, PromptInputEvent, PromptModel};
+use atelier_ui::{PromptInput, PromptInputEvent, PromptModel};
 use gpui_kit::{AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString, Subscription, Task, Window, };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_agents::{
     registry::Agent,
     session::{
@@ -57,7 +57,7 @@ pub enum SessionEvent {
     /// The reader picked another agent for this session before its first message, by its backend's name.
     ChooseAgent(String),
     /// The reader pressed a pull request's chip in the agent's text.
-    OpenPull(beui::PrChipData),
+    OpenPull(atelier_ui::PrChipData),
     /// The reader named it: the name is kept across launches.
     Renamed,
     /// The reader pressed the session's pull request card.
@@ -143,7 +143,7 @@ pub struct AgentSession {
     /// Turns the sink finished, waiting for the next drain.
     finished: Arc<Mutex<Vec<TurnReview>>>,
     /// The pull requests a `#N` in the agent's text can name, from the project's list.
-    pub pr_chips: std::rc::Rc<Vec<beui::PrChipData>>,
+    pub pr_chips: std::rc::Rc<Vec<atelier_ui::PrChipData>>,
     /// The session's review: its turns, decisions, marks and comments, kept in the data folder.
     pub reviews: ReviewState,
     /// The card of the pull request the session opened, above the composer.
@@ -153,7 +153,7 @@ pub struct AgentSession {
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
     /// The project's badge, as the sidebar draws it.
-    pub badge: Option<beui::sidebar_model::Badge>,
+    pub badge: Option<atelier_ui::sidebar_model::Badge>,
     /// The activity groups the reader opened, by the index of their first item.
     pub opened_groups: std::collections::HashSet<usize>,
     /// What the project adds to the `/` list, and the agent's own commands once it has said them.
@@ -172,7 +172,7 @@ pub struct AgentSession {
 
 impl AgentSession {
     /// Gives the session its project's badge, which its panel's head shows. The shell sets it whenever it syncs.
-    pub fn set_badge(&mut self, badge: beui::sidebar_model::Badge, cx: &mut Context<Self>) {
+    pub fn set_badge(&mut self, badge: atelier_ui::sidebar_model::Badge, cx: &mut Context<Self>) {
         if self.badge.as_ref() != Some(&badge) {
             self.badge = Some(badge);
             cx.notify();
@@ -323,12 +323,12 @@ impl AgentSession {
     fn offer_commands(&mut self, cx: &mut Context<Self>) {
         let items = composer_lists::commands(self.project_commands.clone(), &self.agent_commands)
             .into_iter()
-            .map(|c| beui::command_item::CommandItem {
+            .map(|c| atelier_ui::command_item::CommandItem {
                 name: c.name.into(),
                 source: match c.source {
-                    atelier_agents::commands::CommandSource::Agent => beui::command_item::CommandSource::Agent,
-                    atelier_agents::commands::CommandSource::Atelier => beui::command_item::CommandSource::Atelier,
-                    atelier_agents::commands::CommandSource::Skill => beui::command_item::CommandSource::Skill,
+                    atelier_agents::commands::CommandSource::Agent => atelier_ui::command_item::CommandSource::Agent,
+                    atelier_agents::commands::CommandSource::Atelier => atelier_ui::command_item::CommandSource::Atelier,
+                    atelier_agents::commands::CommandSource::Skill => atelier_ui::command_item::CommandSource::Skill,
                 },
                 summary: c.summary.into(),
                 args_hint: c.args_hint.map(Into::into),
@@ -395,7 +395,7 @@ impl AgentSession {
                     }
                     Err(error) => {
                         s.waiting_send = None;
-                        s.status = SessionStatus::Failed(beui::session_status::short_reason(&problem_words(&error)));
+                        s.status = SessionStatus::Failed(atelier_ui::session_status::short_reason(&problem_words(&error)));
                         s.problem = Some(problem_words(&error).into());
                     }
                 }

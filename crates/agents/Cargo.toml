@@ -1,6 +1,6 @@
 [package]
 name = "atelier-agents"
-description = "Agents in atelier: their session model and backends, and each one's look for beui: Claude's spark, colours, and wording."
+description = "Agents in atelier: their session model and backends, and each one's look for atelier-ui: Claude's spark, colours, and wording."
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
@@ -8,7 +8,7 @@ license.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true
-beui.workspace = true
+atelier-ui.workspace = true
 atelier-project.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

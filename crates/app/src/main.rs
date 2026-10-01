@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, size};
-use beui::scale::px;
+use atelier_ui::scale::px;
 
 mod activity;
 mod agent_session;
@@ -60,16 +60,16 @@ fn main() {
     let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let folders: Vec<Opening> = folders.into_iter().map(Opening::from).collect();
     gpui_kit::application().with_assets(atelier_agents::Assets).run(move |cx| {
-        beui::init(cx);
+        atelier_ui::init(cx);
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
         // or the system's, which keeps the pick.
-        beui::design_preview::init_strength(saved.design_strength); // design preview: remove after Alex picks
-        beui::design_preview::init_elevation(saved.design_elevation); // design preview: remove after Alex picks
-        beui::design_preview::init(saved.design_tabs, cx); // design preview: remove after Alex picks
-        beui::theme::set_pick(saved.primary.map(settings_pane::colour), cx);
-        if let Some(theme) = saved.theme.as_deref().and_then(beui::themes::named) {
-            beui::theme::set_theme(theme.clone(), cx);
+        atelier_ui::design_preview::init_strength(saved.design_strength); // design preview: remove after Alex picks
+        atelier_ui::design_preview::init_elevation(saved.design_elevation); // design preview: remove after Alex picks
+        atelier_ui::design_preview::init(saved.design_tabs, cx); // design preview: remove after Alex picks
+        atelier_ui::theme::set_pick(saved.primary.map(settings_pane::colour), cx);
+        if let Some(theme) = saved.theme.as_deref().and_then(atelier_ui::themes::named) {
+            atelier_ui::theme::set_theme(theme.clone(), cx);
         }
         if let Some(mode) = saved.mode.as_deref().and_then(settings_pane::Mode::from_key) {
             mode.apply(cx);

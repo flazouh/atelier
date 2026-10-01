@@ -1,9 +1,9 @@
-//! Shows every beui component in each state, in light and dark. Run with `cargo run -p beui-gallery`.
+//! Shows every atelier-ui component in each state, in light and dark. Run with `cargo run -p atelier-gallery`.
 //! `GALLERY_STORY=<title>` opens a story and `GALLERY_THEME=<theme name>` (or `light`, `dark`) picks the theme, so a script can
 //! screenshot any of them. Without it, the theme last picked in the sidebar comes back (`settings`).
 //! `GALLERY_REPLAY=1` starts the Agent panel's "Replay session" on launch, so a capture can see the entrances.
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
     CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
@@ -194,11 +194,11 @@ struct Gallery {
     /// The hunks still waiting in that buffer.
     inline_hunks: Vec<InlineHunk>,
     /// Hunks the user decided, fading before their edit runs.
-    inline_resolving: Vec<beui::Resolve>,
+    inline_resolving: Vec<atelier_ui::Resolve>,
     /// That buffer's text as the hunks last matched it, so an edit can move them with the rows.
     inline_text: String,
     /// The review before and after each decision, so undo and redo bring its hunks back too.
-    inline_history: beui::inline_review::DecisionHistory,
+    inline_history: atelier_ui::inline_review::DecisionHistory,
     /// Moves the hunks whenever the user edits that buffer.
     _inline_edits: gpui_kit::Subscription,
     /// The Editor story's tabs: a real file per language, each with its language server.
@@ -285,7 +285,7 @@ impl Gallery {
             cx.notify();
         })
         .detach();
-        let _system = beui::watch_system(window, cx);
+        let _system = atelier_ui::watch_system(window, cx);
         let inline = CodeEditor::state("config.rs", INLINE_FILE, window, cx);
         // The user can type anywhere, so the hunks follow the rows they describe.
         let _inline_edits = cx.subscribe(&inline, |this, state, event: &InputEvent, cx| {
@@ -296,7 +296,7 @@ impl Gallery {
             if text != this.inline_text {
                 this.inline_hunks = match this.inline_history.hunks_for(&text) {
                     Some(hunks) => hunks,
-                    None => beui::inline_review::track_edit(&this.inline_hunks, &this.inline_text, &text),
+                    None => atelier_ui::inline_review::track_edit(&this.inline_hunks, &this.inline_text, &text),
                 };
                 this.inline_text = text;
                 cx.notify();
@@ -439,7 +439,7 @@ impl Gallery {
                     .pb(px(12.))
                     .text_size(TextSize::Sm.font_size())
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child("beui for atelier"),
+                    .child("atelier-ui for atelier"),
             )
             // The list scrolls, so the theme picker at the foot stays in view in a short window.
             .child(div().id("stories").flex().flex_col().gap(px(2.)).flex_1().min_h_0().overflow_y_scroll().children(Story::ALL.into_iter().map(|story| {
@@ -449,7 +449,7 @@ impl Gallery {
                     .id(story.title())
                     .px(px(10.))
                     .py(px(6.))
-                    .rounded(beui::theme::radius::lg())
+                    .rounded(atelier_ui::theme::radius::lg())
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
                     .when(selected, |d| d.bg(theme.card_strong).font_weight(FontWeight::MEDIUM))
@@ -593,7 +593,7 @@ fn colors(cx: &App) -> impl IntoElement {
             .flex_col()
             .gap(px(8.))
             .w(px(120.))
-            .child(div().h(px(64.)).rounded(beui::theme::radius::xl()).bg(color))
+            .child(div().h(px(64.)).rounded(atelier_ui::theme::radius::xl()).bg(color))
             .child(div().text_size(TextSize::Xs.font_size()).child(name))
     }))
 }
@@ -625,8 +625,8 @@ fn typography() -> impl IntoElement {
                 .gap(px(4.))
                 .font_family(MONO_FONT_FAMILY)
                 .text_size(TextSize::Xs.font_size())
-                .child("cargo test -p beui --release")
-                .child("crates/beui/src/file_diff.rs  +42 -7")
+                .child("cargo test -p ui --release")
+                .child("crates/ui/src/file_diff.rs  +42 -7")
                 .child("0123456789 → ≠ ≤ ≥"),
         ))
 }
@@ -681,7 +681,7 @@ fn buttons() -> impl IntoElement {
         .child(section(
             "A button group in each size",
             row().children([("Sm", ButtonSize::Sm), ("Md", ButtonSize::Md), ("Lg", ButtonSize::Lg), ("Xl", ButtonSize::Xl)].map(|(name, size)| {
-                beui::ButtonGroup::new(SharedString::from(format!("group-size-{name}")))
+                atelier_ui::ButtonGroup::new(SharedString::from(format!("group-size-{name}")))
                     .size(size)
                     .child(Button::new(SharedString::from(format!("gs-{name}-merge"))).label("Squash and merge"))
                     .child(Button::new(SharedString::from(format!("gs-{name}-more"))).icon(IconName::ChevronDown))
@@ -718,12 +718,12 @@ fn buttons() -> impl IntoElement {
                 .child(
                     row()
                         .child(
-                            beui::ButtonGroup::new("group-two")
+                            atelier_ui::ButtonGroup::new("group-two")
                                 .child(Button::new("g2-merge").label("Squash and merge"))
                                 .child(Button::new("g2-more").icon(IconName::ChevronDown)),
                         )
                         .child(
-                            beui::ButtonGroup::new("group-three")
+                            atelier_ui::ButtonGroup::new("group-three")
                                 .child(Button::new("g3-prev").icon(IconName::ArrowUp))
                                 .child(Button::new("g3-mark").label("Seen"))
                                 .child(Button::new("g3-next").icon(IconName::ArrowDown)),
@@ -732,13 +732,13 @@ fn buttons() -> impl IntoElement {
                 .child(
                     row()
                         .child(
-                            beui::ButtonGroup::new("group-two-secondary")
+                            atelier_ui::ButtonGroup::new("group-two-secondary")
                                 .variant(ButtonVariant::Secondary)
                                 .child(Button::new("g2s-open").label("Open"))
                                 .child(Button::new("g2s-more").icon(IconName::ChevronDown)),
                         )
                         .child(
-                            beui::ButtonGroup::new("group-three-secondary")
+                            atelier_ui::ButtonGroup::new("group-three-secondary")
                                 .variant(ButtonVariant::Secondary)
                                 .child(Button::new("g3s-left").label("Left"))
                                 .child(Button::new("g3s-center").label("Center"))
@@ -747,7 +747,7 @@ fn buttons() -> impl IntoElement {
                 )
                 .child(
                     row().child(
-                        beui::ButtonGroup::new("group-disabled")
+                        atelier_ui::ButtonGroup::new("group-disabled")
                             .child(Button::new("gd-merge").label("Squash and merge").disabled(true).tooltip("2 checks still running"))
                             .child(Button::new("gd-more").icon(IconName::ChevronDown)),
                     ),
@@ -772,7 +772,7 @@ fn badges() -> impl IntoElement {
 
 const REPLY: &str = "I found the bug. `parse_hunk` counts the header line as a context line, so every \
 number after it is off by one.\n\nI will:\n\n1. Skip the `@@` line when counting.\n2. Add a test for a hunk that starts at line 1.\n\n\
-The fix is in `crates/beui/src/file_diff.rs`.";
+The fix is in `crates/ui/src/file_diff.rs`.";
 
 const SUMMARY: &str = "The release is ready for a focused rollout. The main conversation flow, keyboard \
 navigation, error recovery, and reduced-motion behavior are all covered.\n\nI would keep advanced workflow \
@@ -886,10 +886,10 @@ fn tools() -> impl IntoElement {
                 div()
                     .flex()
                     .flex_col()
-                    .child(ToolCall::new("t-read", "Read file").file("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
-                    .child(ToolCall::new("t-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done).output("crates/beui/src/file_diff.rs:69: fn hunk_starts(header: &str) -> (u32, u32) {"))
-                    .child(ToolCall::new("t-test", "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
-                    .child(ToolCall::new("t-run", "Running clippy").tool("cargo clippy --workspace").status(ToolStatus::Running).output("Checking beui v0.1.0\n    Checking beui-gallery v0.1.0"))
+                    .child(ToolCall::new("t-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done))
+                    .child(ToolCall::new("t-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done).output("crates/ui/src/file_diff.rs:69: fn hunk_starts(header: &str) -> (u32, u32) {"))
+                    .child(ToolCall::new("t-test", "Ran tests").tool("cargo test -p ui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
+                    .child(ToolCall::new("t-run", "Running clippy").tool("cargo clippy --workspace").status(ToolStatus::Running).output("Checking ui v0.1.0\n    Checking atelier-gallery v0.1.0"))
                     .child(ToolCall::new("t-fail", "Fetched theme").tool("https://beui.dev/docs/theme").status(ToolStatus::Failed).output("error: request timed out after 30s"))
                     .child(ToolCall::new("t-wait", "Push to main").tool("git push origin main").status(ToolStatus::Cancelled)),
             ))
@@ -912,7 +912,7 @@ fn tools() -> impl IntoElement {
                     .child(
                         ToolApproval::new("approve-edit", "Edit")
                             .title("Edit src/main.rs")
-                            .preview(beui::ToolPreview::edit(
+                            .preview(atelier_ui::ToolPreview::edit(
                                 "src/main.rs",
                                 "}\n\nfn main() {\n    println!(\"{}\", add(2, 3));\n}\n",
                                 "}\n\nfn subtract(a: i32, b: i32) -> i32 {\n    a - b\n}\n\nfn main() {\n    println!(\"{}\", add(2, 3));\n    println!(\"{}\", subtract(5, 2));\n}\n",
@@ -924,7 +924,7 @@ fn tools() -> impl IntoElement {
                     )
                     .child(
                         ToolApproval::new("approve-command", "Bash")
-                            .preview(beui::ToolPreview::command("cargo test --workspace -- --nocapture"))
+                            .preview(atelier_ui::ToolPreview::command("cargo test --workspace -- --nocapture"))
                             .parameter("command", "cargo test --workspace -- --nocapture")
                             .on_approve(|_, _, _| {})
                             .on_deny(|_, _, _| {}),
@@ -962,8 +962,8 @@ fn tools() -> impl IntoElement {
 }
 
 const DIFF: &str = "\
---- a/crates/beui/src/file_diff.rs
-+++ b/crates/beui/src/file_diff.rs
+--- a/crates/ui/src/file_diff.rs
++++ b/crates/ui/src/file_diff.rs
 @@ -66,7 +66,7 @@ impl DiffLine {
  /// The line before each side's first line.
  fn hunk_starts(header: &str) -> (u32, u32) {
@@ -992,7 +992,7 @@ fn diffs() -> impl IntoElement {
                     .flex_col()
                     .gap(px(12.))
                     .child(
-                        FileDiff::new("diff-a", "crates/beui/src/file_diff.rs", diff_a)
+                        FileDiff::new("diff-a", "crates/ui/src/file_diff.rs", diff_a)
                             .default_open(true)
                             .status(FileDiffStatus::Complete)
                             .copy_text(diff_a_copy),
@@ -1000,7 +1000,7 @@ fn diffs() -> impl IntoElement {
                     .child(
                         FileDiff::new(
                             "diff-b",
-                            "crates/beui/src/file_diff/tests.rs",
+                            "crates/ui/src/file_diff/tests.rs",
                             DiffLine::parse("@@ -40,0 +41,6 @@\n+#[test]\n+fn one() {}\n"),
                         )
                         .status(FileDiffStatus::Streaming)
@@ -1076,16 +1076,16 @@ fn inline_fixture() -> Vec<InlineHunk> {
 fn inline_story(
     state: &Entity<gpui_kit::component::input::EditorState>,
     hunks: &[InlineHunk],
-    resolving: &[beui::Resolve],
+    resolving: &[atelier_ui::Resolve],
     cx: &mut Context<Gallery>,
 ) -> impl IntoElement {
-    let left = beui::inline_review::pending_count(hunks, &[]);
+    let left = atelier_ui::inline_review::pending_count(hunks, &[]);
     // A decision starts the hunk's fade; its edit runs once the fade is over.
     let decide = cx.listener(|this: &mut Gallery, (id, decision): &(SharedString, Decision), _, cx| {
         let (now, reduce_motion) = (std::time::Instant::now(), cx.reduce_motion());
         this.inline_resolving.retain(|r| !r.is_over(now, reduce_motion));
         if !this.inline_resolving.iter().any(|r| &r.id == id) {
-            this.inline_resolving.push(beui::Resolve::new(id.clone(), *decision));
+            this.inline_resolving.push(atelier_ui::Resolve::new(id.clone(), *decision));
             cx.notify();
         }
     });
@@ -1101,8 +1101,8 @@ fn inline_story(
             // The resolve stays until its gap has closed; the next decision drops it.
             this.inline_resolving[at].edited(closed.clone());
             let before = (this.inline_text.clone(), this.inline_hunks.clone());
-            beui::inline_review::apply(&this.inline, &[(hunk, *decision)], window, cx);
-            this.inline_hunks = beui::inline_review::shift_after(&this.inline_hunks, id, &closed);
+            atelier_ui::inline_review::apply(&this.inline, &[(hunk, *decision)], window, cx);
+            this.inline_hunks = atelier_ui::inline_review::shift_after(&this.inline_hunks, id, &closed);
             // The decision already moved the hunks; the edit it made must not move them again.
             this.inline_text = this.inline.read(cx).value().to_string();
             this.inline_history.record(before, (this.inline_text.clone(), this.inline_hunks.clone()));
@@ -1154,8 +1154,8 @@ fn select_story(choice: Option<usize>, cx: &mut Context<Gallery>) -> impl IntoEl
 }
 
 /// The theme picker at the sidebar's foot. A pick is remembered for the next launch.
-fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
-    beui::theme_picker::theme_picker("theme", theme, |picked, cx| {
+fn theme_picker(theme: &atelier_ui::Theme) -> impl IntoElement {
+    atelier_ui::theme_picker::theme_picker("theme", theme, |picked, cx| {
         let name = picked.name.to_string();
         if let Some(path) = atelier_settings::path() {
             cx.background_spawn(async move {
@@ -1169,11 +1169,11 @@ fn theme_picker(theme: &beui::Theme) -> impl IntoElement {
 }
 
 /// The theme to start in: `GALLERY_THEME`, then the one saved last time; `None` follows the system.
-fn starting_theme(saved: &atelier_settings::Settings) -> Option<beui::Theme> {
+fn starting_theme(saved: &atelier_settings::Settings) -> Option<atelier_ui::Theme> {
     let by_name = |name: &str| match name {
-        "light" => Some(beui::themes::atelier(Appearance::Light).clone()),
-        "dark" => Some(beui::themes::atelier(Appearance::Dark).clone()),
-        name => beui::themes::named(name).cloned(),
+        "light" => Some(atelier_ui::themes::atelier(Appearance::Light).clone()),
+        "dark" => Some(atelier_ui::themes::atelier(Appearance::Dark).clone()),
+        name => atelier_ui::themes::named(name).cloned(),
     };
     match std::env::var("GALLERY_THEME") {
         Ok(name) => by_name(&name).or_else(|| {
@@ -1188,9 +1188,9 @@ fn main() {
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
     gpui_kit::application().with_assets(atelier_agents::Assets).run(move |cx| {
-        beui::init(cx);
+        atelier_ui::init(cx);
         if let Some(theme) = starting_theme(&saved) {
-            beui::theme::set_theme(theme, cx);
+            atelier_ui::theme::set_theme(theme, cx);
         }
         // GALLERY_SIZE=1500x900 opens a larger window, for a story laid out like a full screen.
         let (w, h) = std::env::var("GALLERY_SIZE")

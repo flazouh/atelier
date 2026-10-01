@@ -4,7 +4,7 @@
 //! (50 by default) of `SIDEBAR_SESSIONS` sessions each (40) and prints the frame numbers.
 use std::time::{Duration, Instant};
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, Button, ButtonSize, ButtonVariant, Connection, Location, Need, ProjectData, SessionData, SessionStatus, Sidebar,
     SidebarEvent, agent_look::AgentLook,
 };

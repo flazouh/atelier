@@ -1,8 +1,8 @@
-//! The forge's data as the models beui draws, checked through beui's own words: the merge model's
+//! The forge's data as the models atelier-ui draws, checked through atelier-ui's own words: the merge model's
 //! blockers and standing line, the chip, the checks summary.
 mod support;
 
-use beui::{
+use atelier_ui::{
     merge::{self, Blocker, MergeFacts, ReviewNeed, Rights as UiRights},
     pr::{ChecksSummary, PrState, ReviewState},
 };

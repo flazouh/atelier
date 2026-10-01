@@ -1,4 +1,4 @@
-use beui::pr::PrState;
+use atelier_ui::pr::PrState;
 
 use super::*;
 

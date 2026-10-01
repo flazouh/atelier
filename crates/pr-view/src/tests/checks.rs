@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use beui::{checks_panel::{CheckState as Ui, fault}, };
+use atelier_ui::{checks_panel::{CheckState as Ui, fault}, };
 use atelier_forge::{CheckStatus, Conclusion, Job, JobRef, RepoRef, Step};
 
 use crate::{
@@ -63,7 +63,7 @@ fn only_the_failing_step_keeps_its_lines_and_the_fault_names_the_cause() {
     assert!(steps.iter().enumerate().all(|(i, s)| (i == 2) == !s.log.is_empty()), "{steps:#?}");
     assert_eq!(steps[2].state, Ui::Failed);
     assert_eq!(steps[2].seconds, Some(5));
-    let run = beui::CheckRun { name: "linux".into(), summary: "".into(), state: Ui::Failed, steps };
+    let run = atelier_ui::CheckRun { name: "linux".into(), summary: "".into(), state: Ui::Failed, steps };
     let fault = fault(&run).unwrap();
     assert_eq!(fault.step.as_ref(), "Run cargo test");
     assert!(fault.line.contains("error[E0308]"), "{}", fault.line);

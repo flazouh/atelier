@@ -3,7 +3,7 @@
 //! the words for each row are `atelier_forge::present::court_item`.
 use std::collections::HashMap;
 
-use beui::{PrChipData, court::CourtItem};
+use atelier_ui::{PrChipData, court::CourtItem};
 use atelier_forge::{Court, Filed, ForgeError, Involved, PullRef, file_courts, present};
 
 #[derive(Default)]

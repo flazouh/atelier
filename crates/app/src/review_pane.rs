@@ -14,7 +14,7 @@
 
 use std::{collections::{HashMap, HashSet}, sync::Arc, time::{Duration, Instant}};
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, Breadcrumb, ChangedFile, Crumb, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer, LineComposerEvent, RowMap,
     ReviewBar, ReviewFileHeader, ReviewHandlers, ReviewProgress,
     file_tree::FileTree,
@@ -30,7 +30,7 @@ use gpui_kit::{
     component::input::EditorState,
     div, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_editor::EditorSession;
 use atelier_project::Project;
 use atelier_review::{Content, FileReview, Merged};
@@ -174,7 +174,7 @@ pub struct ReviewPane {
     pub ship: Entity<ShipStrip>,
     focus: FocusHandle,
     pub review_mode: bool,
-    resolving: Vec<beui::Resolve>,
+    resolving: Vec<atelier_ui::Resolve>,
     /// The comment being written: its file, the composer, and what the pane listens to on it.
     composer: Option<(usize, Entity<LineComposer>, [Subscription; 2])>,
     width: f32,
@@ -291,7 +291,7 @@ impl ReviewPane {
     /// An editor on `file`'s merged text, and the subscription that follows the reader's typing.
     fn editor_for(file: Option<&PaneFile>, window: &mut Window, cx: &mut Context<Self>) -> (Entity<EditorState>, Subscription) {
         let (path, text) = file.map_or(("", String::new()), |f| (f.review.path.as_str(), f.merged.as_ref().map_or_else(String::new, |m| m.text().to_string())));
-        let editor = beui::CodeEditor::state(path, text, window, cx);
+        let editor = atelier_ui::CodeEditor::state(path, text, window, cx);
         let edits = cx.subscribe(&editor, |this, state, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
                 let text = state.read(cx).value().to_string();
@@ -989,7 +989,7 @@ impl Render for ReviewPane {
             let (now, reduce) = (Instant::now(), cx.reduce_motion());
             this.resolving.retain(|r| !r.is_over(now, reduce));
             if !this.resolving.iter().any(|r| &r.id == id) {
-                this.resolving.push(beui::Resolve::new(id.clone(), *decision));
+                this.resolving.push(atelier_ui::Resolve::new(id.clone(), *decision));
                 cx.notify();
             }
         });

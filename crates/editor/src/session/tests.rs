@@ -1,4 +1,4 @@
-use beui::InlineHunk;
+use atelier_ui::InlineHunk;
 
 use super::*;
 

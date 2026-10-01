@@ -3,7 +3,7 @@
 //! frame numbers; with `GALLERY_SWITCH=1` it also switches the layout every 30th frame and counts those
 //! frames apart.
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, AgentPanels, Button, ButtonSize, ButtonVariant, Location, Need, PanelData, PanelLayout, PanelsEvent, PanelsState, ProjectLabel,
     SessionStatus,
     agent_look::AgentLook,
@@ -73,7 +73,7 @@ fn panel(n: usize, look: &AgentLook, cx: &mut gpui_kit::App) -> PanelData {
         title: title.clone(),
         look: look.clone(),
         status: status.clone(),
-        content: beui::panel_types::content_from(body(title, status), cx),
+        content: atelier_ui::panel_types::content_from(body(title, status), cx),
     }
 }
 

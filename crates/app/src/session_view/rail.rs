@@ -1,6 +1,6 @@
 //! What the conversation's rail holds, from the conversation: one entry for each message the reader sent, with the start
 //! of that message and the start of what came back, and the row of the list each one is at. Pure.
-use beui::message_rail::{DESCRIPTION_CHARS, LABEL_CHARS, RailItem, excerpt};
+use atelier_ui::message_rail::{DESCRIPTION_CHARS, LABEL_CHARS, RailItem, excerpt};
 use atelier_agents::session::Item;
 
 use crate::list_diff::Row;

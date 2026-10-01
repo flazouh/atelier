@@ -3,7 +3,7 @@
 
 use std::rc::Rc;
 
-use beui::{
+use atelier_ui::{
     file_icon::FileIcon,
     icon::{Icon, IconName},
     theme::{ActiveTheme, radius},
@@ -13,7 +13,7 @@ use gpui_kit::{
     App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled,
     div, prelude::FluentBuilder, uniform_list,
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 
 use crate::open_project::{Listing, OpenProject};
 

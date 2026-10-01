@@ -1,4 +1,4 @@
-use beui::inline_review::{Decision, InlineHunk, apply_to_text};
+use atelier_ui::inline_review::{Decision, InlineHunk, apply_to_text};
 
 use super::{Merged, Side};
 

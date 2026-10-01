@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use beui::{CodeBlock, CodeEditor, DiffLine, FileDiff, FileDiffStatus, syntax::SyntaxCache};
+use atelier_ui::{CodeBlock, CodeEditor, DiffLine, FileDiff, FileDiffStatus, syntax::SyntaxCache};
 use gpui_kit::{
     Context, Entity, InteractiveElement, IntoElement, ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled,
     UniformListScrollHandle, Window, component::input::EditorState, div, point, px,

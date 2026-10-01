@@ -3,7 +3,7 @@
 //! a row reports [`ListEvent::Open`] and the owner decides where the pull request shows.
 use std::sync::Arc;
 
-use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant, CourtList};
+use atelier_ui::{ActiveTheme, Button, ButtonSize, ButtonVariant, CourtList};
 use futures_channel::mpsc;
 use futures_util::StreamExt;
 use gpui_kit::{

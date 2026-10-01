@@ -1,7 +1,7 @@
 //! What an approval shows in place of a tool's raw input: an Edit or a MultiEdit as a diff, a Write as
 //! all-new lines, a Bash call as its command, each under the path relative to the project. The raw input
 //! stays behind "View details".
-use beui::tool_preview::{TextEdit, ToolPreview, relative_path};
+use atelier_ui::tool_preview::{TextEdit, ToolPreview, relative_path};
 use atelier_agents::session::ToolCall;
 use serde_json::Value;
 

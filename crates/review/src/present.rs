@@ -1,5 +1,5 @@
-//! The review as the models beui draws.
-use beui::{
+//! The review as the models atelier-ui draws.
+use atelier_ui::{
     changed_files::{ChangedFile, FileChange},
     inline_review::InlineHunk,
 };

@@ -6,7 +6,7 @@
 
 use std::time::Duration;
 
-use beui::{
+use atelier_ui::{
     Button, ButtonVariant, ChangedFile, ChangedFiles, Checks, FileChange, ModelBadge, PrCard, PrChip,
     PrChipData, PrState, ReviewState, SubagentCard, SubagentRow, SubagentStrip, ToolCall, ToolStatus,
     AgentText, AgentTextStatus,
@@ -23,11 +23,11 @@ pub const LIVE_STEP: Duration = Duration::from_millis(900);
 const LOOP: usize = 14;
 
 const TOOLS: [&str; 5] = [
-    "Read crates/beui/src/theme.rs",
+    "Read crates/ui/src/theme.rs",
     "Grep hunk_starts",
-    "Read crates/beui/src/file_diff.rs",
-    "Edit crates/beui/src/file_diff.rs",
-    "Bash cargo test -p beui",
+    "Read crates/ui/src/file_diff.rs",
+    "Edit crates/ui/src/file_diff.rs",
+    "Bash cargo test -p ui",
 ];
 
 /// The live tool call at `tick`.
@@ -38,16 +38,16 @@ pub fn live_tool(tick: usize, offset: usize) -> &'static str {
 /// The files a turn changes, in the order it touches them.
 pub fn changed_files() -> Vec<ChangedFile> {
     vec![
-        ChangedFile::new("crates/beui/src/file_diff.rs", 18, 6),
-        ChangedFile::new("crates/beui/src/file_diff/tests.rs", 42, 0),
-        ChangedFile::new("crates/beui/src/inline_review.rs", 3, 3),
-        ChangedFile::new("crates/beui/src/hunk.rs", 64, 0).change(FileChange::Added),
-        ChangedFile::new("crates/beui/src/theme.rs", 2, 1),
+        ChangedFile::new("crates/ui/src/file_diff.rs", 18, 6),
+        ChangedFile::new("crates/ui/src/file_diff/tests.rs", 42, 0),
+        ChangedFile::new("crates/ui/src/inline_review.rs", 3, 3),
+        ChangedFile::new("crates/ui/src/hunk.rs", 64, 0).change(FileChange::Added),
+        ChangedFile::new("crates/ui/src/theme.rs", 2, 1),
         ChangedFile::new("crates/gallery/src/main.rs", 12, 4),
         ChangedFile::new("docs/diff-view.md", 0, 31).change(FileChange::Deleted),
-        ChangedFile::new("crates/beui/src/line_numbers.rs", 5, 5).change(FileChange::Renamed { from: "crates/beui/src/gutter.rs".into() }),
-        ChangedFile::new("crates/beui/src/code_editor.rs", 7, 2),
-        ChangedFile::new("crates/beui/src/lib.rs", 1, 0),
+        ChangedFile::new("crates/ui/src/line_numbers.rs", 5, 5).change(FileChange::Renamed { from: "crates/ui/src/gutter.rs".into() }),
+        ChangedFile::new("crates/ui/src/code_editor.rs", 7, 2),
+        ChangedFile::new("crates/ui/src/lib.rs", 1, 0),
         ChangedFile::new("Cargo.lock", 4, 4),
         ChangedFile::new("README.md", 2, 0),
     ]
@@ -111,9 +111,9 @@ pub fn running_card(id: &'static str, tick: usize) -> SubagentCard {
 
 fn sample_calls() -> Vec<ToolCall> {
     vec![
-        ToolCall::new("sc-read", "Read file").file("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done),
+        ToolCall::new("sc-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done),
         ToolCall::new("sc-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done),
-        ToolCall::new("sc-read2", "Read file").file("crates/beui/src/theme.rs").status(ToolStatus::Running),
+        ToolCall::new("sc-read2", "Read file").file("crates/ui/src/theme.rs").status(ToolStatus::Running),
     ]
 }
 
@@ -205,12 +205,12 @@ pub fn pr_chip_story() -> impl IntoElement {
 }
 
 /// The Anthropic mark, for Claude's models.
-pub fn anthropic() -> beui::BrandMark {
+pub fn anthropic() -> atelier_ui::BrandMark {
     Lab::Anthropic.mark().expect("Anthropic has a mark")
 }
 
 /// A badge for `label`, with the mark when there is one and a monogram when there is not.
-fn badge(id: &'static str, label: &'static str, mark: Option<beui::BrandMark>) -> ModelBadge {
+fn badge(id: &'static str, label: &'static str, mark: Option<atelier_ui::BrandMark>) -> ModelBadge {
     match mark {
         Some(mark) => ModelBadge::new(label).mark(id, mark),
         None => ModelBadge::new(label).monogram(id),

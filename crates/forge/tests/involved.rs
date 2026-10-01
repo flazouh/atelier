@@ -1,6 +1,6 @@
 //! The reader's working set: ten searches, each answered by its own hand-made page in the shape of
 //! GitHub's search results (recorded answers would hold the private pull requests of whoever ran the
-//! recording). Then the pure step after it: filing into Courts and mapping to the rows beui draws.
+//! recording). Then the pure step after it: filing into Courts and mapping to the rows atelier-ui draws.
 mod support;
 
 use std::sync::Mutex;

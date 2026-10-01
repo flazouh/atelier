@@ -77,7 +77,7 @@ fn open<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)]) -> Opened<'a> {
 fn open_with<'a>(cx: &'a mut TestAppContext, files: &[(&str, &str)], before: impl FnOnce(&Path)) -> Opened<'a> {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Dark, cx);
         cx.set_reduce_motion(true);
     });
     let dir = tempfile::tempdir().unwrap();
@@ -342,8 +342,8 @@ fn a_new_session_takes_another_agent_until_its_first_message(cx: &mut TestAppCon
     assert_eq!(cx.update(|_, cx| project.read(cx).sessions[0].read(cx).agent.name), "second", "it has a conversation now");
 }
 
-fn chip(repo: &str, number: u64) -> beui::PrChipData {
-    beui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: beui::pr::PrState::Open, url: "u".into() }
+fn chip(repo: &str, number: u64) -> atelier_ui::PrChipData {
+    atelier_ui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::pr::PrState::Open, url: "u".into() }
 }
 
 /// The chips follow the project's repository when it lands after the list, and a list change that
@@ -478,7 +478,7 @@ fn a_merged_pull_request_moves_its_task_to_done(cx: &mut TestAppContext) {
     let tracker = cx.update(|_, cx| project.read(cx).tasks.as_ref().unwrap().pane.read(cx).tracker().unwrap());
     let task = tracker.create(&NewTask::titled("Ship it"), "me").unwrap();
     tracker.record(&task.id, &Entry::PrOpened(PrLink { number: 12, repo: "o/r".into() }), "me").unwrap();
-    let merged = beui::PrChipData { state: beui::pr::PrState::Merged, ..chip("o/r", 12) };
+    let merged = atelier_ui::PrChipData { state: atelier_ui::pr::PrState::Merged, ..chip("o/r", 12) };
     for _ in 0..2 {
         cx.update(|_, cx| project.update(cx, |p, cx| p.set_list_rows(vec![merged.clone()], cx)));
         cx.run_until_parked();

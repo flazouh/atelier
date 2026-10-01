@@ -7,7 +7,7 @@
 
 use std::{collections::HashSet, time::Instant};
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, ChangedFile, ChangedFileTree, Comment, Decision, InlineHunk, InlineReview, LineComment, LineComposer,
     LineComposerEvent, ReviewBar, ReviewFileHeader, ReviewHandlers, ReviewProgress,
     file_tree::FileTree,
@@ -77,12 +77,12 @@ const MAIN: &str = "fn diffs() -> impl IntoElement {
 
 const FIXTURES: [Fixture; 4] = [
     Fixture {
-        path: "crates/beui/src/file_diff.rs",
+        path: "crates/ui/src/file_diff.rs",
         text: FILE_DIFF,
         hunks: || vec![InlineHunk::new("fd-1", 3..4, 4..5), InlineHunk::new("fd-2", 8..9, 9..10)],
     },
-    Fixture { path: "crates/beui/src/file_diff/tests.rs", text: FILE_DIFF_TESTS, hunks: || vec![InlineHunk::new("fdt-1", 7..7, 7..12)] },
-    Fixture { path: "crates/beui/src/theme.rs", text: THEME, hunks: || vec![InlineHunk::new("th-1", 5..6, 6..7)] },
+    Fixture { path: "crates/ui/src/file_diff/tests.rs", text: FILE_DIFF_TESTS, hunks: || vec![InlineHunk::new("fdt-1", 7..7, 7..12)] },
+    Fixture { path: "crates/ui/src/theme.rs", text: THEME, hunks: || vec![InlineHunk::new("th-1", 5..6, 6..7)] },
     Fixture { path: "crates/gallery/src/main.rs", text: MAIN, hunks: || vec![InlineHunk::new("mn-1", 2..3, 3..3)] },
 ];
 
@@ -124,7 +124,7 @@ pub struct ReviewStory {
     review_mode: bool,
     files: Vec<FileState>,
     current: usize,
-    resolving: Vec<beui::Resolve>,
+    resolving: Vec<atelier_ui::Resolve>,
     history: DecisionHistory,
     threads: Vec<Thread>,
     composer: Option<(usize, Entity<LineComposer>, Subscription)>,
@@ -134,7 +134,7 @@ pub struct ReviewStory {
 impl ReviewStory {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let files: Vec<FileState> = FIXTURES.iter().map(FileState::open).collect();
-        let editor = beui::CodeEditor::state(files[0].path.as_ref(), files[0].text.clone(), window, cx);
+        let editor = atelier_ui::CodeEditor::state(files[0].path.as_ref(), files[0].text.clone(), window, cx);
         // The user can type anywhere, so the hunks follow the rows they describe.
         let _edits = cx.subscribe(&editor, |this, state, event: &InputEvent, cx| {
             if !matches!(event, InputEvent::Change) {
@@ -333,7 +333,7 @@ impl Render for ReviewStory {
             let (now, reduce) = (Instant::now(), cx.reduce_motion());
             this.resolving.retain(|r| !r.is_over(now, reduce));
             if !this.resolving.iter().any(|r| &r.id == id) {
-                this.resolving.push(beui::Resolve::new(id.clone(), *decision));
+                this.resolving.push(atelier_ui::Resolve::new(id.clone(), *decision));
                 cx.notify();
             }
         });

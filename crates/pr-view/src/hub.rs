@@ -3,7 +3,7 @@
 //! way back to the list, and tells the app when the reader wants a file in the editor.
 use std::{collections::HashSet, sync::Arc};
 
-use beui::{ActiveTheme, Button, ButtonSize, ButtonVariant};
+use atelier_ui::{ActiveTheme, Button, ButtonSize, ButtonVariant};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FontWeight, IntoElement, ParentElement, Render, SharedString, Styled, Subscription,
     Window, div, px,
@@ -167,7 +167,7 @@ impl Render for PrHub {
                     .gap(px(8.))
                     .h(px(40.))
                     .px(px(10.))
-                    .child(Button::new("pr-back").label("Pull requests").icon(beui::IconName::ArrowBack).variant(ButtonVariant::Ghost).size(ButtonSize::Sm).on_click(move |e, w, cx| back(e, w, cx)))
+                    .child(Button::new("pr-back").label("Pull requests").icon(atelier_ui::IconName::ArrowBack).variant(ButtonVariant::Ghost).size(ButtonSize::Sm).on_click(move |e, w, cx| back(e, w, cx)))
                     .child(div().font_weight(FontWeight::MEDIUM).text_color(theme.muted_foreground).child(format!("{} #{}", open.reference.repo.slug(), open.reference.number)))
                     .child(div().flex_1())
                     .children(linked.map(|label| Button::new("pr-session").label(label).variant(ButtonVariant::Secondary).size(ButtonSize::Sm).on_click(move |e, w, cx| session(e, w, cx)))),

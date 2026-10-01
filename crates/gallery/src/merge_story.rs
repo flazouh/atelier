@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use beui::{
+use atelier_ui::{
     MergeBox, MergeBoxEvent, MergeButton, PrCard, PrChipData, PrState,
     merge::{Action, Choice, MergeFacts, MergeMethod, PullState, Queue, ReviewNeed, Rights, UpdateWay, first_choice},
     pr::{Checks, ReviewState},
@@ -152,7 +152,7 @@ impl Render for MergeStory {
             });
         let rows = (0..self.states.len()).map(|i| {
             let (name, facts) = &self.states[i];
-            let standing = beui::merge::standing(facts);
+            let standing = atelier_ui::merge::standing(facts);
             div()
                 .flex()
                 .items_center()

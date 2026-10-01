@@ -3,7 +3,7 @@
 //! picks the tab to start on (for screenshots). `GALLERY_SCROLL=1` scrolls a list of `TASK_COUNT` tasks
 //! (5,000 by default; with `TASKS_VIEW=board`, the board) applies a filter in the middle of the run and takes it off again, and prints the
 //! frame numbers; the frames with a filter are counted apart.
-use beui::{
+use atelier_ui::{
     ActiveTheme, AgentLook, Button, ButtonSize, ButtonVariant,
     new_task::{NewTask, NewTaskEvent},
     new_task_model::{create, next_key},
@@ -40,7 +40,7 @@ pub struct TasksStory {
     board: Entity<TaskBoard>,
     view: Entity<TaskView>,
     dialog: Entity<NewTask>,
-    people: Vec<beui::task_model::Assignee>,
+    people: Vec<atelier_ui::task_model::Assignee>,
     open: SharedString,
     run: Option<Run>,
     _subscriptions: Vec<Subscription>,
@@ -205,7 +205,7 @@ impl Render for TasksStory {
             Tab::Create => {
                 let this = cx.entity();
                 let focus = self.dialog.read(cx).focus_handle(cx);
-                beui::Modal::new("new-task-modal")
+                atelier_ui::Modal::new("new-task-modal")
                     .width(560.)
                     .focus(&focus)
                     .on_close(move |window, cx| this.update(cx, |s, cx| s.go(Tab::List, window, cx)))
@@ -226,7 +226,7 @@ impl Render for TasksStory {
                     .variant(if tab == self.tab { ButtonVariant::Secondary } else { ButtonVariant::Ghost })
                     .on_click(move |_, window, cx| this.update(cx, |s, cx| s.go(tab, window, cx)))
             })))
-            .child(div().flex_1().min_h_0().rounded(beui::theme::radius::xl()).bg(theme.card.opacity(0.35)).child(body));
+            .child(div().flex_1().min_h_0().rounded(atelier_ui::theme::radius::xl()).bg(theme.card.opacity(0.35)).child(body));
         match &self.run {
             Some(run) => run.wrap(root.into_any_element()).into_any_element(),
             None => root.into_any_element(),

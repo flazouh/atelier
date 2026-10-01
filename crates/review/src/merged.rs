@@ -6,7 +6,7 @@ use std::{
     ops::Range,
 };
 
-use beui::inline_review::{Decision, InlineHunk, track_edit};
+use atelier_ui::inline_review::{Decision, InlineHunk, track_edit};
 use imara_diff::{Algorithm, Diff, InternedInput};
 
 use crate::lines::{Rows, RowTokens, join};

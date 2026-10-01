@@ -1,4 +1,4 @@
-//! The views of a window, one on screen at a time (`plans/views-and-commands.md`): Sessions (the
+//! The views of a window, one on screen at a time: Sessions (the
 //! session list, the agent panels, and the review, the pull requests or the tasks when one is asked for) and
 //! Files (the file tree and the editor).
 

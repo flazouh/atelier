@@ -5,7 +5,7 @@
 //! `REPLAY_LINES` sets how many lines play each frame (1 by default).
 use std::time::{Duration, Instant};
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, AgentText, AgentTextStatus, SubagentCard, Todo as TodoRow, TodoList, TodoStatus as RowStatus,
     ToolApproval, ToolApprovalStatus, ToolCall as ToolRow, ToolStatus as RowToolStatus,
 };

@@ -2,7 +2,7 @@
 //! has. `MOTION_PART=<name>` shows one alone, at the top left of the page, so a screenshot of it can be laid
 //! beside the web demo's (`~/shots/beui/<name>-compare.png`). Without it, every part is listed.
 use gpui_kit::AppContext as _;
-use beui::{ActiveTheme, Segment, Segmented, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, BloomMenu, FileUpload, FileUploadEvent, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
+use atelier_ui::{ActiveTheme, Segment, Segmented, Button, ButtonSize, ButtonVariant, Checkbox, ColorSelector, MultiOption, MultiSelect, BloomMenu, FileUpload, FileUploadEvent, NotificationItem, NotificationStack, RangeSlider, Swatch, Toast, ToastPatch, ToastPosition, ToastStack, ToastStatus};
 use gpui_kit::{
     AnyElement, Context, Entity, Hsla, IntoElement, ParentElement, Render, Rgba, SharedString, Styled, Window, div, px,
 };
@@ -36,11 +36,11 @@ fn teams() -> Vec<MultiOption> {
 }
 
 /// The web preview's queue: one arrived, one on its way, one that failed.
-fn initial_uploads() -> Vec<beui::UploadItem> {
+fn initial_uploads() -> Vec<atelier_ui::UploadItem> {
     vec![
-        beui::UploadItem::new("brand-assets", "brand-assets.zip", 18_400_000).mime("application/zip").progress(100.).status(beui::UploadStatus::Success),
-        beui::UploadItem::new("release-video", "release-cut.mov", 84_200_000).mime("video/quicktime").progress(58.).status(beui::UploadStatus::Uploading),
-        beui::UploadItem::new("contracts", "vendor-contract.pdf", 2_800_000).mime("application/pdf").progress(32.).status(beui::UploadStatus::Error).error("Connection lost"),
+        atelier_ui::UploadItem::new("brand-assets", "brand-assets.zip", 18_400_000).mime("application/zip").progress(100.).status(atelier_ui::UploadStatus::Success),
+        atelier_ui::UploadItem::new("release-video", "release-cut.mov", 84_200_000).mime("video/quicktime").progress(58.).status(atelier_ui::UploadStatus::Uploading),
+        atelier_ui::UploadItem::new("contracts", "vendor-contract.pdf", 2_800_000).mime("application/pdf").progress(32.).status(atelier_ui::UploadStatus::Error).error("Connection lost"),
     ]
 }
 
@@ -66,7 +66,7 @@ pub struct MotionStory {
     notes: Entity<NotificationStack>,
     uploads: Entity<FileUpload>,
     bloom: Entity<BloomMenu>,
-    upload_variant: beui::UploadVariant,
+    upload_variant: atelier_ui::UploadVariant,
     upload_ticks: Vec<gpui_kit::Task<()>>,
     position: ToastPosition,
     accent: SharedString,
@@ -86,7 +86,7 @@ impl MotionStory {
         if let Ok(pick) = std::env::var("MOTION_PICK") {
             let bytes: Vec<f32> = pick.split(',').filter_map(|n| n.trim().parse::<f32>().ok()).collect();
             if let [r, g, b] = bytes[..] {
-                beui::theme::set_pick(Some(Hsla::from(Rgba { r: r / 255., g: g / 255., b: b / 255., a: 1. })), cx);
+                atelier_ui::theme::set_pick(Some(Hsla::from(Rgba { r: r / 255., g: g / 255., b: b / 255., a: 1. })), cx);
             }
         }
         let teams = cx.new(|cx| MultiSelect::new("teams", teams(), window, cx).placeholder("Choose teams").empty("No teams found.").with_values(["design", "engineering"]));
@@ -97,14 +97,14 @@ impl MotionStory {
                 vec![
                     NotificationItem::new("import-failed", "Orders import failed")
                         .description("42s · TimeoutError at Step 2")
-                        .trailing(Some(beui::IconName::RotateRight), "2", beui::TrailingTone::Warning),
+                        .trailing(Some(atelier_ui::IconName::RotateRight), "2", atelier_ui::TrailingTone::Warning),
                     NotificationItem::new("sla-breach", "SLA breach").description("2m 11s · Data enrichment"),
                     NotificationItem::new("sync-fixed", "Product sync auto-fixed").description("5m · 404 on GET /products"),
                 ],
                 cx,
             )
         });
-        let uploads = cx.new(|_| FileUpload::new("uploads").variant(beui::UploadVariant::Centered).words("Drop files to upload", "PDF, images, video or zipped assets").max_files(5));
+        let uploads = cx.new(|_| FileUpload::new("uploads").variant(atelier_ui::UploadVariant::Centered).words("Drop files to upload", "PDF, images, video or zipped assets").max_files(5));
         let initial = initial_uploads();
         uploads.update(cx, |u, cx| u.set_items(initial, cx));
         cx.subscribe(&uploads, |this, _, event: &FileUploadEvent, cx| match event {
@@ -113,8 +113,8 @@ impl MotionStory {
             FileUploadEvent::Removed(_) => {}
         })
         .detach();
-        let bloom = cx.new(|cx| BloomMenu::new("bloom", beui::bloom_menu::default_items(), cx));
-        let mut story = Self { segs: [0, 1, 1], swap: 0, switches: [true, false], tabs: [0, 0, 0], email: cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("you@example.com")), bloom, uploads, upload_variant: beui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
+        let bloom = cx.new(|cx| BloomMenu::new("bloom", atelier_ui::bloom_menu::default_items(), cx));
+        let mut story = Self { segs: [0, 1, 1], swap: 0, switches: [true, false], tabs: [0, 0, 0], email: cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("you@example.com")), bloom, uploads, upload_variant: atelier_ui::UploadVariant::Centered, upload_ticks: Vec::new(), teams, toasts, notes, position: ToastPosition::BottomRight, part: std::env::var("MOTION_PART").ok(), accent: "blue".into(), second: "green".into(), third: "pink".into(), terms: true, updates: false, all: false, level: 40., fine: 2.5 };
         story.tick_upload("release-video".to_string(), cx);
         story
     }
@@ -122,7 +122,7 @@ impl MotionStory {
     /// Moves one file's progress on, as the web preview's timer does: 7 to 19 a step, every 520 ms, until it is done.
     fn tick_upload(&mut self, id: String, cx: &mut Context<Self>) {
         let uploads = self.uploads.downgrade();
-        let mut seed = beui::motion::now_millis() as u64 ^ (id.len() as u64) << 7;
+        let mut seed = atelier_ui::motion::now_millis() as u64 ^ (id.len() as u64) << 7;
         self.upload_ticks.push(cx.spawn(async move |_, cx| {
             loop {
                 cx.background_executor().timer(std::time::Duration::from_millis(520)).await;
@@ -132,10 +132,10 @@ impl MotionStory {
                 let id = id.clone();
                 let ok = uploads.update(cx, |u, cx| {
                     u.update(&id, |item| {
-                        if item.status == beui::UploadStatus::Uploading {
+                        if item.status == atelier_ui::UploadStatus::Uploading {
                             item.progress = (item.progress + jump).min(100.);
                             if item.progress >= 100. {
-                                item.status = beui::UploadStatus::Success;
+                                item.status = atelier_ui::UploadStatus::Success;
                             } else {
                                 done = false;
                             }
@@ -153,7 +153,7 @@ impl MotionStory {
     }
 }
 
-fn section(title: &'static str, theme: &beui::Theme, body: impl IntoElement) -> AnyElement {
+fn section(title: &'static str, theme: &atelier_ui::Theme, body: impl IntoElement) -> AnyElement {
     div()
         .flex()
         .flex_col()
@@ -329,7 +329,7 @@ impl Render for MotionStory {
                     .flex()
                     .items_center()
                     .gap(px(12.))
-                    .child(Button::new("continue").label("Continue").trailing_icon(beui::IconName::ArrowForward).variant(ButtonVariant::Primary).size(ButtonSize::Md))
+                    .child(Button::new("continue").label("Continue").trailing_icon(atelier_ui::IconName::ArrowForward).variant(ButtonVariant::Primary).size(ButtonSize::Md))
                     .child(Button::new("new-session").label("New session").cap("⌃ N").variant(ButtonVariant::Primary).size(ButtonSize::Md))
                     .into_any_element(),
             );
@@ -415,9 +415,9 @@ impl Render for MotionStory {
         }
         if self.shows("file-upload") {
             let uploads = self.uploads.clone();
-            let ready = uploads.read(cx).items().iter().filter(|i| i.status == beui::UploadStatus::Success).count();
+            let ready = uploads.read(cx).items().iter().filter(|i| i.status == atelier_ui::UploadStatus::Success).count();
             let total = uploads.read(cx).items().len();
-            let variants = [(beui::UploadVariant::Centered, "Centered"), (beui::UploadVariant::Row, "Row")];
+            let variants = [(atelier_ui::UploadVariant::Centered, "Centered"), (atelier_ui::UploadVariant::Row, "Row")];
             let switch = {
                 let (this, uploads) = (cx.entity().downgrade(), uploads.clone());
                 let selected = variants.iter().position(|(v, _)| *v == self.upload_variant).unwrap_or(0);
@@ -430,13 +430,13 @@ impl Render for MotionStory {
                     .ok();
                     uploads.update(cx, |u, cx| {
                         u.set_variant(variant, cx);
-                        u.set_words(if variant == beui::UploadVariant::Centered { "Drop files to upload" } else { "Drop release files" }, "PDF, images, video or zipped assets", cx);
+                        u.set_words(if variant == atelier_ui::UploadVariant::Centered { "Drop files to upload" } else { "Drop release files" }, "PDF, images, video or zipped assets", cx);
                     });
                 })
             };
             let reset = {
                 let (this, uploads) = (cx.entity().downgrade(), uploads.clone());
-                Button::new("upload-reset").icon(beui::IconName::RotateLeft).size(ButtonSize::Icon).pill(true).variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                Button::new("upload-reset").icon(atelier_ui::IconName::RotateLeft).size(ButtonSize::Icon).pill(true).variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
                     let items = initial_uploads();
                     uploads.update(cx, |u, cx| u.set_items(items, cx));
                     this.update(cx, |s, cx| s.tick_upload("release-video".to_string(), cx)).ok();
@@ -495,17 +495,17 @@ impl Render for MotionStory {
                 .flex_col()
                 .items_start()
                 .gap(px(16.))
-                .child(beui::SessionsIsland::new("island-a", beui::IslandCounts { running: 2, needs: 0, done: 0 }))
-                .child(beui::SessionsIsland::new("island-b", beui::IslandCounts { running: 2, needs: 1, done: 0 }))
-                .child(beui::SessionsIsland::new("island-c", beui::IslandCounts { running: 1, needs: 2, done: 3 }));
+                .child(atelier_ui::SessionsIsland::new("island-a", atelier_ui::IslandCounts { running: 2, needs: 0, done: 0 }))
+                .child(atelier_ui::SessionsIsland::new("island-b", atelier_ui::IslandCounts { running: 2, needs: 1, done: 0 }))
+                .child(atelier_ui::SessionsIsland::new("island-c", atelier_ui::IslandCounts { running: 1, needs: 2, done: 3 }));
             parts.push(if alone { demo.into_any_element() } else { section("Island (sessions)", &theme, demo) });
         }
         if self.shows("action-swap") {
             const WORDS: [&str; 4] = ["Commit", "Push", "Open pull request", "Open #3344"];
             let this = cx.entity().downgrade();
             let demo = div().flex().items_center().gap(px(16.)).child(
-                beui::ActionSwapButton::new("swap-demo", WORDS[self.swap % 4])
-                    .size(beui::SwapSize::Medium)
+                atelier_ui::ActionSwapButton::new("swap-demo", WORDS[self.swap % 4])
+                    .size(atelier_ui::SwapSize::Medium)
                     .cap("⌘↵")
                     .debug_name("swap-demo")
                     .on_click(move |_, _, cx| {
@@ -519,8 +519,8 @@ impl Render for MotionStory {
             parts.push(if alone { demo.into_any_element() } else { section("Action swap", &theme, demo) });
         }
         if self.shows("animated-badge") {
-            use beui::BadgeStatus as S;
-            let one = |id: &'static str, status: S, label: &'static str| beui::AnimatedBadge::new(id, status).size(beui::BadgeSize::Small).label(label);
+            use atelier_ui::BadgeStatus as S;
+            let one = |id: &'static str, status: S, label: &'static str| atelier_ui::AnimatedBadge::new(id, status).size(atelier_ui::BadgeSize::Small).label(label);
             let demo = div()
                 .flex()
                 .flex_wrap()
@@ -537,16 +537,16 @@ impl Render for MotionStory {
         }
         if self.shows("loader") {
             let demo = div().flex().items_center().gap(px(24.)).text_color(theme.foreground)
-                .child(beui::spinner::Spinner::new("loader-32").size(px(32.)))
-                .child(beui::spinner::Spinner::new("loader-20").size(px(20.)))
-                .child(beui::spinner::Spinner::new("loader-12").size(px(12.)));
+                .child(atelier_ui::spinner::Spinner::new("loader-32").size(px(32.)))
+                .child(atelier_ui::spinner::Spinner::new("loader-20").size(px(20.)))
+                .child(atelier_ui::spinner::Spinner::new("loader-12").size(px(12.)));
             parts.push(if alone { demo.into_any_element() } else { section("Loader (spinner)", &theme, demo) });
         }
         if self.shows("switch") {
             let this = cx.entity().downgrade();
             let one = |slot: usize, id: &'static str, label: &'static str| {
                 let this = this.clone();
-                beui::Switch::new(id, self.switches[slot]).label(label).debug_name(id).on_change(move |on, _, cx| {
+                atelier_ui::Switch::new(id, self.switches[slot]).label(label).debug_name(id).on_change(move |on, _, cx| {
                     this.update(cx, |s, cx| {
                         s.switches[slot] = on;
                         cx.notify();
@@ -561,14 +561,14 @@ impl Render for MotionStory {
                 .gap(px(12.))
                 .child(one(0, "switch-on", "Enable notifications"))
                 .child(one(1, "switch-off", "Off"))
-                .child(beui::Switch::new("switch-disabled", true).label("Disabled").disabled(true).debug_name("switch-disabled"));
+                .child(atelier_ui::Switch::new("switch-disabled", true).label("Disabled").disabled(true).debug_name("switch-disabled"));
             parts.push(if alone { demo.into_any_element() } else { section("Switch", &theme, demo) });
         }
         if self.shows("tabs") {
             let this = cx.entity().downgrade();
-            let set = |slot: usize, variant: beui::TabsVariant, id: &'static str, names: [&'static str; 3]| {
+            let set = |slot: usize, variant: atelier_ui::TabsVariant, id: &'static str, names: [&'static str; 3]| {
                 let this = this.clone();
-                beui::Tabs::new(id, variant, names.map(|n| beui::Tab::new(n).debug_name(format!("{id}-{n}"))), Some(self.tabs[slot])).on_select(
+                atelier_ui::Tabs::new(id, variant, names.map(|n| atelier_ui::Tab::new(n).debug_name(format!("{id}-{n}"))), Some(self.tabs[slot])).on_select(
                     move |i, _, cx| {
                         this.update(cx, |s, cx| {
                             s.tabs[slot] = i;
@@ -583,16 +583,16 @@ impl Render for MotionStory {
                 .flex_col()
                 .items_start()
                 .gap(px(24.))
-                .child(set(0, beui::TabsVariant::Pill, "tabs-pill", ["Overview", "Activity", "Settings"]))
-                .child(set(1, beui::TabsVariant::Segment, "tabs-segment", ["Day", "Week", "Month"]))
-                .child(set(2, beui::TabsVariant::Underline, "tabs-underline", ["All", "Open", "Closed"]));
+                .child(set(0, atelier_ui::TabsVariant::Pill, "tabs-pill", ["Overview", "Activity", "Settings"]))
+                .child(set(1, atelier_ui::TabsVariant::Segment, "tabs-segment", ["Day", "Week", "Month"]))
+                .child(set(2, atelier_ui::TabsVariant::Underline, "tabs-underline", ["All", "Open", "Closed"]));
             parts.push(if alone { demo.into_any_element() } else { section("Tabs", &theme, demo) });
         }
         if self.shows("text-input") {
             let demo = div().w(px(360.)).child(
-                beui::TextInput::new("email", &self.email)
+                atelier_ui::TextInput::new("email", &self.email)
                     .label("Email")
-                    .left_icon(beui::IconName::Search)
+                    .left_icon(atelier_ui::IconName::Search)
                     .reserve_error_line(true)
                     .surface(theme.background)
                     .debug_name("text-input"),
@@ -600,18 +600,18 @@ impl Render for MotionStory {
             parts.push(if alone { demo.into_any_element() } else { section("Text input", &theme, demo) });
         }
         if self.shows("menu") {
-            let menu = beui::Menu::new(
+            let menu = atelier_ui::Menu::new(
                 "menu-demo",
                 [
-                    beui::menu::Entry::Label("Project files".into()),
-                    beui::MenuItem::new("Open").icon(beui::IconName::Visibility).shortcut("↵").into(),
-                    beui::MenuItem::new("Rename").icon(beui::IconName::Edit).shortcut("R").into(),
-                    beui::MenuItem::new("Duplicate").icon(beui::IconName::Copy).shortcut("⌘D").into(),
-                    beui::MenuItem::new("Download").icon(beui::IconName::Download).into(),
-                    beui::menu::Entry::Separator,
-                    beui::MenuItem::new("Keep offline").choice(beui::menu::Choice::Check(false)).close_on_select(false).into(),
-                    beui::menu::Entry::Separator,
-                    beui::MenuItem::new("Move to trash").icon(beui::IconName::Delete).tone(beui::menu::Tone::Destructive).shortcut("⌘⌫").into(),
+                    atelier_ui::menu::Entry::Label("Project files".into()),
+                    atelier_ui::MenuItem::new("Open").icon(atelier_ui::IconName::Visibility).shortcut("↵").into(),
+                    atelier_ui::MenuItem::new("Rename").icon(atelier_ui::IconName::Edit).shortcut("R").into(),
+                    atelier_ui::MenuItem::new("Duplicate").icon(atelier_ui::IconName::Copy).shortcut("⌘D").into(),
+                    atelier_ui::MenuItem::new("Download").icon(atelier_ui::IconName::Download).into(),
+                    atelier_ui::menu::Entry::Separator,
+                    atelier_ui::MenuItem::new("Keep offline").choice(atelier_ui::menu::Choice::Check(false)).close_on_select(false).into(),
+                    atelier_ui::menu::Entry::Separator,
+                    atelier_ui::MenuItem::new("Move to trash").icon(atelier_ui::IconName::Delete).tone(atelier_ui::menu::Tone::Destructive).shortcut("⌘⌫").into(),
                 ],
             )
             .min_width(240.)

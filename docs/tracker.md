@@ -1,6 +1,6 @@
 # The task back end
-`crates/tracker` (`atelier-tracker`). It keeps the tasks that the task parts in beui show. It has no UI type
-and no network code. The app maps a `Task` to beui's `TaskData`, and an agent's name to its `AgentLook`.
+`crates/tracker` (`atelier-tracker`). It keeps the tasks that the task parts in atelier-ui show. It has no UI type
+and no network code. The app maps a `Task` to atelier-ui's `TaskData`, and an agent's name to its `AgentLook`.
 ## The pieces
 - **`Tracker`** is the neutral interface. Every call blocks, so none is made on the UI thread (the same
   rule as `Forge`). The app talks to this and to nothing else.

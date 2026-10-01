@@ -32,7 +32,7 @@ fn a_turn_asks_is_answered_and_ends_finished(cx: &mut TestAppContext) {
     let (session, fake, cx) = start(cx, vec![vec![Event::Permission(ask())]], false);
     cx.update(|_, cx| session.update(cx, |s, cx| s.send("write a.txt".into(), cx)));
     cx.run_until_parked();
-    assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), SessionStatus::NeedsYou(beui::session_status::Need::Approval));
+    assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), SessionStatus::NeedsYou(atelier_ui::session_status::Need::Approval));
     assert_eq!(cx.update(|_, cx| session.read(cx).title.to_string()), "write a.txt", "the first message names it");
     cx.update(|_, cx| session.update(cx, |s, cx| s.answer(&RequestId::new("r1"), ChoiceKind::AllowAlways, cx)));
     assert!(fake.received.lock().unwrap().iter().any(|c| matches!(c, Command::Answer { choice, .. } if choice.0 == "always")));

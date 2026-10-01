@@ -1,5 +1,5 @@
-//! The pull request as the models beui draws. Times are words ("2h ago"), so every function takes `now`.
-use beui::{
+//! The pull request as the models atelier-ui draws. Times are words ("2h ago"), so every function takes `now`.
+use atelier_ui::{
     ChangedFile, CommitData, RemarkSummary, ThreadSummary,
     changed_files::FileChange,
     line_comment::Comment as UiComment,

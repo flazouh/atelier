@@ -2,7 +2,7 @@
 //! to the end of its turn, NeedsYou while a question waits, Finished when a turn ends while the reader
 //! looks elsewhere, Idle once they look, and Failed when the session ends badly. Pure.
 
-use beui::session_status::{Need, SessionStatus, short_reason};
+use atelier_ui::session_status::{Need, SessionStatus, short_reason};
 use atelier_agents::session::{EndReason, Event, TurnOutcome};
 
 /// The status after `event`, from `now`. `seen` says the reader is looking at this session.

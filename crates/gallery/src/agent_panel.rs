@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, AgentText, AgentTextStatus, ModelBadge, Button, ButtonSize, ButtonVariant, ChangedFiles, Checks, DiffLine,
     EntranceList, FileDiff, FileDiffStatus, IconName, MessageBubble, MessageBubbleAlign, MessageBubbleVariant,
     PrCard, ReviewState, SubagentStrip, Thinking, Todo, TodoList, TodoStatus, ToolApproval, ToolCall, ToolStatus,
@@ -36,7 +36,7 @@ pub const SESSION_LEN: usize = 12;
 /// own list, so each still enters on its own.
 fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> EntranceList {
     let tools = [
-        ("s-read", ToolCall::new("s-read", "Read file").file("crates/beui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
+        ("s-read", ToolCall::new("s-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
         ("s-grep", ToolCall::new("s-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),
     ];
     let tools = tools.into_iter().take(shown.saturating_sub(1)).fold(
@@ -57,8 +57,8 @@ fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> E
         ("s-reply", reply("s-reply", REPLY)),
         ("s-agent", running_card("s-agent", tick).into_any_element()),
         ("s-plan", TodoList::new("s-plan", sample_plan()).into_any_element()),
-        ("s-diff", FileDiff::new("s-diff", "crates/beui/src/file_diff.rs", DiffLine::parse(DIFF)).status(FileDiffStatus::Complete).into_any_element()),
-        ("s-test", ToolCall::new("s-test", "Ran tests").tool("cargo test -p beui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT).into_any_element()),
+        ("s-diff", FileDiff::new("s-diff", "crates/ui/src/file_diff.rs", DiffLine::parse(DIFF)).status(FileDiffStatus::Complete).into_any_element()),
+        ("s-test", ToolCall::new("s-test", "Ran tests").tool("cargo test -p ui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT).into_any_element()),
         ("s-pr", reply("s-pr", PR_TEXT)),
         (
             "s-files",

@@ -3,7 +3,7 @@
 //! screen. The card's merge actions write to the forge only after the reader confirms a merge or a
 //! branch delete, and the forge's refusals show in its own words.
 use std::sync::Arc;
-use beui::{
+use atelier_ui::{
     ActiveTheme, PrCard, PrChipData,
     button::{Button, ButtonVariant},
     merge::{Action, Choice, MergeFacts, MergeMethod as UiMethod},
@@ -13,7 +13,7 @@ use gpui_kit::{
     App, AppContext, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Task,
     Window, div, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_forge::{Check, Forge, Pull, PullRef, PullUpdate, present};
 use atelier_pr_view::actions::{Ask, ask};
 mod poll;

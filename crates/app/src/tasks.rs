@@ -1,5 +1,4 @@
-//! Tasks in the app: the tracker of a project, what beui shows of it, and the pane that holds them.
-//! See plans/m6-tasks.md.
+//! Tasks in the app: the tracker of a project, what atelier-ui shows of it, and the pane that holds them.
 use std::sync::Arc;
 
 use gpui_kit::{AppContext, Context, Entity, SharedString, Subscription, Window};

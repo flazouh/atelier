@@ -7,7 +7,7 @@
 
 use std::{rc::Rc, time::Instant};
 
-use beui::{
+use atelier_ui::{
     PressStop,
     AgentText, AgentTextStatus, MessageBubble, MessageBubbleAlign, MessageBubbleVariant, SubagentCard, SubagentRow,
     SubagentStrip, Thinking, ThinkingPhase, Todo as TodoRow, TodoList, TodoStatus as RowStatus, ToolApproval,
@@ -25,7 +25,7 @@ use gpui_kit::{
     AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement,
     Styled, Window, div, list, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_agents::session::{Answer, Call, ChoiceKind, Item, SubagentStatus, TodoStatus, ToolStatus};
 
 use crate::{
@@ -44,7 +44,7 @@ fn row_status(status: ToolStatus) -> RowToolStatus {
 /// The row of `call`: what it is about (the command, the file, the pattern, with an icon for its kind), its paths
 /// relative to `root`, and the mark its answered approval left.
 fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
-    let about = summary::summary(call, |path| beui::tool_preview::relative_path(path, root).to_string());
+    let about = summary::summary(call, |path| atelier_ui::tool_preview::relative_path(path, root).to_string());
     let icon = match about.kind {
         atelier_agents::session::ToolKind::Shell => IconName::Terminal,
         atelier_agents::session::ToolKind::Read => IconName::Description,
@@ -247,7 +247,7 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
                 approval = approval.preview(preview);
             }
             if let Some(file) = &request.call.file {
-                approval = approval.parameter("File", beui::tool_preview::relative_path(file, &root));
+                approval = approval.parameter("File", atelier_ui::tool_preview::relative_path(file, &root));
             }
             for (name, value) in request.call.input.as_object().into_iter().flatten() {
                 let shown = value.as_str().map_or_else(|| value.to_string(), str::to_string);
@@ -313,7 +313,7 @@ pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
                 .icon(IconName::ArrowDownward)
                 .label("Latest")
                 .variant(ButtonVariant::Secondary)
-                .size(beui::ButtonSize::Sm)
+                .size(atelier_ui::ButtonSize::Sm)
                 .on_click(move |_, _, _| state.set_follow_mode(gpui_kit::FollowMode::Tail)),
         )
     });
@@ -383,7 +383,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
             )
             .when(shown, |d| {
                 d.children(details.map(|t| {
-                    div().font_family(beui::typography::MONO_FONT_FAMILY).text_color(muted).whitespace_normal().child(t)
+                    div().font_family(atelier_ui::typography::MONO_FONT_FAMILY).text_color(muted).whitespace_normal().child(t)
                 }))
             })
     });
@@ -546,7 +546,7 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
                 .cursor_text()
                 .text_size(TextSize::Sm.font_size())
                 .font_weight(gpui_kit::FontWeight::MEDIUM)
-                .tooltip(beui::tooltip::Tooltip::text("Rename"))
+                .tooltip(atelier_ui::tooltip::Tooltip::text("Rename"))
                 .press_stop(gpui_kit::ElementId::Name(format!("{key}-title-focus").into()), radius::md(), window, cx)
                 .on_click(move |_, window, cx| rename.update(cx, |s, cx| s.start_rename(window, cx)))
                 .child(shown_title)
@@ -567,7 +567,7 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
         Button::new(gpui_kit::ElementId::Name(format!("{key}-task").into()))
             .label(task.key)
             .variant(ButtonVariant::Ghost)
-            .size(beui::ButtonSize::Sm)
+            .size(atelier_ui::ButtonSize::Sm)
             .tooltip("Open the task")
             .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenTask)))
     });
@@ -588,7 +588,7 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
             .debug_name("panel-close")
             .icon(IconName::Close)
             .variant(ButtonVariant::Ghost)
-            .size(beui::ButtonSize::IconSm)
+            .size(atelier_ui::ButtonSize::IconSm)
             .tooltip("Close the panel")
             .on_click(move |_, _, cx| close.update(cx, |_, cx| cx.emit(SessionEvent::Close)))
     };
@@ -607,8 +607,8 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
                 .id(gpui_kit::ElementId::Name(format!("{key}-project").into()))
                 .debug_selector(|| "panel-project".into())
                 .flex_none()
-                .tooltip(beui::tooltip::Tooltip::text(project))
-                .child(beui::project_badge::ProjectBadge::new(badge.label, badge.color).icon(badge.icon))
+                .tooltip(atelier_ui::tooltip::Tooltip::text(project))
+                .child(atelier_ui::project_badge::ProjectBadge::new(badge.label, badge.color).icon(badge.icon))
                 .into_any_element(),
             None => div().debug_selector(|| "panel-project".into()).flex_none().max_w(px(120.)).truncate().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(project).into_any_element(),
         })
@@ -626,7 +626,7 @@ type MenuAction = Rc<dyn Fn(&mut Window, &mut App)>;
 /// The panel's ⋯ menu: what a reader does with a session besides talking to it. Rename it, begin another in the same
 /// project, see the project's files, copy the id the agent knows it by (to resume it elsewhere), archive it.
 fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Option<String>, window: &mut Window, cx: &mut App) -> impl IntoElement {
-    use beui::{
+    use atelier_ui::{
         menu::{self, Entry, Menu, MenuItem, MenuLook, Origin},
         popover::{Hang, Popover},
     };
@@ -683,7 +683,7 @@ fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Op
                 .debug_name("panel-more")
                 .icon(IconName::MoreHoriz)
                 .variant(ButtonVariant::Ghost)
-                .size(beui::ButtonSize::IconSm)
+                .size(atelier_ui::ButtonSize::IconSm)
                 .tooltip("More")
                 .open(is_open)
                 .on_click(move |_, _, cx| {

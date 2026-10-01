@@ -1,4 +1,4 @@
-use beui::{
+use atelier_ui::{
     agent_panels::AgentPanels,
     panel_types::{PanelData, ProjectLabel},
     session_status::SessionStatus,
@@ -28,8 +28,8 @@ impl Render for Host {
 fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Dark, cx);
         cx.set_reduce_motion(true);
     });
     let (host, cx) = cx.add_window_view(|window, cx| {
@@ -42,7 +42,7 @@ fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
             title: "A session".into(),
             look: atelier_agents::registry::agents()[0].look.clone(),
             status: SessionStatus::Idle,
-            content: beui::panel_types::content_from(move |_, _| {
+            content: atelier_ui::panel_types::content_from(move |_, _| {
                 div().size_full().child(div().debug_selector(|| "composer".into()).h(px(40.)).child(Input::new(&shown))).into_any_element()
             }, cx),
         };

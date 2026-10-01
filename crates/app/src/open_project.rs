@@ -158,10 +158,10 @@ pub struct OpenProject {
     repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
-    list_rows: Vec<beui::PrChipData>,
-    pr_chips: std::rc::Rc<Vec<beui::PrChipData>>,
+    list_rows: Vec<atelier_ui::PrChipData>,
+    pr_chips: std::rc::Rc<Vec<atelier_ui::PrChipData>>,
     /// Chips looked up for numbers the list lacks, by number; `None` for one that is no pull request.
-    looked_up: HashMap<u64, Option<beui::PrChipData>>,
+    looked_up: HashMap<u64, Option<atelier_ui::PrChipData>>,
     /// When each number was last asked about, so it is not asked again for a while.
     asked: HashMap<u64, std::time::Instant>,
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
@@ -491,9 +491,9 @@ impl OpenProject {
     }
 
     /// The pull requests the list holds now.
-    pub fn set_list_rows(&mut self, rows: Vec<beui::PrChipData>, cx: &mut Context<Self>) {
+    pub fn set_list_rows(&mut self, rows: Vec<atelier_ui::PrChipData>, cx: &mut Context<Self>) {
         // A pull request that reads as merged for the first time in this run tells its tasks.
-        for row in rows.iter().filter(|r| r.state == beui::pr::PrState::Merged) {
+        for row in rows.iter().filter(|r| r.state == atelier_ui::pr::PrState::Merged) {
             if self.merged_told.insert(row.number) {
                 self.send_signal(atelier_tracker::Signal::PrMerged { number: row.number, by: "github".into() }, cx);
             }
@@ -528,7 +528,7 @@ impl OpenProject {
 
     /// The chips the sessions' text shows.
     #[cfg(test)]
-    pub fn chips(&self) -> std::rc::Rc<Vec<beui::PrChipData>> {
+    pub fn chips(&self) -> std::rc::Rc<Vec<atelier_ui::PrChipData>> {
         self.pr_chips.clone()
     }
 
@@ -586,7 +586,7 @@ impl OpenProject {
     }
 
     /// Opens the pull request a chip names, in the pull request pane.
-    fn open_pull(&mut self, chip: &beui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
         let Some(pulls) = &mut self.pulls else { return };
         let hub = pulls.hub.clone();
         let Some(reference) = hub.read(cx).list().read(cx).model().reference_of(chip) else { return };
@@ -1042,7 +1042,7 @@ impl OpenProject {
 
     /// The language server session for `path`'s editor, with jumps to other files opening them here.
     fn session_for(&self, path: &str, editor: Entity<EditorState>, cx: &mut Context<Self>) -> Entity<EditorSession> {
-        (self.language_for(cx))(path, editor, beui::RowMap::default(), cx)
+        (self.language_for(cx))(path, editor, atelier_ui::RowMap::default(), cx)
     }
 
     /// Makes the language server session for a file of this project, shown with `rows` over it, from
@@ -1061,7 +1061,7 @@ impl OpenProject {
     }
 
     fn add_buffer(&mut self, path: String, text: String, window: &mut Window, cx: &mut Context<Self>) {
-        let editor = beui::CodeEditor::state(&path, text.clone(), window, cx);
+        let editor = atelier_ui::CodeEditor::state(&path, text.clone(), window, cx);
         let session = self.session_for(&path, editor.clone(), cx);
         let key = path.clone();
         let _edits = cx.subscribe(&editor, move |this, editor, event: &InputEvent, cx| {

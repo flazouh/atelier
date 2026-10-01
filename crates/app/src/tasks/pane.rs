@@ -3,7 +3,7 @@
 //! and keeps its own copy of the tasks, which the four parts share: a change in one shows in the others.
 use std::sync::Arc;
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, AgentLook, Button, ButtonSize, ButtonVariant, Modal, Segment, Segmented,
     new_task::{NewTask, NewTaskEvent},
     task_board::{TaskBoard, TaskBoardEvent},
@@ -18,7 +18,7 @@ use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render,
     SharedString, Styled, Subscription, Window, canvas, div, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_tracker::{Entry, Patch, Query, Task, TaskId, Tracker, TrackerResult};
 
 use super::map;
@@ -267,7 +267,7 @@ impl TasksPane {
         match result {
             Ok((tasks, labels)) => {
                 let looks = self.looks(cx);
-                let kept: std::collections::HashMap<SharedString, Vec<beui::task_model::Activity>> =
+                let kept: std::collections::HashMap<SharedString, Vec<atelier_ui::task_model::Activity>> =
                     self.tasks.iter().map(|t| (t.id.clone(), t.activity.clone())).collect();
                 self.tasks = tasks
                     .iter()
@@ -279,7 +279,7 @@ impl TasksPane {
                     .collect();
                 self.labels = labels.iter().map(|l| map::label_of(l)).collect();
                 self.load = Load::Ready;
-                let open = self.tasks.iter().filter(|t| !matches!(t.status, beui::task_model::TaskStatus::Done | beui::task_model::TaskStatus::Canceled)).count();
+                let open = self.tasks.iter().filter(|t| !matches!(t.status, atelier_ui::task_model::TaskStatus::Done | atelier_ui::task_model::TaskStatus::Canceled)).count();
                 cx.emit(TasksEvent::Counted(open));
                 let (people, labels) = (self.people.clone(), self.labels.clone());
                 self.dialog.update(cx, |d, _| d.set_people(people, labels));
@@ -367,7 +367,7 @@ impl TasksPane {
         cx.notify();
     }
 
-    fn create(&mut self, draft: &beui::new_task_model::Draft, start_session: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn create(&mut self, draft: &atelier_ui::new_task_model::Draft, start_session: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.close_dialog(window, cx);
         let (Ok(tracker), Some(new)) = (self.tracker.clone(), Some(map::new_task_of(draft))) else { return };
         let by = self.me.to_string();

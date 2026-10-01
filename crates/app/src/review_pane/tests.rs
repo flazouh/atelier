@@ -309,7 +309,7 @@ fn a_review_with_a_language_server_opens_its_file_once(cx: &mut TestAppContext) 
 fn the_comment_key_opens_the_composer_on_the_row_of_the_caret(cx: &mut TestAppContext) {
     use gpui_kit::component::input::Position;
     let (pane, _, _, _, cx) = reviewing(cx);
-    let handler = cx.update(|_, cx| pane.update(cx, |p, cx| p.handlers(cx))).for_command(beui::keys::Command::Comment).cloned().expect("the pane answers the comment key");
+    let handler = cx.update(|_, cx| pane.update(cx, |p, cx| p.handlers(cx))).for_command(atelier_ui::keys::Command::Comment).cloned().expect("the pane answers the comment key");
     assert!(cx.update(|_, cx| pane.read(cx).composer.is_none()));
     cx.update(|window, cx| {
         let editor = pane.read(cx).editor.clone();

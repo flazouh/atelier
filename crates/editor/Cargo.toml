@@ -8,7 +8,7 @@ license.workspace = true
 
 [dependencies]
 gpui-kit.workspace = true
-beui.workspace = true
+atelier-ui.workspace = true
 atelier-lsp.workspace = true
 lsp-types = "0.97"
 futures-channel = "0.3"

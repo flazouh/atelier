@@ -8,7 +8,7 @@
 //! servers on the head's checkout (rust-analyzer, downloaded once unless `ATELIER_OFFLINE` is set).
 //! `PRV_BIG=1` opens a large pull request (`PRV_FILES`, `PRV_COMMENTS`); `GALLERY_SCROLL=1` measures frames on it.
 //! `PRV_REAL=owner/name#number` reads a real pull request through `gh`, read only (`PRV_ME` names the reader).
-use beui::ActiveTheme;
+use atelier_ui::ActiveTheme;
 use gpui_kit::{AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window, div};
 use atelier_pr_view::{
     fixture::{big::Big, real::Real, relay::Relay},

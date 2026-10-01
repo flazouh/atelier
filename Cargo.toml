@@ -12,7 +12,7 @@ license = "Apache-2.0"
 
 [workspace.dependencies]
 gpui-kit = "0.6.6"
-beui = { path = "crates/beui" }
+atelier-ui = { git = "https://github.com/flazouh/atelier-ui" }
 atelier-agents = { path = "crates/agents" }
 atelier-editor = { path = "crates/editor" }
 atelier-forge = { path = "crates/forge" }

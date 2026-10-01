@@ -1,4 +1,4 @@
-use beui::{
+use atelier_ui::{
     AgentLook,
     task_edit::Change,
     task_model::{Assignee, Label, Priority, TaskStatus},
@@ -9,7 +9,7 @@ use atelier_tracker::Tracker as _;
 use super::map::*;
 
 fn looks(_: &str) -> AgentLook {
-    AgentLook::neutral(&beui::theme::Theme::light())
+    AgentLook::neutral(&atelier_ui::theme::Theme::light())
 }
 
 fn tracker() -> tracker::LocalTracker {
@@ -32,7 +32,7 @@ fn a_task_reads_the_same_in_beui_as_in_the_tracker() {
     assert_eq!(data.assignee.as_ref().map(|a| a.name().to_string()), Some("Claude".into()));
     assert!(matches!(data.assignee, Some(Assignee::Agent { .. })));
     assert_eq!(data.labels.iter().map(|l| l.name.to_string()).collect::<Vec<_>>(), ["bug"]);
-    assert!(matches!(data.activity.first(), Some(beui::task_model::Activity::Created { .. })));
+    assert!(matches!(data.activity.first(), Some(atelier_ui::task_model::Activity::Created { .. })));
 }
 
 #[test]

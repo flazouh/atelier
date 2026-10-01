@@ -7,7 +7,7 @@ publish.workspace = true
 license.workspace = true
 
 [dependencies]
-beui.workspace = true
+atelier-ui.workspace = true
 imara-diff = "0.2"
 atelier-agents.workspace = true
 atelier-project.workspace = true

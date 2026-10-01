@@ -1,5 +1,5 @@
 //! Tasks for the "Tasks" story: the same list every time, so a screenshot or a run can be compared.
-use beui::{
+use atelier_ui::{
     AgentLook, PrChipData, PrState, SessionStatus,
     task_model::{Activity, Assignee, Label, Priority, SessionLink, TaskData, TaskStatus},
 };
@@ -134,7 +134,7 @@ fn feature(task: &mut TaskData, claude: &AgentLook) {
     task.priority = Priority::High;
     task.assignee = Some(Assignee::agent("Claude", claude.clone()));
     task.labels = vec![Label::new("ui", 1), Label::new("agents", 5)];
-    task.description = "## Goal\n\nShow the work as **tasks**, the way Linear does.\n\n- a list grouped by status\n- a board with drag between columns\n- a page for one task\n\nSee `docs/tasks.md` for the keys.".into();
+    task.description = "## Goal\n\nShow the work as **tasks**, the way Linear does.\n\n- a list grouped by status\n- a board with drag between columns\n- a page for one task".into();
     task.sessions = vec![SessionLink { id: "s0".into(), title: "Build the task parts".into(), status: SessionStatus::Working, look: claude.clone() }];
     task.prs = vec![pr(3344, PrState::Open, "Add the task parts")];
     let at = task.updated_at;

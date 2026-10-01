@@ -1,4 +1,4 @@
-//! Serves every agent's strips to GPUI, then everything beui serves.
+//! Serves every agent's strips to GPUI, then everything atelier-ui serves.
 
 use std::borrow::Cow;
 
@@ -6,7 +6,7 @@ use gpui_kit::{AssetSource, Result, SharedString};
 
 use crate::claude;
 
-/// Hand this to the application in place of [`beui::Assets`], so agents' marks load.
+/// Hand this to the application in place of [`atelier_ui::Assets`], so agents' marks load.
 pub struct Assets;
 
 impl AssetSource for Assets {
@@ -14,11 +14,11 @@ impl AssetSource for Assets {
         if let Some(bytes) = strip_bytes(path) {
             return Ok(Some(Cow::Borrowed(bytes)));
         }
-        beui::Assets.load(path)
+        atelier_ui::Assets.load(path)
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
-        beui::Assets.list(path)
+        atelier_ui::Assets.list(path)
     }
 }
 

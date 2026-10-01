@@ -1,7 +1,7 @@
 # The sidebar and the agent panels
 
-Parts in `crates/beui` that show many projects, the sessions under each, and many agent panels at once.
-beui names no agent and fetches nothing: every part takes plain data, and the app decides what goes in
+Parts in atelier-ui that show many projects, the sessions under each, and many agent panels at once.
+atelier-ui names no agent and fetches nothing: every part takes plain data, and the app decides what goes in
 a panel.
 
 ## Data

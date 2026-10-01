@@ -1,10 +1,10 @@
 //! The Settings page: what a reader can set, in four sections with a list of them at its left. Appearance holds the
 //! theme, light, dark or the system's, and the primary colour: the fill of the main button, and the accent and the
-//! selection wash too (see `beui::theme::with_pick`). Agents lists the agents this build can start and the models
+//! selection wash too (see `atelier_ui::theme::with_pick`). Agents lists the agents this build can start and the models
 //! each offers. Tasks holds the rules that move a task by itself. Keys lists the review's key table, read only for
 //! now. A change applies at once, to every window, and is kept in `atelier-settings`. Escape closes the page, and so
 //! does the Back button in the title bar.
-use beui::{
+use atelier_ui::{
     ActiveTheme, ColorSelector, Kbd, Segment, Segmented, Swatch,
     sidebar_layout::{BadgeShow, EARLIER_CHOICES, FOLD_CHOICES, SidebarLayout},
     keys,
@@ -16,7 +16,7 @@ use gpui_kit::{
     AppContext, Context, EventEmitter, FocusHandle, Focusable, FontWeight, Hsla, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
     Render, Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 
 /// Light, dark, or whatever the system is set to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -350,7 +350,7 @@ impl Render for SettingsPane {
                 ))
                 .child(row(
                     "Time on rows",
-                    beui::Switch::new("sidebar-time", look.show_time)
+                    atelier_ui::Switch::new("sidebar-time", look.show_time)
                         .debug_name("sidebar-time")
                         .on_change(move |on, _, cx| {
                             time_pane.update(cx, |p, cx| p.change_look(|l| l.show_time = on, cx)).ok();
@@ -359,7 +359,7 @@ impl Render for SettingsPane {
                 ))
                 .child(row(
                     "Agent icon on rows",
-                    beui::Switch::new("sidebar-icon", look.show_agent_icon)
+                    atelier_ui::Switch::new("sidebar-icon", look.show_agent_icon)
                         .debug_name("sidebar-icon")
                         .on_change(move |on, _, cx| {
                             icon_pane.update(cx, |p, cx| p.change_look(|l| l.show_agent_icon = on, cx)).ok();
@@ -373,7 +373,7 @@ impl Render for SettingsPane {
             let pane = this.clone();
             row(
                 rule.words(),
-                beui::Switch::new(rule.id(), self.rules.is_on(rule))
+                atelier_ui::Switch::new(rule.id(), self.rules.is_on(rule))
                     .debug_name(rule_switch(rule))
                     .on_change(move |on, _, cx| {
                         pane.update(cx, |p, cx| p.set_rule(rule, on, cx)).ok();
@@ -416,7 +416,7 @@ impl Render for SettingsPane {
                     .items_center()
                     .h(px(32.))
                     .px(px(8.))
-                    .rounded(beui::theme::radius::md())
+                    .rounded(atelier_ui::theme::radius::md())
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
                     .text_color(if front { theme.foreground } else { muted })

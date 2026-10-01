@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use beui::{PrChipData, PrState};
+use atelier_ui::{PrChipData, PrState};
 use super::*;
 fn chip(number: u64, title: &str) -> PrChipData {
     PrChipData { number, repo: "flazouh/atelier".into(), title: title.into(), state: PrState::Open, url: format!("https://github.com/flazouh/atelier/pull/{number}").into() }

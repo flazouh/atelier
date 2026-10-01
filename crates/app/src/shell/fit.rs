@@ -9,7 +9,7 @@ pub const SIDEBAR_LEAST: f32 = 180.;
 pub const SIDEBAR_MOST: f32 = 480.;
 pub const SIDEBAR_DEFAULT: f32 = 260.;
 /// The session column's least width: a session panel's least width, which it never goes under.
-pub const AGENT_LEAST: f32 = beui::panel_layout::MIN_WIDTH;
+pub const AGENT_LEAST: f32 = atelier_ui::panel_layout::MIN_WIDTH;
 pub const RIGHT_LEAST: f32 = 320.;
 pub const RIGHT_MOST: f32 = 2400.;
 pub const RIGHT_DEFAULT: f32 = 560.;

@@ -2,7 +2,7 @@
 //! close button on hover), then the file. A file that changed on disk under unsaved edits says so
 //! above the text, with Reload and Keep mine.
 
-use beui::{
+use atelier_ui::{
     Breadcrumb, CodeEditor, Crumb, Tab, Tabs,
     button::{Button, ButtonVariant, dot},
     file_icon::FileIcon,
@@ -14,7 +14,7 @@ use gpui_kit::{
     App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled,
     div, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 
 use crate::open_project::{Deleted, OpenProject};
 
@@ -69,7 +69,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
     // A file still being read shows as a pending tab, so a slow host is seen to be working.
     let opening = p.opening().enumerate().map(|(i, path)| {
         let name = path.rsplit('/').next().unwrap_or(path).to_string();
-        Tab::new(name).pending(true).leading(beui::spinner::Spinner::new(("opening", i)).size(px(12.)).color(muted))
+        Tab::new(name).pending(true).leading(atelier_ui::spinner::Spinner::new(("opening", i)).size(px(12.)).color(muted))
     });
     let crumbs = active.as_deref().map(|path| {
         let parts: Vec<String> = path.split('/').map(str::to_string).collect();
@@ -82,7 +82,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         )
     });
     let open = project.clone();
-    let strip = Tabs::new("editor-tabs", beui::design_preview::tab_variant(beui::design_preview::tabs(cx)), tabs.chain(opening), selected).on_select(move |i, window, cx| {
+    let strip = Tabs::new("editor-tabs", atelier_ui::design_preview::tab_variant(atelier_ui::design_preview::tabs(cx)), tabs.chain(opening), selected).on_select(move |i, window, cx| {
         if let Some(path) = paths.get(i) {
             open.update(cx, |p, cx| p.open_file(path, window, cx));
         }
@@ -152,7 +152,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
 }
 
 /// A line above the text about the file on disk, with its two answers.
-fn banner(icon: IconName, tone: gpui_kit::Hsla, words: &'static str, first: Button, second: Button, theme: &beui::Theme) -> impl IntoElement {
+fn banner(icon: IconName, tone: gpui_kit::Hsla, words: &'static str, first: Button, second: Button, theme: &atelier_ui::Theme) -> impl IntoElement {
     div()
         .flex()
         .items_center()

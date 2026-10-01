@@ -7,8 +7,8 @@ use super::*;
 #[gpui_kit::test]
 fn the_theme_picker_stays_in_a_short_window(cx: &mut TestAppContext) {
     cx.update(|cx| {
-        beui::init(cx);
-        beui::theme::set_theme(beui::themes::atelier(Appearance::Dark).clone(), cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_theme(atelier_ui::themes::atelier(Appearance::Dark).clone(), cx);
     });
     let (_gallery, cx) = cx.add_window_view(Gallery::new);
     cx.simulate_resize(size(px(1100.), px(860.)));

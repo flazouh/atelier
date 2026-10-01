@@ -22,7 +22,7 @@ app has its own components. It shares the logic and the look, not the widget cod
 
 ## Rules for the code, from now on
 
-1. A crate with logic or data has no UI dependency: no `gpui`, no `beui`. UI crates depend on logic crates,
+1. A crate with logic or data has no UI dependency: no `gpui`, no `atelier-ui`. UI crates depend on logic crates,
    never the other way.
 2. A crate the browser needs builds for `wasm32-unknown-unknown`. It keeps processes, files and the network
    behind a trait that the desktop and the Hub implement.
@@ -31,6 +31,6 @@ app has its own components. It shares the logic and the look, not the widget cod
 
 ## First step (queued)
 
-- Move the types that `crates/review` takes from `beui` (such as `InlineHunk`) into a UI-free crate, so that
-  `crates/review` no longer depends on `beui`.
-- A CI check: the pure crates build for `wasm32-unknown-unknown`, and none depends on `gpui` or `beui`.
+- Move the types that `crates/review` takes from `atelier-ui` (such as `InlineHunk`) into a UI-free crate, so that
+  `crates/review` no longer depends on `atelier-ui`.
+- A CI check: the pure crates build for `wasm32-unknown-unknown`, and none depends on `gpui` or `atelier-ui`.

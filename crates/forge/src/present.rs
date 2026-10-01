@@ -1,6 +1,6 @@
-//! The forge's data as the M0.4 models beui draws, so the UI needs no new types. The words follow
+//! The forge's data as the M0.4 models atelier-ui draws, so the UI needs no new types. The words follow
 //! GitQuiet's (`docs/glossary.md`).
-use beui::{
+use atelier_ui::{
     court::{Court as UiCourt, CourtItem},
     merge::{
         MergeFacts, MergeMethod as UiMethod, PullState as UiPullState, Queue, ReviewNeed, Rights as UiRights,

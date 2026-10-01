@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use beui::inline_review::Decision;
+use atelier_ui::inline_review::Decision;
 use atelier_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolStatus};
 use atelier_project::LocalProject;
 use atelier_review::{FileReview, Merged, TurnTracker};

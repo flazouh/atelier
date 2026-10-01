@@ -1,6 +1,6 @@
-//! Tasks between the tracker's types and what beui shows. The tracker knows no UI type and beui names no
+//! Tasks between the tracker's types and what atelier-ui shows. The tracker knows no UI type and atelier-ui names no
 //! tracker, so this is the one place that knows both.
-use beui::{
+use atelier_ui::{
     AgentLook, PrChipData,
     pr::PrState,
     session_status::SessionStatus,
@@ -108,12 +108,12 @@ fn activity_of(line: &tracker::Activity) -> Option<Activity> {
     })
 }
 
-/// The log of a task as beui shows it.
+/// The log of a task as atelier-ui shows it.
 pub fn activity_data(lines: &[tracker::Activity]) -> Vec<Activity> {
     lines.iter().filter_map(activity_of).collect()
 }
 
-/// A task as beui shows it. `activity` is the task's log, empty for a list that does not need it.
+/// A task as atelier-ui shows it. `activity` is the task's log, empty for a list that does not need it.
 pub fn task_data(task: &tracker::Task, activity: &[tracker::Activity], looks: Looks) -> TaskData {
     let mut data = TaskData::new(task.id.0.clone(), task.key.clone(), task.title.clone(), status_of(task.status));
     data.description = task.description.clone().into();
@@ -139,7 +139,7 @@ pub fn task_data(task: &tracker::Task, activity: &[tracker::Activity], looks: Lo
     data
 }
 
-/// The patch a change makes to one task. A label toggles as `beui::task_edit::apply` does it: it comes
+/// The patch a change makes to one task. A label toggles as `atelier_ui::task_edit::apply` does it: it comes
 /// off when every task named has it, else it goes on. `all` says whether every task has it.
 pub fn patch_of(change: &Change, all_have_label: bool) -> tracker::Patch {
     let mut patch = tracker::Patch::default();
@@ -164,7 +164,7 @@ pub fn patches_of(tasks: &[TaskData], ids: &[SharedString], change: &Change) -> 
 }
 
 /// A task to make from what the create dialog collected.
-pub fn new_task_of(draft: &beui::new_task_model::Draft) -> tracker::NewTask {
+pub fn new_task_of(draft: &atelier_ui::new_task_model::Draft) -> tracker::NewTask {
     tracker::NewTask {
         title: draft.title.trim().to_string(),
         description: draft.description.clone(),

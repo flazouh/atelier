@@ -2,7 +2,7 @@
 
 `crates/pr-view` (`atelier-pr-view`) is the pull request view on real data: the list of pull requests, and
 one pull request with its description, checks, conversation, verdict, merge box, commits, tree and diff.
-The parts are beui's (`docs/review.md`, `docs/inline-review.md`). The data is the forge's (`docs/forge.md`)
+The parts are atelier-ui's (`docs/review.md`, `docs/inline-review.md`). The data is the forge's (`docs/forge.md`)
 and git's. This crate joins them.
 
 ## The app's side

@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use beui::{
+use atelier_ui::{
     Button, ButtonSize, ButtonVariant, CommentComposer, CommentComposerEvent, Filter, Finder, FinderEvent, FinderItem, LineComment, LineComposer, LineComposerEvent, MergeBox, MergeBoxEvent,
     ReviewHandlers, VerdictBox, VerdictEvent,
     verdict::Verb,
@@ -203,11 +203,11 @@ impl PullView {
         let me = services.config.me.clone();
         let mut model = PrModel::new(reference.clone(), me.clone(), PullData::new(reference.clone()));
         model.read_only = services.config.read_only;
-        let editor = beui::CodeEditor::state("", "", window, cx);
+        let editor = atelier_ui::CodeEditor::state("", "", window, cx);
         let composer = cx.new(|cx| CommentComposer::new("On this pull request", me, window, cx));
         let verdict = cx.new(|cx| VerdictBox::new("", false, window, cx));
         let facts = atelier_forge::present::merge_facts(&crate::fixture::sample::pull(&reference, ""), None, &[]);
-        let choice = beui::merge::first_choice(&facts, None);
+        let choice = atelier_ui::merge::first_choice(&facts, None);
         let merge = cx.new(|cx| MergeBox::new(facts, choice, "", "", window, cx));
         let subscriptions = vec![
             cx.subscribe_in(&composer, window, |view, _, event: &CommentComposerEvent, window, cx| {
@@ -731,13 +731,13 @@ impl PullView {
                 state.set_cursor_position(position, window, cx);
             }
         });
-        beui::code_editor::set_diagnostics(&self.editor, Vec::new(), cx);
+        atelier_ui::code_editor::set_diagnostics(&self.editor, Vec::new(), cx);
         self.start_session(&place.path, rows_hunks.map(|(rows, _)| rows).unwrap_or_default(), cx);
         cx.notify();
     }
 
     /// A language server on the file in the head's checkout, when there is a checkout and servers.
-    fn start_session(&mut self, path: &str, rows: beui::RowMap, cx: &mut Context<Self>) {
+    fn start_session(&mut self, path: &str, rows: atelier_ui::RowMap, cx: &mut Context<Self>) {
         self.session = None;
         self._session = None;
         let (Some(workers), Some(dir)) = (self.services.config.workers.clone(), self.checkout.clone()) else { return };
@@ -887,7 +887,7 @@ impl PullView {
     pub fn go_to_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(prepared) = self.prepared.clone() else { return };
         let finder = cx.new(|cx| {
-            let mut finder = Finder::new("Go to file", "Part of a path", Filter::Here, window, cx).command(beui::keys::Command::GoToFile);
+            let mut finder = Finder::new("Go to file", "Part of a path", Filter::Here, window, cx).command(atelier_ui::keys::Command::GoToFile);
             finder.set_note("Loading files", cx);
             finder
         });
@@ -933,14 +933,14 @@ impl PullView {
     }
 
     /// The lookup, as a popover hung from the top of the pane: a press outside, Escape or Tab closes it.
-    pub(crate) fn picker_popover(&self, cx: &mut Context<Self>) -> Option<beui::popover::Popover> {
+    pub(crate) fn picker_popover(&self, cx: &mut Context<Self>) -> Option<atelier_ui::popover::Popover> {
         let p = self.picker.as_ref()?;
         let finder_focus = gpui_kit::Focusable::focus_handle(&p.finder, cx);
         let this = cx.entity().downgrade();
         Some(
-            beui::popover::Popover::new("pr-lookup")
+            atelier_ui::popover::Popover::new("pr-lookup")
                 .open(true)
-                .hang(beui::popover::Hang::Centre(52.))
+                .hang(atelier_ui::popover::Hang::Centre(52.))
                 .height(360.)
                 .panel_focus(&finder_focus)
                 .return_focus(&self.focus)
@@ -1014,7 +1014,7 @@ impl PullView {
     }
 
     /// A press in the merge box: a merge, or one of the other calls the box offers.
-    pub(crate) fn merge_pull(&mut self, action: beui::merge::Action, choice: beui::merge::Choice, title: String, message: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn merge_pull(&mut self, action: atelier_ui::merge::Action, choice: atelier_ui::merge::Choice, title: String, message: String, window: &mut Window, cx: &mut Context<Self>) {
         use crate::actions::{Ask, ask};
         let Some(head) = self.model.pull().map(|p| p.head_sha.clone()) else { return };
         let asked = ask(action, choice, &title, &message, &head);
@@ -1147,10 +1147,10 @@ impl PullView {
             let thread = self.model.data.threads[*index].clone();
             let (weak_reply, weak_resolve) = (this.clone(), this.clone());
             let (id_reply, id_resolve) = (thread.id.clone(), thread.id.clone());
-            let all: Vec<beui::Comment> = thread.comments.iter().map(|c| crate::present::comment(c, now)).collect();
+            let all: Vec<atelier_ui::Comment> = thread.comments.iter().map(|c| crate::present::comment(c, now)).collect();
             // A long thread shows its first and last comments until the reader asks for the rest.
             let hidden = if all.len() > crate::layout::FOLD_AFTER && !self.unfolded.contains(&thread.id) { all.len() - 2 } else { 0 };
-            let comments: Vec<beui::Comment> = if hidden > 0 { vec![all[0].clone(), all[all.len() - 1].clone()] } else { all };
+            let comments: Vec<atelier_ui::Comment> = if hidden > 0 { vec![all[0].clone(), all[all.len() - 1].clone()] } else { all };
             let (weak_unfold, id_unfold) = (this.clone(), thread.id.clone());
             let resolved = thread.resolved;
             let element_id = SharedString::from(format!("pr-thread-{}", thread.id.0));

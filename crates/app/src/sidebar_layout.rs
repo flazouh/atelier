@@ -1,6 +1,6 @@
-//! The sidebar's layout as the settings file keeps it: the mapping between [`beui::sidebar_layout::SidebarLayout`] and
+//! The sidebar's layout as the settings file keeps it: the mapping between [`atelier_ui::sidebar_layout::SidebarLayout`] and
 //! the settings' [`atelier_settings::SidebarSaved`] and mode. The one place that knows how the layout is stored.
-use beui::{
+use atelier_ui::{
     sidebar_layout::{BadgeShow, SidebarLayout},
     sidebar_model::ListMode,
 };

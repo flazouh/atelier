@@ -3,7 +3,7 @@
 //! reads it and does the I/O; a test can walk a whole review here.
 use std::collections::{HashMap, HashSet};
 
-use beui::{CheckRun, RemarkSummary, ReviewProgress, ThreadSummary, conversation::open_first, file_tree::FileTree, merge::MergeFacts, review::step};
+use atelier_ui::{CheckRun, RemarkSummary, ReviewProgress, ThreadSummary, conversation::open_first, file_tree::FileTree, merge::MergeFacts, review::step};
 use gpui_kit::SharedString;
 use atelier_forge::{ForgeError, Pull, PullRef, PullState};
 
@@ -141,7 +141,7 @@ impl PrModel {
     }
 
     /// The files for the tree: git's when it has answered (it finds renames), else the forge's.
-    pub fn files(&self) -> Vec<beui::ChangedFile> {
+    pub fn files(&self) -> Vec<atelier_ui::ChangedFile> {
         match &self.entries {
             Some(entries) => present::changed_files(entries),
             None => present::forge_files(&self.data.files),
@@ -264,7 +264,7 @@ impl PrModel {
 
     pub fn progress(&self) -> ReviewProgress {
         let files = self.files();
-        let (added, removed) = beui::changed_files::totals(&files);
+        let (added, removed) = atelier_ui::changed_files::totals(&files);
         ReviewProgress { files: files.len(), reviewed: self.seen_set().len(), added, removed }
     }
 

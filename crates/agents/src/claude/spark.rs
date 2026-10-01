@@ -1,14 +1,14 @@
-//! Claude's spark: the animated mark Claude shows while it works, as beui [`Strip`]s.
+//! Claude's spark: the animated mark Claude shows while it works, as atelier-ui [`Strip`]s.
 //!
 //! The strips are Anthropic's artwork, used here for our own Claude Code front end. They come from the
 //! Claude desktop app 2.9939.2, `/Applications/Claude.app/Contents/Resources/ion-dist/assets/v1/
 //! cf2613ee5-Btwr9m9F.js` (read on 2026-09-26), where each state is `{svg, width: 100, height: 100,
 //! frameCount, speed}`. Each SVG stacks its frames top to bottom, so its `viewBox` is 100 wide and
-//! `100 * frames` tall; entrance and exit are exported at 100x601 and 101x601, which beui's
-//! [`beui::Sprite`] allows for. The app (component `ob` in `shared-frame-BgE9BXIr.js`) slides the strip
-//! up with `steps(frames, jump-none)`, as [`beui::Sprite`] does.
+//! `100 * frames` tall; entrance and exit are exported at 100x601 and 101x601, which atelier-ui's
+//! [`atelier_ui::Sprite`] allows for. The app (component `ob` in `shared-frame-BgE9BXIr.js`) slides the strip
+//! up with `steps(frames, jump-none)`, as [`atelier_ui::Sprite`] does.
 
-use beui::Strip;
+use atelier_ui::Strip;
 
 macro_rules! strips {
     ($($variant:ident => $file:literal, $frames:literal, $frame_ms:literal, $loops:literal),* $(,)?) => {

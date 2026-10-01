@@ -1,7 +1,7 @@
 //! The coding agents atelier can drive, and their marks, as acepe keeps them: Claude Code, Codex, Cursor,
-//! Grok, opencode, and Custom, which takes beui's monogram.
+//! Grok, opencode, and Custom, which takes atelier-ui's monogram.
 
-use beui::BrandMark;
+use atelier_ui::BrandMark;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CodingAgent {

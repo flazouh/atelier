@@ -5,7 +5,7 @@ hunks in each, and a way to send comments back. It is pure text and git. It has 
 names, and it reads the project only through `Project`, so it works on a remote project as on a local one.
 
 It is a crate of its own, not a module of `crates/agents`, because it reads git and diffs files and
-depends on beui's `InlineHunk`. `crates/agents` stays the session model and its backends.
+depends on atelier-ui's `InlineHunk`. `crates/agents` stays the session model and its backends.
 
 ## The baseline
 

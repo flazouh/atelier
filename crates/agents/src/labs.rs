@@ -1,8 +1,8 @@
 //! The labs that make models, and their marks, as acepe keeps them (`provider-brand-icons.ts`,
 //! `upstream-provider-mark.svelte`): Anthropic, OpenAI, xAI, OpenRouter, GitHub Copilot, and Custom. acepe
-//! has no mark for xAI, so it and Custom take beui's monogram.
+//! has no mark for xAI, so it and Custom take atelier-ui's monogram.
 
-use beui::BrandMark;
+use atelier_ui::BrandMark;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lab {

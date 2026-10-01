@@ -7,7 +7,7 @@
 
 use std::{path::PathBuf, rc::Rc, sync::Arc};
 
-use beui::{
+use atelier_ui::{
     PressStop,
     button::{Button, ButtonSize, ButtonVariant},
     file_icon::FileIcon,
@@ -25,7 +25,7 @@ use gpui_kit::{
     WindowControlArea, actions,
     div, prelude::FluentBuilder, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 use atelier_project::LocalProject;
 use atelier_settings::Location;
 
@@ -37,7 +37,7 @@ mod view;
 pub use view::{FilesPane, ShellView};
 use fit::{Fit, Pane};
 
-use beui::{
+use atelier_ui::{
     agent_panels::AgentPanels,
     panel_types::{Layout, PanelsEvent, PanelsState},
     sidebar::{Sidebar, SidebarEvent},
@@ -120,7 +120,7 @@ pub struct Shell {
     settings: Option<(Entity<crate::settings_pane::SettingsPane>, Subscription)>,
     ssh: Option<(Entity<SshForm>, Subscription)>,
     /// The in-app folder picker, when the system has none.
-    folder: Option<(Entity<beui::FolderPicker>, Subscription)>,
+    folder: Option<(Entity<atelier_ui::FolderPicker>, Subscription)>,
     focus: FocusHandle,
     /// The projects and their sessions.
     agents_sidebar: Entity<Sidebar>,
@@ -131,7 +131,7 @@ pub struct Shell {
     /// The colours and images the reader gave projects' badges.
     badges: agents_view::Badges,
     /// "Choose an icon…", while it is open: the chooser, the project's place, and its events.
-    icon: Option<(Entity<beui::icon_picker::IconPicker>, SharedString, Subscription)>,
+    icon: Option<(Entity<atelier_ui::icon_picker::IconPicker>, SharedString, Subscription)>,
     /// With `ATELIER_FRAMES=1`, times every frame.
     meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
     /// The sidebar's and the right pane's widths as the reader dragged them; the window's width may
@@ -175,12 +175,12 @@ pub struct Shell {
 /// has not got it, since the agent panel keeps its least width.
 const REVIEW_WIDTH: f32 = 860.;
 /// What a review leaves the agent panel: a session panel at its default width, and its margins.
-const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::panel_layout::GAP + 4.;
+const AGENT_BESIDE_REVIEW: f32 = atelier_ui::panel_layout::DEFAULT_WIDTH + 2. * atelier_ui::panel_layout::GAP + 4.;
 
 impl Shell {
     pub fn new(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Self {
         // The zoom the reader left it at.
-        beui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
+        atelier_ui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
         let agents_sidebar = cx.new(Sidebar::new);
         agents_sidebar.update(cx, |s, cx| s.set_layout(crate::sidebar_layout::from_settings(saved), cx));
         let panels = cx.new(|cx| {
@@ -249,7 +249,7 @@ impl Shell {
     fn push_sidebar(&mut self, cx: &mut Context<Self>) {
         let all = agents_view::sidebar(&self.projects, &self.names, &self.badges, &self.archived, cx);
         // Each session carries its project's badge, for the head of its panel.
-        let sessions: Vec<(Vec<Entity<AgentSession>>, beui::sidebar_model::Badge)> =
+        let sessions: Vec<(Vec<Entity<AgentSession>>, atelier_ui::sidebar_model::Badge)> =
             self.projects.iter().zip(&all).map(|(p, data)| (p.read(cx).sessions.clone(), data.badge.clone())).collect();
         for (open, badge) in sessions {
             for session in open {
@@ -542,7 +542,7 @@ impl Shell {
     /// Zooms the interface to `to` (kept between the least and the most), keeps it for the next launch, and draws every view
     /// again: the cached ones are told, since they only draw again when notified.
     fn zoom_to(&mut self, to: f32, cx: &mut Context<Self>) {
-        let kept = beui::scale::set_zoom(to);
+        let kept = atelier_ui::scale::set_zoom(to);
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
                 if let Err(error) = atelier_settings::update(&path, |s| s.ui_zoom = Some(kept)) {
@@ -563,7 +563,7 @@ impl Shell {
 
     /// Keeps what the sidebar's head chose that outlives the launch: how it lists (the filter starts as Active each
     /// time, so no session is hidden by a choice the reader forgot).
-    fn keep_sidebar_layout(&mut self, layout: beui::sidebar_layout::SidebarLayout, cx: &mut Context<Self>) {
+    fn keep_sidebar_layout(&mut self, layout: atelier_ui::sidebar_layout::SidebarLayout, cx: &mut Context<Self>) {
         let key = layout.mode.key().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
@@ -807,7 +807,7 @@ impl Shell {
     /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
     /// still fits in it.
     fn widen_for_review(&mut self, window: &mut Window, _: &mut Context<Self>) {
-        let total = beui::scale::design(window.viewport_size().width);
+        let total = atelier_ui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
             self.narrow = Pane::Right;
@@ -1136,9 +1136,9 @@ impl Shell {
                 .take(5)
                 .collect(),
         };
-        let picker = cx.new(|cx| beui::FolderPicker::new("~/", window, cx).with_recent(recent));
-        let events = cx.subscribe_in(&picker, window, move |this, picker, event: &beui::FolderPickerEvent, window, cx| match event {
-            beui::FolderPickerEvent::Want(dir) => {
+        let picker = cx.new(|cx| atelier_ui::FolderPicker::new("~/", window, cx).with_recent(recent));
+        let events = cx.subscribe_in(&picker, window, move |this, picker, event: &atelier_ui::FolderPickerEvent, window, cx| match event {
+            atelier_ui::FolderPickerEvent::Want(dir) => {
                 let dir = dir.to_string();
                 let listing = cx.background_spawn({
                     let (dir, source) = (dir.clone(), source.clone());
@@ -1156,7 +1156,7 @@ impl Shell {
                 })
                 .detach();
             }
-            beui::FolderPickerEvent::Choose(path) => {
+            atelier_ui::FolderPickerEvent::Choose(path) => {
                 // The picker stays until the folder opens: a folder that will not open is said in the picker, with
                 // the path as the reader typed it.
                 match &source {
@@ -1180,7 +1180,7 @@ impl Shell {
                             .detach();
                         }
                         None => {
-                            picker.update(cx, |p, cx| p.refuse(beui::FolderError::Missing, cx));
+                            picker.update(cx, |p, cx| p.refuse(atelier_ui::FolderError::Missing, cx));
                         }
                     },
                     FolderSource::Remote { host, .. } => {
@@ -1207,7 +1207,7 @@ impl Shell {
                     }
                 }
             }
-            beui::FolderPickerEvent::Cancel => this.close_folder_picker(window, cx),
+            atelier_ui::FolderPickerEvent::Cancel => this.close_folder_picker(window, cx),
         });
         picker.update(cx, |p, cx| p.ask(cx));
         picker.read(cx).focus_handle(cx).focus(window, cx);
@@ -1267,12 +1267,12 @@ impl Shell {
             atelier_settings::Location::Local { path } => Some(path.clone()),
             atelier_settings::Location::Ssh { .. } => None,
         };
-        let picker = cx.new(|cx| beui::icon_picker::IconPicker::new(paths, root, window, cx));
+        let picker = cx.new(|cx| atelier_ui::icon_picker::IconPicker::new(paths, root, window, cx));
         let key = place.clone();
-        let events = cx.subscribe_in(&picker, window, move |this, _, event: &beui::icon_picker::IconPickerEvent, window, cx| match event {
-            beui::icon_picker::IconPickerEvent::Choose(path) => this.save_icon(key.clone(), Some(path.to_string()), window, cx),
-            beui::icon_picker::IconPickerEvent::Clear => this.save_icon(key.clone(), None, window, cx),
-            beui::icon_picker::IconPickerEvent::Cancel => this.close_icon_picker(window, cx),
+        let events = cx.subscribe_in(&picker, window, move |this, _, event: &atelier_ui::icon_picker::IconPickerEvent, window, cx| match event {
+            atelier_ui::icon_picker::IconPickerEvent::Choose(path) => this.save_icon(key.clone(), Some(path.to_string()), window, cx),
+            atelier_ui::icon_picker::IconPickerEvent::Clear => this.save_icon(key.clone(), None, window, cx),
+            atelier_ui::icon_picker::IconPickerEvent::Cancel => this.close_icon_picker(window, cx),
         });
         picker.read(cx).focus_handle(cx).focus(window, cx);
         self.icon = Some((picker, place, events));
@@ -1352,7 +1352,7 @@ impl Shell {
     }
 
     fn toggle_sidebar(&mut self, _: &ToggleSidebar, window: &mut Window, cx: &mut Context<Self>) {
-        match Fit::of(beui::scale::design(window.viewport_size().width)) {
+        match Fit::of(atelier_ui::scale::design(window.viewport_size().width)) {
             Fit::Wide => self.sidebar = !self.sidebar,
             Fit::Medium => self.sidebar_in_medium = !self.sidebar_in_medium,
             Fit::Narrow => self.narrow = if self.narrow == Pane::Projects { Pane::Session } else { Pane::Projects },
@@ -1360,7 +1360,7 @@ impl Shell {
         cx.notify();
     }
     fn toggle_right(&mut self, _: &ToggleRight, window: &mut Window, cx: &mut Context<Self>) {
-        match Fit::of(beui::scale::design(window.viewport_size().width)) {
+        match Fit::of(atelier_ui::scale::design(window.viewport_size().width)) {
             Fit::Narrow => self.narrow = if self.narrow == Pane::Right { Pane::Session } else { Pane::Right },
             Fit::Medium | Fit::Wide => self.right = !self.right,
         }
@@ -1370,12 +1370,12 @@ impl Shell {
     /// Opens the session that needs the reader most: one waiting for a yes or no, then a question, then one finished and unseen.
     fn open_most_urgent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let sidebar = self.agents_sidebar.clone();
-        let Some((project, session)) = beui::most_urgent(self.agents_sidebar.read(cx).all_projects()) else { return };
+        let Some((project, session)) = atelier_ui::most_urgent(self.agents_sidebar.read(cx).all_projects()) else { return };
         self.sidebar_event(&sidebar, &SidebarEvent::Open { project, session }, window, cx);
     }
 
     fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let counts = beui::counts_of(self.agents_sidebar.read(cx).all_projects());
+        let counts = atelier_ui::counts_of(self.agents_sidebar.read(cx).all_projects());
         let this = cx.entity().downgrade();
         div()
             .id("title-bar")
@@ -1399,7 +1399,7 @@ impl Shell {
             .child(self.title_left(cx))
             .relative()
             .children(self.layout_button(cx))
-            .child(div().flex_1().flex().justify_center().child(beui::SessionsIsland::new("sessions-island", counts).on_press(
+            .child(div().flex_1().flex().justify_center().child(atelier_ui::SessionsIsland::new("sessions-island", counts).on_press(
                 move |window, cx| drop(this.update(cx, |shell, cx| shell.open_most_urgent(window, cx))),
             )))
             .child(self.settings_button(cx))
@@ -1412,7 +1412,7 @@ impl Shell {
         if self.settings.is_some() {
             return Button::new("settings-back")
                 .debug_name("settings-back")
-                .icon(beui::IconName::ArrowBack)
+                .icon(atelier_ui::IconName::ArrowBack)
                 .label("Back")
                 .cap("Esc")
                 .variant(ButtonVariant::Ghost)
@@ -1430,7 +1430,7 @@ impl Shell {
         let this = cx.entity();
         Button::new("settings-entry")
             .debug_name("settings-entry")
-            .icon(beui::IconName::Settings)
+            .icon(atelier_ui::IconName::Settings)
             .variant(ButtonVariant::Ghost)
             .size(ButtonSize::IconSm)
             .tooltip("Settings")
@@ -1467,7 +1467,7 @@ impl Shell {
     /// The ⋯ at the top right of the session area, and its layout menu: side by side or single, grouped by
     /// project or not, each with its key. `None` while no session is open.
     fn layout_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        use beui::{
+        use atelier_ui::{
             agent_panels::chord,
             menu::{self, Choice, Entry, Menu, MenuItem, MenuLook, Origin},
             panel_types::Layout,
@@ -1516,7 +1516,7 @@ impl Shell {
         let toggle = this.clone();
         let button = Button::new("layout-menu")
             .debug_name("layout-menu")
-            .icon(beui::IconName::MoreHoriz)
+            .icon(atelier_ui::IconName::MoreHoriz)
             .variant(ButtonVariant::Ghost)
             .size(ButtonSize::IconSm)
             .tooltip("Layout")
@@ -1537,7 +1537,7 @@ impl Shell {
         Some(at.child(div().relative().child(button).children(menu)).into_any_element())
     }
 
-    fn choose_layout(&mut self, layout: beui::panel_types::Layout, cx: &mut Context<Self>) {
+    fn choose_layout(&mut self, layout: atelier_ui::panel_types::Layout, cx: &mut Context<Self>) {
         self.panels.update(cx, |p, cx| p.set_layout(layout, cx));
         self.mark_open_session(cx);
         self.close_layout_menu(cx);
@@ -1574,7 +1574,7 @@ impl Shell {
                     Location::Ssh { host, path } => this.open_remote(host.clone(), path.display().to_string(), window, cx),
                 }))
                 .child(match location {
-                    Location::Ssh { .. } => beui::Icon::new(beui::IconName::Dns).size(px(16.)).color(muted).into_any_element(),
+                    Location::Ssh { .. } => atelier_ui::Icon::new(atelier_ui::IconName::Dns).size(px(16.)).color(muted).into_any_element(),
                     Location::Local { .. } => FileIcon::folder(&location.name(), false).size(px(16.)).into_any_element(),
                 })
                 .child(
@@ -1598,7 +1598,7 @@ impl Shell {
                     .flex_col()
                     .gap(px(20.))
                     .w(px(420.))
-                    .child(div().flex().child(beui::AtelierMark::new(40.)))
+                    .child(div().flex().child(atelier_ui::AtelierMark::new(40.)))
                     .child(div().text_size(TextSize::Lg.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open a project"))
                     .child(div().debug_selector(|| "first-launch-line".into()).mt(px(-12.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(WHAT_ATELIER_IS))
                     .child(
@@ -1758,7 +1758,7 @@ impl Shell {
     /// The panes for the window's width: the three side by side, the two without the sidebar, or one at
     /// a time with tabs (docs/app.md, "Window widths").
     fn panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let total = beui::scale::design(window.viewport_size().width);
+        let total = atelier_ui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
             self.session_right = None;
@@ -1866,7 +1866,7 @@ impl Shell {
         let body = match self.narrow {
             Pane::Projects => self.sidebar(cx).into_any_element(),
             Pane::Session => {
-                let total = beui::scale::design(window.viewport_size().width);
+                let total = atelier_ui::scale::design(window.viewport_size().width);
                 self.panels.update(cx, |p, cx| p.fit_to(total - 16., cx));
                 self.agent_panel(cx)
             }
@@ -1917,8 +1917,8 @@ impl Shell {
     fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         // Rems follow the zoom too, so what is written in them scales with the rest.
-        window.set_rem_size(gpui_kit::px(16. * beui::scale::zoom()));
-        self.width = beui::scale::design(window.viewport_size().width);
+        window.set_rem_size(gpui_kit::px(16. * atelier_ui::scale::zoom()));
+        self.width = atelier_ui::scale::design(window.viewport_size().width);
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
             None => self.start_screen(window, cx).into_any_element(),
@@ -1940,7 +1940,7 @@ impl Shell {
                 .rounded(radius::lg())
                 .bg(theme.card_strong)
                 .text_size(TextSize::Xs.font_size())
-                .child(beui::spinner::Spinner::new("reconnecting").size(px(12.)).color(theme.warning))
+                .child(atelier_ui::spinner::Spinner::new("reconnecting").size(px(12.)).color(theme.warning))
                 .child(format!("Lost {place} ({why}). Reconnecting; your unsaved edits are kept here."))
         });
         div()
@@ -1958,8 +1958,8 @@ impl Shell {
             .on_action(cx.listener(Self::toggle_right))
             .on_action(cx.listener(Self::pull_requests_key))
             .on_action(cx.listener(|this, _: &ShowSessions, window, cx| this.show_view(ShellView::Sessions, window, cx)))
-            .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.zoom_to(beui::scale::zoom() + beui::scale::STEP, cx)))
-            .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.zoom_to(beui::scale::zoom() - beui::scale::STEP, cx)))
+            .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.zoom_to(atelier_ui::scale::zoom() + atelier_ui::scale::STEP, cx)))
+            .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.zoom_to(atelier_ui::scale::zoom() - atelier_ui::scale::STEP, cx)))
             .on_action(cx.listener(|this, _: &ZoomReset, _, cx| this.zoom_to(1., cx)))
             .on_action(cx.listener(Self::open_tasks_key))
             .on_key_down(cx.listener(Self::key_down))
@@ -1990,7 +1990,7 @@ impl Shell {
                             .py(px(8.))
                             .rounded(radius::lg())
                             .bg(theme.popover)
-                            .shadow(beui::theme::popover_shadow(&theme))
+                            .shadow(atelier_ui::theme::popover_shadow(&theme))
                             .text_size(TextSize::Sm.font_size())
                             .text_color(theme.foreground)
                             .child(words),
@@ -2050,12 +2050,12 @@ enum FolderSource {
 }
 
 /// A failure to read or open a folder, as the picker tells it.
-fn folder_error(error: &std::io::Error) -> beui::FolderError {
+fn folder_error(error: &std::io::Error) -> atelier_ui::FolderError {
     match error.kind() {
-        std::io::ErrorKind::NotFound => beui::FolderError::Missing,
-        std::io::ErrorKind::PermissionDenied => beui::FolderError::Denied,
-        std::io::ErrorKind::NotADirectory => beui::FolderError::NotAFolder,
-        _ => beui::FolderError::Other(error.to_string().into()),
+        std::io::ErrorKind::NotFound => atelier_ui::FolderError::Missing,
+        std::io::ErrorKind::PermissionDenied => atelier_ui::FolderError::Denied,
+        std::io::ErrorKind::NotADirectory => atelier_ui::FolderError::NotAFolder,
+        _ => atelier_ui::FolderError::Other(error.to_string().into()),
     }
 }
 

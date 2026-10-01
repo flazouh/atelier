@@ -26,7 +26,7 @@ fn the_strip_commits_the_accepted_hunk_on_a_drafted_branch(cx: &mut TestAppConte
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
     cx.update(|window, cx| {
         pane.update(cx, |p, cx| {
-            p.decide_hunk(&first, beui::Decision::Accept, window, cx);
+            p.decide_hunk(&first, atelier_ui::Decision::Accept, window, cx);
         })
     });
     cx.run_until_parked();
@@ -71,7 +71,7 @@ fn the_strip_makes_the_first_commit_of_a_new_repository(cx: &mut TestAppContext)
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
-    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, beui::Decision::Accept, window, cx)));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, atelier_ui::Decision::Accept, window, cx)));
     cx.run_until_parked();
     let kept_now: Vec<Kept> = cx.update(|_, cx| pane.read(cx).files.iter().filter_map(|f| kept(&f.review, f.merged.as_ref())).collect());
     let backend = crate::fake_agent::fake_agent("fake").backend;
@@ -116,7 +116,7 @@ fn a_commit_from_the_pane_marks_its_files_committed(cx: &mut TestAppContext) {
     });
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
-    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, beui::Decision::Accept, window, cx)));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, atelier_ui::Decision::Accept, window, cx)));
     cx.update(|window, cx| pane.update(cx, |p, cx| p.open_ship(window, cx)));
     cx.run_until_parked();
     let strip = cx.update(|_, cx| pane.read(cx).ship.clone());
@@ -152,7 +152,7 @@ fn opened_strip(cx: &mut TestAppContext, prepare: impl FnOnce(&std::path::Path))
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
-    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, beui::Decision::Accept, window, cx)));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, atelier_ui::Decision::Accept, window, cx)));
     cx.update(|window, cx| pane.update(cx, |p, cx| p.open_ship(window, cx)));
     cx.run_until_parked();
     let strip = cx.update(|_, cx| pane.read(cx).ship.clone());
@@ -387,7 +387,7 @@ fn the_draft_names_the_task_and_the_commit_tells_it(cx: &mut TestAppContext) {
     let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project.clone(), Scope::Turn(0), None, window, cx)));
     cx.run_until_parked();
     let first = cx.update(|_, cx| pane.read(cx).files[0].merged.as_ref().unwrap().hunks()[0].id.to_string());
-    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, beui::Decision::Accept, window, cx)));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_hunk(&first, atelier_ui::Decision::Accept, window, cx)));
     cx.update(|window, cx| pane.update(cx, |p, cx| p.open_ship(window, cx)));
     cx.run_until_parked();
     let strip = cx.update(|_, cx| pane.read(cx).ship.clone());

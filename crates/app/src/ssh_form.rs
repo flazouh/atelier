@@ -3,7 +3,7 @@
 //! connects, and Escape closes the form. While it connects the form shows each step ("Reaching hp-agent…", "Putting atelier-remote
 //! on hp-agent…"); a failure shows ssh's own words and leaves the form open to try again.
 
-use beui::{
+use atelier_ui::{
     TextInput,
     button::{Button, ButtonVariant},
     spinner::Spinner,
@@ -17,7 +17,7 @@ use gpui_kit::{
     component::input::{InputEvent, InputState},
     div, 
 };
-use beui::scale::px;
+use atelier_ui::scale::px;
 
 /// The chips' names for tests and screenshots, by their place in the list.
 const HOST_CHIPS: [&str; 8] = ["ssh-host-0", "ssh-host-1", "ssh-host-2", "ssh-host-3", "ssh-host-4", "ssh-host-5", "ssh-host-6", "ssh-host-7"];

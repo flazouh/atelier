@@ -6,7 +6,7 @@
 
 use std::{collections::BTreeMap, path::PathBuf};
 
-use beui::{
+use atelier_ui::{
     panel_types::{PanelData, ProjectLabel},
     session_status::SessionStatus,
     project_badge,

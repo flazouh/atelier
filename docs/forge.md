@@ -38,12 +38,12 @@ and `Unexpected` (an answer atelier could not read, with what was wrong).
 
 ### What the UI gets without new types
 
-`present` maps the model to the M0.4 models beui draws:
+`present` maps the model to the M0.4 models atelier-ui draws:
 
 - `chip(&PullBrief)` gives `PrChipData`, `pr_state`, `checks`, `review_state`.
 - `court_item(&Filed, now)` gives a `CourtItem`, with GitQuiet's short reason ("Ready to merge", "Checks
   running", "In the merge queue").
-- `merge_facts(&Pull, checks, conflicting_files)` gives `MergeFacts`, so `beui::merge` decides the
+- `merge_facts(&Pull, checks, conflicting_files)` gives `MergeFacts`, so `atelier-ui::merge` decides the
   blockers, the button and the standing line.
 
 ### Courts

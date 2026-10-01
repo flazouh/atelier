@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use beui::{AgentLook, BrandMark};
+use atelier_ui::{AgentLook, BrandMark};
 
 use crate::{claude, claude_code::ClaudeCode, coding_agents::CodingAgent, labs::Lab, own::OwnAgent, session::Backend};
 

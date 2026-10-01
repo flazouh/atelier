@@ -1,13 +1,13 @@
 //! One check over the whole key table: no two commands that can be active at once share a chord.
 //!
 //! The table has two parts. The GPUI bindings (`cx.bind_keys`, each with a context or none) and the
-//! chords of beui's `keys` table, which a pane reads itself. Two GPUI bindings clash when they have the
+//! chords of atelier-ui's `keys` table, which a pane reads itself. Two GPUI bindings clash when they have the
 //! same keys and different actions, and either has no context (it is live everywhere) or both have the
 //! same context. A chord of the `keys` table with a modifier clashes with a GPUI binding of the same keys.
 //! Bare letters of the `keys` table belong to their pane and are only checked against each other.
 use std::collections::BTreeMap;
 
-use beui::keys::{Command, Profile, chords};
+use atelier_ui::keys::{Command, Profile, chords};
 use gpui_kit::TestAppContext;
 
 /// A clash that was chosen. Each one names who wins and why the other still works.
@@ -50,7 +50,7 @@ struct Bound {
 
 fn bindings(cx: &mut TestAppContext) -> Vec<Bound> {
     cx.update(|cx| {
-        beui::init(cx);
+        atelier_ui::init(cx);
         crate::shell::bind_keys(cx);
         let map = cx.key_bindings();
         let map = map.borrow();

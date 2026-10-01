@@ -4,7 +4,7 @@
 
 use std::path::{Path, PathBuf};
 
-use beui::{ActiveTheme, Badge, Button, ButtonSize, ButtonVariant, CodeEditor, MONO_FONT_FAMILY, TextSize};
+use atelier_ui::{ActiveTheme, Badge, Button, ButtonSize, ButtonVariant, CodeEditor, MONO_FONT_FAMILY, TextSize};
 use gpui_kit::{
     App, AppContext, Context, ElementId, Entity, InteractiveElement, IntoElement, ParentElement, SharedString,
     StatefulInteractiveElement, Styled, Window, component::input::EditorState, div, prelude::FluentBuilder, px,
@@ -150,7 +150,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
     };
     let find_key = {
         let session = session.clone();
-        move |_: &beui::code_editor::FindReferences, _: &mut Window, cx: &mut App| {
+        move |_: &atelier_ui::code_editor::FindReferences, _: &mut Window, cx: &mut App| {
             session.update(cx, |session, cx| session.find_references(cx))
         }
     };
@@ -195,7 +195,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
                 ),
         )
         .child(div().on_action(find_key).child(CodeEditor::new(&state).height(px(380.))))
-        .child(div().flex().gap(px(beui::SEGMENT_GAP)).text_size(TextSize::Xs.font_size()).text_color(muted).children(session.read(cx).status()))
+        .child(div().flex().gap(px(atelier_ui::SEGMENT_GAP)).text_size(TextSize::Xs.font_size()).text_color(muted).children(session.read(cx).status()))
         .when(!references.is_empty(), |d| d.child(references_list(&references, &session, cx)))
         .into_any_element()
 }

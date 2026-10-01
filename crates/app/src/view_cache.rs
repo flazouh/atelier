@@ -1,4 +1,4 @@
-//! Views drawn from their last frame until they change (`plans/view-cache.md`). A cached view is laid out
+//! Views drawn from their last frame until they change. A cached view is laid out
 //! and painted again only when its entity is notified, so each one must be told when what it shows changes.
 //! `ATELIER_VIEW_CACHE=0` draws every view afresh, to prove or rule out a stale view in one run.
 

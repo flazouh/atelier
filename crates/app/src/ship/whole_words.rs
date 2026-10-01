@@ -3,7 +3,7 @@
 //! the line wraps between words, before the branch. Every strip line that names a branch goes through it.
 
 use gpui_kit::{Div, InteractiveElement, ParentElement, SharedString, Styled, div, };
-use beui::scale::px;
+use atelier_ui::scale::px;
 
 /// The words of `text`, each kept whole, wrapping between them. A word wider than the line is cut with an
 /// ellipsis rather than broken.

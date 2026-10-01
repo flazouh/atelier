@@ -3,7 +3,7 @@ use std::{cell::Cell, rc::Rc};
 use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 
 use super::*;
-use beui::theme::{Appearance, picked, set_appearance};
+use atelier_ui::theme::{Appearance, picked, set_appearance};
 
 #[test]
 fn the_mode_is_kept_by_its_key_and_a_stranger_is_refused() {
@@ -185,7 +185,7 @@ fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestApp
 /// The Sidebar section holds the layout's knobs; a change reaches the shell as one event and is kept in the settings.
 #[gpui_kit::test]
 fn the_sidebar_section_edits_the_layout_and_says_so_once(cx: &mut TestAppContext) {
-    use beui::sidebar_layout::BadgeShow;
+    use atelier_ui::sidebar_layout::BadgeShow;
     let (pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
     let heard = Rc::new(std::cell::RefCell::new(Vec::new()));
     let log = heard.clone();

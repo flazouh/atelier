@@ -1,4 +1,4 @@
-//! One session's panel as a view of its own (`plans/view-cache.md`), and its conversation rows as another.
+//! One session's panel as a view of its own, and its conversation rows as another.
 //! Both are drawn afresh for now: cached, either one made a caret blink draw a second frame (see
 //! docs/performance.md, "View cache"). Each observes its session, so caching them is one line each.
 

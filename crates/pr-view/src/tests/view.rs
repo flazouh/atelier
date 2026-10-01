@@ -2,7 +2,7 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
 use gpui_kit::{Entity, TestAppContext, VisualTestContext};
-use beui::verdict::Verb;
+use atelier_ui::verdict::Verb;
 use atelier_forge::{Change, ChangedFile, CheckStatus, Conclusion, Forge, PullRef};
 
 use super::repo::{Scenario, put};
@@ -72,8 +72,8 @@ pub fn harness_with(tune: impl FnOnce(PrConfig) -> PrConfig) -> Harness {
 pub fn setup(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Dark, cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Dark, cx);
         cx.set_reduce_motion(true);
     });
     cx.executor().allow_parking();
@@ -171,7 +171,7 @@ fn a_verdict_reply_and_resolve_each_send_one_write(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 fn a_merge_names_the_head_the_reader_saw_and_a_moved_branch_is_refused(cx: &mut TestAppContext) {
-    use beui::merge::{Action, Choice, MergeMethod};
+    use atelier_ui::merge::{Action, Choice, MergeMethod};
     setup(cx);
     let h = harness();
     let (view, cx) = open(&h, cx);
@@ -188,7 +188,7 @@ fn a_merge_names_the_head_the_reader_saw_and_a_moved_branch_is_refused(cx: &mut 
 
 #[gpui_kit::test]
 fn a_merge_that_goes_through_shows_the_pull_request_as_merged(cx: &mut TestAppContext) {
-    use beui::merge::{Action, Choice, MergeMethod};
+    use atelier_ui::merge::{Action, Choice, MergeMethod};
     setup(cx);
     let h = harness();
     let (view, cx) = open(&h, cx);
@@ -308,7 +308,7 @@ fn the_rail_lists_a_page_of_threads_and_shows_more_when_asked(cx: &mut TestAppCo
 
 #[gpui_kit::test]
 fn the_other_merge_box_presses_each_reach_the_forge_with_their_own_call(cx: &mut TestAppContext) {
-    use beui::merge::{Action, Choice, MergeMethod, UpdateWay};
+    use atelier_ui::merge::{Action, Choice, MergeMethod, UpdateWay};
     setup(cx);
     let h = harness();
     let (view, cx) = open(&h, cx);
@@ -341,7 +341,7 @@ fn the_other_merge_box_presses_each_reach_the_forge_with_their_own_call(cx: &mut
 
 #[gpui_kit::test]
 fn an_update_of_a_branch_that_moved_is_refused_and_says_so(cx: &mut TestAppContext) {
-    use beui::merge::{Action, Choice, MergeMethod, UpdateWay};
+    use atelier_ui::merge::{Action, Choice, MergeMethod, UpdateWay};
     setup(cx);
     let h = harness();
     let (view, cx) = open(&h, cx);
@@ -355,7 +355,7 @@ fn an_update_of_a_branch_that_moved_is_refused_and_says_so(cx: &mut TestAppConte
 
 #[gpui_kit::test]
 fn a_read_only_view_sends_none_of_the_merge_box_presses(cx: &mut TestAppContext) {
-    use beui::merge::{Action, Choice, MergeMethod};
+    use atelier_ui::merge::{Action, Choice, MergeMethod};
     setup(cx);
     let h = harness_with(|c| c.read_only(true));
     let (view, cx) = open(&h, cx);
@@ -377,7 +377,7 @@ fn the_comment_key_starts_a_draft_on_the_row_of_the_caret(cx: &mut TestAppContex
     let h = harness();
     let (view, cx) = open(&h, cx);
     settle(&view, cx, |v| v.current_view().is_some());
-    let handler = view.update(cx, |v, cx| v.handlers(cx)).for_command(beui::keys::Command::Comment).cloned().expect("the view answers the comment key");
+    let handler = view.update(cx, |v, cx| v.handlers(cx)).for_command(atelier_ui::keys::Command::Comment).cloned().expect("the view answers the comment key");
     assert!(view.read_with(cx, |v, _| v.draft.is_none()));
     // Row 1 of the shown file is a row that changed or sits beside a change; any row with a line will do.
     cx.update(|window, cx| {
@@ -419,7 +419,7 @@ fn a_narrow_pane_shows_details_or_files_and_the_switch_and_the_keys_change_it(cx
     assert_eq!(view.read_with(cx, |v, _| v.part), Part::Files);
     assert!(cx.debug_bounds("pr-rail").is_none() && cx.debug_bounds("pr-diff").is_some());
     // The Details key comes back to the rail.
-    let handler = view.update(cx, |v, cx| v.handlers(cx)).for_command(beui::keys::Command::ToggleDetails).cloned().expect("the view answers the details key");
+    let handler = view.update(cx, |v, cx| v.handlers(cx)).for_command(atelier_ui::keys::Command::ToggleDetails).cloned().expect("the view answers the details key");
     cx.update(|window, cx| handler(window, cx));
     cx.run_until_parked();
     assert_eq!(view.read_with(cx, |v, _| v.part), Part::Details);

@@ -6,7 +6,7 @@ use super::*;
 fn the_first_launch_shows_the_mark_and_one_line_about_what_atelier_is_above_the_buttons(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
     let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&atelier_settings::Settings::default(), cx));
@@ -41,7 +41,7 @@ fn quit_has_its_key(cx: &mut TestAppContext) {
 fn open_shell(cx: &mut TestAppContext) -> (Entity<Shell>, &mut gpui_kit::VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
     let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&atelier_settings::Settings::default(), cx));
@@ -306,7 +306,7 @@ fn the_layout_lives_in_a_menu_and_the_bar_is_gone(cx: &mut TestAppContext) {
     cx.simulate_click(single.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     let layout = shell.read_with(cx, |s, cx| s.panels.read(cx).layout());
-    assert_eq!(layout, beui::panel_types::Layout::Single, "Single view is chosen");
+    assert_eq!(layout, atelier_ui::panel_types::Layout::Single, "Single view is chosen");
 }
 
 /// A shell with a project and one session, at `width`.
@@ -328,7 +328,7 @@ fn open_files_from_the_menu(shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTest
     shell.update_in(cx, |s, window, cx| {
         let project = crate::agents_view::project_id(s.active().unwrap().read(cx));
         let sidebar = s.agents_sidebar.clone();
-        s.sidebar_event(&sidebar, &beui::sidebar::SidebarEvent::OpenFiles { project }, window, cx);
+        s.sidebar_event(&sidebar, &atelier_ui::sidebar::SidebarEvent::OpenFiles { project }, window, cx);
     });
     settle(shell, cx);
 }
@@ -381,7 +381,7 @@ fn a_narrow_files_view_has_a_tab_for_the_tree_and_the_editor(cx: &mut TestAppCon
 fn a_window_opens_on_the_view_it_closed_on(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
-        beui::theme::set_appearance(beui::theme::Appearance::Light, cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
     });
     let saved = atelier_settings::Settings { view: Some("files".into()), ..Default::default() };
     let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&saved, cx));
@@ -511,13 +511,13 @@ fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) 
     let filter = cx.debug_bounds("filter-button").expect("the filter button is drawn");
     cx.simulate_click(filter.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    for choice in beui::sidebar_filter::SessionFilter::ALL {
+    for choice in atelier_ui::sidebar_filter::SessionFilter::ALL {
         assert!(cx.debug_bounds(choice.row()).is_some(), "{} is on the menu", choice.words());
     }
     let archived = cx.debug_bounds("filter-archived").unwrap();
     cx.simulate_click(archived.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    assert_eq!(shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).layout().filter), beui::sidebar_filter::SessionFilter::Archived);
+    assert_eq!(shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).layout().filter), atelier_ui::sidebar_filter::SessionFilter::Archived);
 }
 
 /// An archived session leaves the list until the Archived or All filter asks for it, and comes back when taken out.
@@ -533,10 +533,10 @@ fn an_archived_session_leaves_the_list_until_the_filter_asks(cx: &mut TestAppCon
     assert!(titles(cx).iter().any(|t| t == "an old idea"), "a past session is on the list");
     shell.update(cx, |s, cx| s.set_archived("past:old-1", true, cx));
     assert!(!titles(cx).iter().any(|t| t == "an old idea"), "archived: gone from the list");
-    shell.update(cx, |s, cx| s.agents_sidebar.update(cx, |sb, cx| sb.choose_filter(beui::sidebar_filter::SessionFilter::Archived, cx)));
+    shell.update(cx, |s, cx| s.agents_sidebar.update(cx, |sb, cx| sb.choose_filter(atelier_ui::sidebar_filter::SessionFilter::Archived, cx)));
     assert_eq!(titles(cx), ["an old idea"], "the Archived filter shows only it");
     shell.update(cx, |s, cx| s.set_archived("past:old-1", false, cx));
-    shell.update(cx, |s, cx| s.agents_sidebar.update(cx, |sb, cx| sb.choose_filter(beui::sidebar_filter::SessionFilter::Active, cx)));
+    shell.update(cx, |s, cx| s.agents_sidebar.update(cx, |sb, cx| sb.choose_filter(atelier_ui::sidebar_filter::SessionFilter::Active, cx)));
     assert!(titles(cx).iter().any(|t| t == "an old idea"), "taken out of the archive: back on the list");
 }
 
@@ -566,10 +566,10 @@ fn the_sidebar_marks_the_open_session_in_the_single_view_only(cx: &mut TestAppCo
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     let marked = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).open_session().is_some());
     assert!(!marked(&shell, cx), "side by side: no row is marked");
-    shell.update(cx, |s, cx| s.choose_layout(beui::panel_types::Layout::Single, cx));
+    shell.update(cx, |s, cx| s.choose_layout(atelier_ui::panel_types::Layout::Single, cx));
     settle(&shell, cx);
     assert!(marked(&shell, cx), "single view: the one in front is marked");
-    shell.update(cx, |s, cx| s.choose_layout(beui::panel_types::Layout::SideBySide, cx));
+    shell.update(cx, |s, cx| s.choose_layout(atelier_ui::panel_types::Layout::SideBySide, cx));
     settle(&shell, cx);
     assert!(!marked(&shell, cx), "back side by side: none");
 }
@@ -593,7 +593,7 @@ fn the_sidebar_switches_between_projects_and_the_priority_list(cx: &mut TestAppC
 /// The Settings page changes the sidebar's look and the sidebar keeps the mode and the filter the head chose.
 #[gpui_kit::test]
 fn a_look_from_settings_reaches_the_sidebar_and_keeps_the_heads_choices(cx: &mut TestAppContext) {
-    use beui::{sidebar_layout::{BadgeShow, SidebarLayout}, sidebar_model::ListMode};
+    use atelier_ui::{sidebar_layout::{BadgeShow, SidebarLayout}, sidebar_model::ListMode};
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     shell.update(cx, |s, cx| s.agents_sidebar.update(cx, |sb, cx| sb.choose_mode(ListMode::Priority, cx)));
     let look = SidebarLayout { project_badge: BadgeShow::Never, show_time: false, ..Default::default() };
@@ -620,15 +620,15 @@ fn the_zoom_keys_scale_every_size_together(cx: &mut TestAppContext) {
         cx.simulate_keystrokes(zoom_in);
     }
     settle(&shell, cx);
-    assert!((beui::scale::zoom() - 1.5).abs() < 1e-4, "five presses of ⌘+ are 1.5: {}", beui::scale::zoom());
+    assert!((atelier_ui::scale::zoom() - 1.5).abs() < 1e-4, "five presses of ⌘+ are 1.5: {}", atelier_ui::scale::zoom());
     assert!((width(cx) - base * 1.5).abs() < 1.5, "the button is 1.5 times as wide: {} against {base}", width(cx));
     for _ in 0..30 {
         cx.simulate_keystrokes(zoom_out);
     }
-    assert_eq!(beui::scale::zoom(), beui::scale::MIN, "⌘− stops at the least");
+    assert_eq!(atelier_ui::scale::zoom(), atelier_ui::scale::MIN, "⌘− stops at the least");
     cx.simulate_keystrokes(reset);
     settle(&shell, cx);
-    assert_eq!(beui::scale::zoom(), 1.);
+    assert_eq!(atelier_ui::scale::zoom(), 1.);
     assert!((width(cx) - base).abs() < 0.5, "⌘0 puts it back");
 }
 

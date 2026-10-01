@@ -1,6 +1,6 @@
 //! The "Variants" story: designs for three controls, each in atelier's look (our tokens, sizes and radii,
 //! borderless) with the motion running, so Alex can pick. The toggle and tab designs are the parts the real app
-//! shows through Settings, "Design preview" (`beui::design_preview`): there is no second copy.
+//! shows through Settings, "Design preview" (`atelier_ui::design_preview`): there is no second copy.
 //!
 //! 1. The spinner: A the old glyph, B the ring, C three dots, D a bar sweep. Each 14px, at the text size.
 //! 2. The editor tabs: A a chip, B a chip with a 2px bottom line, C a text tab with an under-dot, D a tab with a
@@ -9,7 +9,7 @@
 //! `VARIANTS_GROUP=spinner|tabs` shows one group alone, for a screenshot.
 use std::time::Duration;
 
-use beui::{
+use atelier_ui::{
     ActiveTheme, FileIcon, Icon, IconName, Tab, Tabs,
     design_preview,
     motion::duration,
@@ -35,7 +35,7 @@ impl VariantsStory {
 }
 
 /// A control with its letter and a few words under it.
-fn labelled(letter: &str, words: &str, theme: &beui::Theme, control: impl IntoElement) -> AnyElement {
+fn labelled(letter: &str, words: &str, theme: &atelier_ui::Theme, control: impl IntoElement) -> AnyElement {
     div()
         .flex()
         .flex_col()
@@ -53,7 +53,7 @@ fn labelled(letter: &str, words: &str, theme: &beui::Theme, control: impl IntoEl
         .into_any_element()
 }
 
-fn group(title: &str, theme: &beui::Theme, items: Vec<AnyElement>) -> impl IntoElement {
+fn group(title: &str, theme: &atelier_ui::Theme, items: Vec<AnyElement>) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
@@ -77,7 +77,7 @@ impl Render for VariantsStory {
                     &theme,
                     vec![
                         labelled("A", "the old glyph", &theme, row(old_glyph(&theme))),
-                        labelled("B", "the ring", &theme, row(beui::spinner::Spinner::new("vs-b").size(px(14.)).color(theme.muted_foreground).into_any_element())),
+                        labelled("B", "the ring", &theme, row(atelier_ui::spinner::Spinner::new("vs-b").size(px(14.)).color(theme.muted_foreground).into_any_element())),
                         labelled("C", "three dots", &theme, row(dots(&theme))),
                         labelled("D", "a bar sweep", &theme, row(sweep(&theme))),
                     ],
@@ -123,7 +123,7 @@ impl Render for VariantsStory {
 }
 
 /// The old spinner: the Material "progress" glyph, turning once a second.
-fn old_glyph(theme: &beui::Theme) -> AnyElement {
+fn old_glyph(theme: &atelier_ui::Theme) -> AnyElement {
     Icon::new(IconName::Progress)
         .size(px(14.))
         .color(theme.muted_foreground)
@@ -132,7 +132,7 @@ fn old_glyph(theme: &beui::Theme) -> AnyElement {
 }
 
 /// Three dots that rise and fall in turn.
-fn dots(theme: &beui::Theme) -> AnyElement {
+fn dots(theme: &atelier_ui::Theme) -> AnyElement {
     let ink = theme.muted_foreground;
     div()
         .flex()
@@ -154,7 +154,7 @@ fn dots(theme: &beui::Theme) -> AnyElement {
 }
 
 /// A 14px bar with a short piece that sweeps across it.
-fn sweep(theme: &beui::Theme) -> AnyElement {
+fn sweep(theme: &atelier_ui::Theme) -> AnyElement {
     let ink = theme.muted_foreground;
     div()
         .relative()

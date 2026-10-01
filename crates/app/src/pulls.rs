@@ -6,7 +6,7 @@
 
 use std::{io::Read, path::PathBuf, sync::Arc};
 
-use beui::PrChipData;
+use atelier_ui::PrChipData;
 use gpui_kit::{Entity, Subscription};
 use atelier_lsp::Workers;
 use atelier_pr_view::{hub::PrHub, services::{PrConfig, Services}};
