@@ -12,6 +12,7 @@ mod activity;
 mod agent_session;
 mod project_icons;
 mod agents_view;
+mod file_glyphs;
 mod dirty;
 mod editor_pane;
 mod exit_log;
@@ -61,6 +62,7 @@ fn main() {
     let folders: Vec<Opening> = folders.into_iter().map(Opening::from).collect();
     gpui_kit::application().with_assets(atelier_agents::Assets).run(move |cx| {
         atelier_ui::init(cx);
+        file_glyphs::install(cx);
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
         // or the system's, which keeps the pick.
