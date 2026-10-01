@@ -882,7 +882,18 @@ impl Shell {
                 cx.notify();
             }
             ProjectEvent::CloseSession(key) => this.close_session(key.as_ref(), cx),
-            ProjectEvent::ShowFiles => this.show_view(ShellView::Files, window, cx),
+            ProjectEvent::NewSessionHere => {
+                if let Some(at) = this.projects.iter().position(|p| p == project) {
+                    this.new_session(at, window, cx);
+                }
+            }
+            ProjectEvent::ArchiveSession(key) => this.set_archived(key.as_ref(), true, cx),
+            ProjectEvent::ShowFiles => {
+                if let Some(at) = this.projects.iter().position(|p| p == project) {
+                    this.active = at;
+                }
+                this.show_view(ShellView::Files, window, cx)
+            }
             ProjectEvent::ShowTasks => {
                 if let Some(i) = this.projects.iter().position(|p| p == project) {
                     this.active = i;

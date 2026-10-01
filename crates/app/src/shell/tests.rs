@@ -539,3 +539,23 @@ fn an_archived_session_leaves_the_list_until_the_filter_asks(cx: &mut TestAppCon
     shell.update(cx, |s, cx| s.choose_filter(beui::sidebar_filter::SessionFilter::Active, cx));
     assert!(titles(cx).iter().any(|t| t == "an old idea"), "taken out of the archive: back on the list");
 }
+
+/// The panel's head has no status words; its ⋯ menu holds what a reader does with a session, and a choice does it.
+#[gpui_kit::test]
+fn the_panel_menu_holds_the_actions_for_a_session(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    assert!(cx.debug_bounds("panel-review").is_none(), "nothing to review before a turn changed something");
+    let more = cx.debug_bounds("panel-more").expect("the panel has a ⋯ button");
+    cx.simulate_click(more.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    for row in ["panel-rename", "panel-new-session", "panel-files", "panel-archive"] {
+        assert!(cx.debug_bounds(row).is_some(), "the menu has {row}");
+    }
+    let open = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions.len());
+    assert_eq!(open(&shell, cx), 1);
+    let fresh = cx.debug_bounds("panel-new-session").unwrap();
+    cx.simulate_click(fresh.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(open(&shell, cx), 2, "New session in this project opens another panel");
+    assert!(cx.debug_bounds("panel-rename").is_none(), "and the menu shut");
+}

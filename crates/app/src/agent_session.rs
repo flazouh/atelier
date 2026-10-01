@@ -69,6 +69,10 @@ pub enum SessionEvent {
     OpenTask,
     /// The reader pressed the panel's close button.
     Close,
+    /// The reader asked, in the panel's menu, for a new session in this project.
+    NewSession,
+    /// The reader asked, in the panel's menu, to archive this session.
+    Archive,
     /// The reader ran `/files`: the Files view comes to the front.
     ShowFiles,
     /// The reader ran `/tasks`: the project's tasks come to the right pane.

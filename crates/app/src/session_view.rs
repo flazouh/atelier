@@ -5,7 +5,7 @@
 //! The list lays out only the rows on screen; a question shows `ToolApproval` in its place in the
 //! conversation, and its answer goes back through the session.
 
-use std::time::Instant;
+use std::{rc::Rc, time::Instant};
 
 use beui::{
     PressStop,
@@ -468,9 +468,19 @@ fn shows_stop(running: bool, status: &SessionStatus) -> bool {
 
 fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, status_words, task, project, badge) = {
+    let (key, renaming, shown_title, running, task, project, badge, reviewable, session_id) = {
         let s = session.read(cx);
-        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words(), s.task.clone(), s.project_name(), s.badge.clone())
+        (
+            s.key.clone(),
+            s.renaming.clone(),
+            s.shown_title(),
+            shows_stop(s.running(), &s.status),
+            s.task.clone(),
+            s.project_name(),
+            s.badge.clone(),
+            !s.reviews.turns.turns().is_empty(),
+            s.id.as_ref().map(|i| i.as_str().to_string()),
+        )
     };
     let title = match &renaming {
         Some(input) => div()
@@ -519,6 +529,17 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
             .tooltip("Open the task")
             .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenTask)))
     });
+    // What the session has to show for itself: the changes its turns made, ready to review.
+    let review = reviewable.then(|| {
+        let open = session.clone();
+        Button::new(gpui_kit::ElementId::Name(format!("{key}-review").into()))
+            .debug_name("panel-review")
+            .label("Review")
+            .variant(ButtonVariant::Ghost)
+            .tooltip("Review what this session changed")
+            .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: None })))
+    });
+    let more = panel_menu(session, &key, session_id, window, cx);
     let close = {
         let close = session.clone();
         Button::new(gpui_kit::ElementId::Name(format!("{key}-close").into()))
@@ -551,9 +572,84 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
         })
         .child(title)
         .children(chip)
-        .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(status_words))
+        .children(review)
         .children(stop)
+        .child(more)
         .child(close)
+}
+
+/// What a choice in the panel's menu does.
+type MenuAction = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// The panel's ⋯ menu: what a reader does with a session besides talking to it. Rename it, begin another in the same
+/// project, see the project's files, copy the id the agent knows it by (to resume it elsewhere), archive it.
+fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Option<String>, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    use beui::{
+        menu::{self, Entry, Menu, MenuItem, MenuLook, Origin},
+        popover::{Hang, Popover},
+    };
+    let open = window.use_keyed_state(gpui_kit::ElementId::Name(format!("{key}-more").into()), cx, |_, _| false);
+    let is_open = *open.read(cx);
+    let flip = {
+        let open = open.clone();
+        move |cx: &mut App| open.update(cx, |o, cx| {
+            *o = !*o;
+            cx.notify();
+        })
+    };
+    let menu = is_open.then(|| {
+        // A choice shuts the menu, then does its work.
+        let item = |label: &'static str, name: &'static str, run: MenuAction| {
+            let open = open.clone();
+            Entry::from(MenuItem::new(label).debug_name(name).on_select(move |window, cx| {
+                open.update(cx, |o, cx| {
+                    *o = false;
+                    cx.notify();
+                });
+                run(window, cx)
+            }))
+        };
+        let (rename, fresh, files, archive) = (session.clone(), session.clone(), session.clone(), session.clone());
+        let mut entries = vec![
+            item("Rename", "panel-rename", Rc::new(move |window, cx| rename.update(cx, |s, cx| s.start_rename(window, cx)))),
+            item("New session in this project", "panel-new-session", Rc::new(move |_, cx| fresh.update(cx, |_, cx| cx.emit(SessionEvent::NewSession)))),
+            item("Open the project's files", "panel-files", Rc::new(move |_, cx| files.update(cx, |_, cx| cx.emit(SessionEvent::ShowFiles)))),
+        ];
+        if let Some(id) = session_id.clone() {
+            entries.push(item("Copy session id", "panel-copy-id", Rc::new(move |_, cx| cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(id.clone())))));
+        }
+        entries.push(item("Archive", "panel-archive", Rc::new(move |_, cx| archive.update(cx, |_, cx| cx.emit(SessionEvent::Archive)))));
+        let rows = entries.len();
+        let close = open.clone();
+        Popover::new(gpui_kit::ElementId::Name(format!("{key}-more-popover").into()))
+            .open(true)
+            .hang(Hang::Right(0., 30.))
+            .keep_focus()
+            .height(menu::height_in(MenuLook::PROJECT, rows))
+            .on_close(move |_, cx| {
+                close.update(cx, |o, cx| {
+                    *o = false;
+                    cx.notify();
+                });
+            })
+            .child(Menu::new(gpui_kit::ElementId::Name(format!("{key}-more-menu").into()), entries).look(MenuLook::PROJECT).origin(Origin::TopRight))
+    });
+    div()
+        .relative()
+        .child(
+            Button::new(gpui_kit::ElementId::Name(format!("{key}-more-button").into()))
+                .debug_name("panel-more")
+                .icon(IconName::MoreHoriz)
+                .variant(ButtonVariant::Ghost)
+                .size(beui::ButtonSize::IconSm)
+                .tooltip("More")
+                .open(is_open)
+                .on_click(move |_, _, cx| {
+                    cx.stop_propagation();
+                    flip(cx)
+                }),
+        )
+        .children(menu)
 }
 
 pub(crate) mod calls;
