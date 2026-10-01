@@ -7,6 +7,7 @@ use std::path::PathBuf;
 
 use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
 
+mod activity;
 mod agent_session;
 mod project_icons;
 mod agents_view;

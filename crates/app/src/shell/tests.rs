@@ -429,3 +429,49 @@ fn going_back_to_sessions_puts_the_caret_in_the_composer(cx: &mut TestAppContext
     });
     assert_eq!(typed, "hello", "the keys reached the composer");
 }
+
+/// While the agent works, its run of tool calls shows in a viewport no taller than `LIVE_HEIGHT`; once the turn
+/// ends the run folds to one line of words, and a press on it opens the calls.
+#[gpui_kit::test]
+fn a_long_run_of_tool_calls_is_capped_while_live_and_folds_after(cx: &mut TestAppContext) {
+    use lathe_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolOutput, ToolStatus, TurnEnd, TurnOutcome};
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
+    let tool = |n: usize| {
+        [
+            Event::ToolStarted(ToolCall {
+                id: ToolId::new(format!("t{n}")),
+                name: "Bash".into(),
+                kind: ToolKind::Shell,
+                input: serde_json::json!({ "command": format!("echo {n}") }),
+                file: None,
+                parent: None,
+                status: ToolStatus::Running,
+            }),
+            Event::ToolFinished { id: ToolId::new(format!("t{n}")), output: ToolOutput { text: format!("{n}"), truncated: false, full_at: None, is_error: false } },
+        ]
+    };
+    session.update(cx, |s, _| {
+        s.conversation.user_sent("go");
+        for event in (0..10).flat_map(tool) {
+            s.conversation.apply(&event);
+        }
+        s.refresh_rows();
+    });
+    settle(&shell, cx);
+    let live = cx.debug_bounds("activity-live").expect("the run shows as a live group");
+    assert!(f32::from(live.size.height) <= crate::activity::LIVE_HEIGHT + 0.5, "the viewport is capped: {:?}", live.size);
+    assert!(f32::from(live.size.height) > 150., "and full: {:?}", live.size);
+    assert!(cx.debug_bounds("activity-summary").is_none(), "no summary while it works");
+    session.update(cx, |s, cx| {
+        s.conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Completed, summary: None }));
+        s.refresh_rows();
+        cx.notify();
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("activity-live").is_none(), "the turn is over: no live viewport");
+    let summary = cx.debug_bounds("activity-summary").expect("the run folded to its summary");
+    cx.simulate_click(summary.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(session.read_with(cx, |s, _| s.group_is_open(1, 11)), "a press opens the group");
+}

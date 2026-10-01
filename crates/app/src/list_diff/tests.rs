@@ -39,3 +39,55 @@ fn a_card_past_the_last_item_goes_at_the_end() {
     use Row::*;
     assert_eq!(rows(2, &[(5, 0)]), [Item(0), Item(1), Changes { turn: 0 }]);
 }
+
+fn tool(name: &str) -> Item {
+    use lathe_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
+    Item::Tool(Call {
+        call: ToolCall { id: ToolId::new(name), name: name.into(), kind: ToolKind::Other, input: serde_json::json!({}), file: None, parent: None, status: ToolStatus::Done },
+        output: None,
+    })
+}
+
+fn think() -> Item {
+    Item::Thinking { block: lathe_agents::session::BlockId(1), text: "hm".into(), took: None }
+}
+
+fn said() -> Item {
+    Item::Text { block: lathe_agents::session::BlockId(2), text: "ok".into() }
+}
+
+/// Two or more activity items in a row are one group; one alone stays a row; what is said ends a group.
+#[test]
+fn a_run_of_activity_is_one_row_and_a_lone_item_is_not() {
+    use Row::{Activity, Changes, Item as At};
+    let items = [Item::User { text: "go".into() }, think(), tool("a"), tool("b"), said(), tool("c"), said()];
+    assert_eq!(grouped(&items, &|_| true, &[]), [At(0), Activity { from: 1, to: 4 }, At(4), At(5), At(6)]);
+}
+
+/// A turn's card of changed files ends a group, since it sits between two items.
+#[test]
+fn a_changes_card_ends_a_group() {
+    use Row::{Activity, Changes, Item as At};
+    let items = [think(), tool("a"), tool("b"), tool("c")];
+    assert_eq!(grouped(&items, &|_| true, &[(2, 0)]), [Activity { from: 0, to: 2 }, Changes { turn: 0 }, Activity { from: 2, to: 4 }]);
+}
+
+/// An item that draws no row (a call waiting on its approval) does not count toward the two.
+#[test]
+fn items_that_draw_nothing_do_not_make_a_group() {
+    use Row::{Activity, Changes, Item as At};
+    let items = [tool("a"), tool("b")];
+    assert_eq!(grouped(&items, &|ix| ix == 0, &[]), [At(0), At(1)]);
+}
+
+/// A group's fingerprint moves when an item in it changes, when it goes live, and when it opens.
+#[test]
+fn a_groups_fingerprint_follows_its_items_and_its_state() {
+    let items = [think(), tool("a")];
+    let base = activity_fingerprint(&items, 0, 2, false, false);
+    assert_ne!(base, activity_fingerprint(&items, 0, 2, true, false), "live");
+    assert_ne!(base, activity_fingerprint(&items, 0, 2, false, true), "open");
+    let grown = [think(), tool("a"), tool("b")];
+    assert_ne!(base, activity_fingerprint(&grown, 0, 3, false, false), "a third item");
+    assert_eq!(base, activity_fingerprint(&items, 0, 2, false, false), "same state, same print");
+}

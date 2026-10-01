@@ -269,3 +269,56 @@ fn a_command_runs_in_lathe_or_goes_to_the_agent_as_text(cx: &mut TestAppContext)
     cx.run_until_parked();
     assert!(fake.received.lock().unwrap().iter().any(|c| matches!(c, Command::Send { text, .. } if text == "/compact now")), "the agent's own command went as text");
 }
+
+fn started_tool(id: &str) -> Event {
+    Event::ToolStarted(ToolCall {
+        id: ToolId::new(id),
+        name: "Bash".into(),
+        kind: ToolKind::Shell,
+        input: serde_json::json!({ "command": "ls" }),
+        file: None,
+        parent: None,
+        status: ToolStatus::Running,
+    })
+}
+
+fn finished_tool(id: &str) -> Event {
+    Event::ToolFinished { id: ToolId::new(id), output: lathe_agents::session::ToolOutput { text: "ok".into(), truncated: false, full_at: None, is_error: false } }
+}
+
+/// The agent's work in a turn is one group: live and open while the agent works with nothing after it,
+/// folded to its words once the turn is over, and a press opens it again.
+#[gpui_kit::test]
+fn a_run_of_work_is_one_group_that_folds_when_the_turn_ends(cx: &mut TestAppContext) {
+    let block = lathe_agents::session::BlockId(1);
+    let work = vec![
+        Event::Thinking { block, delta: "hm".into() },
+        Event::ThinkingDone { block, took: std::time::Duration::from_secs(3) },
+        started_tool("a"),
+        finished_tool("a"),
+        started_tool("b"),
+        finished_tool("b"),
+    ];
+    let (session, fake, cx) = start(cx, vec![work.clone()], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("go".into(), cx)));
+    cx.run_until_parked();
+    let (shown, live, open) = cx.update(|_, cx| {
+        let s = session.read(cx);
+        (s.shown.clone(), s.group_is_live(4), s.group_is_open(1, 4))
+    });
+    assert_eq!(shown, [list_diff::Row::Item(0), list_diff::Row::Activity { from: 1, to: 4 }], "the user's message, then one group");
+    assert!(live && open, "the agent still works: the group is live and open");
+    fake.turns.lock().unwrap().push(vec![Event::Text { block: lathe_agents::session::BlockId(2), delta: "done".into() }, ended()]);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("more".into(), cx)));
+    cx.run_until_parked();
+    let (shown, folded) = cx.update(|_, cx| {
+        let s = session.read(cx);
+        (s.shown.clone(), !s.group_is_open(1, 4))
+    });
+    assert!(shown.contains(&list_diff::Row::Activity { from: 1, to: 4 }), "the group is still one row: {shown:?}");
+    assert!(folded, "the turn is over: the group is folded");
+    cx.update(|_, cx| session.update(cx, |s, cx| s.toggle_group(1, cx)));
+    assert!(cx.update(|_, cx| session.read(cx).group_is_open(1, 4)), "a press opens it");
+    cx.update(|_, cx| session.update(cx, |s, cx| s.toggle_group(1, cx)));
+    assert!(!cx.update(|_, cx| session.read(cx).group_is_open(1, 4)), "and folds it again");
+}

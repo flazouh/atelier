@@ -145,6 +145,8 @@ pub struct AgentSession {
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
+    /// The activity groups the reader opened, by the index of their first item.
+    pub opened_groups: std::collections::HashSet<usize>,
     /// What the project adds to the `/` list, and the agent's own commands once it has said them.
     project_commands: Vec<lathe_agents::commands::CommandInfo>,
     agent_commands: Vec<String>,
@@ -256,6 +258,7 @@ impl AgentSession {
             _pull_card: None,
             _saving: Task::ready(()),
             composer,
+            opened_groups: std::collections::HashSet::new(),
             project_commands: Vec::new(),
             agent_commands: Vec::new(),
             _lists: Task::ready(()),
@@ -467,15 +470,35 @@ impl AgentSession {
         cx.notify();
     }
 
+    /// Whether the group of items `from..to` is the live one: the agent works and nothing comes after it.
+    pub fn group_is_live(&self, to: usize) -> bool {
+        self.conversation.working() && to == self.conversation.items().len()
+    }
+
+    /// Whether group `from` shows its items: the live one always does, a finished one when the reader opened it.
+    pub fn group_is_open(&self, from: usize, to: usize) -> bool {
+        self.group_is_live(to) || self.opened_groups.contains(&from)
+    }
+
+    /// Opens or folds the finished group that starts at item `from`.
+    pub fn toggle_group(&mut self, from: usize, cx: &mut Context<Self>) {
+        if !self.opened_groups.remove(&from) {
+            self.opened_groups.insert(from);
+        }
+        self.refresh_rows();
+        cx.notify();
+    }
+
     /// Tells the list which rows to measure again.
-    fn refresh_rows(&mut self) {
+    pub(crate) fn refresh_rows(&mut self) {
         let items = self.conversation.items();
-        let shown = list_diff::rows(items.len(), &self.reviews.turn_marks);
+        let shown = list_diff::grouped(items, &|ix| crate::session_view::calls::shows(items, ix), &self.reviews.turn_marks);
         let after: Vec<_> = shown
             .iter()
             .map(|row| match *row {
                 list_diff::Row::Item(ix) => list_diff::fingerprint(&items[ix]),
                 list_diff::Row::Changes { turn } => list_diff::changes_fingerprint(turn),
+                list_diff::Row::Activity { from, to } => list_diff::activity_fingerprint(items, from, to, self.group_is_live(to), self.group_is_open(from, to)),
             })
             .collect();
         for (range, count) in list_diff::changes(&self.rows, &after) {

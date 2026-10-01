@@ -64,6 +64,7 @@ fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     match session.read(cx).shown.get(ix).copied() {
         Some(Row::Item(item)) => item_row(session, item, cx),
         Some(Row::Changes { turn }) => changes_row(session, turn, cx),
+        Some(Row::Activity { from, to }) => activity_row(session, from, to, cx),
         None => div().into_any_element(),
     }
 }
@@ -84,15 +85,77 @@ fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElem
     div().px(px(16.)).pb(px(14.)).child(card).into_any_element()
 }
 
-/// One item of the conversation.
+/// One item of the conversation, in its row's padding.
 fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
+    match item_body(session, ix, cx) {
+        Some(body) => div().px(px(16.)).pb(px(14.)).child(body).into_any_element(),
+        None => div().into_any_element(),
+    }
+}
+
+/// An activity group: the run of thinking, tool calls and subagents `from..to`. While the agent works and the
+/// group is the last row, its newest items show in a viewport that holds the end in view; once the turn is over
+/// it folds to one line of words that a press opens.
+fn activity_row(session: &Entity<AgentSession>, from: usize, to: usize, cx: &App) -> AnyElement {
     let s = session.read(cx);
     let theme = cx.theme().clone();
     let items = s.conversation.items();
-    let Some(item) = items.get(ix) else { return div().into_any_element() };
+    let visible = |ix: usize| calls::shows(items, ix);
+    let (live, open) = (s.group_is_live(to), s.group_is_open(from, to));
+    let words = crate::activity::summary(items, from, to, &visible);
+    let bodies: Vec<AnyElement> = if open { (from..to).filter(|&ix| visible(ix)).filter_map(|ix| item_body(session, ix, cx)).collect() } else { Vec::new() };
+    let key = s.key.clone();
+    let list = div().flex().flex_col().flex_none().w_full().gap(px(8.)).children(bodies);
+    let body = if live {
+        // The end stays in view: the room is filled from its bottom, so what does not fit runs off the top.
+        let surface = theme.card;
+        div()
+            .debug_selector(|| "activity-live".into())
+            .relative()
+            .flex()
+            .flex_col()
+            .justify_end()
+            .w_full()
+            .max_h(px(crate::activity::LIVE_HEIGHT))
+            .overflow_hidden()
+            .child(list)
+            .child(
+                div().absolute().top_0().left_0().right_0().h(px(12.)).bg(gpui_kit::linear_gradient(
+                    180.,
+                    gpui_kit::linear_color_stop(surface, 0.),
+                    gpui_kit::linear_color_stop(surface.opacity(0.), 1.),
+                )),
+            )
+            .into_any_element()
+    } else {
+        let toggle = session.clone();
+        let head = div()
+            .id(gpui_kit::ElementId::Name(format!("{key}-activity-{from}").into()))
+            .debug_selector(|| "activity-summary".into())
+            .flex()
+            .items_center()
+            .gap(px(6.))
+            .cursor_pointer()
+            .text_size(TextSize::Sm.font_size())
+            .text_color(theme.muted_foreground)
+            .hover(|s| s.text_color(theme.foreground))
+            .on_click(move |_, _, cx| toggle.update(cx, |s, cx| s.toggle_group(from, cx)))
+            .child(Icon::new(if open { IconName::ChevronDown } else { IconName::ChevronRight }).size(px(14.)))
+            .child(SharedString::from(words));
+        div().flex().flex_col().gap(px(8.)).child(head).when(open, |d| d.child(list)).into_any_element()
+    };
+    div().px(px(16.)).pb(px(14.)).child(body).into_any_element()
+}
+
+/// One item of the conversation, without its row's padding; `None` for an item that draws nothing.
+fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyElement> {
+    let s = session.read(cx);
+    let theme = cx.theme().clone();
+    let items = s.conversation.items();
+    let item = items.get(ix)?;
     // One row per call: the approval stands in for it while it waits, and its row carries the answer.
     if !calls::shows(items, ix) {
-        return div().into_any_element();
+        return None;
     }
     let root = s.root();
     let working = s.conversation.working();
@@ -202,7 +265,7 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
             .child(SharedString::from(text.clone()))
             .into_any_element(),
     };
-    div().px(px(16.)).pb(px(14.)).child(body).into_any_element()
+    Some(body)
 }
 
 /// The conversation's rows: a list that lays out only the rows on screen. Each row has a test name,
@@ -469,7 +532,7 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
         .children(stop)
 }
 
-mod calls;
+pub(crate) mod calls;
 mod preview;
 #[cfg(test)]
 mod tests;
