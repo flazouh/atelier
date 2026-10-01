@@ -39,11 +39,24 @@ fn row_status(status: ToolStatus) -> RowToolStatus {
     }
 }
 
-/// The row of `call`: its path relative to `root`, and the mark its answered approval left.
+/// The row of `call`: what it is about (the command, the file, the pattern, with an icon for its kind), its paths
+/// relative to `root`, and the mark its answered approval left.
 fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
-    let mut row = ToolRow::new(id, SharedString::from(call.call.name.clone())).status(row_status(call.call.status));
-    if let Some(file) = &call.call.file {
-        row = row.file(beui::tool_preview::relative_path(file, root));
+    let about = summary::summary(call, |path| beui::tool_preview::relative_path(path, root).to_string());
+    let icon = match about.kind {
+        lathe_agents::session::ToolKind::Shell => IconName::Terminal,
+        lathe_agents::session::ToolKind::Read => IconName::Description,
+        lathe_agents::session::ToolKind::Edit | lathe_agents::session::ToolKind::Write => IconName::Edit,
+        lathe_agents::session::ToolKind::Search => IconName::Search,
+        lathe_agents::session::ToolKind::Fetch => IconName::Public,
+        lathe_agents::session::ToolKind::Other => IconName::Build,
+    };
+    let mut row = ToolRow::new(id, SharedString::from(about.title)).icon(icon).status(row_status(call.call.status));
+    if let Some(detail) = about.detail {
+        row = row.tool(detail);
+    }
+    if let Some(file) = about.file {
+        row = row.file(file);
     }
     if let Some(mark) = mark {
         row = row.meta(mark);
@@ -107,8 +120,9 @@ fn activity_row(session: &Entity<AgentSession>, from: usize, to: usize, cx: &App
     let key = s.key.clone();
     let list = div().flex().flex_col().flex_none().w_full().gap(px(8.)).children(bodies);
     let body = if live {
-        // The end stays in view: the room is filled from its bottom, so what does not fit runs off the top.
-        let surface = theme.card;
+        // The end stays in view: the room is filled from its bottom, so what does not fit runs off the top. There is no fade
+        // over that edge: the panel behind is a different tone when it is the active one, and a fade of a fixed tone showed
+        // as a dark band.
         div()
             .debug_selector(|| "activity-live".into())
             .relative()
@@ -119,13 +133,6 @@ fn activity_row(session: &Entity<AgentSession>, from: usize, to: usize, cx: &App
             .max_h(px(crate::activity::LIVE_HEIGHT))
             .overflow_hidden()
             .child(list)
-            .child(
-                div().absolute().top_0().left_0().right_0().h(px(12.)).bg(gpui_kit::linear_gradient(
-                    180.,
-                    gpui_kit::linear_color_stop(surface, 0.),
-                    gpui_kit::linear_color_stop(surface.opacity(0.), 1.),
-                )),
-            )
             .into_any_element()
     } else {
         let toggle = session.clone();
@@ -654,5 +661,6 @@ fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Op
 
 pub(crate) mod calls;
 mod preview;
+mod summary;
 #[cfg(test)]
 mod tests;
