@@ -410,3 +410,22 @@ fn the_team_view_shows_the_readers_sessions_and_a_card_opens_one(cx: &mut TestAp
 fn the_team_view_shows_in_a_narrow_window_too(cx: &mut TestAppContext) {
     team_view_at(cx, 700.);
 }
+
+/// Back in the Sessions view the caret is in the composer of the session in front: typing goes on there.
+#[gpui_kit::test]
+fn going_back_to_sessions_puts_the_caret_in_the_composer(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    let (files, sessions) = if cfg!(target_os = "macos") { ("cmd-2", "cmd-1") } else { ("ctrl-2", "ctrl-1") };
+    cx.simulate_keystrokes(files);
+    settle(&shell, cx);
+    cx.simulate_keystrokes(sessions);
+    settle(&shell, cx);
+    cx.simulate_input("hello");
+    settle(&shell, cx);
+    let typed = shell.read_with(cx, |s, cx| {
+        let project = s.active().cloned().unwrap();
+        let session = project.read(cx).sessions[0].clone();
+        session.read(cx).composer.read(cx).text(cx).to_string()
+    });
+    assert_eq!(typed, "hello", "the keys reached the composer");
+}

@@ -714,8 +714,16 @@ impl Shell {
     pub fn show_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         if self.view != view {
             self.view = view;
-            self.focus.focus(window, cx);
             self.save_view(cx);
+            // Back in Sessions the reader is in the composer of the session in front, so typing goes on there.
+            let composer = (view == ShellView::Sessions)
+                .then(|| self.panels.read(cx).active().and_then(|key| self.session_by_key(key, cx)))
+                .flatten()
+                .map(|(_, session)| session.read(cx).composer.clone());
+            match composer {
+                Some(composer) => composer.read(cx).focus_handle(cx).focus(window, cx),
+                None => self.focus.focus(window, cx),
+            }
             cx.notify();
         }
     }

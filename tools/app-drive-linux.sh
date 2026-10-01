@@ -4,13 +4,13 @@
 # Build first: cargo build -p lathe-app.
 # Usage: tools/app-drive-linux.sh "<folders, or ->" "<theme>" <width>x<height> out.png|out.mp4 ["<shell script>"]
 # "-" opens no folder, for the start screen; several folders, split by spaces, open as several projects. The run keeps its own settings file, with that theme,
-# unless LATHE_SETTINGS names one. APP_WAIT=<seconds> sets how long it runs before the script.
+# unless LATHE_SETTINGS names one (light or dark sets its `mode`). APP_WAIT=<seconds> sets how long it runs before the script.
 set -euo pipefail
 TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
 DISPLAY_NUM=:${APP_DISPLAY:-79}
 if [ -z "${LATHE_SETTINGS:-}" ]; then
   export LATHE_SETTINGS=$(mktemp -d)/settings.json
-  printf '{"theme": "%s"}' "$2" >"$LATHE_SETTINGS"
+  printf '{"mode": "%s"}' "$2" >"$LATHE_SETTINGS"
 fi
 Xvfb "$DISPLAY_NUM" -screen 0 "${3}x24" -nolisten tcp >/tmp/lathe-xvfb.log 2>&1 &
 XVFB=$!
