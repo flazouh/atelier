@@ -1,7 +1,7 @@
 //! The conversation with an agent: handshake, sign-in, turns, questions, modes and models, and its end.
 use serde_json::json;
 
-use super::{Run, chunk, fail, respond, update};
+use super::{Run, chunk_in, fail, respond, update, update_in};
 use crate::{
     acp::protocol::{Found, Goal},
     session::{
@@ -279,11 +279,20 @@ fn a_resumed_session_loads_it_and_does_not_repeat_its_history() {
     run.initialized(json!({ "loadSession": true }));
     assert_eq!(run.last()["method"], "session/load");
     assert_eq!(run.last()["params"], json!({ "sessionId": "old", "cwd": "/work/project", "mcpServers": [] }));
-    run.agent(chunk("user_message_chunk", "earlier")).agent(chunk("agent_message_chunk", "reply"));
+    run.agent(chunk_in("old", "user_message_chunk", "earlier")).agent(chunk_in("old", "agent_message_chunk", "reply"));
     run.agent(respond(1, json!(null)));
     let events = run.events();
     assert_eq!(events.len(), 1, "only the start: the app read the history itself");
     assert!(matches!(&events[0], Event::Started(s) if s.session.as_str() == "old"));
+}
+
+#[test]
+fn an_agent_that_does_not_load_sessions_does_not_offer_to_resume() {
+    use crate::session::Backend as _;
+    let loads = crate::acp::Acp::new(super::agent());
+    let does_not = crate::acp::Acp::new(crate::acp::AcpAgent { resume: false, ..super::agent() });
+    assert!(loads.capabilities().resume);
+    assert!(!does_not.capabilities().resume);
 }
 
 #[test]
@@ -308,6 +317,25 @@ fn the_model_and_mode_a_session_opens_with_are_set_once_it_is_ready() {
     run.events();
     run.agent(respond(2, json!({}))).agent(respond(3, json!(null)));
     assert_eq!(run.events(), vec![started(Some("fast"), Some(PermissionMode::Ask), &[]), started(Some("fast"), Some(PermissionMode::Plan), &[])]);
+}
+
+/// The first turn runs on the model and mode the session opened with: its prompt waits for the agent's answers.
+#[test]
+fn a_message_sent_before_the_session_is_ready_waits_for_its_model_and_mode() {
+    let request = OpenRequest { model: Some("fast".into()), mode: Some(PermissionMode::Plan), ..OpenRequest::default() };
+    let mut run = Run::new(Goal::Open(request));
+    run.command(Command::send("plan it"));
+    run.initialized(json!({}));
+    run.agent(respond(1, json!({
+        "sessionId": "s1",
+        "modes": { "currentModeId": "agent", "availableModes": [] },
+        "configOptions": [{ "id": "model", "name": "Model", "category": "model", "type": "select", "currentValue": "auto", "options": [] }],
+    })));
+    assert!(run.sent("session/prompt").is_empty(), "the model and mode are not in force yet");
+    run.agent(respond(2, json!({})));
+    assert!(run.sent("session/prompt").is_empty(), "the mode is not in force yet");
+    run.agent(fail(3, -32602, "no plan mode"));
+    assert_eq!(run.sent("session/prompt").len(), 1, "both answered, one refused: the message goes");
 }
 
 #[test]
@@ -438,11 +466,11 @@ fn a_history_is_what_the_agent_replays_as_it_loads_the_session() {
     let mut run = Run::new(Goal::History(SessionId::new("old")));
     run.initialized(json!({ "loadSession": true }));
     assert_eq!(run.last()["method"], "session/load");
-    let said = |text: &str| update(json!({ "sessionUpdate": "user_message_chunk", "messageId": "m1", "content": { "type": "text", "text": text } }));
+    let said = |text: &str| update_in("old", json!({ "sessionUpdate": "user_message_chunk", "messageId": "m1", "content": { "type": "text", "text": text } }));
     run.agent(said("fix the "));
     run.agent(said("test"));
-    run.agent(chunk("agent_message_chunk", "On it."));
-    run.agent(update(json!({ "sessionUpdate": "tool_call", "toolCallId": "t1", "title": "cargo test", "kind": "execute", "status": "in_progress" })));
+    run.agent(chunk_in("old", "agent_message_chunk", "On it."));
+    run.agent(update_in("old", json!({ "sessionUpdate": "tool_call", "toolCallId": "t1", "title": "cargo test", "kind": "execute", "status": "in_progress" })));
     assert!(run.events().is_empty(), "a history gives no live events");
     run.agent(respond(1, json!(null)));
     let Some(Ok(Found::History(events))) = run.protocol.found() else { panic!("a history") };
@@ -456,8 +484,8 @@ fn a_history_is_what_the_agent_replays_as_it_loads_the_session() {
 fn user_chunks_with_no_message_id_are_messages_apart() {
     let mut run = Run::new(Goal::History(SessionId::new("old")));
     run.initialized(json!({ "loadSession": true }));
-    run.agent(chunk("user_message_chunk", "first"));
-    run.agent(chunk("user_message_chunk", "second"));
+    run.agent(chunk_in("old", "user_message_chunk", "first"));
+    run.agent(chunk_in("old", "user_message_chunk", "second"));
     run.agent(respond(1, json!(null)));
     let Some(Ok(Found::History(events))) = run.protocol.found() else { panic!("a history") };
     assert_eq!(events, [Event::UserMessage { text: "first".into() }, Event::UserMessage { text: "second".into() }]);

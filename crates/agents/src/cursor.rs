@@ -38,6 +38,7 @@ pub fn agent() -> AcpAgent {
         ],
         thinking: true,
         todos: true,
+        resume: true,
     }
 }
 

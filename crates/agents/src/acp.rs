@@ -43,6 +43,8 @@ pub struct AcpAgent {
     pub thinking: bool,
     /// Whether the agent keeps a plan, which atelier shows as its todo list.
     pub todos: bool,
+    /// Whether the agent loads a past session (ACP's optional `loadSession`), so a session can resume.
+    pub resume: bool,
 }
 
 impl AcpAgent {
@@ -83,7 +85,7 @@ impl Backend for Acp {
 
     fn capabilities(&self) -> Capabilities {
         Capabilities {
-            resume: true,
+            resume: self.agent.resume,
             interrupt: true,
             models: self.agent.models.clone(),
             permission_modes: self.agent.modes.iter().map(|(mode, _)| *mode).collect(),

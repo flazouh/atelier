@@ -28,6 +28,7 @@ fn agent() -> AcpAgent {
         models: vec![ModelChoice { id: "auto".into(), label: "Auto".into() }, ModelChoice { id: "fast".into(), label: "Fast".into() }],
         thinking: true,
         todos: true,
+        resume: true,
     }
 }
 
@@ -111,10 +112,19 @@ fn fail(id: u64, code: i64, message: &str) -> Value {
     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
 }
 
+/// An update to `s1`, the session `Run::ready` opens.
 fn update(update: Value) -> Value {
-    json!({ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s1", "update": update } })
+    update_in("s1", update)
+}
+
+fn update_in(session: &str, update: Value) -> Value {
+    json!({ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": session, "update": update } })
 }
 
 fn chunk(kind: &str, text: &str) -> Value {
-    update(json!({ "sessionUpdate": kind, "content": { "type": "text", "text": text } }))
+    chunk_in("s1", kind, text)
+}
+
+fn chunk_in(session: &str, kind: &str, text: &str) -> Value {
+    update_in(session, json!({ "sessionUpdate": kind, "content": { "type": "text", "text": text } }))
 }

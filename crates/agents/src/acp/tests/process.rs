@@ -98,7 +98,7 @@ fn a_program_the_host_lacks_is_reported_as_missing() {
 #[test]
 fn a_turn_runs_through_the_process_and_atelier_writes_json_rpc_lines() {
     let stand = Stand::new();
-    let log = stand.log();
+    let (log, pid) = (stand.log(), stand.dir.path().join("sleep-pid"));
     let backend = stand.backend(&format!(
         r#"log='{}'
 read l; printf '%s\n' "$l" >> "$log"; echo '{INITIALIZED}'
@@ -106,8 +106,10 @@ read l; printf '%s\n' "$l" >> "$log"; echo '{{"jsonrpc":"2.0","id":1,"result":{{
 read l; printf '%s\n' "$l" >> "$log"
 echo '{{"jsonrpc":"2.0","method":"session/update","params":{{"sessionId":"s1","update":{{"sessionUpdate":"agent_message_chunk","content":{{"type":"text","text":"Hi there"}}}}}}}}'
 echo '{{"jsonrpc":"2.0","id":2,"result":{{"stopReason":"end_turn"}}}}'
-sleep 60"#,
-        log.display()
+sleep 60 & echo $! > '{}'
+wait"#,
+        log.display(),
+        pid.display()
     ));
     let (sink, rx) = channel();
     let session = backend.open(stand.project(), OpenRequest::default(), sink).unwrap();
@@ -128,6 +130,12 @@ sleep 60"#,
     drop(session);
     assert_eq!(until(&rx, ended).last(), Some(&Event::Ended(EndReason::Closed)));
     assert!(dropped.elapsed() < Duration::from_secs(5), "the process must not run its sleep out");
+    let pid = std::fs::read_to_string(&pid).unwrap().trim().to_string();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while crate::testing::alive(&pid) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(!crate::testing::alive(&pid), "the agent's sleep {pid} outlives the session");
 }
 
 #[test]
@@ -201,4 +209,91 @@ fn a_list_from_an_agent_that_exits_says_why() {
         Err(SessionError::Read(why)) => assert_eq!(why, "the agent exited with code 1: not signed in"),
         other => panic!("wrong answer: {other:?}"),
     }
+}
+
+/// Dropping the session closes the agent's stdin even while a child of the agent holds its stdout open, so
+/// the reader never sees the end of the stream. The child leads a group of its own (`setpgrp`), as a helper
+/// that left the agent's group would, so killing the agent's group does not reach it.
+#[test]
+fn a_dropped_session_closes_stdin_while_a_child_of_the_agent_holds_stdout() {
+    let stand = Stand::new();
+    let (ready, mark) = (stand.dir.path().join("child-ready"), stand.dir.path().join("stdin-closed"));
+    let backend = stand.backend(&format!(
+        r#"exec 3<&0
+read l; echo '{INITIALIZED}'
+read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"sessionId":"s1"}}}}'
+perl -e 'setpgrp(0, 0); exec @ARGV' sh -c 'touch "$0"; while read l; do :; done; touch "$1"' '{}' '{}' <&3 &
+wait"#,
+        ready.display(),
+        mark.display()
+    ));
+    let (sink, rx) = channel();
+    let session = backend.open(stand.project(), OpenRequest::default(), sink).unwrap();
+    until(&rx, |e| matches!(e, Event::Started(_)));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !ready.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    drop(session);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !mark.exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(mark.exists(), "the child read to the end of stdin");
+}
+
+/// A command for an agent that no longer reads its stdin fails, instead of going nowhere.
+#[test]
+fn a_command_for_an_agent_that_stopped_reading_says_the_session_is_closed() {
+    let stand = Stand::new();
+    let backend = stand.backend(&format!(
+        r#"read l; echo '{INITIALIZED}'
+read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"sessionId":"s1"}}}}'
+exec 0<&-
+exec sleep 30"#
+    ));
+    let (sink, rx) = channel();
+    let session = backend.open(stand.project(), OpenRequest::default(), sink).unwrap();
+    until(&rx, |e| matches!(e, Event::Started(_)));
+    let deadline = Instant::now() + WAIT;
+    let refused = loop {
+        let sent = session.send(Command::SetModel { model: "fast".into() });
+        if sent.is_err() || Instant::now() > deadline {
+            break sent;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    assert!(matches!(refused, Err(SessionError::Closed)), "{refused:?}");
+}
+
+/// An agent that closes its stdout and keeps running does not hold up a list.
+#[test]
+fn a_list_from_an_agent_that_closes_its_stdout_and_runs_on_ends() {
+    let stand = Stand::new();
+    let backend = stand.backend("read l; exec 1>&-; exec sleep 30");
+    let started = Instant::now();
+    assert!(backend.sessions(stand.project().as_ref()).is_err());
+    assert!(started.elapsed() < Duration::from_secs(10), "took {:?}", started.elapsed());
+}
+
+/// A list stops the agent's children with it: a child that holds the agent's stdout and says nothing would
+/// otherwise keep atelier's reader waiting for as long as it runs.
+#[test]
+fn a_list_stops_the_agents_children_too() {
+    let stand = Stand::new();
+    let pid = stand.dir.path().join("child-pid");
+    let backend = stand.backend(&format!(
+        r#"sleep 30 & echo $! > '{}'
+read l; echo '{INITIALIZED}'
+read l; echo '{{"jsonrpc":"2.0","id":1,"result":{{"sessions":[]}}}}'
+wait"#,
+        pid.display()
+    ));
+    backend.sessions(stand.project().as_ref()).unwrap();
+    let pid = std::fs::read_to_string(&pid).unwrap().trim().to_string();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while crate::testing::alive(&pid) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(!crate::testing::alive(&pid), "the agent's child {pid} still runs");
 }

@@ -5,8 +5,8 @@
 //! The handshake is `initialize`, then `session/new`, `session/load` or `session/list` for the goal. When
 //! the agent answers that it needs a sign-in, atelier calls `authenticate` with the first method the agent
 //! offered and asks again, once. A session is ready when the agent answers with its id: `Started` goes
-//! out, the model and mode the request asked for are set, and the messages sent before then are prompted
-//! one after another.
+//! out, the model and mode the request asked for are set, and once the agent has answered those, the
+//! messages sent before then are prompted one after another.
 //!
 //! Cursor puts a model's settings in brackets after its id (`composer-2.5[fast=true]`) and takes only the
 //! whole id. atelier names a model by the part before the brackets, and sends the whole id the agent listed.
@@ -265,6 +265,7 @@ impl Protocol {
             (Asked::SetMode(_), Err(error)) => step.events.push(Event::Warning(format!("the agent kept its mode: {error}"))),
             (Asked::SetModel(_), Err(error)) => step.events.push(Event::Warning(format!("the agent kept its model: {error}"))),
         }
+        self.prompt_next(&mut step);
         step
     }
 
@@ -396,8 +397,10 @@ impl Protocol {
         }
     }
 
+    /// Prompts the next message, unless a turn runs or a model or mode atelier asked for is not answered yet:
+    /// a turn runs on the settings the user chose.
     fn prompt_next(&mut self, step: &mut Step) {
-        if self.in_turn {
+        if self.in_turn || self.waiting.values().any(|asked| matches!(asked, Asked::SetMode(_) | Asked::SetModel(_))) {
             return;
         }
         let Some(session) = self.ready_session() else { return };

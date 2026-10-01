@@ -18,7 +18,7 @@ use atelier_tracker::{LocalTracker, Tracker, TrackerError, TrackerResult, prefix
 
 use crate::{
     Change, ChangeKind, ChangeSink, Command, DataEntry, Entry, GitOutput, Match, Process, Project, Query, Watch,
-    TrackerSlot, data::DataFolder, host_path, process::LocalChild,
+    TrackerSlot, data::DataFolder, host_path, process::{Control as _, LocalChild},
 };
 
 /// Writes `target` whole, through a temporary file beside it, so a reader never sees half of it. The
@@ -227,19 +227,28 @@ impl Project for LocalProject {
         Ok(found)
     }
 
+    /// Starts `command` as the leader of a process group of its own, so killing it ends what it started, with
+    /// a watchdog that ends that group when atelier ends. A child the watchdog cannot guard is not left running.
     fn spawn(&self, command: &Command) -> io::Result<Process> {
-        let mut child = std::process::Command::new(&command.program)
-            .args(&command.args)
+        let mut os = std::process::Command::new(&command.program);
+        os.args(&command.args)
             .current_dir(command.cwd.as_deref().unwrap_or(&self.root))
             .envs(command.env.iter().map(|(k, v)| (k, v)))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-        crate::process::tether(child.id());
+            .stderr(Stdio::piped());
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut os, 0);
+        let mut child = os.spawn()?;
         let stdin = child.stdin.take().expect("stdin is piped");
         let stdout = child.stdout.take().expect("stdout is piped");
-        Ok(Process { stdin: Box::new(stdin), stdout: Box::new(stdout), control: Box::new(LocalChild::new(child)) })
+        let mut control = LocalChild::new(child);
+        if let Err(error) = crate::process::tether(control.child.id()) {
+            let _ = control.kill();
+            let _ = control.wait();
+            return Err(error);
+        }
+        Ok(Process { stdin: Box::new(stdin), stdout: Box::new(stdout), control: Box::new(control) })
     }
 
     fn git(&self, args: &[&str]) -> io::Result<GitOutput> {

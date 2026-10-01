@@ -9,7 +9,7 @@ pub(super) fn epoch_seconds(text: &str) -> Option<u64> {
         // Past the year 33658 in seconds, so it counts milliseconds.
         return Some(if number >= 1_000_000_000_000 { number / 1000 } else { number });
     }
-    let (date, rest) = text.split_once(['T', ' '])?;
+    let (date, rest) = text.split_once(['T', 't', ' '])?;
     let mut date = date.splitn(3, '-').map(str::parse::<i64>);
     let (year, month, day) = (date.next()?.ok()?, date.next()?.ok()?, date.next()?.ok()?);
     let zone_at = rest.find(['Z', 'z', '+', '-']).unwrap_or(rest.len());
@@ -17,21 +17,40 @@ pub(super) fn epoch_seconds(text: &str) -> Option<u64> {
     let mut clock = clock.split(':');
     let hour: i64 = clock.next()?.parse().ok()?;
     let minute: i64 = clock.next()?.parse().ok()?;
-    let second: i64 = clock.next().map_or(Some(0.), |s| s.parse::<f64>().ok())? as i64;
+    let second = clock.next().map_or(Some(0), |s| {
+        let (whole, fraction) = s.split_once('.').unwrap_or((s, "0"));
+        let digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+        (digits(whole) && digits(fraction)).then(|| whole.parse::<i64>().ok()).flatten()
+    })?;
     let offset = match zone {
         "" | "Z" | "z" => 0,
         _ => {
             let sign = if zone.starts_with('-') { -1 } else { 1 };
-            let digits = zone[1..].replace(':', "");
-            let (hours, minutes) = digits.split_at(digits.len().min(2));
-            sign * (hours.parse::<i64>().ok()? * 3600 + if minutes.is_empty() { 0 } else { minutes.parse::<i64>().ok()? * 60 })
+            let digits = zone[1..].replacen(':', "", 1);
+            if digits.len() != 4 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            let (hours, minutes) = (digits[..2].parse::<i64>().ok()?, digits[2..].parse::<i64>().ok()?);
+            if hours > 23 || minutes > 59 {
+                return None;
+            }
+            sign * (hours * 3600 + minutes * 60)
         }
     };
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 || second > 60 {
+    if !(1..=12).contains(&month) || !(1..=days_in_month(year, month)).contains(&day) || hour > 23 || minute > 59 || second > 60 {
         return None;
     }
     let seconds = days_from_civil(year, month, day) * 86_400 + hour * 3600 + minute * 60 + second - offset;
     u64::try_from(seconds).ok()
+}
+
+fn days_in_month(year: i64, month: i64) -> i64 {
+    match month {
+        2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
 }
 
 /// Days from 1970-01-01 to a date of the proleptic Gregorian calendar (Howard Hinnant's algorithm).

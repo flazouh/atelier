@@ -20,9 +20,9 @@ use crate::{
 };
 
 struct Replay {
-    /// The methods of the requests and notifications atelier wrote, and of those the capture sent.
-    written: Vec<String>,
-    captured: Vec<String>,
+    /// The requests and notifications atelier wrote, and those the capture sent, each as its method and params.
+    written: Vec<Value>,
+    captured: Vec<Value>,
     /// Every line atelier wrote.
     lines: Vec<Value>,
     events: Vec<Event>,
@@ -42,8 +42,8 @@ fn replay(name: &str, goal: Goal) -> Replay {
         let step = if entry["dir"] == "in" {
             protocol.line(&message.to_string(), start + Duration::from_millis(i as u64))
         } else {
-            if let Some(method) = message["method"].as_str() {
-                captured.push(method.to_string());
+            if message["method"].is_string() {
+                captured.push(request(message));
             }
             match command(message) {
                 Some(command) => protocol.command(command).expect("the command is taken"),
@@ -53,8 +53,12 @@ fn replay(name: &str, goal: Goal) -> Replay {
         lines.extend(step.lines.iter().map(|l| serde_json::from_str::<Value>(l).unwrap()));
         events.extend(step.events);
     }
-    let written = lines.iter().filter_map(|l| l["method"].as_str().map(str::to_string)).collect();
+    let written = lines.iter().filter(|l| l["method"].is_string()).map(request).collect();
     Replay { written, captured, lines, events, found: protocol.found() }
+}
+
+fn request(line: &Value) -> Value {
+    serde_json::json!({ "method": line["method"], "params": line["params"] })
 }
 
 /// The command of atelier's that writes what the capture's client wrote. The handshake and the answers to
@@ -124,6 +128,9 @@ fn edits_commands_questions_plan_mode_and_an_interrupt_replay() {
     assert_eq!(questions[0].reason.as_deref(), Some("Not in allowlist: rm"));
     assert_eq!(questions[0].call.input["command"], "rm notes.txt");
     assert_eq!(questions[0].choices.iter().map(|c| c.kind).collect::<Vec<_>>(), [ChoiceKind::Allow, ChoiceKind::AllowAlways, ChoiceKind::Deny]);
+    let started: Vec<_> = run.events.iter().filter_map(|e| if let Event::ToolStarted(call) = e { Some(&call.id) } else { None }).collect();
+    assert_eq!(started.len(), started.iter().collect::<std::collections::HashSet<_>>().len(), "a question adds no second card");
+    assert!(questions.iter().all(|q| started.contains(&&q.call.id)), "each question names a call already on screen");
     let rm = &questions[0].call.id;
     assert!(run.events.iter().any(|e| matches!(e, Event::ToolFinished { id, output } if id == rm && output.text.is_empty())),
         "a denied command ends with nothing, not with the question's reason");
