@@ -483,6 +483,9 @@ fn a_narrow_sessions_view_has_no_editor_tab(cx: &mut TestAppContext) {
 fn a_panel_names_its_project_and_a_press_on_its_close_button_closes_it(cx: &mut TestAppContext) {
     let (shell, cx, dir) = with_a_session(cx, 1400.);
     assert!(cx.debug_bounds("panel-project").is_some(), "the panel names its project");
+    let badge = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].read(cx).badge.clone());
+    let sidebar = shell.read_with(cx, |s, _| s.all_projects[0].badge.clone());
+    assert_eq!(badge, Some(sidebar), "the panel wears the badge the sidebar draws for the project");
     let name = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].read(cx).project_name());
     assert_eq!(name.as_ref(), dir.path().file_name().unwrap().to_string_lossy());
     let open = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions.len());

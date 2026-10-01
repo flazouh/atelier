@@ -256,6 +256,14 @@ impl Shell {
         let all = agents_view::sidebar(&self.projects, &self.names, &self.badges, &self.archived, cx);
         let query = self.filter_input.as_ref().map(|i| i.read(cx).value().to_string()).unwrap_or_default();
         let shown = beui::sidebar_filter::narrow(&all, self.session_filter, &query);
+        // Each session carries its project's badge, for the head of its panel.
+        let sessions: Vec<(Vec<Entity<AgentSession>>, beui::sidebar_model::Badge)> =
+            self.projects.iter().zip(&all).map(|(p, data)| (p.read(cx).sessions.clone(), data.badge.clone())).collect();
+        for (open, badge) in sessions {
+            for session in open {
+                session.update(cx, |s, cx| s.set_badge(badge.clone(), cx));
+            }
+        }
         self.all_projects = all;
         let now = agent_session::now();
         self.agents_sidebar.update(cx, |s, cx| s.set_projects(shown, now, cx));

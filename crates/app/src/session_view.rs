@@ -468,9 +468,9 @@ fn shows_stop(running: bool, status: &SessionStatus) -> bool {
 
 fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, status_words, task, project) = {
+    let (key, renaming, shown_title, running, status_words, task, project, badge) = {
         let s = session.read(cx);
-        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words(), s.task.clone(), s.project_name())
+        (s.key.clone(), s.renaming.clone(), s.shown_title(), shows_stop(s.running(), &s.status), s.status.words(), s.task.clone(), s.project_name(), s.badge.clone())
     };
     let title = match &renaming {
         Some(input) => div()
@@ -537,8 +537,18 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
         .h(px(40.))
         .pl(px(16.))
         .pr(px(8.))
-        // The project the session works in, so a panel always says where it is.
-        .child(div().debug_selector(|| "panel-project".into()).flex_none().max_w(px(120.)).truncate().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(project))
+        // The project the session works in, as its badge (its name stands in until the shell has set the badge), so a
+        // panel always says where it is; the name is its tooltip.
+        .child(match badge {
+            Some(badge) => div()
+                .id(gpui_kit::ElementId::Name(format!("{key}-project").into()))
+                .debug_selector(|| "panel-project".into())
+                .flex_none()
+                .tooltip(beui::tooltip::Tooltip::text(project))
+                .child(beui::project_badge::ProjectBadge::new(badge.label, badge.color).icon(badge.icon))
+                .into_any_element(),
+            None => div().debug_selector(|| "panel-project".into()).flex_none().max_w(px(120.)).truncate().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(project).into_any_element(),
+        })
         .child(title)
         .children(chip)
         .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(status_words))

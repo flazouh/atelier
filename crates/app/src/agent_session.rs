@@ -147,6 +147,8 @@ pub struct AgentSession {
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
+    /// The project's badge, as the sidebar draws it.
+    pub badge: Option<beui::sidebar_model::Badge>,
     /// The activity groups the reader opened, by the index of their first item.
     pub opened_groups: std::collections::HashSet<usize>,
     /// What the project adds to the `/` list, and the agent's own commands once it has said them.
@@ -164,6 +166,14 @@ pub struct AgentSession {
 }
 
 impl AgentSession {
+    /// Gives the session its project's badge, which its panel's head shows. The shell sets it whenever it syncs.
+    pub fn set_badge(&mut self, badge: beui::sidebar_model::Badge, cx: &mut Context<Self>) {
+        if self.badge.as_ref() != Some(&badge) {
+            self.badge = Some(badge);
+            cx.notify();
+        }
+    }
+
     /// The name of the project's folder: the panel names the project it works in.
     pub fn project_name(&self) -> SharedString {
         self.project.root().file_name().map_or_else(|| self.project.root().display().to_string(), |n| n.to_string_lossy().into_owned()).into()
@@ -265,6 +275,7 @@ impl AgentSession {
             _pull_card: None,
             _saving: Task::ready(()),
             composer,
+            badge: None,
             opened_groups: std::collections::HashSet::new(),
             project_commands: Vec::new(),
             agent_commands: Vec::new(),
