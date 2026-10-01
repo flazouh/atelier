@@ -1364,6 +1364,12 @@ impl Shell {
         div()
             .id("title-bar")
             .window_control_area(WindowControlArea::Drag)
+            // A double press on the bar zooms the window, as on every Mac window.
+            .on_click(|event, window, _| {
+                if event.click_count() == 2 {
+                    window.zoom_window();
+                }
+            })
             .flex()
             .flex_none()
             .items_center()

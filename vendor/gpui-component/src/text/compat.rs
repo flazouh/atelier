@@ -325,6 +325,9 @@ pub(super) fn resolve_component_style(
     if let Some(heading_font_size) = legacy.heading_font_size {
         style = style.with_heading_font_size(move |level, base| heading_font_size(level, base));
     }
+    if let Some(tiles) = legacy.table_tiles {
+        style = style.with_table_tiles(tiles);
+    }
     style
 }
 

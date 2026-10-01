@@ -2660,9 +2660,11 @@ impl BlockNode {
             .read(cx)
             .clone();
         let row_count = table.children.len();
+        let tiles = style.table_tiles();
         let mut rows = Vec::with_capacity(row_count);
         let mut cell_ordinal = 0;
         for (row_ix, row) in table.children.iter().enumerate() {
+            let group: gpui::SharedString = format!("tile-row-{}-{row_ix}", table.span.map_or(0, |s| s.start)).into();
             let mut cells = Vec::with_capacity(row.children.len());
             for (ix, cell) in row.children.iter().enumerate() {
                 let fade_key = table
@@ -2690,8 +2692,13 @@ impl BlockNode {
                         .when(align == ColumnumnAlign::Right, |this| this.text_right())
                         .px_2()
                         .py_1()
-                        .when(!is_last_col, |this| {
+                        .when(tiles.is_none() && !is_last_col, |this| {
                             this.border_r_1().border_color(style.border())
+                        })
+                        // A tile: its own rounded fill, brighter while the pointer is on its row.
+                        .when_some(tiles, |this, tiles| {
+                            let (fill, hover) = if row_ix == 0 { (tiles.head, tiles.head) } else { (tiles.cell, tiles.hover) };
+                            this.rounded(px(4.)).bg(fill).group_hover(group.clone(), move |s| s.bg(hover))
                         })
                         .refine_style(&style.table_cell())
                         .child(cell.children.render(fade_key, node_cx, window, cx)),
@@ -2700,17 +2707,24 @@ impl BlockNode {
             rows.push(
                 div()
                     .w_full()
-                    .when(row_ix < row_count - 1, |this| this.border_b_1())
+                    .group(group.clone())
+                    .when(tiles.is_none() && row_ix < row_count - 1, |this| this.border_b_1())
                     .border_color(style.border())
                     .flex()
                     .flex_row()
+                    // Tiles sit 2px from each other, across and down.
+                    .when(tiles.is_some(), |this| this.gap(px(2.)).when(row_ix < row_count - 1, |this| this.mb(px(2.))))
                     // The first row is the header, as everywhere else that
                     // reads a table (`table_data`, `to_markdown`). The
                     // refinement comes last so it can override the defaults.
                     .when(row_ix == 0, |this| {
-                        this.bg(style.code_background())
-                            .text_color(style.foreground())
-                            .refine_style(&style.table_head())
+                        if tiles.is_some() {
+                            this.text_color(style.foreground())
+                        } else {
+                            this.bg(style.code_background())
+                                .text_color(style.foreground())
+                                .refine_style(&style.table_head())
+                        }
                     })
                     .children(cells),
             );
@@ -2732,11 +2746,16 @@ impl BlockNode {
                 horizontal_scroll_area(
                     block_element_id("table", table.span, options.ix),
                     &scroll_handle,
-                    &StyleRefinement::default()
-                        .bg(cx.theme().tokens.colors.surface)
-                        .border_1()
-                        .border_color(style.border())
-                        .refine_style(style.table()),
+                    &if tiles.is_some() {
+                        // Tiles stand on the page: no frame, no fill, no border.
+                        StyleRefinement::default().refine_style(style.table())
+                    } else {
+                        StyleRefinement::default()
+                            .bg(cx.theme().tokens.colors.surface)
+                            .border_1()
+                            .border_color(style.border())
+                            .refine_style(style.table())
+                    },
                     // Row track sized to `max(viewport, column floors)`:
                     // `min_w_full` fills the frame while the columns can still
                     // shrink-to-fit (their text wrapping), the definite

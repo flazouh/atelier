@@ -187,3 +187,13 @@ focus. An unfocused editor (the review's, beside a focused composer) then asked 
 for ever. The cursor now knows it is on (started and not stopped); a pause while it is off shows it and
 schedules nothing.
 Test: `a_pause_does_not_start_a_stopped_cursor`.
+
+## 19. Tables as tiles
+
+`TextViewStyle::with_table_tiles(TableTiles { head, cell, hover })` draws a Markdown table as Acepe does:
+every cell is its own rounded 4px tile on a fill, 2px from the next across and down, with no frame, no
+fill behind the table and no border; the header tiles take the stronger fill, and the tiles of a row
+take `hover` while the pointer is on the row (a group hover on the row). It is the scroll layout's
+(`overflow-x: scroll` on `style.table`); a style with no tiles draws the bordered grid as before.
+The component's `TextViewStyle` carries it as `table_tiles` and folds it onto the base style.
+Test: `a_style_with_table_tiles_differs_from_one_without`.

@@ -25,8 +25,18 @@ pub struct TextViewStyle {
     table: StyleRefinement,
     table_head: StyleRefinement,
     table_cell: StyleRefinement,
+    table_tiles: Option<TableTiles>,
     inline_code: HighlightStyle,
     is_dark: bool,
+}
+
+/// A table drawn as tiles (lathe patch 19): each cell is its own rounded tile on a fill, 2px from the next, with no
+/// border or frame; the header tiles are one step stronger, and a row's tiles brighten while the pointer is on it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TableTiles {
+    pub head: Hsla,
+    pub cell: Hsla,
+    pub hover: Hsla,
 }
 
 impl PartialEq for TextViewStyle {
@@ -51,6 +61,7 @@ impl PartialEq for TextViewStyle {
             && self.table == other.table
             && self.table_head == other.table_head
             && self.table_cell == other.table_cell
+            && self.table_tiles == other.table_tiles
             && self.inline_code == other.inline_code
             && self.is_dark == other.is_dark
     }
@@ -91,6 +102,7 @@ impl TextViewStyle {
             table: StyleRefinement::default(),
             table_head: StyleRefinement::default(),
             table_cell: StyleRefinement::default(),
+            table_tiles: None,
             inline_code: HighlightStyle {
                 background_color: Some(colors.accent),
                 ..Default::default()
@@ -187,6 +199,16 @@ impl TextViewStyle {
     pub fn with_table(mut self, style: StyleRefinement) -> Self {
         self.table = style;
         self
+    }
+
+    /// Draws tables as tiles ([`TableTiles`]) instead of a bordered grid.
+    pub fn with_table_tiles(mut self, tiles: TableTiles) -> Self {
+        self.table_tiles = Some(tiles);
+        self
+    }
+
+    pub(crate) fn table_tiles(&self) -> Option<TableTiles> {
+        self.table_tiles
     }
 
     /// Sets the style refinement for the header row (the first row) of a
@@ -308,6 +330,16 @@ impl TextViewStyle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_style_with_table_tiles_differs_from_one_without() {
+        let base = TextViewStyle::default();
+        let tiles = TableTiles { head: gpui::black(), cell: gpui::white(), hover: gpui::black() };
+        let with = base.clone().with_table_tiles(tiles);
+        assert!(base != with);
+        assert_eq!(with.table_tiles(), Some(tiles));
+        assert_eq!(base.table_tiles(), None);
+    }
 
     #[test]
     fn selection_layout_fingerprint_covers_callback_table_and_theme_fields() {

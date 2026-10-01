@@ -11,7 +11,7 @@ pub use frontmatter::FrontmatterPlugin;
 pub use gpui_base::text::{
     InlineElement, InlineRenderContext, MarkdownBlockParserFn, MarkdownBlockRenderFn,
     MarkdownExtensions, MarkdownNode, MarkdownParseContext, MarkdownPlugin, SelectionFormat,
-    TableData, TextViewMotion, TextViewState, markdown_ast,
+    TableData, TableTiles, TextViewMotion, TextViewState, markdown_ast,
 };
 pub use style::TextViewStyle;
 

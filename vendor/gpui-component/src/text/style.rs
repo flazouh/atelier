@@ -42,6 +42,8 @@ pub struct TextViewStyle {
     /// on a single line — columns then never shrink and the table scrolls as
     /// soon as the content is wider than the frame.
     pub table_cell: StyleRefinement,
+    /// Draw tables as tiles, one rounded tile for each cell with no frame or border (lathe patch 19).
+    pub table_tiles: Option<gpui_base::text::TableTiles>,
     /// The highlight style for inline code.
     ///
     /// Default is [`HighlightStyle::default()`], the `background_color` will
@@ -62,6 +64,7 @@ impl Default for TextViewStyle {
             table: StyleRefinement::default(),
             table_head: StyleRefinement::default(),
             table_cell: StyleRefinement::default(),
+            table_tiles: None,
             inline_code: HighlightStyle::default(),
             is_dark: false,
         }
@@ -85,6 +88,7 @@ impl PartialEq for TextViewStyle {
             && self.table == other.table
             && self.table_head == other.table_head
             && self.table_cell == other.table_cell
+            && self.table_tiles == other.table_tiles
             && self.inline_code == other.inline_code
             && self.is_dark == other.is_dark
     }
@@ -127,6 +131,11 @@ impl TextViewStyle {
     /// Set extra style for the table header row.
     pub fn table_head(mut self, style: StyleRefinement) -> Self {
         self.table_head = style;
+        self
+    }
+    /// Draw tables as tiles instead of a bordered grid.
+    pub fn table_tiles(mut self, tiles: gpui_base::text::TableTiles) -> Self {
+        self.table_tiles = Some(tiles);
         self
     }
     /// Set extra style for each table cell.
