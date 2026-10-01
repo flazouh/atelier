@@ -32,6 +32,28 @@ pub fn lines(stream: impl Read) -> impl Iterator<Item = String> {
     })
 }
 
+/// How many of the last lines of a process's stderr an end event carries.
+const STDERR_LINES: usize = 20;
+
+/// The last [`STDERR_LINES`] lines of `stderr`, trailing blank lines dropped.
+pub fn stderr_tail(stderr: &str) -> String {
+    let lines: Vec<&str> = stderr.trim_end().lines().collect();
+    lines[lines.len().saturating_sub(STDERR_LINES)..].join("\n")
+}
+
+/// Why the agent's process ended, for a turn it cut short: its exit code (`None` for a signal) and the
+/// last line of `tail` that says something.
+pub fn exit_why(code: Option<i32>, tail: &str) -> String {
+    let how = match code {
+        Some(code) => format!("the agent exited with code {code}"),
+        None => "the agent was stopped by a signal".to_string(),
+    };
+    match tail.lines().rev().find(|line| !line.trim().is_empty()).map(str::trim) {
+        Some(line) => format!("{how}: {line}"),
+        None => how,
+    }
+}
+
 /// Runs `command` to the end and returns what it wrote to stdout.
 pub fn output(project: &dyn Project, command: &Command) -> Result<String, SessionError> {
     let Process { stdin, stdout, mut control } = start(project, command)?;
