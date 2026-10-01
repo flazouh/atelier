@@ -113,6 +113,7 @@ fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
             let opener = session.downgrade();
             AgentText::new(id("text"), SharedString::from(text.clone()))
                 .status(status)
+                .fade_tail(true)
                 .copy_text(text.clone())
                 .pr_resolver(move |number| chips.iter().find(|c| c.number == number).cloned())
                 .on_open_pr(move |chip, _, cx| drop(opener.update(cx, |_, cx| cx.emit(SessionEvent::OpenPull(chip.clone())))))
