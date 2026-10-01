@@ -91,6 +91,9 @@ pub struct AgentSession {
     pub pr_chips: std::rc::Rc<Vec<atelier_ui::PrChipData>>,
     /// The session's review: its turns, decisions, marks and comments, kept in the data folder.
     pub reviews: ReviewState,
+    /// The files the whole session changed, each against its text before the session, above the composer.
+    changed: std::rc::Rc<Vec<atelier_ui::ChangedFile>>,
+    _changed: Task<()>,
     /// The card of the pull request the session opened, above the composer.
     pub pull_card: Option<Entity<crate::pull_card::PullCard>>,
     _pull_card: Option<Subscription>,
@@ -119,6 +122,24 @@ pub struct AgentSession {
 }
 
 impl AgentSession {
+    /// The files the whole session changed, as the list above the composer shows them.
+    pub fn changed_files(&self) -> std::rc::Rc<Vec<atelier_ui::ChangedFile>> {
+        self.changed.clone()
+    }
+
+    /// Diffs the whole session off the UI thread, for [`Self::changed_files`].
+    fn diff_session(&mut self, cx: &mut Context<Self>) {
+        let turns = self.reviews.turns.clone();
+        let whole = cx.background_spawn(async move { atelier_review::present::changed_files(&turns.whole()) });
+        self._changed = cx.spawn(async move |this, cx| {
+            let files = whole.await;
+            _ = this.update(cx, |s, cx| {
+                s.changed = std::rc::Rc::new(files);
+                cx.notify();
+            });
+        });
+    }
+
     /// Gives the session its project's badge, which its panel's head shows. The shell sets it whenever it syncs.
     pub fn set_badge(&mut self, badge: atelier_ui::sidebar_model::Badge, cx: &mut Context<Self>) {
         if self.badge.as_ref() != Some(&badge) {
@@ -251,6 +272,8 @@ impl AgentSession {
             thinking_since: HashMap::new(),
             _composer,
             _skills,
+            changed: std::rc::Rc::default(),
+            _changed: Task::ready(()),
             _pump,
             _start: Task::ready(()),
         };
@@ -337,6 +360,7 @@ impl AgentSession {
                 }
                 if let Some(record) = record {
                     s.reviews = ReviewState::from_record(record);
+                    s.diff_session(cx);
                     // The record knows when the agent last worked; the agent's list, which a resume
                     // touches, does not.
                     if let (Some(at), false) = (s.reviews.last_activity, s.activity_known) {
@@ -439,6 +463,7 @@ impl AgentSession {
             self.reviews.finish_turn(turn, self.conversation.items().len());
         }
         if ended_turns {
+            self.diff_session(cx);
             self.save_review(cx);
             cx.emit(SessionEvent::TextSettled);
             self.draft_title(cx);

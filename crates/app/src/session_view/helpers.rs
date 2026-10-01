@@ -498,6 +498,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         div().flex_1().min_h_0().pt(px(12.)).child(rows).into_any_element()
     };
     let composer = s.composer.clone();
+    let changed = changed_files(session, cx);
     let pull_card = session.read(cx).pull_card.clone();
     let header = header(session, window, cx);
     let interrupt = session.clone();
@@ -518,8 +519,26 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         .child(header)
         .child(body)
         .children(failure)
-        .child(div().flex().flex_col().gap(px(atelier_ui::STACK_GAP)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).child(composer))
+        .child(div().flex().flex_col().gap(px(atelier_ui::STACK_GAP)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).children(changed).child(composer))
         .into_any_element()
+}
+
+/// The files the whole session changed, folded to a header with Review, which opens the session's review.
+fn changed_files(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
+    let s = session.read(cx);
+    let files = s.changed_files();
+    if files.is_empty() {
+        return None;
+    }
+    let (review, open) = (session.clone(), session.clone());
+    Some(
+        atelier_ui::ChangedFiles::new(gpui_kit::ElementId::Name(format!("{}-changed", s.key).into()), files.to_vec())
+            .collapsible()
+            .running(s.conversation.working())
+            .on_review(move |path, _, cx| review.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: Some(path.to_string()) })))
+            .on_open_file(move |path, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: Some(path.to_string()) })))
+            .into_any_element(),
+    )
 }
 
 /// The agents this build can start, as a picker a new session shows until its first message.
@@ -567,7 +586,7 @@ pub(super) fn shows_stop(running: bool, status: &SessionStatus) -> bool {
 
 pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, task, project, badge, reviewable, session_id) = {
+    let (key, renaming, shown_title, running, task, project, badge, session_id) = {
         let s = session.read(cx);
         (
             s.key.clone(),
@@ -577,7 +596,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             s.task.clone(),
             s.project_name(),
             s.badge.clone(),
-            !s.reviews.turns.turns().is_empty(),
             s.id.as_ref().map(|i| i.as_str().to_string()),
         )
     };
@@ -628,16 +646,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             .tooltip("Open the task")
             .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenTask)))
     });
-    // What the session has to show for itself: the changes its turns made, ready to review.
-    let review = reviewable.then(|| {
-        let open = session.clone();
-        Button::new(gpui_kit::ElementId::Name(format!("{key}-review").into()))
-            .debug_name("panel-review")
-            .label("Review")
-            .variant(ButtonVariant::Ghost)
-            .tooltip("Review what this session changed")
-            .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: None })))
-    });
     let more = panel_menu(session, &key, session_id, window, cx);
     let close = {
         let close = session.clone();
@@ -671,7 +679,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
         })
         .child(title)
         .children(chip)
-        .children(review)
         .children(stop)
         .child(more)
         .child(close)

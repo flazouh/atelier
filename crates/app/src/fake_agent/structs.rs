@@ -67,10 +67,13 @@ impl Backend for FakeBackend {
 /// Keeps the session alive in the window.
 pub(super) struct Root {
     pub(super) _session: Entity<AgentSession>,
+    pub(super) shown: bool,
 }
 
 impl gpui_kit::Render for Root {
-    fn render(&mut self, _: &mut gpui_kit::Window, _: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
-        gpui_kit::div()
+    fn render(&mut self, window: &mut gpui_kit::Window, cx: &mut gpui_kit::Context<Self>) -> impl gpui_kit::IntoElement {
+        use gpui_kit::{ParentElement, Styled};
+        let view = self.shown.then(|| crate::session_view::session_view(&self._session, window, cx));
+        gpui_kit::div().size_full().children(view)
     }
 }

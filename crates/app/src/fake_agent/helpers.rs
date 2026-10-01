@@ -20,6 +20,15 @@ pub fn start(cx: &mut TestAppContext, turns: Vec<Vec<Event>>, fail_first: bool) 
 
 /// The same, on a project at `dir`.
 pub fn start_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, fail_first: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+    start_with(cx, dir, turns, fail_first, false)
+}
+
+/// The same, with the session's view drawn in the window.
+pub fn start_shown_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+    start_with(cx, dir, turns, false, true)
+}
+
+fn start_with(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, fail_first: bool, shown: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         atelier_ui::init(cx);
@@ -35,7 +44,7 @@ pub fn start_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, f
     let (_root, cx) = cx.add_window_view(|window, cx| {
         let session = cx.new(|cx| AgentSession::start("k".into(), agent, project, None, window, cx));
         made = Some(session.clone());
-        Root { _session: session }
+        Root { _session: session, shown }
     });
     cx.run_until_parked();
     (made.unwrap(), fake, cx)
