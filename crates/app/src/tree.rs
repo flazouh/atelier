@@ -52,10 +52,6 @@ impl ProjectTree {
         self.entries.is_empty()
     }
 
-    pub fn files(&self) -> usize {
-        self.entries.iter().filter(|e| !e.dir).count()
-    }
-
     /// Every file's path, in path order, for Go to file.
     pub fn file_paths(&self) -> Vec<String> {
         self.entries.iter().filter(|e| !e.dir).map(|e| e.path.clone()).collect()

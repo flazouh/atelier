@@ -69,28 +69,38 @@ fn a_long_error_shows_on_the_start_screen_above_recent_and_wraps(cx: &mut TestAp
     assert!(error.size.height > px(20.), "the error wraps to more than one line: {error:?}");
 }
 
-/// A view that draws only the sidebar foot.
-struct Foot(Entity<Shell>);
-
-impl Render for Foot {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let foot = self.0.update(cx, |shell, cx| shell.sidebar_foot(cx));
-        div().w(px(240.)).child(foot)
-    }
+/// The Settings button holds the window's top right; a press opens the page, whose Back button holds the top
+/// left; a press on Back closes it. The sidebar has no foot and the window has no status bar.
+#[gpui_kit::test]
+fn settings_opens_from_the_top_right_and_back_closes_it(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let gear = cx.debug_bounds("settings-entry").expect("the Settings button is drawn");
+    assert!(f32::from(gear.right()) > 1400. - 40. && f32::from(gear.top()) < 40., "at the top right: {gear:?}");
+    let layout = cx.debug_bounds("layout-menu").expect("the layout button is drawn");
+    assert!(layout.right() <= gear.left(), "the layout button stands left of it: {layout:?} {gear:?}");
+    assert!(cx.debug_bounds("settings-back").is_none());
+    cx.simulate_click(gear.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(shell.read_with(cx, |s, _| s.settings.is_some()), "a press opens Settings");
+    let back = cx.debug_bounds("settings-back").expect("Back is drawn");
+    assert!(f32::from(back.left()) < 200. && f32::from(back.top()) < 40., "at the top left: {back:?}");
+    assert!(cx.debug_bounds("settings-sections").is_some(), "with its sections");
+    cx.simulate_click(back.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(shell.read_with(cx, |s, _| s.settings.is_none()), "Back closes it");
 }
 
-/// A12: the sidebar foot holds the Settings entry, with its key on the cap, and no theme picker.
+/// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
-fn the_sidebar_foot_holds_settings_and_not_the_theme_picker(cx: &mut TestAppContext) {
-    let (shell, cx) = open_shell(cx);
-    let (foot, cx) = cx.add_window_view(|_, _| Foot(shell.clone()));
-    cx.simulate_resize(size(px(300.), px(200.)));
-    for _ in 0..3 {
-        cx.run_until_parked();
-        foot.update(cx, |_, cx| cx.notify());
-    }
-    assert!(cx.debug_bounds("settings-entry").is_some(), "the Settings entry stands in the foot");
-    assert!(cx.debug_bounds("theme").is_none(), "no theme picker in the foot");
+fn a_notice_floats_and_goes_after_a_few_seconds(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1200.);
+    shell.update(cx, |s, cx| s.say("Saved a.txt".into(), cx));
+    settle(&shell, cx);
+    let notice = cx.debug_bounds("notice").expect("the notice is drawn");
+    assert!(f32::from(notice.bottom()) < 900., "it floats inside the window: {notice:?}");
+    cx.executor().advance_clock(std::time::Duration::from_secs(6));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("notice").is_none(), "and it goes");
 }
 
 /// K1: every global chord reaches its action from each place the focus can be. Tasks is the chord that

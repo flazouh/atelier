@@ -196,7 +196,6 @@ fn a_repository_with_no_commits_says_so(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         let p = project.read(cx);
         assert_eq!(p.git, Git::Unborn("main".into()));
-        assert_eq!(p.git.words(p.dirty).as_ref(), "main, no commits yet");
     });
     run_git(dir.path(), &["add", "-A"]);
     run_git(dir.path(), &["commit", "-q", "-m", "first"]);
@@ -205,20 +204,7 @@ fn a_repository_with_no_commits_says_so(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         let p = project.read(cx);
         assert_eq!(p.git, Git::Branch("main".into()));
-        assert_eq!(p.git.words(p.dirty).as_ref(), "main, clean");
     });
-}
-/// The line's words for each state.
-#[test]
-fn the_git_words() {
-    let main = || Git::Branch("main".into());
-    assert_eq!(Git::Unknown.words(None).as_ref(), "…");
-    assert_eq!(Git::None.words(None).as_ref(), "No git repository");
-    assert_eq!(main().words(Some(0)).as_ref(), "main, clean");
-    assert_eq!(main().words(Some(1)).as_ref(), "main, 1 file changed");
-    assert_eq!(main().words(Some(3)).as_ref(), "main, 3 files changed");
-    assert_eq!(main().words(None).as_ref(), "main");
-    assert_eq!(Git::Unborn("main".into()).words(Some(2)).as_ref(), "main, no commits yet");
 }
 /// Closing a tab with unsaved edits asks; Cancel keeps it, Don't Save drops it, and a clean tab
 /// closes without asking.

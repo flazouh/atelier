@@ -51,5 +51,4 @@ fn an_empty_folder_is_an_empty_tree() {
     let t = ProjectTree::new(Vec::new());
     assert!(t.is_empty());
     assert!(t.rows(&HashSet::new()).is_empty());
-    assert_eq!(tree().files(), 6);
 }

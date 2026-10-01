@@ -58,18 +58,6 @@ impl Git {
             Git::Unknown | Git::None => None,
         }
     }
-    /// What the status line says, given the count of changed files.
-    pub fn words(&self, dirty: Option<usize>) -> SharedString {
-        match (self, dirty) {
-            (Git::Unknown, _) => "…".into(),
-            (Git::None, _) => "No git repository".into(),
-            (Git::Unborn(b), _) => format!("{b}, no commits yet").into(),
-            (Git::Branch(b), Some(0)) => format!("{b}, clean").into(),
-            (Git::Branch(b), Some(1)) => format!("{b}, 1 file changed").into(),
-            (Git::Branch(b), Some(n)) => format!("{b}, {n} files changed").into(),
-            (Git::Branch(b), None) => b.clone(),
-        }
-    }
 }
 
 /// The tree as the last listing left it.

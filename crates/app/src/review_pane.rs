@@ -453,11 +453,6 @@ impl ReviewPane {
         });
     }
 
-    /// The server's words for the status line, when the open file has one.
-    pub fn status(&self, cx: &gpui_kit::App) -> Vec<SharedString> {
-        self.lsp.as_ref().map(|lsp| lsp.read(cx).status()).unwrap_or_default()
-    }
-
     /// Tells the open file's server which shown rows the file does not have, after its hunks moved.
     fn sync_rows(&self, cx: &mut Context<Self>) {
         if let (Some(lsp), Some(file)) = (&self.lsp, self.files.get(self.current)) {

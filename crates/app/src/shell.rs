@@ -56,6 +56,8 @@ actions!(lathe, [ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Sa
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
+/// How long a notice stays at the foot of the window.
+const NOTICE_FOR: std::time::Duration = std::time::Duration::from_secs(5);
 const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else { 12. };
 
 /// Where the shell keeps what it saves. A test writes only where `LATHE_SETTINGS` points, never the
@@ -100,8 +102,11 @@ pub struct Shell {
     sidebar: bool,
     right: bool,
     recent: Vec<Location>,
-    /// The last thing a project or the shell said, for the status line.
+    /// The last thing a project or the shell said: a notice at the foot of the window for a few seconds, and the start
+    /// screen's error line.
     said: Option<SharedString>,
+    /// The window's width as of the last frame.
+    width: f32,
     /// Go to file, while it is open: the finder and the paths its rows stand for.
     finder: Option<(Entity<Finder>, Vec<String>, Subscription)>,
     /// "Open over SSH…", while it is open.
@@ -181,6 +186,7 @@ impl Shell {
             right: true,
             recent: saved.recent.clone(),
             said: None,
+            width: 1200.,
             finder: None,
             ssh: None,
             folder: None,
@@ -846,7 +852,19 @@ impl Shell {
     }
 
     fn say(&mut self, line: String, cx: &mut Context<Self>) {
-        self.said = Some(line.into());
+        let line: SharedString = line.into();
+        self.said = Some(line.clone());
+        // The notice goes after a few seconds, unless something newer was said in the meantime.
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(NOTICE_FOR).await;
+            _ = this.update(cx, |this, cx| {
+                if this.said.as_ref() == Some(&line) {
+                    this.said = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
         cx.notify();
     }
 
@@ -1221,14 +1239,6 @@ impl Shell {
     fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let counts = beui::counts_of(self.agents_sidebar.read(cx).projects());
         let this = cx.entity().downgrade();
-        let theme = cx.theme().clone();
-        let (name, branch) = match self.active() {
-            Some(p) => {
-                let p = p.read(cx);
-                (Some(p.name()), p.git.branch().map(ToString::to_string))
-            }
-            None => (None, None),
-        };
         div()
             .id("title-bar")
             .window_control_area(WindowControlArea::Drag)
@@ -1240,14 +1250,56 @@ impl Shell {
             .pl(px(TRAFFIC_LIGHTS))
             .pr(px(12.))
             .text_size(TextSize::Sm.font_size())
-            .child(div().font_weight(gpui_kit::FontWeight::MEDIUM).child(name.unwrap_or_else(|| "lathe".into())))
-            .children(branch.map(|b| div().text_color(theme.muted_foreground).child(b)))
-            .children(self.active().and_then(|_| self.back_to_sessions(cx)))
+            // No project is "the" project of the window: the title bar names the app, and each project names itself
+            // in the sidebar, on its panels, and at the head of its Files.
+            .child(self.title_left(cx))
             .relative()
             .children(self.layout_button(cx))
             .child(div().flex_1().flex().justify_center().child(beui::SessionsIsland::new("sessions-island", counts).on_press(
                 move |window, cx| drop(this.update(cx, |shell, cx| shell.open_most_urgent(window, cx))),
             )))
+            .child(self.settings_button(cx))
+    }
+
+    /// What the title bar holds at its left: Back while Settings is open, "Sessions" back from the Files view, else the
+    /// app's name.
+    fn title_left(&self, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity();
+        if self.settings.is_some() {
+            return Button::new("settings-back")
+                .debug_name("settings-back")
+                .icon(beui::IconName::ArrowBack)
+                .label("Back")
+                .cap("Esc")
+                .variant(ButtonVariant::Ghost)
+                .on_click(move |_, window, cx| this.update(cx, |this, cx| this.close_settings(window, cx)))
+                .into_any_element();
+        }
+        match self.active().and_then(|_| self.back_to_sessions(cx)) {
+            Some(back) => back,
+            None => div().font_weight(gpui_kit::FontWeight::MEDIUM).child("lathe").into_any_element(),
+        }
+    }
+
+    /// The Settings button at the top right, lit while the page is open.
+    fn settings_button(&self, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity();
+        Button::new("settings-entry")
+            .debug_name("settings-entry")
+            .icon(beui::IconName::Settings)
+            .variant(ButtonVariant::Ghost)
+            .size(ButtonSize::IconSm)
+            .tooltip("Settings")
+            .open(self.settings.is_some())
+            .on_click(move |_, window, cx| this.update(cx, |this, cx| this.open_settings(&OpenSettings, window, cx)))
+            .into_any_element()
+    }
+
+    fn close_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.settings.take().is_some() {
+            window.focus(&self.focus, cx);
+            cx.notify();
+        }
     }
 
     /// In the Files view, the way back: "Sessions" with its key. Nothing in the Sessions view: Files is entered
@@ -1332,10 +1384,11 @@ impl Shell {
                     cx.notify();
                 }))
             });
+        // The Settings button holds the window's top right corner; the layout menu stands left of it.
         let at = div().absolute().top(px(7.));
         let at = match self.session_right {
-            Some(right) => at.left(px(right - 36.)),
-            None => at.right(px(12.)),
+            Some(right) => at.left(px((right - 36.).min(self.width - 72.))),
+            None => at.right(px(48.)),
         };
         Some(at.child(div().relative().child(button).children(menu)).into_any_element())
     }
@@ -1443,27 +1496,13 @@ impl Shell {
     }
 
     /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
-    fn sidebar_foot(&self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
-        div().flex_none().p(px(8.)).child(
-            Button::new("settings-entry")
-                .debug_name("settings-entry")
-                .icon(beui::IconName::Settings)
-                .label("Settings")
-                .variant(ButtonVariant::Ghost)
-                .cap(keys::cap("⌘,"))
-                .on_click(cx.listener(|this, _, window, cx| this.open_settings(&OpenSettings, window, cx))),
-        )
-        .into_any_element()
-    }
-
-    fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn sidebar(&self, _cx: &mut Context<Self>) -> impl IntoElement {
         // The projects and their sessions; the files are the Files view's.
         div()
             .flex()
             .flex_col()
             .size_full()
             .child(div().flex_1().min_h_0().child(crate::view_cache::draw(&self.agents_sidebar)))
-            .child(self.sidebar_foot(cx))
     }
 
     /// The Files view's tree: the front project's files, under their heading.
@@ -1484,7 +1523,6 @@ impl Shell {
                     .child(format!("Files in {}", project.read(cx).name())),
             )
             .child(div().flex_1().min_h_0().child(tree_view(project, cx)))
-            .child(self.sidebar_foot(cx))
             .into_any_element()
     }
 
@@ -1706,49 +1744,6 @@ impl Shell {
         self.right_view.update(cx, |pane, cx| pane.show(project, cx));
         crate::view_cache::draw(&self.right_view)
     }
-
-    fn status_line(&self, cx: &App) -> impl IntoElement {
-        let theme = cx.theme();
-        let muted = theme.muted_foreground;
-        let mut parts: Vec<SharedString> = Vec::new();
-        if let Some(p) = self.active() {
-            let p = p.read(cx);
-            parts.push(p.location.place().into());
-            parts.push(p.git.words(p.dirty));
-            if let (Listing::Ready(tree), Some(took)) = (&p.listing, p.listed_in) {
-                let files = match tree.files() {
-                    1 => "1 file".to_string(),
-                    n => format!("{n} files"),
-                };
-                parts.push(format!("{files}, listed in {} ms", took.as_millis()).into());
-            }
-            // The review's server while it shows, else the open tab's.
-            match (&p.review, p.active_buffer()) {
-                (Some((pane, _)), _) => parts.extend(pane.read(cx).status(cx)),
-                (None, Some((_, buffer))) => parts.extend(buffer.session.read(cx).status()),
-                (None, None) => {}
-            }
-        }
-        // With no project open the start screen shows the line itself.
-        if self.active().is_some() {
-            parts.extend(self.said.clone());
-        }
-        div()
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap(px(16.))
-            .h(px(28.))
-            .px(px(12.))
-            .text_size(TextSize::Xs.font_size())
-            .text_color(muted)
-            .overflow_hidden()
-            // The place and the branch keep their width; the rest gives way with an ellipsis, never a clip.
-            .children(parts.into_iter().enumerate().map(|(at, part)| {
-                let d = div().whitespace_nowrap().child(part);
-                if at < 2 { d.flex_none() } else { d.min_w_0().truncate() }
-            }))
-    }
 }
 
 /// What the first launch says lathe is, in one line.
@@ -1776,6 +1771,7 @@ impl Render for Shell {
 impl Shell {
     fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
+        self.width = f32::from(window.viewport_size().width);
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
             None => self.start_screen(window, cx).into_any_element(),
@@ -1827,7 +1823,29 @@ impl Shell {
             .child(self.title_bar(cx))
             .children(banner)
             .child(div().flex().flex_1().min_h_0().child(body))
-            .child(self.part("status", self.status_line(cx).into_any_element()))
+            .children((self.settings.is_none() && self.active().is_some()).then(|| self.said.clone()).flatten().map(|words| {
+                // A notice floats over the foot of the window: it is not a bar that takes the room.
+                div()
+                    .absolute()
+                    .bottom(px(16.))
+                    .left_0()
+                    .right_0()
+                    .flex()
+                    .justify_center()
+                    .child(
+                        div()
+                            .debug_selector(|| "notice".into())
+                            .max_w(px(560.))
+                            .px(px(12.))
+                            .py(px(8.))
+                            .rounded(radius::LG)
+                            .bg(theme.popover)
+                            .shadow(beui::theme::popover_shadow(&theme))
+                            .text_size(TextSize::Sm.font_size())
+                            .text_color(theme.foreground)
+                            .child(words),
+                    )
+            }))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {

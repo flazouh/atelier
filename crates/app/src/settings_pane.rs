@@ -331,10 +331,10 @@ impl Render for SettingsPane {
             .h_full()
             .flex()
             .flex_col()
-            .gap(px(2.))
+            .gap(px(4.))
             .px(px(12.))
             .pt(px(48.))
-            .child(div().px(px(10.)).pb(px(12.)).text_size(TextSize::Lg.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child("Settings"))
+            .child(div().px(px(8.)).pb(px(12.)).text_size(TextSize::Lg.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child("Settings"))
             .children(Section::ALL.into_iter().map(|section| {
                 let pane = this.clone();
                 let front = section == self.section;
@@ -344,7 +344,7 @@ impl Render for SettingsPane {
                     .flex()
                     .items_center()
                     .h(px(32.))
-                    .px(px(10.))
+                    .px(px(8.))
                     .rounded(beui::theme::radius::MD)
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
