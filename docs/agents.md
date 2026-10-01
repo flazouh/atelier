@@ -2,8 +2,9 @@
 
 atelier talks to agents through one model of its own. The app and the UI see events, commands and
 capabilities. They never see an agent's wire format, its tool names or its process. Code lives in
-`crates/agents`: `session` is the model, `claude_code` is the first backend, `subprocess` is a helper
-for backends that run a child process.
+`crates/agents`: `session` is the model, `claude_code` and `acp` are the backends that run an agent's
+process, `own` is atelier's own agent, and `subprocess` is a helper for backends that run a child process.
+`claude` and `cursor` hold what is particular to each agent: its launch, models and look.
 
 Nothing outside `crates/agents` names an agent, a lab or a forge.
 
@@ -77,7 +78,7 @@ in atelier.
 1. **A subprocess with its own protocol.** Claude Code, over stream-json. It runs through
    `Project::spawn`, so a remote project runs it on its host. Built.
 2. **An ACP agent.** One generic backend for every agent that speaks the Agent Client Protocol.
-   Not built. See below.
+   Built, with Cursor as its first agent. See below.
 3. **Our own agent, in process.** An agent loop in atelier that calls model APIs and runs its tools through
    `Project`. Not built. See "Our own agent".
 
@@ -189,6 +190,10 @@ atelier reads it through a process the project spawns (`sh`), never from disk di
   finishes what is open: each running call fails, each waiting question is cancelled, each subagent ends,
   then `TurnEnded(Failed("the agent exited with code N: <its last stderr line>"))` and `Ended(Exited { code, stderr })`, where `stderr` is the last 20 lines the process wrote. `Ended` comes once.
 - **A line does not parse:** a `Warning`. The stream goes on.
+- **atelier dies** (a crash, a kill): every process a local project starts has a watchdog (`sh`, detached)
+  that stops it, and kills it two seconds later if it still runs, once atelier is gone. An agent that ignores
+  the end of its stdin, as Cursor's does, ends too. On a remote project `atelier-remote` kills its processes
+  when the app's connection closes.
 - **atelier closes the session:** dropping it closes stdin, kills the process and sends `Ended(Closed)` at
   once. The process can have children that keep its pipes open, so atelier does not wait for the end of
   stdout.
@@ -201,36 +206,57 @@ stdin). `send` only queues, so it never waits on a full pipe.
 
 ## The ACP backend
 
-Agent Client Protocol: JSON-RPC 2.0 over the agent's stdin and stdout. One backend, `Acp`, serves every
-agent that speaks it, so adding one is a launch command in settings, not new code. This section is a plan
-from the protocol's specification. It is not built and not checked against a real agent yet.
+Agent Client Protocol: JSON-RPC 2.0 over the agent's stdin and stdout. One backend, `Acp`
+(`crates/agents/src/acp`), serves every agent that speaks it. An `AcpAgent` says how to start one, which
+of the agent's modes stand for atelier's permission modes, and which models to offer. Everything else comes
+over the protocol. The agent starts through `Project::spawn`, on the host.
 
 | atelier | ACP |
 | --- | --- |
-| `open` | `initialize`, then `session/new` (or `session/load` to resume when the agent says it can). |
-| `Command::Send` | `session/prompt`. Its response carries the stop reason and ends the turn. |
-| `Command::Interrupt` | `session/cancel` (a notification). The turn ends with stop reason `cancelled`. |
-| `SetPermissionMode`, `SetModel` | `session/set_mode`, and the agent's model option, when it offers them. |
-| `Text` | `session/update` with `agent_message_chunk`. |
-| `Thinking` | `session/update` with `agent_thought_chunk`. |
-| `ToolStarted`, `ToolFinished` | `tool_call` and `tool_call_update`. ACP gives a kind (read, edit, delete, move, search, execute, think, fetch, other), which maps to `ToolKind`, and locations, which give `file`. |
+| `open` | `initialize`, then `session/new`, or `session/load` to resume when the agent says it can. On error `-32000` (sign-in needed) atelier calls `authenticate` once with the agent's first method and asks again. |
+| `Command::Send` | `session/prompt`, one turn at a time. Messages sent during a turn wait. Its response carries the stop reason and ends the turn. |
+| `Command::Interrupt` | `session/cancel` (a notification). A waiting question is answered `cancelled`. The turn ends with stop reason `cancelled`. |
+| `SetPermissionMode` | `session/set_mode` with the agent's name for the mode. A mode it has no name for is `Unsupported`. |
+| `SetModel` | The agent's `model` config option when it has one, else `session/set_model` (unstable). A model given by its name is set by the full id the agent listed. |
+| `Text`, `Thinking` | `agent_message_chunk`, `agent_thought_chunk`. |
+| `ToolStarted`, `ToolInput`, `ToolTarget`, `ToolFinished` | `tool_call` and `tool_call_update`, merged by id. The kind maps to `ToolKind` (read, edit, search, execute as shell, fetch; delete and move as edit; others as other). An edit whose diff has no old text is a write. Locations and diffs give `file`. |
 | `Todos` | `plan` updates: the whole list each time. |
-| `Permission` | The agent's request `session/request_permission`. Its options (allow once, allow always, reject once, reject always) become `Choice`s, and `Answer` is the response. |
-| `Capabilities` | From the `initialize` response, so the UI shows only what that agent offers. |
+| `Permission` | The agent's request `session/request_permission`. Its options become `Choice`s, the call's content is the reason, and `Answer` is the response. |
+| `Started` | The session's id, mode and model, again each time the agent changes them (`current_mode_update`, `config_option_update`) or names its commands (`available_commands_update`). |
+| `sessions`, `history` | `session/list`, and `session/load` in a short-lived process, whose replayed updates are the history. |
 
-ACP is a two-way protocol: the agent calls the client. atelier must serve `fs/read_text_file` and
-`fs/write_text_file`, and the `terminal/*` methods, and it serves them through `Project`. So an ACP agent
-works on a remote project the same way Claude Code does. The agent process itself starts through
-`Project::spawn`, on the host.
+atelier tells the agent it serves no files and no terminal (`fs` and `terminal` are false), so the agent
+runs its tools itself. Any other request from the agent gets "method not found". Stop reasons other than
+`end_turn` and `cancelled` fail the turn in atelier's words.
 
-How the agents named so far plug in. The launch commands are to be checked before building:
+### Cursor
 
-- **Gemini CLI:** ACP mode of `gemini`.
-- **opencode:** `opencode acp`.
-- **Codex:** through an ACP adapter for Codex, since Codex has its own protocol.
+`agent acp`, Cursor's CLI, checked on 2026.10.01-14929f9, logged in with `agent login`, on the HP. The
+captured runs are the fixtures in `crates/agents/tests/fixtures/cursor/`, and `acp/tests/replay.rs` plays
+them back. `crates/agents/tests/cursor_live.rs` runs the real CLI end to end:
+`cargo test -p atelier-agents --test cursor_live -- --ignored --nocapture`.
 
-None of them needs a change in `session`. If ACP has an event the model lacks, the model grows a
-variant, and every backend and the UI keep working because the UI ignores what it does not know.
+- **Sign-in:** none needed once logged in, though `initialize` still offers `cursor_login`.
+- **Modes:** `agent`, `plan` and `ask`. atelier's Ask is `agent`, where a command outside Cursor's allowlist
+  asks first, and Plan is `plan`. `ask` (read only) has no atelier mode and is not offered.
+- **Models:** in `models.availableModels`, with options in the id: `default[]` (Auto),
+  `composer-2.5[fast=true]`. `session/set_model` takes only the full id, so atelier shows the name before
+  `[` and sets the full id. The list atelier offers is in `cursor.rs`.
+- **Tools:** a read's text is in `rawOutput.content`, a command's in `rawOutput.stdout` and `stderr`, an
+  edit is a diff, and a new file's diff has old text `-- /dev/null`.
+- **Questions:** a question comes after the call is running. Its content is the reason ("Not in
+  allowlist: rm"), not output. A denied call ends `completed` with no output.
+- **Plan mode:** a "Create Plan" tool, then a `plan` update, then Cursor's own request
+  `cursor/create_plan`, which atelier declines.
+- **Load:** replays each user message as one chunk with no message id, so chunks join only under one id.
+- **List:** `updatedAt` is an ISO time with milliseconds.
+- **Usage:** Cursor reports no tokens, so its turns have no `Usage`.
+- **Processes:** `agent acp` starts a `worker-server` for the folder, which outlives it and the next run
+  in that folder reuses. Cursor's own `agent -p` leaves it too. After a turn, `agent acp` does not exit
+  when its stdin closes. So atelier ties every local child to itself (see "Failure" above).
+
+Other agents that speak ACP (Gemini CLI, opencode, Codex through an adapter) are an `AcpAgent` each, with
+no change in `acp` or `session`. Their launch and modes are to be checked against the real agent first.
 
 ## Our own agent
 
@@ -369,4 +395,4 @@ Targets and numbers are in `docs/performance.md` ("Agent sessions"). The measure
 
 - `Project::spawn` drops stderr, so a crash has no message. The interface needs a way to keep it.
 - `Backend::sessions` and `history` start `sh` on the host. A host with no POSIX shell has no list.
-- The ACP backend is a design only.
+- Cursor reports no tokens, so a Cursor turn has no `Usage`.

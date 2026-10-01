@@ -115,6 +115,35 @@ impl Tail {
     }
 }
 
+/// How a watchdog ends a child whose app is gone: it asks each second whether both still run, and once
+/// the app does not, stops the child, killing it when it has not stopped two seconds later. It ignores
+/// the signals a closing terminal sends the app's whole group, so it outlives them to do its work.
+const TETHER: &str = r#"(
+trap '' HUP INT TERM
+while kill -0 "$1" 2>/dev/null && kill -0 "$2" 2>/dev/null; do sleep 1; done
+if ! kill -0 "$1" 2>/dev/null; then kill "$2" 2>/dev/null; sleep 2; kill -9 "$2" 2>/dev/null; fi
+) </dev/null >/dev/null 2>&1 &"#;
+
+/// Ends the child `pid` when this app ends, however it ends. Closing a child's stdin is not enough: some
+/// agents keep running after it, and a crash or a kill gives the app no time to stop them. The watchdog
+/// runs detached; the `sh` that starts it ends at once, and a thread of its own waits for it, so a spawn
+/// does not wait and leaves no zombie.
+#[cfg(unix)]
+pub fn tether(pid: u32) {
+    let started = std::process::Command::new("sh")
+        .args(["-c", TETHER, "atelier-tether", &std::process::id().to_string(), &pid.to_string()])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+    if let Ok(mut starter) = started {
+        let _ = thread::Builder::new().name("atelier-tether".into()).spawn(move || starter.wait());
+    }
+}
+
+#[cfg(not(unix))]
+pub fn tether(_pid: u32) {}
+
 /// A child process on this machine, with its stderr's tail.
 pub struct LocalChild {
     pub child: Child,

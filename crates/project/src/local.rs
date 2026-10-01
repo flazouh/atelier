@@ -236,6 +236,7 @@ impl Project for LocalProject {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()?;
+        crate::process::tether(child.id());
         let stdin = child.stdin.take().expect("stdin is piped");
         let stdout = child.stdout.take().expect("stdout is piped");
         Ok(Process { stdin: Box::new(stdin), stdout: Box::new(stdout), control: Box::new(LocalChild::new(child)) })

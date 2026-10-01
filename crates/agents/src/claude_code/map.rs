@@ -13,9 +13,12 @@ use super::{
     tools::{self, TodoTool},
     wire::{Block, CanUseTool, Content, ControlBody, ControlRequest, Delta, Finish, Line, Message, Stream, StreamEvent, System},
 };
-use crate::session::{
-    BlockId, Choice, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started,
-    Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage,
+use crate::{
+    session::{
+        BlockId, Choice, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started,
+        Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage,
+    },
+    subprocess,
 };
 
 pub(super) const ALLOW: &str = "allow";
@@ -117,16 +120,8 @@ impl Mapper {
         if std::mem::replace(&mut self.ended, true) {
             return Vec::new();
         }
-        let tail = stderr_tail(stderr);
-        let last = tail.lines().rev().find(|line| !line.trim().is_empty()).map(str::trim);
-        let how = match code {
-            Some(code) => format!("the agent exited with code {code}"),
-            None => "the agent was stopped by a signal".to_string(),
-        };
-        let why = match last {
-            Some(line) => format!("{how}: {line}"),
-            None => how,
-        };
+        let tail = subprocess::stderr_tail(stderr);
+        let why = subprocess::exit_why(code, &tail);
         let mut events = self.fail_open_tools(&why, false);
         events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
         let mut open: Vec<_> = self.subagents.drain().collect();
@@ -512,15 +507,6 @@ fn is_agent_task(task_type: Option<&str>) -> bool {
     task_type.is_none_or(|t| t.contains("agent"))
 }
 
-/// How many of the last lines of a process's stderr an end event carries.
-const STDERR_LINES: usize = 20;
-
-/// The last [`STDERR_LINES`] lines of `stderr`, trailing blank lines dropped.
-fn stderr_tail(stderr: &str) -> String {
-    let lines: Vec<&str> = stderr.trim_end().lines().collect();
-    lines[lines.len().saturating_sub(STDERR_LINES)..].join("\n")
-}
-
 fn todo_status(status: Option<&str>) -> TodoStatus {
     match status {
         Some("in_progress") => TodoStatus::InProgress,
@@ -560,17 +546,7 @@ fn tool_output(text: &str, is_error: bool) -> ToolOutput {
             .split_once(PREVIEW)
             .and_then(|(_, rest)| rest.split_once('\n'))
             .map_or("", |(_, preview)| preview.trim_end().trim_end_matches("</persisted-output>").trim_end_matches("...").trim_end());
-        return ToolOutput { text: head(preview).0, is_error, truncated: true, full_at };
+        return ToolOutput { truncated: true, full_at, ..ToolOutput::head(preview, is_error) };
     }
-    let (text, truncated) = head(text);
-    ToolOutput { text, is_error, truncated, full_at: None }
-}
-
-/// At most [`ToolOutput::MAX_TEXT`] bytes of `text`, cut on a character boundary.
-fn head(text: &str) -> (String, bool) {
-    if text.len() <= ToolOutput::MAX_TEXT {
-        return (text.to_string(), false);
-    }
-    let cut = (0..=ToolOutput::MAX_TEXT).rev().find(|i| text.is_char_boundary(*i)).unwrap_or(0);
-    (text[..cut].to_string(), true)
+    ToolOutput::head(text, is_error)
 }

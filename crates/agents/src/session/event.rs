@@ -93,6 +93,13 @@ pub struct ToolOutput {
 
 impl ToolOutput {
     pub const MAX_TEXT: usize = 64 * 1024;
+
+    /// At most [`Self::MAX_TEXT`] bytes of `text`, cut on a character boundary and marked `truncated`
+    /// when cut.
+    pub fn head(text: &str, is_error: bool) -> Self {
+        let cut = (0..=Self::MAX_TEXT.min(text.len())).rev().find(|i| text.is_char_boundary(*i)).unwrap_or(0);
+        Self { text: text[..cut].to_string(), is_error, truncated: cut < text.len(), full_at: None }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

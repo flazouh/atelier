@@ -3,7 +3,8 @@
 A native code editor on GPUI, made for work with coding agents. It runs agent sessions next to your code,
 shows what each turn changed for review, and opens pull requests, on a local folder or over SSH.
 
-Agents plug in through one model of atelier's own (`crates/agents`): Claude Code, and atelier's own agent.
+Agents plug in through one model of atelier's own (`crates/agents`): Claude Code, Cursor (over the Agent Client
+Protocol), and atelier's own agent.
 
 ## Build and run
 
@@ -16,7 +17,7 @@ tools/check.sh                 # every check a change needs: tests, clippy, the 
 ```
 
 An agent runs as its own program on the project's host, so install and sign in to the agent you want there
-(for example `claude` for Claude Code).
+(for example `claude` for Claude Code, `agent` for Cursor).
 
 ## Layout
 
