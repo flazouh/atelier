@@ -85,6 +85,7 @@ fn settings_opens_from_the_top_right_and_back_closes_it(cx: &mut TestAppContext)
     let back = cx.debug_bounds("settings-back").expect("Back is drawn");
     assert!(f32::from(back.left()) < 200. && f32::from(back.top()) < 40., "at the top left: {back:?}");
     assert!(cx.debug_bounds("settings-sections").is_some(), "with its sections");
+    assert!(cx.debug_bounds("layout-menu").is_none(), "the layout button is not on the Settings page");
     cx.simulate_click(back.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(shell.read_with(cx, |s, _| s.settings.is_none()), "Back closes it");

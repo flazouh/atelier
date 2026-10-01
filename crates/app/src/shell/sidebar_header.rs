@@ -8,6 +8,16 @@ use beui::{
 };
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 
+/// What a button of the head looks like: its name, icon and tip, whether its filter is on (`lit`), and its menu.
+struct HeadButton {
+    id: &'static str,
+    icon: beui::IconName,
+    tip: SharedString,
+    lit: bool,
+    open: bool,
+    menu: Option<AnyElement>,
+}
+
 impl Shell {
     /// Makes the box that narrows the sessions, the first time there is a window; a change in it narrows the list.
     pub(super) fn ensure_filter_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -23,8 +33,9 @@ impl Shell {
         self.filter_input = Some(input);
     }
 
-    /// A button with a menu hung under it, drawn open while `open`.
-    fn head_button(&self, id: &'static str, icon: beui::IconName, tip: SharedString, lit: bool, open: bool, menu: Option<AnyElement>, press: impl Fn(&mut Window, &mut gpui_kit::App) + 'static) -> AnyElement {
+    /// A button with a menu hung under it, drawn open while its menu shows.
+    fn head_button(&self, look: HeadButton, press: impl Fn(&mut Window, &mut gpui_kit::App) + 'static) -> AnyElement {
+        let HeadButton { id, icon, tip, lit, open, menu } = look;
         div()
             .relative()
             .child(
@@ -119,14 +130,14 @@ impl Shell {
             .flex()
             .items_center()
             .gap(px(4.))
-            .child(self.head_button("filter-button", beui::IconName::FilterList, describe(filter, &query), lit, self.filter_menu, filter_menu, move |_, cx| {
+            .child(self.head_button(HeadButton { id: "filter-button", icon: beui::IconName::FilterList, tip: describe(filter, &query), lit, open: self.filter_menu, menu: filter_menu }, move |_, cx| {
                 drop(toggle_filter.update(cx, |s, cx| {
                     s.filter_menu = !s.filter_menu;
                     s.add_menu = false;
                     cx.notify();
                 }))
             }))
-            .child(self.head_button("add-project", beui::IconName::Add, "Add a project".into(), false, self.add_menu, add_menu, move |_, cx| {
+            .child(self.head_button(HeadButton { id: "add-project", icon: beui::IconName::Add, tip: "Add a project".into(), lit: false, open: self.add_menu, menu: add_menu }, move |_, cx| {
                 drop(toggle_add.update(cx, |s, cx| {
                     s.add_menu = !s.add_menu;
                     s.filter_menu = false;

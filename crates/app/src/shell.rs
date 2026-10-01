@@ -537,7 +537,7 @@ impl Shell {
                 self.seen(key, cx);
                 self.mark_open_session(cx);
             }
-            PanelsEvent::Closed(key) => self.close_session(&key.to_string(), cx),
+            PanelsEvent::Closed(key) => self.close_session(key.as_ref(), cx),
             PanelsEvent::StateChanged => {
                 let state = self.panels.read(cx).state();
                 let panels = lathe_settings::Panels {
@@ -878,7 +878,7 @@ impl Shell {
                 }
                 cx.notify();
             }
-            ProjectEvent::CloseSession(key) => this.close_session(&key.to_string(), cx),
+            ProjectEvent::CloseSession(key) => this.close_session(key.as_ref(), cx),
             ProjectEvent::ShowFiles => this.show_view(ShellView::Files, window, cx),
             ProjectEvent::ShowTasks => {
                 if let Some(i) = this.projects.iter().position(|p| p == project) {
@@ -1403,7 +1403,7 @@ impl Shell {
             panel_types::Layout,
             popover::{Hang, Popover},
         };
-        if self.view != ShellView::Sessions || !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
+        if self.settings.is_some() || self.view != ShellView::Sessions || !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
             return None;
         }
         let (layout, grouped) = {
