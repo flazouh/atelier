@@ -210,6 +210,8 @@ pub enum Event {
     /// The whole input of a call announced before its input was known, and the file it names.
     ToolInput { id: ToolId, input: Value, file: Option<String> },
     ToolStatus { id: ToolId, status: ToolStatus },
+    /// What a call does, when an update shows more than its start did: an edit that makes a new file is a write.
+    ToolKind { id: ToolId, kind: ToolKind },
     ToolFinished { id: ToolId, output: ToolOutput },
     SubagentStarted(Subagent),
     SubagentProgress { id: ToolId, activity: String },

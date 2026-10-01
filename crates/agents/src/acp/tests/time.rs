@@ -22,3 +22,29 @@ fn a_time_that_does_not_read_is_none() {
         assert_eq!(epoch_seconds(text), None, "{text}");
     }
 }
+
+#[test]
+fn seconds_that_are_not_a_number_do_not_read() {
+    for text in ["2026-10-01T00:00:NaNZ", "2026-10-01T00:00:infZ", "2026-10-01T00:00:-1Z"] {
+        assert_eq!(epoch_seconds(text), None, "{text}");
+    }
+}
+
+#[test]
+fn a_day_or_an_offset_that_does_not_exist_does_not_read() {
+    for text in [
+        "2026-02-30T00:00:00Z",
+        "2026-04-31T00:00:00Z",
+        "2025-02-29T00:00:00Z",
+        "2026-10-01T00:00:00+99:99",
+        "2026-10-01T00:00:00+02:60",
+        "2026-10-01T00:00:00+2",
+    ] {
+        assert_eq!(epoch_seconds(text), None, "{text}");
+    }
+}
+
+#[test]
+fn a_lowercase_separator_reads() {
+    assert_eq!(epoch_seconds("2026-10-01t18:51:00z"), Some(1_790_880_660));
+}

@@ -206,6 +206,9 @@ impl Mapper {
         } else if let (None, Some(file)) = (&before.file, &after.file) {
             events.push(Event::ToolTarget { id: id.clone(), file: file.clone() });
         }
+        if after.kind != before.kind {
+            events.push(Event::ToolKind { id: id.clone(), kind: after.kind });
+        }
         match after.status {
             ToolStatus::Done | ToolStatus::Failed if before.status != after.status => events.extend(self.finish_if_ended(&id)),
             ToolStatus::Running if before.status != ToolStatus::Running => {
@@ -233,6 +236,8 @@ impl Mapper {
         }
         if update.kind.is_some() {
             seen.call.kind = tool_kind(update.kind.as_deref(), &seen.content);
+        } else if seen.call.kind == ToolKind::Edit && update.content.is_some() {
+            seen.call.kind = tool_kind(Some("edit"), &seen.content);
         }
         if let Some(status) = status(update.status.as_deref()) {
             seen.call.status = status;
@@ -374,20 +379,23 @@ fn content_text(content: &[ToolContent]) -> String {
 }
 
 /// The text of a raw output, which ACP leaves to the agent: a string, or an object whose `content`,
-/// `output`, `stdout` or `text` holds it (Cursor's read and shell results), with a `stderr` after. Any
-/// other shape shows as its JSON.
+/// `output`, `stdout` or `text` holds it (Cursor's read and shell results), with a `stderr` after. A
+/// command that printed nothing gives empty text. Any other shape shows as its JSON.
 fn raw_text(raw: &Value) -> String {
-    let field = |key: &str| raw.get(key).and_then(Value::as_str).filter(|t| !t.is_empty());
+    let field = |key: &str| raw.get(key).and_then(Value::as_str);
     match raw {
         Value::String(text) => text.clone(),
         Value::Null => String::new(),
-        Value::Object(_) => match ["content", "output", "stdout", "text"].into_iter().find_map(field) {
-            Some(text) => match field("stderr") {
-                Some(stderr) => format!("{}\n{stderr}", text.trim_end_matches('\n')),
-                None => text.to_string(),
-            },
-            None => field("stderr").map_or_else(|| raw.to_string(), str::to_string),
-        },
+        Value::Object(_) => {
+            let text = ["content", "output", "stdout", "text"].into_iter().filter_map(field).find(|t| !t.is_empty());
+            match (text, field("stderr")) {
+                (Some(text), Some(stderr)) if !stderr.is_empty() => format!("{}\n{stderr}", text.trim_end_matches('\n')),
+                (Some(text), _) => text.to_string(),
+                (None, Some(stderr)) => stderr.to_string(),
+                (None, None) if field("stdout").is_some() => String::new(),
+                (None, None) => raw.to_string(),
+            }
+        }
         other => other.to_string(),
     }
 }

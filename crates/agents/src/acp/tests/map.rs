@@ -105,6 +105,19 @@ fn a_diff_with_no_old_text_is_a_write_and_its_output_says_what_changed() {
 }
 
 #[test]
+fn an_edit_whose_diff_comes_later_and_makes_a_new_file_turns_into_a_write() {
+    let mut run = turn();
+    run.agent(tool_call(json!({ "toolCallId": "t1", "title": "Edit File", "kind": "edit", "status": "pending" })));
+    assert!(matches!(&run.events()[0], Event::ToolStarted(call) if call.kind == ToolKind::Edit));
+    let diff = json!([{ "type": "diff", "path": "/work/project/new.rs", "oldText": "-- /dev/null", "newText": "x" }]);
+    run.agent(tool_update(json!({ "toolCallId": "t1", "status": "completed", "content": diff })));
+    let events = run.events();
+    let kind = events.iter().position(|e| matches!(e, Event::ToolKind { id, kind: ToolKind::Write } if id.as_str() == "t1"));
+    let finished = events.iter().position(|e| matches!(e, Event::ToolFinished { .. }));
+    assert!(kind.is_some() && kind < finished, "the write is known before the call ends: {events:?}");
+}
+
+#[test]
 fn acp_kinds_map_to_ateliers() {
     let mut run = turn();
     for (i, (kind, want)) in [
@@ -147,6 +160,8 @@ fn a_raw_output_object_gives_its_text_not_its_json() {
         (json!({ "exitCode": 0, "stdout": "a.rs\n", "stderr": "" }), "a.rs\n"),
         (json!({ "exitCode": 2, "stdout": "", "stderr": "no such file" }), "no such file"),
         (json!({ "exitCode": 1, "stdout": "half", "stderr": "then failed" }), "half\nthen failed"),
+        (json!({ "exitCode": 0, "stdout": "", "stderr": "" }), ""),
+        (json!({ "exitCode": 0, "stdout": "" }), ""),
     ]
     .into_iter()
     .enumerate()

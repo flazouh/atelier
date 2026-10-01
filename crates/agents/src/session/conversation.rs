@@ -165,6 +165,11 @@ impl Conversation {
                     call.call.status = *status;
                 }
             }
+            Event::ToolKind { id, kind } => {
+                if let Some(call) = self.call_mut(id) {
+                    call.call.kind = *kind;
+                }
+            }
             Event::ToolFinished { id, output } => {
                 if let Some(call) = self.call_mut(id) {
                     call.call.status = if output.is_error { ToolStatus::Failed } else { ToolStatus::Done };

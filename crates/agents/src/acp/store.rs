@@ -20,6 +20,8 @@ use crate::{
 
 /// How long a list or a history may take before atelier gives up on the agent.
 const PATIENCE: Duration = Duration::from_secs(60);
+/// How long an agent that closed its stdout has to exit before atelier stops it: it says nothing more.
+const EXIT_GRACE: Duration = Duration::from_secs(2);
 
 pub(super) fn list(agent: Arc<AcpAgent>, project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
     match ask(agent, project, Goal::List)? {
@@ -61,6 +63,13 @@ fn ask(agent: Arc<AcpAgent>, project: &dyn Project, goal: Goal) -> Result<Found,
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => return Err(SessionError::Read("the agent did not answer in time".into())),
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    let grace = Instant::now() + EXIT_GRACE;
+                    while control.running() && Instant::now() < grace {
+                        thread::sleep(Duration::from_millis(20));
+                    }
+                    if control.running() {
+                        return Err(SessionError::Read("the agent closed its output and did not exit".into()));
+                    }
                     let code = control.wait().ok().flatten();
                     protocol.exited(code, &control.stderr(), Instant::now());
                     return protocol.found().unwrap_or(Err(SessionError::Read("the agent stopped".into())));

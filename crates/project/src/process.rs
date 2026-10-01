@@ -115,45 +115,63 @@ impl Tail {
     }
 }
 
-/// How a watchdog ends a child whose app is gone: it asks each second whether both still run, and once
-/// the app does not, stops the child, killing it when it has not stopped two seconds later. It ignores
-/// the signals a closing terminal sends the app's whole group, so it outlives them to do its work.
+/// How a watchdog ends a child whose app is gone. The child leads a process group of its own, so the
+/// watchdog ends the child's whole group, the helpers the child started too. It asks each second whether
+/// the app runs (a zombie, killed but not reaped, does not) and whether the group still has a process; once
+/// the app is gone, it stops the group, and kills it when it still has a process two seconds later. A group
+/// id is not reused while the group has a process, so the kill reaches no other process. It ignores the
+/// signals a closing terminal sends the app's whole group, so it outlives them to do its work.
 const TETHER: &str = r#"(
 trap '' HUP INT TERM
-while kill -0 "$1" 2>/dev/null && kill -0 "$2" 2>/dev/null; do sleep 1; done
-if ! kill -0 "$1" 2>/dev/null; then kill "$2" 2>/dev/null; sleep 2; kill -9 "$2" 2>/dev/null; fi
+up() { s=$(ps -o stat= -p "$1" 2>/dev/null) && [ -n "$s" ] && case $s in *Z*) false ;; esac; }
+while up "$1" && kill -0 "-$2" 2>/dev/null; do sleep 1; done
+if ! up "$1"; then
+  kill -TERM "-$2" 2>/dev/null
+  sleep 2
+  kill -0 "-$2" 2>/dev/null && kill -KILL "-$2" 2>/dev/null
+fi
 ) </dev/null >/dev/null 2>&1 &"#;
 
-/// Ends the child `pid` when this app ends, however it ends. Closing a child's stdin is not enough: some
-/// agents keep running after it, and a crash or a kill gives the app no time to stop them. The watchdog
-/// runs detached; the `sh` that starts it ends at once, and a thread of its own waits for it, so a spawn
-/// does not wait and leaves no zombie.
+/// Ends the child `pid`, the leader of its own process group, and its group when this app ends, however it
+/// ends. Closing a child's stdin is not enough: some agents keep running after it, and a crash or a kill
+/// gives the app no time to stop them. The watchdog runs detached; the `sh` that starts it ends at once, and
+/// a thread of its own waits for it, so a spawn does not wait and leaves no zombie.
 #[cfg(unix)]
-pub fn tether(pid: u32) {
-    let started = std::process::Command::new("sh")
+pub fn tether(pid: u32) -> io::Result<()> {
+    tether_with("sh", pid)
+}
+
+#[cfg(unix)]
+fn tether_with(shell: &str, pid: u32) -> io::Result<()> {
+    let mut starter = std::process::Command::new(shell)
         .args(["-c", TETHER, "atelier-tether", &std::process::id().to_string(), &pid.to_string()])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
-        .spawn();
-    if let Ok(mut starter) = started {
-        let _ = thread::Builder::new().name("atelier-tether".into()).spawn(move || starter.wait());
+        .spawn()?;
+    match thread::Builder::new().name("atelier-tether".into()).spawn(move || starter.wait()) {
+        Ok(_) => Ok(()),
+        Err(error) => Err(error),
     }
 }
 
 #[cfg(not(unix))]
-pub fn tether(_pid: u32) {}
+pub fn tether(_pid: u32) -> io::Result<()> {
+    Ok(())
+}
 
-/// A child process on this machine, with its stderr's tail.
+/// A child process on this machine, the leader of a process group of its own, with its stderr's tail.
 pub struct LocalChild {
     pub child: Child,
     pub stderr: Tail,
+    /// Whether the child has been waited for. Until then its pid, so its group's id, belongs to it.
+    reaped: bool,
 }
 
 impl LocalChild {
     pub fn new(mut child: Child) -> Self {
         let stderr = child.stderr.take().map(|e: ChildStderr| Tail::follow(e)).unwrap_or_default();
-        Self { child, stderr }
+        Self { child, stderr, reaped: false }
     }
 }
 
@@ -165,22 +183,46 @@ pub struct Process {
 }
 
 impl Control for LocalChild {
+    /// Kills the child's whole group, so the helpers it started end with it and no pipe it shared stays open.
     fn kill(&mut self) -> io::Result<()> {
+        #[cfg(unix)]
+        if !self.reaped {
+            // SAFETY: `kill` takes no pointers. The group's id is the unreaped child's pid, so it is no
+            // other process's.
+            unsafe { libc::kill(-(self.child.id() as libc::pid_t), libc::SIGKILL) };
+        }
         self.child.kill()
     }
 
     /// Waits for the process, then for its stderr's last bytes.
     fn wait(&mut self) -> io::Result<Option<i32>> {
         let code = self.child.wait().map(|status| status.code());
+        self.reaped |= code.is_ok();
         self.stderr.finish();
         code
     }
 
     fn running(&mut self) -> bool {
-        matches!(self.child.try_wait(), Ok(None))
+        match self.child.try_wait() {
+            Ok(None) => true,
+            Ok(Some(_)) => {
+                self.reaped = true;
+                false
+            }
+            Err(_) => false,
+        }
     }
 
     fn stderr(&self) -> String {
         self.stderr.text()
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    /// A watchdog that cannot start is an error for the spawn to report, not a child left unguarded.
+    #[test]
+    fn a_watchdog_that_cannot_start_is_an_error() {
+        assert!(super::tether_with("/nonexistent/atelier-sh", std::process::id()).is_err());
     }
 }
