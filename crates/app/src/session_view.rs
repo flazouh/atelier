@@ -22,8 +22,9 @@ use beui::{
 };
 use gpui_kit::{
     AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement,
-    Styled, Window, div, list, prelude::FluentBuilder, px,
+    Styled, Window, div, list, prelude::FluentBuilder, 
 };
+use beui::scale::px;
 use lathe_agents::session::{Answer, Call, ChoiceKind, Item, SubagentStatus, TodoStatus, ToolStatus};
 
 use crate::{
@@ -322,7 +323,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
             .mb(px(8.))
             .px(px(12.))
             .py(px(8.))
-            .rounded(radius::LG)
+            .rounded(radius::lg())
             .bg(theme.card_strong)
             .flex()
             .flex_col()
@@ -493,7 +494,7 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
         Some(input) => div()
             .flex_1()
             .min_w_0()
-            .rounded(radius::MD)
+            .rounded(radius::md())
             .bg(theme.card_strong)
             .child(gpui_kit::component::input::Input::new(input).appearance(false).px(px(8.)).text_size(TextSize::Sm.font_size()))
             .into_any_element(),
@@ -512,7 +513,7 @@ fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> 
                 .text_size(TextSize::Sm.font_size())
                 .font_weight(gpui_kit::FontWeight::MEDIUM)
                 .tooltip(beui::tooltip::Tooltip::text("Rename"))
-                .press_stop(gpui_kit::ElementId::Name(format!("{key}-title-focus").into()), radius::MD, window, cx)
+                .press_stop(gpui_kit::ElementId::Name(format!("{key}-title-focus").into()), radius::md(), window, cx)
                 .on_click(move |_, window, cx| rename.update(cx, |s, cx| s.start_rename(window, cx)))
                 .child(shown_title)
                 .into_any_element()

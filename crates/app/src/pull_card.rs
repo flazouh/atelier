@@ -11,8 +11,9 @@ use beui::{
 };
 use gpui_kit::{
     App, AppContext, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Task,
-    Window, div, px,
+    Window, div, 
 };
+use beui::scale::px;
 use lathe_forge::{Check, Forge, Pull, PullRef, PullUpdate, present};
 use lathe_pr_view::actions::{Ask, ask};
 mod poll;

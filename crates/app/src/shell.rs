@@ -23,8 +23,9 @@ use gpui_kit::{
     App, AppContext, Context, Entity, FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, KeyDownEvent, ParentElement,
     PathPromptOptions, Render, SharedString, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea, actions,
-    div, prelude::FluentBuilder, px,
+    div, prelude::FluentBuilder, 
 };
+use beui::scale::px;
 use lathe_project::LocalProject;
 use lathe_settings::Location;
 
@@ -52,7 +53,7 @@ use crate::{
     tree_view::tree_view,
 };
 
-actions!(lathe, [ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(lathe, [ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 /// The title bar's height, and the room the macOS window buttons take at its left.
 pub const TITLE_BAR: f32 = 38.;
@@ -78,6 +79,11 @@ pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("secondary-o", OpenFolder, None),
         KeyBinding::new("secondary-1", ShowSessions, None),
+        // Zoom, as in every editor: ⌘+ (and ⌘=, the same key unshifted), ⌘−, ⌘0.
+        KeyBinding::new("secondary-=", ZoomIn, None),
+        KeyBinding::new("secondary-+", ZoomIn, None),
+        KeyBinding::new("secondary--", ZoomOut, None),
+        KeyBinding::new("secondary-0", ZoomReset, None),
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("secondary-shift-o", OpenRemote, None),
         KeyBinding::new("secondary-shift-O", OpenRemote, None),
@@ -173,6 +179,8 @@ const AGENT_BESIDE_REVIEW: f32 = beui::panel_layout::DEFAULT_WIDTH + 2. * beui::
 
 impl Shell {
     pub fn new(saved: &lathe_settings::Settings, cx: &mut Context<Self>) -> Self {
+        // The zoom the reader left it at.
+        beui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
         let agents_sidebar = cx.new(Sidebar::new);
         agents_sidebar.update(cx, |s, cx| s.set_layout(crate::sidebar_layout::from_settings(saved), cx));
         let panels = cx.new(|cx| {
@@ -531,6 +539,28 @@ impl Shell {
         self.sync(cx);
     }
 
+    /// Zooms the interface to `to` (kept between the least and the most), keeps it for the next launch, and draws every view
+    /// again: the cached ones are told, since they only draw again when notified.
+    fn zoom_to(&mut self, to: f32, cx: &mut Context<Self>) {
+        let kept = beui::scale::set_zoom(to);
+        if let Some(path) = settings_path() {
+            cx.background_spawn(async move {
+                if let Err(error) = lathe_settings::update(&path, |s| s.ui_zoom = Some(kept)) {
+                    eprintln!("could not keep the zoom: {error}");
+                }
+            })
+            .detach();
+        }
+        self.agents_sidebar.update(cx, |_, cx| cx.notify());
+        self.right_view.update(cx, |_, cx| cx.notify());
+        self.panels.update(cx, |_, cx| cx.notify());
+        for view in self.panel_views.values() {
+            view.update(cx, |_, cx| cx.notify());
+        }
+        cx.refresh_windows();
+        cx.notify();
+    }
+
     /// Keeps what the sidebar's head chose that outlives the launch: how it lists (the filter starts as Active each
     /// time, so no session is hidden by a choice the reader forgot).
     fn keep_sidebar_layout(&mut self, layout: beui::sidebar_layout::SidebarLayout, cx: &mut Context<Self>) {
@@ -777,7 +807,7 @@ impl Shell {
     /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
     /// still fits in it.
     fn widen_for_review(&mut self, window: &mut Window, _: &mut Context<Self>) {
-        let total = f32::from(window.viewport_size().width);
+        let total = beui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
             self.narrow = Pane::Right;
@@ -1322,7 +1352,7 @@ impl Shell {
     }
 
     fn toggle_sidebar(&mut self, _: &ToggleSidebar, window: &mut Window, cx: &mut Context<Self>) {
-        match Fit::of(f32::from(window.viewport_size().width)) {
+        match Fit::of(beui::scale::design(window.viewport_size().width)) {
             Fit::Wide => self.sidebar = !self.sidebar,
             Fit::Medium => self.sidebar_in_medium = !self.sidebar_in_medium,
             Fit::Narrow => self.narrow = if self.narrow == Pane::Projects { Pane::Session } else { Pane::Projects },
@@ -1330,7 +1360,7 @@ impl Shell {
         cx.notify();
     }
     fn toggle_right(&mut self, _: &ToggleRight, window: &mut Window, cx: &mut Context<Self>) {
-        match Fit::of(f32::from(window.viewport_size().width)) {
+        match Fit::of(beui::scale::design(window.viewport_size().width)) {
             Fit::Narrow => self.narrow = if self.narrow == Pane::Right { Pane::Session } else { Pane::Right },
             Fit::Medium | Fit::Wide => self.right = !self.right,
         }
@@ -1360,8 +1390,8 @@ impl Shell {
             .flex_none()
             .items_center()
             .gap(px(8.))
-            .h(px(TITLE_BAR))
-            .pl(px(TRAFFIC_LIGHTS))
+            .h(gpui_kit::px(TITLE_BAR))
+            .pl(gpui_kit::px(TRAFFIC_LIGHTS))
             .pr(px(12.))
             .text_size(TextSize::Sm.font_size())
             // No project is "the" project of the window: the title bar names the app, and each project names itself
@@ -1535,10 +1565,10 @@ impl Shell {
                 .gap(px(8.))
                 .h(px(40.))
                 .px(px(12.))
-                .rounded(radius::LG)
+                .rounded(radius::lg())
                 .cursor_pointer()
                 .hover(|s| s.bg(theme.muted_hover()))
-                .press_stop(gpui_kit::ElementId::Name(format!("recent-focus-{i}").into()), radius::LG, window, cx)
+                .press_stop(gpui_kit::ElementId::Name(format!("recent-focus-{i}").into()), radius::lg(), window, cx)
                 .on_click(cx.listener(move |this, _, window, cx| match &open {
                     Location::Local { path } => this.open_local(path.clone(), window, cx),
                     Location::Ssh { host, path } => this.open_remote(host.clone(), path.display().to_string(), window, cx),
@@ -1648,7 +1678,7 @@ impl Shell {
             .size_full()
             .pr(px(8.))
             .pb(px(4.))
-            .child(div().size_full().pt(px(8.)).rounded(radius::LG).bg(theme.card).child(crate::editor_pane::editor_pane(project, cx)))
+            .child(div().size_full().pt(px(8.)).rounded(radius::lg()).bg(theme.card).child(crate::editor_pane::editor_pane(project, cx)))
             .into_any_element()
     }
 
@@ -1728,7 +1758,7 @@ impl Shell {
     /// The panes for the window's width: the three side by side, the two without the sidebar, or one at
     /// a time with tabs (docs/app.md, "Window widths").
     fn panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let total = f32::from(window.viewport_size().width);
+        let total = beui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
             self.session_right = None;
@@ -1836,7 +1866,7 @@ impl Shell {
         let body = match self.narrow {
             Pane::Projects => self.sidebar(cx).into_any_element(),
             Pane::Session => {
-                let total = f32::from(window.viewport_size().width);
+                let total = beui::scale::design(window.viewport_size().width);
                 self.panels.update(cx, |p, cx| p.fit_to(total - 16., cx));
                 self.agent_panel(cx)
             }
@@ -1886,7 +1916,9 @@ impl Render for Shell {
 impl Shell {
     fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        self.width = f32::from(window.viewport_size().width);
+        // Rems follow the zoom too, so what is written in them scales with the rest.
+        window.set_rem_size(gpui_kit::px(16. * beui::scale::zoom()));
+        self.width = beui::scale::design(window.viewport_size().width);
         // The side panes keep their width when the other hides; the agent panel takes what is left.
         let body = match self.active().cloned() {
             None => self.start_screen(window, cx).into_any_element(),
@@ -1905,7 +1937,7 @@ impl Shell {
                 .mb(px(8.))
                 .px(px(12.))
                 .py(px(8.))
-                .rounded(radius::LG)
+                .rounded(radius::lg())
                 .bg(theme.card_strong)
                 .text_size(TextSize::Xs.font_size())
                 .child(beui::spinner::Spinner::new("reconnecting").size(px(12.)).color(theme.warning))
@@ -1926,6 +1958,9 @@ impl Shell {
             .on_action(cx.listener(Self::toggle_right))
             .on_action(cx.listener(Self::pull_requests_key))
             .on_action(cx.listener(|this, _: &ShowSessions, window, cx| this.show_view(ShellView::Sessions, window, cx)))
+            .on_action(cx.listener(|this, _: &ZoomIn, _, cx| this.zoom_to(beui::scale::zoom() + beui::scale::STEP, cx)))
+            .on_action(cx.listener(|this, _: &ZoomOut, _, cx| this.zoom_to(beui::scale::zoom() - beui::scale::STEP, cx)))
+            .on_action(cx.listener(|this, _: &ZoomReset, _, cx| this.zoom_to(1., cx)))
             .on_action(cx.listener(Self::open_tasks_key))
             .on_key_down(cx.listener(Self::key_down))
             .flex()
@@ -1953,7 +1988,7 @@ impl Shell {
                             .max_w(px(560.))
                             .px(px(12.))
                             .py(px(8.))
-                            .rounded(radius::LG)
+                            .rounded(radius::lg())
                             .bg(theme.popover)
                             .shadow(beui::theme::popover_shadow(&theme))
                             .text_size(TextSize::Sm.font_size())
@@ -1961,7 +1996,7 @@ impl Shell {
                             .child(words),
                     )
             }))
-            .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
+            .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(gpui_kit::px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {
                 let this = cx.entity().downgrade();

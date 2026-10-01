@@ -74,7 +74,7 @@ impl PullView {
             .flex_none()
             .gap(px(6.))
             .p(px(12.))
-            .rounded(radius::LG)
+            .rounded(radius::lg())
             .bg(theme.card)
             .child(div().font_weight(FontWeight::SEMIBOLD).text_color(theme.foreground).child(SharedString::from(pull.title.clone())))
             .child(
@@ -160,7 +160,7 @@ impl PullView {
                     .flex()
                     .flex_col()
                     .flex_none()
-                    .rounded(radius::LG)
+                    .rounded(radius::lg())
                     .bg(theme.card)
                     .child(
                         ConversationList::new("pr-conversation", page.threads, page.remarks)
@@ -232,7 +232,7 @@ impl PullView {
         let muted = theme.muted_foreground;
         let Some(place_now) = self.model.place.clone() else {
             let words = if self.model.entries.is_none() && self.model.git_error.is_none() { "Reading the files…" } else { "No files changed." };
-            return div().flex_1().min_w_0().h(px(body)).flex().flex_col().rounded(radius::LG).bg(theme.card).child(self.empty_card(words, cx)).into_any_element();
+            return div().flex_1().min_w_0().h(px(body)).flex().flex_col().rounded(radius::lg()).bg(theme.card).child(self.empty_card(words, cx)).into_any_element();
         };
         let handlers = self.handlers(cx);
         let view = if place_now.brought_in { None } else { self.current_view() };
@@ -290,7 +290,7 @@ impl PullView {
             .min_w_0()
             .h(px(body))
             .bg(theme.card)
-            .rounded(radius::LG)
+            .rounded(radius::lg())
             .p(px(6.))
             .flex()
             .flex_col()
@@ -382,7 +382,7 @@ impl Render for PullView {
         let current: SharedString = self.model.place.as_ref().filter(|p| !p.brought_in).map(|p| SharedString::from(p.path.clone())).unwrap_or_default();
         let body = (height - 16. - 52.).max(200.);
         let open = cx.listener(|this, path: &SharedString, window, cx| this.open_file(path, window, cx));
-        let tree = div().flex_none().w(px(TREE)).h(px(body)).bg(theme.card).rounded(radius::LG).p(px(6.)).child(
+        let tree = div().flex_none().w(px(TREE)).h(px(body)).bg(theme.card).rounded(radius::lg()).p(px(6.)).child(
             ChangedFileTree::new("pr-tree", files).reviewed(seen).current(current).on_open(move |path, window, cx| open(path, window, cx)),
         );
         let card = self.file_card(body, cx);

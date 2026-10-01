@@ -449,7 +449,7 @@ impl Gallery {
                     .id(story.title())
                     .px(px(10.))
                     .py(px(6.))
-                    .rounded(beui::theme::radius::LG)
+                    .rounded(beui::theme::radius::lg())
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
                     .when(selected, |d| d.bg(theme.card_strong).font_weight(FontWeight::MEDIUM))
@@ -593,7 +593,7 @@ fn colors(cx: &App) -> impl IntoElement {
             .flex_col()
             .gap(px(8.))
             .w(px(120.))
-            .child(div().h(px(64.)).rounded(beui::theme::radius::XL).bg(color))
+            .child(div().h(px(64.)).rounded(beui::theme::radius::xl()).bg(color))
             .child(div().text_size(TextSize::Xs.font_size()).child(name))
     }))
 }

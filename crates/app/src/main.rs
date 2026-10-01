@@ -5,7 +5,8 @@
 
 use std::path::PathBuf;
 
-use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, px, size};
+use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, size};
+use beui::scale::px;
 
 mod activity;
 mod agent_session;

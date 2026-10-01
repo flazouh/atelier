@@ -12,8 +12,9 @@ use beui::{
 };
 use gpui_kit::{
     App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled,
-    div, prelude::FluentBuilder, px,
+    div, prelude::FluentBuilder, 
 };
+use beui::scale::px;
 
 use crate::open_project::{Deleted, OpenProject};
 
@@ -45,7 +46,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
                     .size(px(18.))
                     .items_center()
                     .justify_center()
-                    .rounded(radius::MD)
+                    .rounded(radius::md())
                     .when(dirty, |d| d.child(div().group_hover(group.clone(), |s| s.invisible()).child(dot(muted))))
                     .child(
                         div()
@@ -160,7 +161,7 @@ fn banner(icon: IconName, tone: gpui_kit::Hsla, words: &'static str, first: Butt
         .mb(px(6.))
         .px(px(12.))
         .py(px(6.))
-        .rounded(radius::LG)
+        .rounded(radius::lg())
         .bg(theme.card_strong)
         .text_size(TextSize::Xs.font_size())
         .child(Icon::new(icon).size(px(14.)).color(tone))

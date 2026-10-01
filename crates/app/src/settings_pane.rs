@@ -14,8 +14,9 @@ use beui::{
 };
 use gpui_kit::{
     AppContext, Context, EventEmitter, FocusHandle, Focusable, FontWeight, Hsla, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
-    Render, Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, px,
+    Render, Rgba, SharedString, StatefulInteractiveElement, Styled, Window, div, prelude::FluentBuilder, 
 };
+use beui::scale::px;
 
 /// Light, dark, or whatever the system is set to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -415,7 +416,7 @@ impl Render for SettingsPane {
                     .items_center()
                     .h(px(32.))
                     .px(px(8.))
-                    .rounded(beui::theme::radius::MD)
+                    .rounded(beui::theme::radius::md())
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
                     .text_color(if front { theme.foreground } else { muted })

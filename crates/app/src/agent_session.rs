@@ -21,7 +21,8 @@ use futures_util::StreamExt;
 use std::{collections::HashMap, time::Instant};
 
 use beui::{PromptInput, PromptInputEvent, PromptModel};
-use gpui_kit::{AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString, Subscription, Task, Window, px};
+use gpui_kit::{AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString, Subscription, Task, Window, };
+use beui::scale::px;
 use lathe_agents::{
     registry::Agent,
     session::{

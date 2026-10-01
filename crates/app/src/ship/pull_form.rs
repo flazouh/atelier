@@ -14,8 +14,9 @@ use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
     Styled, Task, Window, actions,
     component::input::{InputState, Textarea, TextareaState},
-    div, prelude::FluentBuilder, px,
+    div, prelude::FluentBuilder, 
 };
+use beui::scale::px;
 use lathe_agents::session::Backend;
 use lathe_forge::{Forge, NewPull, PullRef, RepoRef};
 use lathe_project::Project;
@@ -300,7 +301,7 @@ impl Render for PullForm {
         let muted = theme.muted_foreground;
         let words = |text: SharedString| div().text_size(TextSize::Xs.font_size()).text_color(muted).child(text);
         let this = cx.entity().downgrade();
-        let card = div().mx(px(8.)).p(px(12.)).rounded(radius::LG).bg(theme.card).flex().flex_col().gap(px(8.));
+        let card = div().mx(px(8.)).p(px(12.)).rounded(radius::lg()).bg(theme.card).flex().flex_col().gap(px(8.));
         match &self.stage {
             FormStage::Reading => card.child(words("Reading the branch and its bases…".into())).into_any_element(),
             FormStage::Failed(why) => card.child(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(why.clone())).into_any_element(),
@@ -320,7 +321,7 @@ impl Render for PullForm {
                     })
                     .child(div().text_size(TextSize::Sm.font_size()).child(format!("Open a pull request from {}", self.head)))
                     .child(TextInput::new("pull-title", &self.title).surface(theme.card))
-                    .child(Field::new(body_focus, Textarea::new(&self.body).appearance(false)).radius(radius::MD).padding(px(0.)))
+                    .child(Field::new(body_focus, Textarea::new(&self.body).appearance(false)).radius(radius::md()).padding(px(0.)))
                     .when(self.drafting, |d| d.child(words("The agent is drafting…".into())))
                     .when(self.checking, |d| d.child(words("Checking branches…".into())))
                     .child(

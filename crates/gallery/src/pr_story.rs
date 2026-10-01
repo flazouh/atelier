@@ -707,7 +707,7 @@ impl Render for PrStory {
                 }
             }))
             .child(ChecksPanel::new("pr-checks", checks()))
-            .child(div().flex().flex_col().flex_none().rounded(radius::LG).bg(theme.card).child(ConversationList::new("pr-conversation", threads, remarks)).child(self.composer.clone()))
+            .child(div().flex().flex_col().flex_none().rounded(radius::lg()).bg(theme.card).child(ConversationList::new("pr-conversation", threads, remarks)).child(self.composer.clone()))
             .child(self.verdict.clone())
             .child(self.merge.clone())
             .child(CommitsSummary::new("pr-commits", commits()));
@@ -739,7 +739,7 @@ impl Render for PrStory {
         };
         let status = self.session.as_ref().map(|s| s.read(cx).status().join("   ")).unwrap_or_default();
         let current = shown.map(|i| SharedString::from(self.fixture.changed[i].path)).unwrap_or_default();
-        let card = || div().h(px(body)).bg(theme.card).rounded(radius::LG).p(px(6.));
+        let card = || div().h(px(body)).bg(theme.card).rounded(radius::lg()).p(px(6.));
         let files = div()
             .flex()
             .flex_1()

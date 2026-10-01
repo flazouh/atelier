@@ -16,8 +16,9 @@ use beui::{
 };
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, Render,
-    SharedString, Styled, Subscription, Window, canvas, div, prelude::FluentBuilder, px,
+    SharedString, Styled, Subscription, Window, canvas, div, prelude::FluentBuilder, 
 };
+use beui::scale::px;
 use lathe_tracker::{Entry, Patch, Query, Task, TaskId, Tracker, TrackerResult};
 
 use super::map;
@@ -533,7 +534,7 @@ impl Render for TasksPane {
             .flex_col()
             .size_full()
             .min_w_0()
-            .rounded(radius::LG)
+            .rounded(radius::lg())
             .bg(theme.card)
             .child(measure)
             .child(header)

@@ -4,7 +4,8 @@
 //! rest (the front, the tabs, a buffer's banners) is the project's, which it observes.
 
 use beui::theme::{ActiveTheme, radius};
-use gpui_kit::{Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window, div, px};
+use gpui_kit::{Context, Entity, IntoElement, ParentElement, Render, Styled, Subscription, Window, div, };
+use beui::scale::px;
 
 use crate::{
     editor_pane::editor_pane,
@@ -39,7 +40,7 @@ impl Render for RightPane {
             (Front::Review, Some((pane, _)), _) => div().size_full().pt(px(8.)).child(pane.clone()),
             (Front::Pulls, _, Some(hub)) => div().size_full().pt(px(8.)).child(hub),
             (Front::Tasks, _, _) if p.tasks.is_some() => div().size_full().children(p.tasks.as_ref().map(|t| t.pane.clone())),
-            _ => div().size_full().pt(px(8.)).rounded(radius::LG).bg(theme.card).child(editor_pane(project, cx)),
+            _ => div().size_full().pt(px(8.)).rounded(radius::lg()).bg(theme.card).child(editor_pane(project, cx)),
         };
         div().size_full().pr(px(8.)).pb(px(4.)).child(inner)
     }

@@ -607,3 +607,27 @@ fn a_look_from_settings_reaches_the_sidebar_and_keeps_the_heads_choices(cx: &mut
     assert_eq!((layout.project_badge, layout.show_time), (BadgeShow::Never, false));
     assert_eq!(layout.mode, ListMode::Priority, "the head's mode stays");
 }
+
+/// ⌘+, ⌘− and ⌘0 scale the whole interface, as Zed's do: a button is as wide as the zoom says, and the window's breakpoints
+/// follow the scaled width.
+#[gpui_kit::test]
+fn the_zoom_keys_scale_every_size_together(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    let (zoom_in, zoom_out, reset) = if cfg!(target_os = "macos") { ("cmd-=", "cmd--", "cmd-0") } else { ("ctrl-=", "ctrl--", "ctrl-0") };
+    let width = |cx: &mut gpui_kit::VisualTestContext| f32::from(cx.debug_bounds("settings-entry").expect("the Settings button").size.width);
+    let base = width(cx);
+    for _ in 0..5 {
+        cx.simulate_keystrokes(zoom_in);
+    }
+    settle(&shell, cx);
+    assert!((beui::scale::zoom() - 1.5).abs() < 1e-4, "five presses of ⌘+ are 1.5: {}", beui::scale::zoom());
+    assert!((width(cx) - base * 1.5).abs() < 1.5, "the button is 1.5 times as wide: {} against {base}", width(cx));
+    for _ in 0..30 {
+        cx.simulate_keystrokes(zoom_out);
+    }
+    assert_eq!(beui::scale::zoom(), beui::scale::MIN, "⌘− stops at the least");
+    cx.simulate_keystrokes(reset);
+    settle(&shell, cx);
+    assert_eq!(beui::scale::zoom(), 1.);
+    assert!((width(cx) - base).abs() < 0.5, "⌘0 puts it back");
+}

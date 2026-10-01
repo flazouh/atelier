@@ -15,8 +15,9 @@ use gpui_kit::{
     Render, SharedString, Styled, Window,
     base::input::Escape,
     component::input::{InputEvent, InputState},
-    div, px,
+    div, 
 };
+use beui::scale::px;
 
 /// The chips' names for tests and screenshots, by their place in the list.
 const HOST_CHIPS: [&str; 8] = ["ssh-host-0", "ssh-host-1", "ssh-host-2", "ssh-host-3", "ssh-host-4", "ssh-host-5", "ssh-host-6", "ssh-host-7"];

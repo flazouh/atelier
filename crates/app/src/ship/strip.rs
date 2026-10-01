@@ -20,8 +20,9 @@ use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, Focusable, IntoElement, InteractiveElement, ParentElement, Render, SharedString, Styled, Task,
     Window, actions,
     component::input::{Input, InputState, Textarea, TextareaState},
-    div, prelude::FluentBuilder, px,
+    div, prelude::FluentBuilder, 
 };
+use beui::scale::px;
 use lathe_agents::session::Backend;
 use lathe_forge::{Forge, PullRef};
 use lathe_project::Project;
@@ -564,7 +565,7 @@ impl Render for ShipStrip {
                     })
                     .mx(px(8.))
                     .p(px(12.))
-                    .rounded(radius::LG)
+                    .rounded(radius::lg())
                     .bg(theme.card)
                     .flex()
                     .flex_col()
@@ -573,9 +574,9 @@ impl Render for ShipStrip {
                     .child(div().flex().flex_col().gap(px(4.)).children(lines))
                     .when(self.on_default, |d| {
                         d.child(words(format!("{on} is the default branch: this commit goes on a new one").into()))
-                            .child(Field::new(branch_focus.clone(), Input::new(&self.new_branch).appearance(false)).radius(radius::MD))
+                            .child(Field::new(branch_focus.clone(), Input::new(&self.new_branch).appearance(false)).radius(radius::md()))
                     })
-                    .child(Field::new(message_focus.clone(), Textarea::new(&self.message).appearance(false)).radius(radius::MD).padding(px(6.)))
+                    .child(Field::new(message_focus.clone(), Textarea::new(&self.message).appearance(false)).radius(radius::md()).padding(px(6.)))
                     .when(self.drafting, |d| d.child(words("The agent is drafting…".into())))
                     .when_some(self.refused.clone(), |d, refused| {
                         d.child(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(refused))

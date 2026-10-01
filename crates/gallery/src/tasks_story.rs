@@ -226,7 +226,7 @@ impl Render for TasksStory {
                     .variant(if tab == self.tab { ButtonVariant::Secondary } else { ButtonVariant::Ghost })
                     .on_click(move |_, window, cx| this.update(cx, |s, cx| s.go(tab, window, cx)))
             })))
-            .child(div().flex_1().min_h_0().rounded(beui::theme::radius::XL).bg(theme.card.opacity(0.35)).child(body));
+            .child(div().flex_1().min_h_0().rounded(beui::theme::radius::xl()).bg(theme.card.opacity(0.35)).child(body));
         match &self.run {
             Some(run) => run.wrap(root.into_any_element()).into_any_element(),
             None => root.into_any_element(),

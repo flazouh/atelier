@@ -11,8 +11,9 @@ use beui::{
 };
 use gpui_kit::{
     App, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled,
-    div, prelude::FluentBuilder, px, uniform_list,
+    div, prelude::FluentBuilder, uniform_list,
 };
+use beui::scale::px;
 
 use crate::open_project::{Listing, OpenProject};
 
@@ -54,7 +55,7 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                     .pl(px(8. + STEP * row.depth as f32))
                     .pr(px(8.))
                     .mx(px(6.))
-                    .rounded(radius::MD)
+                    .rounded(radius::md())
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
                     .when(shown, |d| d.bg(theme.muted_hover()))

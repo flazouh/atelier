@@ -379,7 +379,7 @@ impl Render for ReviewStory {
             .on_resolved(move |id, decision, window, cx| resolved(&(id.clone(), decision), window, cx));
 
         // The tree and the diff each sit in the same card, under the bar.
-        let card = || div().h(px(body)).bg(theme.card).rounded(radius::LG).p(px(6.));
+        let card = || div().h(px(body)).bg(theme.card).rounded(radius::lg()).p(px(6.));
         let file = &self.files[self.current];
         let header = ReviewFileHeader::new("review-file", file.path.clone(), file.added, file.removed, handlers.clone());
         // The story's width, less the gallery's sidebar (220) and its padding (2 x 40), so the bar fits

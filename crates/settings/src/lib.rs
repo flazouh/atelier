@@ -68,6 +68,8 @@ pub struct Settings {
     pub view: Option<String>,
     /// How the sidebar lists sessions: "projects" or "priority".
     pub sidebar: Option<String>,
+    /// How far the interface is zoomed (1 is as designed), set by ⌘+, ⌘− and ⌘0.
+    pub ui_zoom: Option<f32>,
     /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
     pub sidebar_layout: SidebarSaved,
     /// Keys a newer or older lathe wrote, kept as they are.
