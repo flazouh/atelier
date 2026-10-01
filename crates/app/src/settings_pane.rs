@@ -1,10 +1,11 @@
-//! The Settings pane: what a reader can set, in three sections. Appearance holds the theme, light, dark or the
-//! system's, and the primary colour: the fill of the main button, and the accent and the selection wash too (see
-//! `beui::theme::with_pick`). Keys lists the review's key table, read only for now. Agents lists the agents this
-//! build can start and the models each offers. A change applies at once, to every window, and is kept in
-//! `lathe-settings`. Escape closes the pane.
+//! The Settings page: what a reader can set, in four sections with a list of them at its left. Appearance holds the
+//! theme, light, dark or the system's, and the primary colour: the fill of the main button, and the accent and the
+//! selection wash too (see `beui::theme::with_pick`). Agents lists the agents this build can start and the models
+//! each offers. Tasks holds the rules that move a task by itself. Keys lists the review's key table, read only for
+//! now. A change applies at once, to every window, and is kept in `lathe-settings`. Escape closes the page, and so
+//! does the Back button in the title bar.
 use beui::{
-    ActiveTheme, Button, ButtonSize, ButtonVariant, ColorSelector, IconName, Kbd, Segment, Segmented, Swatch,
+    ActiveTheme, ColorSelector, Kbd, Segment, Segmented, Swatch,
     keys,
     theme::{Appearance, can_be_primary, follow_system, set_appearance, set_pick},
     theme_picker::theme_picker,
@@ -94,10 +95,49 @@ pub struct SettingsPane {
     primary: SharedString,
     /// Which task rules move a task by themselves.
     rules: lathe_tracker::RuleSet,
-    // design preview: remove after Alex picks
-    tabs: usize,
-    elevation: usize,
-    strength: usize,
+    section: Section,
+}
+
+/// The sections of the page, in the order the list at its left shows them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Section {
+    Appearance,
+    Agents,
+    Tasks,
+    Keys,
+}
+
+impl Section {
+    pub const ALL: [Section; 4] = [Section::Appearance, Section::Agents, Section::Tasks, Section::Keys];
+
+    pub fn words(self) -> &'static str {
+        match self {
+            Section::Appearance => "Appearance",
+            Section::Agents => "Agents",
+            Section::Tasks => "Tasks",
+            Section::Keys => "Keys",
+        }
+    }
+
+    /// One line under the section's name.
+    pub fn gist(self) -> &'static str {
+        match self {
+            Section::Appearance => "The theme, light or dark, and the colour of the main button.",
+            Section::Agents => "The agents this build can start, and the models each offers.",
+            Section::Tasks => "What moves a task by itself. Every move shows in its activity, and you can move it back.",
+            Section::Keys => "The keys of the review. They cannot be changed yet.",
+        }
+    }
+
+    /// The name a test finds the section's entry in the list by.
+    pub fn entry(self) -> &'static str {
+        match self {
+            Section::Appearance => "section-appearance",
+            Section::Agents => "section-agents",
+            Section::Tasks => "section-tasks",
+            Section::Keys => "section-keys",
+        }
+    }
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -122,9 +162,7 @@ impl SettingsPane {
             mode,
             primary: primary.into(),
             rules,
-            tabs: saved.design_tabs.map_or(0, usize::from).min(3),
-            elevation: saved.design_elevation.map_or(2, usize::from).min(3),
-            strength: saved.design_strength.map_or(50, usize::from).min(100),
+            section: Section::Appearance,
         }
     }
 
@@ -135,26 +173,8 @@ impl SettingsPane {
         cx.notify();
     }
 
-    // design preview: remove after Alex picks
-    pub(crate) fn choose_strength(&mut self, value: usize, cx: &mut Context<Self>) {
-        self.strength = value.min(100);
-        beui::design_preview::set_strength(self.strength);
-        let kept = self.strength as u8;
-        save(cx, move |s| s.design_strength = Some(kept));
-        cx.notify();
-    }
-    // design preview: remove after Alex picks
-    pub(crate) fn choose_elevation(&mut self, design: usize, cx: &mut Context<Self>) {
-        self.elevation = design;
-        beui::design_preview::set_elevation(design);
-        save(cx, move |s| s.design_elevation = Some(design as u8));
-        cx.notify();
-    }
-    // design preview: remove after Alex picks
-    pub(crate) fn choose_tabs(&mut self, design: usize, cx: &mut Context<Self>) {
-        self.tabs = design;
-        beui::design_preview::set_tabs(design, cx);
-        save(cx, move |s| s.design_tabs = Some(design as u8));
+    pub(crate) fn show(&mut self, section: Section, cx: &mut Context<Self>) {
+        self.section = section;
         cx.notify();
     }
     fn set_rule(&mut self, rule: lathe_tracker::Rule, on: bool, cx: &mut Context<Self>) {
@@ -172,9 +192,6 @@ impl SettingsPane {
     }
 }
 
-// design preview: remove after Alex picks
-const DESIGN_ELEVATION: [&str; 4] = ["design-elevation-0", "design-elevation-1", "design-elevation-2", "design-elevation-3"];
-const DESIGN_TABS: [&str; 4] = ["design-tabs-0", "design-tabs-1", "design-tabs-2", "design-tabs-3"];
 /// The name a test finds a rule's switch by.
 pub(crate) fn rule_switch(rule: lathe_tracker::Rule) -> &'static str {
     match rule {
@@ -202,7 +219,6 @@ impl Render for SettingsPane {
         let muted = theme.muted_foreground;
         let this = cx.entity().downgrade();
 
-        let heading = |words: &'static str| div().pt(px(28.)).pb(px(8.)).text_size(TextSize::Sm.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child(words);
         let row = |label: &'static str, control: gpui_kit::AnyElement| {
             div()
                 .flex()
@@ -266,7 +282,80 @@ impl Render for SettingsPane {
                 }))
         });
 
-        let close = this.clone();
+        let appearance = div()
+            .flex()
+            .flex_col()
+            .child(row("Theme", div().w(px(220.)).child(theme_picker("settings-theme", &theme, |picked, cx| {
+                let name = picked.name.to_string();
+                save(cx, move |s| s.theme = Some(name));
+            })).into_any_element()))
+            .child(row("Mode", modes.into_any_element()))
+            .child(
+                div()
+                    .pt(px(12.))
+                    .flex()
+                    .flex_col()
+                    .child(div().text_size(TextSize::Sm.font_size()).text_color(theme.foreground).child("Primary colour"))
+                    .child(div().pb(px(12.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The main button's fill, and the highlight and the selection. A colour that no text reads on is not offered."))
+                    .child(picker),
+            );
+        let tasks = div().flex().flex_col().children(lathe_tracker::Rule::ALL.into_iter().map(|rule| {
+            let pane = this.clone();
+            row(
+                rule.words(),
+                beui::Switch::new(rule.id(), self.rules.is_on(rule))
+                    .debug_name(rule_switch(rule))
+                    .on_change(move |on, _, cx| {
+                        pane.update(cx, |p, cx| p.set_rule(rule, on, cx)).ok();
+                    })
+                    .into_any_element(),
+            )
+        }));
+        let agents = div()
+            .flex()
+            .flex_col()
+            .children(agent_rows)
+            .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available.")));
+        let keys_list = div().flex().flex_col().children(key_rows);
+        let body = match self.section {
+            Section::Appearance => appearance.into_any_element(),
+            Section::Agents => agents.into_any_element(),
+            Section::Tasks => tasks.into_any_element(),
+            Section::Keys => keys_list.into_any_element(),
+        };
+        // The list of sections, at the left: the front one on a card.
+        let nav = div()
+            .debug_selector(|| "settings-sections".into())
+            .flex_none()
+            .w(px(200.))
+            .h_full()
+            .flex()
+            .flex_col()
+            .gap(px(2.))
+            .px(px(12.))
+            .pt(px(48.))
+            .child(div().px(px(10.)).pb(px(12.)).text_size(TextSize::Lg.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child("Settings"))
+            .children(Section::ALL.into_iter().map(|section| {
+                let pane = this.clone();
+                let front = section == self.section;
+                div()
+                    .id(section.entry())
+                    .debug_selector(move || section.entry().to_string())
+                    .flex()
+                    .items_center()
+                    .h(px(32.))
+                    .px(px(10.))
+                    .rounded(beui::theme::radius::MD)
+                    .cursor_pointer()
+                    .text_size(TextSize::Sm.font_size())
+                    .text_color(if front { theme.foreground } else { muted })
+                    .when(front, |d| d.bg(theme.card_strong).font_weight(FontWeight::MEDIUM))
+                    .hover(|s| s.bg(theme.card_strong.opacity(0.6)))
+                    .on_click(move |_, _, cx| {
+                        pane.update(cx, |p, cx| p.show(section, cx)).ok();
+                    })
+                    .child(section.words())
+            }));
         div()
             .id("settings-pane")
             .key_context("SettingsPane")
@@ -276,134 +365,30 @@ impl Render for SettingsPane {
                     cx.emit(SettingsEvent::Close);
                 }
             }))
-            .relative()
+            .flex()
             .size_full()
             .bg(theme.background)
+            .child(nav)
             .child(
                 div()
                     .id("settings-scroll")
                     .debug_selector(|| "settings-scroll".into())
-                    .size_full()
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
                     .overflow_y_scroll()
                     .child(
-                div()
-                    .mx_auto()
-                    .w_full()
-                    .max_w(px(640.))
-                    .px(px(24.))
-                    .py(px(48.))
-                    .flex()
-                    .flex_col()
-                    .child(div().text_size(TextSize::Xl.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child("Settings"))
-                    .child(heading("Appearance"))
-                    .child(row("Theme", div().w(px(220.)).child(theme_picker("settings-theme", &theme, |picked, cx| {
-                        let name = picked.name.to_string();
-                        save(cx, move |s| s.theme = Some(name));
-                    })).into_any_element()))
-                    .child(row("Mode", modes.into_any_element()))
-                    .child(
                         div()
-                            .pt(px(12.))
+                            .w_full()
+                            .max_w(px(640.))
+                            .px(px(24.))
+                            .py(px(48.))
                             .flex()
                             .flex_col()
-                            .child(div().text_size(TextSize::Sm.font_size()).text_color(theme.foreground).child("Primary colour"))
-                            .child(div().pb(px(12.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The main button's fill, and the highlight and the selection. A colour that no text reads on is not offered."))
-                            .child(picker),
-                    )
-                    .child(heading("Keys"))
-                    .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The keys of the review. They cannot be changed yet."))
-                    .children(key_rows)
-                    .child(heading("Tasks"))
-                    .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("What moves a task by itself. Every move shows in its activity, and you can move it back."))
-                    .children(lathe_tracker::Rule::ALL.into_iter().map(|rule| {
-                        let pane = this.clone();
-                        row(
-                            rule.words(),
-                            beui::Switch::new(rule.id(), self.rules.is_on(rule))
-                                .debug_name(rule_switch(rule))
-                                .on_change(move |on, _, cx| {
-                                    pane.update(cx, |p, cx| p.set_rule(rule, on, cx)).ok();
-                                })
-                                .into_any_element(),
-                        )
-                    }))
-                    // design preview: remove after Alex picks
-                    .child(heading("Design preview"))
-                    .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Pick a design for each control. It applies at once, in the panels bar and in the editor tabs."))
-                    .child(row(
-                        "Editor tabs",
-                        {
-                            let pane = this.clone();
-                            Segmented::new(
-                                "design-tabs",
-                                beui::design_preview::TABS_DESIGNS.iter().enumerate().map(|(i, words)| Segment::new(*words).debug_name(DESIGN_TABS[i])),
-                                self.tabs,
-                            )
-                            .on_change(move |i, _, cx| {
-                                pane.update(cx, |p, cx| p.choose_tabs(i, cx)).ok();
-                            })
-                            .into_any_element()
-                        },
-                    ))
-                    .child(row(
-                        "Dropdown elevation",
-                        {
-                            let pane = this.clone();
-                            Segmented::new(
-                                "design-elevation",
-                                beui::design_preview::ELEVATION_DESIGNS.iter().enumerate().map(|(i, words)| Segment::new(*words).debug_name(DESIGN_ELEVATION[i])),
-                                self.elevation,
-                            )
-                            .on_change(move |i, _, cx| {
-                                pane.update(cx, |p, cx| p.choose_elevation(i, cx)).ok();
-                            })
-                            .into_any_element()
-                        },
-                    ))
-                    .child(row(
-                        "Elevation strength",
-                        {
-                            let pane = this.clone();
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap(px(12.))
-                                .child(div().w(px(200.)).child(
-                                    beui::RangeSlider::new("design-strength", self.strength as f32)
-                                        .range(0., 100.)
-                                        .step(1.)
-                                        .on_change(move |v, _, cx| {
-                                            pane.update(cx, |p, cx| p.choose_strength(v.round() as usize, cx)).ok();
-                                        }),
-                                ))
-                                .child(
-                                    div()
-                                        .w(px(32.))
-                                        .debug_selector(|| "design-strength-value".to_string())
-                                        .text_size(TextSize::Sm.font_size())
-                                        .text_color(muted)
-                                        .child(format!("{}", self.strength)),
-                                )
-                                .into_any_element()
-                        },
-                    ))
-                    .child(heading("Agents"))
-                    .child(div().flex().flex_col().children(agent_rows))
-                    .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available."))),
+                            .child(div().text_size(TextSize::Xl.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child(self.section.words()))
+                            .child(div().pt(px(4.)).pb(px(16.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(self.section.gist()))
+                            .child(body),
                     ),
-            )
-            .child(
-                div().absolute().top(px(16.)).right(px(16.)).child(
-                    Button::new("settings-close")
-                        .debug_name("settings-close")
-                        .icon(IconName::Close)
-                        .cap("Esc")
-                        .variant(ButtonVariant::Ghost)
-                        .size(ButtonSize::Sm)
-                        .on_click(move |_, _, cx| {
-                            close.update(cx, |_, cx| cx.emit(SettingsEvent::Close)).ok();
-                        }),
-                ),
             )
     }
 }

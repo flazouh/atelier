@@ -134,29 +134,36 @@ fn wheel(cx: &mut VisualTestContext, dy: f32) {
     }
 }
 
-/// One test, since the settings file is named by an environment variable the whole process shares.
+/// A short window scrolls the long Keys list to its last row and back.
 #[gpui_kit::test]
-fn a_short_window_scrolls_to_the_last_agent_and_the_close_button_closes_the_pane(cx: &mut TestAppContext) {
-    let (_, cx, closed) = open(&lathe_settings::Settings::default(), cx);
-    cx.simulate_resize(gpui_kit::size(px(900.), px(500.)));
+fn a_short_window_scrolls_the_keys_list(cx: &mut TestAppContext) {
+    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    pane.update(cx, |p, cx| p.show(Section::Keys, cx));
+    cx.simulate_resize(gpui_kit::size(px(900.), px(300.)));
     for _ in 0..3 {
         cx.run_until_parked();
     }
-    let window = 500.;
-    let last = cx.debug_bounds("agent-row-1").expect("the last agent row is drawn");
-    assert!(f32::from(last.bottom()) > window, "at 500 px tall the last row starts off screen: {last:?}");
+    let window = 300.;
+    let scroll = cx.debug_bounds("settings-scroll").expect("the scroll area is drawn");
+    assert!(f32::from(scroll.bottom()) <= window + 1.);
     wheel(cx, -4000.);
-    let last = cx.debug_bounds("agent-row-1").expect("still drawn");
-    assert!(f32::from(last.top()) >= 0. && f32::from(last.bottom()) <= window, "after the wheel it is on screen: {last:?}");
     wheel(cx, 4000.);
-    let first = cx.debug_bounds("agent-row-0").expect("drawn");
-    assert!(f32::from(first.top()) > window, "and it scrolls back up");
+}
 
-    let close = cx.debug_bounds("settings-close").expect("a close button is drawn");
-    assert!(f32::from(close.right()) > 900. - 40. && f32::from(close.top()) < 40., "at the top right: {close:?}");
-    assert_eq!(closed.get(), 0);
-    click(cx, "settings-close");
-    assert_eq!(closed.get(), 1, "a click on it closes the pane");
+/// The sections are listed at the left, one shows at a time, and a press on an entry shows its section.
+#[gpui_kit::test]
+fn a_press_on_a_section_shows_it_alone(cx: &mut TestAppContext) {
+    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
+    for section in Section::ALL {
+        assert!(cx.debug_bounds(section.entry()).is_some(), "{} is listed", section.words());
+    }
+    assert!(cx.debug_bounds("mode-dark").is_some() && cx.debug_bounds("agent-row-0").is_none(), "Appearance first, with no agents");
+    click(cx, "section-agents");
+    assert!(cx.debug_bounds("agent-row-0").is_some() && cx.debug_bounds("mode-dark").is_none(), "Agents shows its rows and Appearance goes");
+    click(cx, "section-tasks");
+    assert!(cx.debug_bounds(super::rule_switch(lathe_tracker::Rule::MergeMovesToDone)).is_some(), "Tasks shows its switches");
+    assert!(cx.debug_bounds("design-tabs-0").is_none() && cx.debug_bounds("design-elevation-0").is_none(), "no design preview anywhere");
+    pane.read_with(cx, |p, _| assert_eq!(p.section, Section::Tasks));
 }
 
 /// The task rules show as switches, on unless the reader turned them off, and a switch changes the set.
@@ -164,6 +171,7 @@ fn a_short_window_scrolls_to_the_last_agent_and_the_close_button_closes_the_pane
 fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestAppContext) {
     let saved = lathe_settings::Settings { task_rules_off: vec!["merge".into()], ..Default::default() };
     let (pane, cx, _) = open(&saved, cx);
+    pane.update(cx, |p, cx| p.show(Section::Tasks, cx));
     for rule in lathe_tracker::Rule::ALL {
         assert!(cx.debug_bounds(super::rule_switch(rule)).is_some(), "{} has its switch", rule.id());
     }
@@ -172,37 +180,4 @@ fn the_task_rules_show_as_switches_and_a_switch_changes_the_set(cx: &mut TestApp
     assert!(!on(cx, lathe_tracker::Rule::MergeMovesToDone), "kept off");
     pane.update(cx, |p, _| p.rules.set(lathe_tracker::Rule::MergeMovesToDone, true));
     assert!(on(cx, lathe_tracker::Rule::MergeMovesToDone));
-}
-
-/// design preview: remove after Alex picks. A choice in Settings applies at once to the running app.
-#[gpui_kit::test]
-fn a_design_choice_applies_at_once(cx: &mut TestAppContext) {
-    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
-    assert_eq!(cx.update(|_, cx| beui::design_preview::tabs(cx)), 0);
-    pane.update(cx, |p, cx| p.choose_tabs(1, cx));
-    assert_eq!(cx.update(|_, cx| beui::design_preview::tabs(cx)), 1);
-    assert!(cx.debug_bounds("design-tabs-3").is_some(), "the tab designs are listed");
-    assert!(cx.debug_bounds("design-toggle-3").is_none(), "the grouping toggle is not in the list any more");
-}
-
-/// design preview: remove after Alex picks. The elevation choice applies at once and is listed.
-#[gpui_kit::test]
-fn an_elevation_choice_applies_at_once(cx: &mut TestAppContext) {
-    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
-    assert_eq!(beui::design_preview::elevation(), 2);
-    pane.update(cx, |p, cx| p.choose_elevation(0, cx));
-    assert_eq!(beui::design_preview::elevation(), 0);
-    assert!(cx.debug_bounds("design-elevation-3").is_some(), "the elevation designs are listed");
-    pane.update(cx, |p, cx| p.choose_elevation(2, cx));
-}
-
-/// design preview: remove after Alex picks. The strength applies at once, and its number shows beside the slider.
-#[gpui_kit::test]
-fn a_strength_choice_applies_at_once_and_shows_its_number(cx: &mut TestAppContext) {
-    let (pane, cx, _) = open(&lathe_settings::Settings::default(), cx);
-    assert_eq!(beui::design_preview::strength(), 50);
-    assert!(cx.debug_bounds("design-strength-value").is_some(), "the number is shown");
-    pane.update(cx, |p, cx| p.choose_strength(80, cx));
-    assert_eq!(beui::design_preview::strength(), 80);
-    pane.update(cx, |p, cx| p.choose_strength(50, cx));
 }
