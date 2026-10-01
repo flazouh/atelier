@@ -666,3 +666,25 @@ fn a_long_conversation_has_a_rail_and_a_latest_button(cx: &mut TestAppContext) {
     settle(&shell, cx);
     assert!(cx.debug_bounds("latest").is_none(), "Latest takes hold of the end again");
 }
+
+/// A review takes the place of the session bar and the panels, not of the sidebar or the right pane; when it
+/// closes, the panels come back.
+#[gpui_kit::test]
+fn a_review_takes_the_place_of_the_panels_and_the_sidebar_stays(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    // The disk watch's own thread would wake the test off its clock while the review opens.
+    shell.update(cx, |s, cx| s.active().cloned().unwrap().update(cx, |p, _| p.stop_watching()));
+    let right_before = shell.read_with(cx, |s, _| (s.right, s.right_width));
+    assert!(cx.debug_bounds("panel-close").is_some() && cx.debug_bounds("review-in-place").is_none());
+    let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
+    session.update(cx, |_, cx| cx.emit(crate::agent_session::SessionEvent::Review { turn: Some(0), path: None }));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("review-in-place").is_some(), "the review is where the panels were");
+    assert!(cx.debug_bounds("panel-close").is_none(), "the panels make way");
+    assert!(cx.debug_bounds("sidebar-tasks").is_some(), "the sidebar stays");
+    assert_eq!(shell.read_with(cx, |s, _| (s.right, s.right_width)), right_before, "the right pane neither opens nor widens");
+    let pane = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).review.as_ref().map(|(p, _)| p.clone()).unwrap());
+    pane.update(cx, |_, cx| cx.emit(crate::review_pane::PaneEvent::Close));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("review-in-place").is_none() && cx.debug_bounds("panel-close").is_some(), "closed: the panels are back");
+}

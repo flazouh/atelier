@@ -40,7 +40,7 @@ use crate::{
     tree_view::tree_view,
 };
 use super::types::{
-    AGENT_BESIDE_REVIEW, AGE_TICK, Edge, FolderSource, NOTICE_FOR, REVIEW_WIDTH, TITLE_BAR,
+    AGENT_BESIDE_RIGHT, AGE_TICK, Edge, FolderSource, NOTICE_FOR, TITLE_BAR, WIDE_RIGHT,
     TRAFFIC_LIGHTS, WHAT_ATELIER_IS,
 };
 use super::helpers::{folder_error, settings_path};
@@ -82,13 +82,11 @@ pub struct Shell {
     /// The sidebar's and the right pane's widths as the reader dragged them; the window's width may
     /// show them narrower (`fit::widths`).
     sidebar_width: f32,
-    right_width: f32,
+    pub(super) right_width: f32,
     /// Whether the sidebar shows in a window too narrow for it by default, after ⌘B.
     sidebar_in_medium: bool,
     /// The pane a narrow window shows.
     pub(super) narrow: Pane,
-    /// The right pane's width before a review widened it, to give back when the review closes.
-    before_review: Option<f32>,
     /// Sessions open at the last quit, waiting for their project to open.
     restoring: Vec<atelier_settings::OpenSession>,
     /// Projects being opened: until they all arrive, a saved session may still find its project.
@@ -156,7 +154,6 @@ impl Shell {
             opening: 0,
             front: None,
             saved_open: (saved.open.clone(), saved.front.clone()),
-            before_review: None,
             _subscriptions: Vec::new(),
             panel_views: Default::default(),
             view: ShellView::from_words(saved.view.as_deref()),
@@ -716,7 +713,7 @@ impl Shell {
         self.view = ShellView::Sessions;
         project.update(cx, |p, cx| p.toggle_tasks(window, cx));
         self.right = true;
-        self.widen_for_review(window, cx);
+        self.widen_right(window, cx);
         self.focus_front(&project, window, cx);
         cx.notify();
     }
@@ -724,23 +721,23 @@ impl Shell {
         self.show_pulls(window, cx);
     }
 
-    /// Shows or hides the active project's pull requests in the right pane, as wide as a review.
+    /// Shows or hides the active project's pull requests in the right pane, wide.
     fn show_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.active().cloned() else { return };
         self.view = ShellView::Sessions;
         project.update(cx, |p, cx| p.toggle_pulls(window, cx));
         self.right = true;
-        self.widen_for_review(window, cx);
+        self.widen_right(window, cx);
         self.focus_front(&project, window, cx);
         cx.notify();
     }
 
-    /// The keys go to what the right pane shows now: the review when it is in front, else the shell,
-    /// so no key is left with a pane that is no longer drawn.
+    /// The keys go to what is in front now: the review when one is open, else the tasks when the right
+    /// pane shows them, else the shell, so no key is left with a pane that is no longer drawn.
     fn focus_front(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) {
         let p = project.read(cx);
         match (p.front(), p.review.as_ref()) {
-            (crate::open_project::front::Front::Review, Some((pane, _))) => pane.focus_handle(cx).focus(window, cx),
+            (_, Some((pane, _))) => pane.focus_handle(cx).focus(window, cx),
             (crate::open_project::front::Front::Tasks, _) => match &p.tasks {
                 Some(tasks) => tasks.pane.focus_handle(cx).focus(window, cx),
                 None => self.focus.focus(window, cx),
@@ -749,9 +746,9 @@ impl Shell {
         }
     }
 
-    /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
-    /// still fits in it.
-    fn widen_for_review(&mut self, window: &mut Window, _: &mut Context<Self>) {
+    /// Gives the right pane the width the tasks and the pull requests want, taken from the agent panel while
+    /// a session panel still fits in it.
+    fn widen_right(&mut self, window: &mut Window, _: &mut Context<Self>) {
         let total = atelier_ui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
@@ -759,9 +756,8 @@ impl Shell {
             return;
         }
         let sidebar = if self.sidebar_shown(fit) { self.sidebar_width } else { 0. };
-        let want = REVIEW_WIDTH.min(total - sidebar - AGENT_BESIDE_REVIEW);
+        let want = WIDE_RIGHT.min(total - sidebar - AGENT_BESIDE_RIGHT);
         if self.right_width < want {
-            self.before_review.get_or_insert(self.right_width);
             self.right_width = want;
         }
     }
@@ -844,8 +840,7 @@ impl Shell {
                 let scope = turn.map_or(Scope::Whole, Scope::Turn);
                 this.view = ShellView::Sessions;
                 project.update(cx, |p, cx| p.open_review(session.clone(), scope, path.as_deref(), window, cx));
-                this.right = true;
-                this.widen_for_review(window, cx);
+                this.narrow = Pane::Session;
                 cx.notify();
             }
             ProjectEvent::ShowSession(session) => {
@@ -855,25 +850,19 @@ impl Shell {
             }
             ProjectEvent::TasksShown => {
                 this.right = true;
-                this.widen_for_review(window, cx);
+                this.widen_right(window, cx);
                 this.focus_front(project, window, cx);
                 cx.notify();
             }
             ProjectEvent::PullsShown => {
                 this.right = true;
-                this.widen_for_review(window, cx);
+                this.widen_right(window, cx);
                 this.focus_front(project, window, cx);
                 cx.notify();
             }
             ProjectEvent::ReviewClosed => {
                 // The review's texts and hunks are freed now: give their pages back.
                 crate::memory::give_back();
-                if let Some(width) = this.before_review.take() {
-                    this.right_width = width;
-                }
-                if this.narrow == Pane::Right {
-                    this.narrow = Pane::Session;
-                }
                 cx.notify();
             }
             ProjectEvent::CloseSession(key) => this.close_session(key.as_ref(), cx),
@@ -1759,7 +1748,7 @@ impl Shell {
                 cx.notify();
             }))
             .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("sidebar", self.sidebar(cx).into_any_element())).child(handle(Edge::Sidebar))))
-            .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.agent_panel(cx))))
+            .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, cx))))
             .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
     }
@@ -1767,12 +1756,11 @@ impl Shell {
     /// One pane at a time, with a tab for each: the sidebar, the sessions, and the editor or what
     /// stands in its place.
     fn narrow_panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        // The right pane has a tab only while it holds something: the review, the pull requests or the tasks.
-        // The editor is the Files view's.
+        // The right pane has a tab only while it holds something: the pull requests or the tasks. The
+        // editor is the Files view's.
         let right = {
             let p = project.read(cx);
             match p.front() {
-                crate::open_project::front::Front::Review => Some("Review"),
                 crate::open_project::front::Front::Pulls => Some("Pull requests"),
                 crate::open_project::front::Front::Tasks => Some("Tasks"),
                 crate::open_project::front::Front::Editor => None,
@@ -1786,7 +1774,6 @@ impl Shell {
             let name = match label {
                 "Projects" => "narrow-tab-Projects",
                 "Session" => "narrow-tab-Session",
-                "Review" => "narrow-tab-Review",
                 "Pull requests" => "narrow-tab-Pull requests",
                 _ => "narrow-tab-Tasks",
             };
@@ -1813,7 +1800,7 @@ impl Shell {
             Pane::Session => {
                 let total = atelier_ui::scale::design(window.viewport_size().width);
                 self.panels.update(cx, |p, cx| p.fit_to(total - 16., cx));
-                self.agent_panel(cx)
+                self.center(project, cx)
             }
             Pane::Right => self.right_pane(project, cx),
         };
@@ -1828,7 +1815,14 @@ impl Shell {
             .into_any_element()
     }
 
-    /// The right pane: the review, the pull requests, or the editor.
+    /// The review when `project` has one open, in place of the session bar and the panels; else they.
+    fn center(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        match project.read(cx).review.as_ref().map(|(pane, _)| pane.clone()) {
+            Some(pane) => div().debug_selector(|| "review-in-place".into()).size_full().pt(px(8.)).pr(px(8.)).pb(px(4.)).child(pane).into_any_element(),
+            None => self.agent_panel(cx),
+        }
+    }
+
     /// The right pane for `project`, drawn from its last frame until the project changes.
     fn right_pane(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         self.right_view.update(cx, |pane, cx| pane.show(project, cx));

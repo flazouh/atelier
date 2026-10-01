@@ -389,9 +389,9 @@ impl OpenProject {
     pub fn toggle_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let behind = self.front() != super::front::Front::Pulls;
         if let Some(pulls) = &mut self.pulls {
-            // Shown behind a review, they come to the front; in front, they hide.
+            // Shown behind the tasks, they come to the front; in front, they hide.
             pulls.shown = !pulls.shown || behind;
-            self.right_asked = if pulls.shown { super::front::Front::Pulls } else { super::front::Front::Review };
+            self.right_asked = if pulls.shown { super::front::Front::Pulls } else { super::front::Front::Editor };
             return cx.notify();
         }
         self.right_asked = super::front::Front::Pulls;
@@ -462,6 +462,13 @@ impl OpenProject {
     #[cfg(test)]
     pub fn chips(&self) -> std::rc::Rc<Vec<atelier_ui::PrChipData>> {
         self.pr_chips.clone()
+    }
+
+    /// Stops watching the disk, for a test that would have the watch's thread wake it off its clock.
+    #[cfg(test)]
+    pub fn stop_watching(&mut self) {
+        self.watching = Task::ready(());
+        self._watch = None;
     }
 
     /// The forge the chip lookups ask, in place of GitHub through gh.
@@ -545,9 +552,9 @@ impl OpenProject {
     pub fn toggle_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let behind = self.front() != super::front::Front::Tasks;
         if let Some(tasks) = &mut self.tasks {
-            // Shown behind a review, they come to the front; in front, they hide.
+            // Shown behind the pull requests, they come to the front; in front, they hide.
             tasks.shown = !tasks.shown || behind;
-            self.right_asked = if tasks.shown { super::front::Front::Tasks } else { super::front::Front::Review };
+            self.right_asked = if tasks.shown { super::front::Front::Tasks } else { super::front::Front::Editor };
             if tasks.shown {
                 cx.emit(ProjectEvent::TasksShown);
             }
@@ -685,7 +692,7 @@ impl OpenProject {
 
     /// What the right pane shows now.
     pub fn front(&self) -> super::front::Front {
-        super::front::front(self.right_asked, self.review.is_some(), self.pulls.as_ref().is_some_and(|p| p.shown), self.tasks.as_ref().is_some_and(|t| t.shown))
+        super::front::front(self.right_asked, self.pulls.as_ref().is_some_and(|p| p.shown), self.tasks.as_ref().is_some_and(|t| t.shown))
     }
 
     /// Shows `reference` in the pull request view, mounting the view first when it is not yet there.
@@ -742,7 +749,6 @@ impl OpenProject {
     pub fn open_review(&mut self, session: Entity<AgentSession>, scope: Scope, path: Option<&str>, window: &mut Window, cx: &mut Context<Self>) {
         let (project, language) = (self.project.clone(), self.language_for(cx));
         let pane = cx.new(|cx| ReviewPane::new(session, project, scope, path, window, cx).with_language(language, window, cx));
-        self.right_asked = super::front::Front::Review;
         let sub = cx.subscribe_in(&pane, window, |this, _, event: &PaneEvent, window, cx| match event {
             PaneEvent::Close => {
                 this.review = None;
