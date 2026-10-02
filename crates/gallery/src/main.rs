@@ -33,6 +33,7 @@ mod merge_story;
 mod pr_fixture;
 mod pr_story;
 mod review_story;
+mod providers_story;
 
 use gpui_kit::base::input::InputEvent;
 
@@ -47,6 +48,8 @@ enum Story {
     AgentPanel,
     ChangedFiles,
     Worktrees,
+    Providers,
+    ProviderSettings,
     SubagentCard,
     SubagentStrip,
     PrCard,
@@ -83,10 +86,12 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 36] = [
+    const ALL: [Story; 38] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::Worktrees,
+        Story::Providers,
+        Story::ProviderSettings,
         Story::SubagentCard,
         Story::SubagentStrip,
         Story::PrCard,
@@ -127,6 +132,8 @@ impl Story {
             Story::AgentPanel => "Agent panel",
             Story::ChangedFiles => "Changed files",
             Story::Worktrees => "Worktrees",
+            Story::Providers => "Providers",
+            Story::ProviderSettings => "Provider settings",
             Story::SubagentCard => "Subagent card",
             Story::SubagentStrip => "Subagent strip",
             Story::PrCard => "PR card",
@@ -487,6 +494,8 @@ impl Gallery {
             }
             Story::ChangedFiles => agent_parts::changed_files_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::Worktrees => agent_parts::worktrees_story().into_any_element(),
+            Story::Providers => providers_story::providers_story(cx).into_any_element(),
+            Story::ProviderSettings => providers_story::settings_story(cx).into_any_element(),
             Story::SubagentCard => agent_parts::subagent_card_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::SubagentStrip => agent_parts::subagent_strip_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::PrCard => agent_parts::pr_card_story().into_any_element(),
