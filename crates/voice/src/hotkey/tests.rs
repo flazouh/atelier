@@ -74,12 +74,33 @@ fn a_repeated_down_is_one_press() {
 
 #[test]
 fn the_keys_are_named_as_the_settings_file_names_them() {
-    assert_eq!("fn".parse(), Ok(Key::Fn));
-    assert_eq!("right-option".parse(), Ok(Key::RightOption));
-    assert_eq!("left-option".parse(), Ok(Key::LeftOption));
     assert_eq!("caps-lock".parse::<Key>(), Err(()));
-    assert_eq!(Key::default(), Key::Fn);
-    for key in Key::ALL {
+    for &key in Key::ALL {
         assert_eq!(key.name().parse(), Ok(key));
     }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn on_macos_fn_dictates_unless_another_key_is_chosen() {
+    assert_eq!(Key::DEFAULT, Some(Key::Fn));
+    assert_eq!("right-option".parse(), Ok(Key::RightOption));
+    assert_eq!("alt".parse::<Key>(), Err(()), "a key from another system's settings");
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn off_macos_no_key_dictates_until_one_is_chosen() {
+    assert_eq!(Key::DEFAULT, None);
+    assert_eq!("alt".parse(), Ok(Key::Alt));
+    assert_eq!("fn".parse::<Key>(), Err(()), "Fn is not heard here");
+}
+
+#[test]
+fn alt_and_ctrl_are_read_from_the_modifiers_and_fn_is_not() {
+    assert_eq!(Key::Alt.held(true, false), Some(true));
+    assert_eq!(Key::Alt.held(false, true), Some(false));
+    assert_eq!(Key::Control.held(false, true), Some(true));
+    assert_eq!(Key::Fn.held(true, true), None);
+    assert_eq!(Key::RightOption.held(true, false), None);
 }

@@ -36,13 +36,27 @@ fn with_no_microphone_there_is_still_a_default_row() {
 #[test]
 fn the_settings_file_names_the_key_and_leaves_the_default_out() {
     use atelier_voice::hotkey::Key;
-    assert_eq!(key_from(None), Some(Key::Fn));
+    assert_eq!(key_from(None), Key::DEFAULT);
     assert_eq!(key_from(Some("off")), None);
-    assert_eq!(key_from(Some("caps-lock")), Some(Key::Fn), "a name this build does not know is the default");
-    for key in [None, Some(Key::Fn), Some(Key::RightOption), Some(Key::LeftOption)] {
+    assert_eq!(key_from(Some("caps-lock")), Key::DEFAULT, "a name this build does not know is the default");
+    for key in Key::ALL.iter().copied().map(Some).chain([None]) {
         assert_eq!(key_from(key_name(key).as_deref()), key);
     }
-    assert_eq!(key_name(Some(Key::Fn)), None);
+    assert_eq!(key_name(Key::DEFAULT), None);
+}
+
+#[test]
+fn the_chosen_modifier_going_down_and_up_is_the_key_going_down_and_up() {
+    use atelier_voice::hotkey::{Input, Key};
+    let alt = gpui_kit::Modifiers { alt: true, ..Default::default() };
+    let alt_shift = gpui_kit::Modifiers { alt: true, shift: true, ..Default::default() };
+    let none = gpui_kit::Modifiers::default();
+    assert_eq!(key_edge(Some(Key::Alt), false, &alt), (true, Some(Input::Down)));
+    assert_eq!(key_edge(Some(Key::Alt), true, &alt_shift), (true, None), "another modifier joining changes nothing");
+    assert_eq!(key_edge(Some(Key::Alt), true, &none), (false, Some(Input::Up)));
+    assert_eq!(key_edge(Some(Key::Control), false, &alt), (false, None), "not the chosen one");
+    assert_eq!(key_edge(None, false, &alt), (false, None));
+    assert_eq!(key_edge(None, true, &alt), (false, Some(Input::Up)), "a key dropped while held lets go");
 }
 
 #[test]
