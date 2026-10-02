@@ -233,7 +233,8 @@ impl AgentSession {
                     this.set_mode(mode, cx)
                 }
             }
-            PromptInputEvent::Action(_) => {}
+            // Dictation is not switched on for this composer yet.
+            PromptInputEvent::Action(_) | PromptInputEvent::DictationStart | PromptInputEvent::DictationStop => {}
             PromptInputEvent::Command { name, args } => this.run_command(name, args, cx),
         });
         let (id, title) = match &resume {
