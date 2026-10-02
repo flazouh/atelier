@@ -39,6 +39,14 @@ impl AgentSession {
         speech(cx).0.cancel(press);
     }
 
+    /// The person threw away the words waiting for the model.
+    pub(in super::super) fn dictation_discard(&mut self, cx: &mut Context<Self>) {
+        let engine = speech(cx).0;
+        for press in self.dictation.waiting.drain() {
+            engine.cancel(press);
+        }
+    }
+
     /// The microphone menu is about to show: bring its rows and its choices up to date, and start fetching the model, since
     /// the person means to dictate.
     pub(in super::super) fn dictation_devices(&mut self, cx: &mut Context<Self>) {
