@@ -60,7 +60,7 @@ impl LocalProject {
         self.data.as_ref().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "this machine has no data folder"))
     }
 
-    pub(super) fn walker(&self) -> WalkBuilder {
+    fn walker(&self) -> WalkBuilder {
         let mut walk = WalkBuilder::new(&self.root);
         // Dotfiles show, as editors show them; `.git` itself never does. A .gitignore counts even
         // before the folder is a git repository.
@@ -68,7 +68,7 @@ impl LocalProject {
         walk
     }
 
-    pub(super) fn relative(&self, path: &Path) -> Option<String> {
+    fn relative(&self, path: &Path) -> Option<String> {
         let rel = path.strip_prefix(&self.root).ok()?;
         let parts: Vec<&str> = rel.iter().filter_map(|p| p.to_str()).collect();
         (!parts.is_empty()).then(|| parts.join("/"))

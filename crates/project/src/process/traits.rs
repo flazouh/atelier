@@ -1,6 +1,4 @@
-use std::{
-    io::{self},
-    };
+use std::io;
 
 /// Stops and waits for a process.
 pub trait Control: Send {

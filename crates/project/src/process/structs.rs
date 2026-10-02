@@ -44,7 +44,7 @@ impl Command {
 #[derive(Clone, Default)]
 pub struct Tail {
     pub(super) kept: Arc<Mutex<VecDeque<u8>>>,
-    pub(super) reader: Arc<Mutex<Option<JoinHandle<()>>>>,
+    reader: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl Tail {

@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::{self},
-    path::{Path},
-    };
+use std::{fs, io, path::Path};
 
 /// Writes `target` whole, through a temporary file beside it, so a reader never sees half of it. The
 /// file keeps its permissions, so saving a script keeps it runnable.

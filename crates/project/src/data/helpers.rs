@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io,
-    path::{Path},
-};
+use std::{fs, io, path::Path};
 
 use super::types::{DATA_NAME, OLD_DATA_NAME};
 

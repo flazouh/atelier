@@ -1,6 +1,4 @@
-use std::{
-    time::{Duration},
-};
+use std::time::Duration;
 
 /// How much of a process's stderr is kept: enough for a crash's message and its backtrace.
 pub const STDERR_KEEP: usize = 64 * 1024;

@@ -1,7 +1,4 @@
-use std::{
-    io::{self},
-    thread::{self},
-    };
+use std::{io, thread};
 
 use super::types::TETHER;
 
