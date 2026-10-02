@@ -123,6 +123,35 @@ pub fn changed_files_story(tick: usize, playing: bool, cx: &mut Context<Gallery>
         .child(section("Short list", narrow(ChangedFiles::new("cf-short", files.into_iter().take(2).collect()))))
 }
 
+/// The Git view's sidebar with a worktree in each state it can be in.
+pub fn worktrees_story() -> impl IntoElement {
+    use atelier_ui::{
+        git_panel::GitPanel,
+        worktree_list::{NoteTone::*, WorktreeNote as Note, WorktreeRow},
+    };
+    let row = |path: &str, branch: Option<&str>, notes: Vec<Note>| WorktreeRow {
+        path: path.to_string().into(),
+        folder: format!("~/code/{path}").into(),
+        branch: branch.map(|b| b.to_string().into()),
+        main: false,
+        notes,
+        sessions: 0,
+    };
+    let rows = vec![
+        WorktreeRow { main: true, sessions: 2, ..row("atelier", Some("main"), vec![]) },
+        row("atelier-sidebar", Some("sidebar-rework"), vec![Note::new("3 uncommitted", Warning), Note::new("2 only here", Warning)]),
+        row("atelier-slider", Some("compact-slider"), vec![Note::new("merged", Good)]),
+        row("atelier-spike", None, vec![Note::new("1 only here", Warning)]),
+        row("atelier-old", Some("old-layout"), vec![Note::new("folder missing", Warning)]),
+        row("atelier-usb", Some("release"), vec![Note::new("locked", Quiet), Note::new("4 behind", Quiet)]),
+        row("atelier-pr", Some("pr-302"), vec![Note::new("1 only here", Warning), Note::new("remote branch gone", Quiet)]),
+    ];
+    div().child(section(
+        "Git view sidebar: main checkout, work in progress, merged, detached, missing, locked",
+        div().w(px(320.)).h(px(640.)).child(GitPanel::new("wt-git", "atelier").branch(Some("main".into())).worktrees(rows)),
+    ))
+}
+
 pub fn subagent_card_story(tick: usize, playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     let done = SubagentCard::new("sc-done", claude::look(), "Review", "Check the off-by-one fix")
         .model("Opus 5.5")

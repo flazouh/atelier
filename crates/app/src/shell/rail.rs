@@ -105,7 +105,7 @@ impl Shell {
         let Some((project, session)) = self.focused(cx) else {
             let Some(project) = self.active() else { return GitPanel::new("git-panel", "").into_any_element() };
             let p = project.read(cx);
-            return GitPanel::new("git-panel", p.name()).branch(p.git.branch().cloned()).into_any_element();
+            return GitPanel::new("git-panel", p.name()).branch(p.git.branch().cloned()).worktrees(p.worktree_rows()).into_any_element();
         };
         let p = project.read(cx);
         let s = session.read(cx);
@@ -113,6 +113,7 @@ impl Shell {
         let this = cx.entity().downgrade();
         GitPanel::new("git-panel", p.name())
             .branch(p.git.branch().cloned())
+            .worktrees(p.worktree_rows())
             .session(Some(s.title.clone()))
             .files(s.changed_files().to_vec())
             .current(current)

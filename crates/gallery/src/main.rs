@@ -46,6 +46,7 @@ use gpui_kit::{
 enum Story {
     AgentPanel,
     ChangedFiles,
+    Worktrees,
     SubagentCard,
     SubagentStrip,
     PrCard,
@@ -82,9 +83,10 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 35] = [
+    const ALL: [Story; 36] = [
         Story::AgentPanel,
         Story::ChangedFiles,
+        Story::Worktrees,
         Story::SubagentCard,
         Story::SubagentStrip,
         Story::PrCard,
@@ -124,6 +126,7 @@ impl Story {
         match self {
             Story::AgentPanel => "Agent panel",
             Story::ChangedFiles => "Changed files",
+            Story::Worktrees => "Worktrees",
             Story::SubagentCard => "Subagent card",
             Story::SubagentStrip => "Subagent strip",
             Story::PrCard => "PR card",
@@ -483,6 +486,7 @@ impl Gallery {
                 agent_panel::agent_panel(&self.panel_prompt, self.started, self.replays, shown, self.tick, cx).into_any_element()
             }
             Story::ChangedFiles => agent_parts::changed_files_story(self.tick, self.is_live(), cx).into_any_element(),
+            Story::Worktrees => agent_parts::worktrees_story().into_any_element(),
             Story::SubagentCard => agent_parts::subagent_card_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::SubagentStrip => agent_parts::subagent_strip_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::PrCard => agent_parts::pr_card_story().into_any_element(),
