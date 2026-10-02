@@ -257,3 +257,65 @@ fn a_project_keeps_its_tasks_in_its_data_folder() {
     let again = LocalProject::open(&root).unwrap().with_data_dir(data.path());
     assert_eq!(again.tracker().unwrap().get(&task.id).unwrap(), Some(task));
 }
+
+fn git(dir: &std::path::Path, args: &[&str]) {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+}
+
+/// A repository with one commit on `main`, and a worktree of it on `fix` beside it.
+fn repo_with_worktree() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    let main = dir.path().join("main");
+    fs::create_dir(&main).unwrap();
+    git(&main, &["init", "-q", "-b", "main"]);
+    fs::write(main.join("a.txt"), "main").unwrap();
+    git(&main, &["add", "."]);
+    git(&main, &["commit", "-qm", "first"]);
+    let tree = dir.path().join("fix");
+    git(&main, &["worktree", "add", "-q", "-b", "fix", tree.to_str().unwrap()]);
+    fs::write(tree.join("a.txt"), "fix").unwrap();
+    (dir, main, tree)
+}
+
+#[test]
+fn a_project_seen_from_its_worktree_works_there_and_keeps_its_data_and_tasks() {
+    let (_dir, main, tree) = repo_with_worktree();
+    let data = tempfile::tempdir().unwrap();
+    let project = LocalProject::open(&main).unwrap().with_data_dir(data.path());
+    let there = project.at(&tree).unwrap();
+    assert_eq!(there.root(), fs::canonicalize(&tree).unwrap());
+    assert_eq!(there.read("a.txt").unwrap(), b"fix");
+    assert_eq!(project.read("a.txt").unwrap(), b"main", "the main checkout is left as it was");
+    assert_eq!(there.git(&["branch", "--show-current"]).unwrap().stdout.trim(), "fix");
+    let mut pwd = there.spawn(&Command::new("pwd")).unwrap();
+    let mut out = String::new();
+    pwd.stdout.read_to_string(&mut out).unwrap();
+    assert_eq!(std::path::Path::new(out.trim()), fs::canonicalize(&tree).unwrap());
+    assert_eq!(there.data_path(), project.data_path(), "one data folder for every worktree");
+    let tasks = there.tracker().unwrap();
+    assert!(std::sync::Arc::ptr_eq(&tasks, &project.tracker().unwrap()), "one tracker too");
+    let task = tasks.create(&atelier_tracker::NewTask::titled("Ship"), "alex").unwrap();
+    assert!(task.key.starts_with(&atelier_tracker::prefix_for("main")), "named for the project, not the worktree: {}", task.key);
+    assert_eq!(project.at(&main).unwrap().root(), project.root(), "the main checkout is a worktree as well");
+}
+
+#[test]
+fn a_folder_that_is_not_a_worktree_of_the_project_is_refused() {
+    let (dir, main, _tree) = repo_with_worktree();
+    let project = LocalProject::open(&main).unwrap();
+    let plain = dir.path().join("plain");
+    fs::create_dir(&plain).unwrap();
+    assert_eq!(project.at(&plain).err().unwrap().kind(), io::ErrorKind::InvalidInput);
+    let other = dir.path().join("other");
+    fs::create_dir(&other).unwrap();
+    git(&other, &["init", "-q"]);
+    assert_eq!(project.at(&other).err().unwrap().kind(), io::ErrorKind::InvalidInput, "another repository");
+    assert_eq!(project.at(&dir.path().join("gone")).err().unwrap().kind(), io::ErrorKind::NotFound);
+}

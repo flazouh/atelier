@@ -16,7 +16,10 @@ pub(super) struct State {
     pub(super) project: Mutex<Option<Arc<LocalProject>>>,
     pub(super) running: Mutex<HashMap<Pid, Running>>,
     pub(super) next_pid: AtomicU64,
-    pub(super) watch: Mutex<Option<Watch>>,
+    /// Each folder's watch: `None` for the project's, a worktree's by its name.
+    pub(super) watches: Mutex<HashMap<Option<String>, Watch>>,
+    /// The worktrees opened so far, by the name they were asked by.
+    pub(super) worktrees: Mutex<HashMap<String, Arc<LocalProject>>>,
     /// Where projects keep their data folders; `None` for the host's own data folder.
     pub(super) data_dir: Option<PathBuf>,
 }

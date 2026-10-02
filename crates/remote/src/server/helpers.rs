@@ -1,6 +1,6 @@
 use std::{
     io::{self, Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex, atomic::Ordering, mpsc},
     thread,
     time::Duration,
@@ -80,8 +80,36 @@ fn expand(root: &str) -> PathBuf {
     }
 }
 
+/// The worktree at `folder`, opened on first use and kept.
+fn worktree(state: &State, folder: &Path) -> io::Result<Arc<LocalProject>> {
+    let key = folder.to_string_lossy().into_owned();
+    if let Some(kept) = state.worktrees.lock().unwrap_or_else(|p| p.into_inner()).get(&key) {
+        return Ok(kept.clone());
+    }
+    let tree = Arc::new(project(state)?.worktree(folder)?);
+    state.worktrees.lock().unwrap_or_else(|p| p.into_inner()).insert(key, tree.clone());
+    Ok(tree)
+}
+
 pub(super) fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Reply> {
+    answer_in(call, None, state, out)
+}
+
+/// `call` in the project's folder, or in its worktree `scope`.
+fn answer_in(call: Call, scope: Option<&str>, state: &Arc<State>, out: &Out) -> io::Result<Reply> {
+    let here = || match scope {
+        None => project(state),
+        Some(root) => worktree(state, Path::new(root)),
+    };
     match call {
+        Call::Hello { .. } | Call::Open { .. } | Call::At { .. } if scope.is_some() => {
+            Err(io::Error::new(io::ErrorKind::InvalidInput, "a worktree opens no project or worktree of its own"))
+        }
+        Call::Open { root } => {
+            let tree = worktree(state, &expand(&root))?;
+            Ok(Reply::Hello { root: tree.root().display().to_string() })
+        }
+        Call::At { root, call } => answer_in(*call, Some(&root), state, out),
         Call::Hello { version, root } => {
             if version != VERSION {
                 return Err(io::Error::new(io::ErrorKind::InvalidInput, UPDATE_WORDS));
@@ -95,31 +123,38 @@ pub(super) fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Re
             *state.project.lock().unwrap_or_else(|p| p.into_inner()) = Some(Arc::new(project));
             Ok(Reply::Hello { root })
         }
-        Call::List => Ok(Reply::Entries(project(state)?.list()?)),
-        Call::Read { path } => Ok(Reply::Bytes(project(state)?.read(&path)?)),
-        Call::Write { path, bytes } => project(state)?.write(&path, &bytes).map(|()| Reply::Done),
-        Call::Remove { path } => project(state)?.remove(&path).map(|()| Reply::Done),
-        Call::DataRead { path } => Ok(Reply::Bytes(project(state)?.data_read(&path)?)),
-        Call::DataWrite { path, bytes } => project(state)?.data_write(&path, &bytes).map(|()| Reply::Done),
-        Call::DataList { prefix } => Ok(Reply::DataEntries(project(state)?.data_list(&prefix)?)),
-        Call::ReadDir { dir } => Ok(Reply::DirEntries(project(state)?.read_dir(&dir)?)),
-        Call::DataPath => match project(state)?.data_path() {
+        Call::List => Ok(Reply::Entries(here()?.list()?)),
+        Call::Read { path } => Ok(Reply::Bytes(here()?.read(&path)?)),
+        Call::Write { path, bytes } => here()?.write(&path, &bytes).map(|()| Reply::Done),
+        Call::Remove { path } => here()?.remove(&path).map(|()| Reply::Done),
+        Call::DataRead { path } => Ok(Reply::Bytes(here()?.data_read(&path)?)),
+        Call::DataWrite { path, bytes } => here()?.data_write(&path, &bytes).map(|()| Reply::Done),
+        Call::DataList { prefix } => Ok(Reply::DataEntries(here()?.data_list(&prefix)?)),
+        Call::ReadDir { dir } => Ok(Reply::DirEntries(here()?.read_dir(&dir)?)),
+        Call::DataPath => match here()?.data_path() {
             Some(path) => Ok(Reply::Text(path.display().to_string())),
             None => Err(io::Error::new(io::ErrorKind::NotFound, "this host has no data folder")),
         },
         Call::Watch => {
-            let out = out.clone();
-            let watch = project(state)?.watch(Box::new(move |changes| send(&out, &Frame::Event(Event::Changes(changes)))))?;
-            *state.watch.lock().unwrap_or_else(|p| p.into_inner()) = Some(watch);
+            let (out, root) = (out.clone(), scope.map(str::to_string));
+            let named = root.clone();
+            let watch = here()?.watch(Box::new(move |changes| {
+                let event = match &named {
+                    Some(root) => Event::ChangesAt { root: root.clone(), changes },
+                    None => Event::Changes(changes),
+                };
+                send(&out, &Frame::Event(event));
+            }))?;
+            state.watches.lock().unwrap_or_else(|p| p.into_inner()).insert(root, watch);
             Ok(Reply::Done)
         }
-        Call::Tracker(call) => Ok(Reply::Tracker(Box::new(project(state)?.tracker().and_then(|t| tracker::answer(&*t, call))))),
-        Call::Search { query } => Ok(Reply::Matches(project(state)?.search(&query)?)),
+        Call::Tracker(call) => Ok(Reply::Tracker(Box::new(here()?.tracker().and_then(|t| tracker::answer(&*t, call))))),
+        Call::Search { query } => Ok(Reply::Matches(here()?.search(&query)?)),
         Call::Git { args } => {
             let args: Vec<&str> = args.iter().map(String::as_str).collect();
-            Ok(Reply::Git(project(state)?.git(&args)?))
+            Ok(Reply::Git(here()?.git(&args)?))
         }
-        Call::Spawn { command } => spawn(state, out, &command),
+        Call::Spawn { command } => spawn(state, out, &command, here()?),
         Call::Kill { pid } => {
             let control = with_control(state, pid)?;
             control.lock().unwrap_or_else(|p| p.into_inner()).kill().map(|()| Reply::Done)
@@ -129,7 +164,10 @@ pub(super) fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Re
             let text = control.lock().unwrap_or_else(|p| p.into_inner()).stderr();
             Ok(Reply::Text(text))
         }
-        Call::Input { .. } | Call::CloseInput { .. } => unreachable!("handled in order on the read loop"),
+        // Handled in order on the read loop; inside `At` they would lose that order.
+        Call::Input { .. } | Call::CloseInput { .. } => {
+            Err(io::Error::new(io::ErrorKind::InvalidInput, "a process's stdin is not sent inside a worktree"))
+        }
     }
 }
 
@@ -138,8 +176,8 @@ fn with_control(state: &State, pid: Pid) -> io::Result<Arc<Mutex<Box<dyn Control
     running.get(&pid).map(|r| r.control.clone()).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no process {pid}")))
 }
 
-fn spawn(state: &Arc<State>, out: &Out, command: &atelier_project::Command) -> io::Result<Reply> {
-    let process = project(state)?.spawn(command)?;
+fn spawn(state: &Arc<State>, out: &Out, command: &atelier_project::Command, place: Arc<LocalProject>) -> io::Result<Reply> {
+    let process = place.spawn(command)?;
     let pid = state.next_pid.fetch_add(1, Ordering::Relaxed) + 1;
     let control = Arc::new(Mutex::new(process.control));
     let (tx, rx) = mpsc::channel::<Vec<u8>>();

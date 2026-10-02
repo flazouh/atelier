@@ -36,7 +36,10 @@ use super::helpers::write_whole;
 pub struct LocalProject {
     pub(super) root: PathBuf,
     pub(super) data: Option<DataFolder>,
-    pub(super) tracker: TrackerSlot,
+    /// Shared with the project's worktrees, so each of them hands out the same store.
+    pub(super) tracker: Arc<TrackerSlot>,
+    /// The project's folder name, which names its tasks, the same from every worktree.
+    pub(super) name: String,
 }
 
 impl LocalProject {
@@ -47,7 +50,33 @@ impl LocalProject {
             return Err(io::Error::new(io::ErrorKind::NotADirectory, format!("{} is not a folder", root.display())));
         }
         let data = DataFolder::for_root(&root, None);
-        Ok(Self { root, data, tracker: TrackerSlot::default() })
+        let name = root.file_name().and_then(|n| n.to_str()).unwrap_or("project").to_string();
+        Ok(Self { root, data, tracker: Arc::default(), name })
+    }
+
+    /// The project seen from `folder`, a worktree of its repository: see [`Project::at`].
+    pub fn worktree(&self, folder: &Path) -> io::Result<Self> {
+        let root = fs::canonicalize(folder)?;
+        let common = |dir: &Path| -> Option<(PathBuf, PathBuf)> {
+            let ask = |what: &str| {
+                let out = std::process::Command::new("git")
+                    .arg("-C")
+                    .arg(dir)
+                    .args(["rev-parse", "--path-format=absolute", what])
+                    .stdin(Stdio::null())
+                    .output()
+                    .ok()?;
+                let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                (out.status.success() && !path.is_empty()).then(|| fs::canonicalize(path).ok()).flatten()
+            };
+            Some((ask("--git-common-dir")?, ask("--show-toplevel")?))
+        };
+        let refuse = || io::Error::new(io::ErrorKind::InvalidInput, format!("{} is not a worktree of {}", root.display(), self.root.display()));
+        let (Some((ours, _)), Some((theirs, top))) = (common(&self.root), common(&root)) else { return Err(refuse()) };
+        if ours != theirs || top != root {
+            return Err(refuse());
+        }
+        Ok(Self { root, data: self.data.clone(), tracker: self.tracker.clone(), name: self.name.clone() })
     }
 
     /// The same project with its data folder under `dir`, as a test wants.
@@ -133,9 +162,12 @@ impl Project for LocalProject {
     fn tracker(&self) -> TrackerResult<Arc<dyn Tracker>> {
         self.tracker.get_or_open(|| {
             let folder = self.data_path().ok_or_else(|| TrackerError::Unsupported("keep tasks with no data folder".into()))?;
-            let name = self.root.file_name().and_then(|n| n.to_str()).unwrap_or("project");
-            Ok(Arc::new(LocalTracker::open(&folder.join(crate::TRACKER_FILE), &prefix_for(name))?))
+            Ok(Arc::new(LocalTracker::open(&folder.join(crate::TRACKER_FILE), &prefix_for(&self.name))?))
         })
+    }
+
+    fn at(&self, folder: &Path) -> io::Result<Arc<dyn Project>> {
+        Ok(Arc::new(self.worktree(folder)?))
     }
 
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {

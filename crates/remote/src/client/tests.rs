@@ -416,3 +416,85 @@ fn a_dropped_subscription_stops_the_poll_before_its_next_list() {
     std::thread::sleep(Duration::from_millis(200));
     assert_eq!(sent.load(Ordering::Relaxed), stopped, "no list after the subscription dropped");
 }
+
+fn git(dir: &std::path::Path, args: &[&str]) {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+}
+
+/// A repository with one commit on `main`, and a worktree of it on `fix` beside it.
+fn repo_with_worktree() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    let main = dir.path().join("main");
+    std::fs::create_dir(&main).unwrap();
+    git(&main, &["init", "-q", "-b", "main"]);
+    std::fs::write(main.join("a.txt"), "main").unwrap();
+    git(&main, &["add", "."]);
+    git(&main, &["commit", "-qm", "first"]);
+    let tree = dir.path().join("fix");
+    git(&main, &["worktree", "add", "-q", "-b", "fix", tree.to_str().unwrap()]);
+    std::fs::write(tree.join("a.txt"), "fix").unwrap();
+    (dir, std::fs::canonicalize(main).unwrap(), std::fs::canonicalize(tree).unwrap())
+}
+
+#[test]
+fn a_worktree_works_in_its_folder_over_the_projects_own_connection() {
+    let (_dir, main, tree) = repo_with_worktree();
+    let data = tempfile::tempdir().unwrap();
+    let (host, dial) = host_with_data(Some(data.path().to_path_buf()));
+    let remote = RemoteProject::connect("test", main.display().to_string(), dial, Timeouts::default()).unwrap();
+    let there = remote.at(&tree).unwrap();
+    assert_eq!(there.root(), tree);
+    assert_eq!(there.host(), Some("test"));
+    assert_eq!(there.read("a.txt").unwrap(), b"fix");
+    assert_eq!(remote.read("a.txt").unwrap(), b"main");
+    assert_eq!(there.git(&["branch", "--show-current"]).unwrap().stdout.trim(), "fix");
+    let mut pwd = there.spawn(&Command::new("pwd")).unwrap();
+    let mut out = String::new();
+    pwd.stdout.read_to_string(&mut out).unwrap();
+    assert_eq!(std::path::Path::new(out.trim()), tree);
+    assert_eq!(there.data_path(), remote.data_path());
+    assert!(Arc::ptr_eq(&there.tracker().unwrap(), &remote.tracker().unwrap()), "one tracker for every worktree");
+    let (main_tx, main_changes) = mpsc::channel();
+    let _main_watch = remote.watch(Box::new(move |batch| drop(main_tx.send(batch)))).unwrap();
+    let (tx, changes) = mpsc::channel();
+    let _watch = there.watch(Box::new(move |batch| drop(tx.send(batch)))).unwrap();
+    thread::sleep(Duration::from_millis(200));
+    std::fs::write(tree.join("a.txt"), "fixed").unwrap();
+    let batch = changes.recv_timeout(Duration::from_secs(3)).expect("the worktree's watch hears it");
+    assert!(batch.iter().any(|c| c.path == "a.txt"), "{batch:?}");
+    assert!(main_changes.recv_timeout(Duration::from_millis(500)).is_err(), "the main checkout's watch does not");
+    host.cuts.recv().unwrap();
+    assert!(host.cuts.try_recv().is_err(), "one connection for the project and its worktrees");
+    assert_eq!(remote.at(data.path()).err().unwrap().kind(), io::ErrorKind::InvalidInput);
+}
+
+#[test]
+fn a_worktree_keeps_the_link_open_and_comes_back_with_it() {
+    let (_dir, main, tree) = repo_with_worktree();
+    let (host, dial) = host();
+    let remote = RemoteProject::connect("test", main.display().to_string(), dial, Timeouts::default()).unwrap();
+    let there = remote.at(&tree).unwrap();
+    let shared = Arc::downgrade(&remote.shared);
+    drop(remote);
+    assert_eq!(there.read("a.txt").unwrap(), b"fix", "the link stays while a worktree is open");
+    let (tx, links) = mpsc::channel();
+    there.on_link(Box::new(move |link| drop(tx.send(link))));
+    let (changes_tx, changes) = mpsc::channel();
+    let _watch = there.watch(Box::new(move |batch| drop(changes_tx.send(batch)))).unwrap();
+    lock(&host.cuts.recv().unwrap().0).take();
+    assert!(matches!(links.recv_timeout(Duration::from_secs(2)).unwrap(), Link::Down(_)));
+    assert_eq!(links.recv_timeout(Duration::from_secs(10)).expect("it comes back"), Link::Up);
+    assert_eq!(there.read("a.txt").unwrap(), b"fix", "the new host opens the worktree again");
+    thread::sleep(Duration::from_millis(200));
+    std::fs::write(tree.join("a.txt"), "again").unwrap();
+    assert!(changes.recv_timeout(Duration::from_secs(3)).is_ok(), "the worktree's watch came back too");
+    drop((_watch, there));
+    assert!(shared.upgrade().is_none(), "the link goes with the last of them");
+}
