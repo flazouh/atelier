@@ -17,6 +17,10 @@ pub(crate) fn rule_switch(rule: atelier_tracker::Rule) -> &'static str {
 
 /// Keeps a change, off the UI thread.
 pub(super) fn save(cx: &mut gpui_kit::App, change: impl FnOnce(&mut atelier_settings::Settings) + Send + 'static) {
+    // A test writes only the file it names, never this machine's settings.
+    if cfg!(test) && std::env::var_os("ATELIER_SETTINGS").is_none() {
+        return;
+    }
     if let Some(path) = atelier_settings::path() {
         cx.background_spawn(async move {
             if let Err(error) = atelier_settings::update(&path, change) {

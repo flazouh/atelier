@@ -76,3 +76,10 @@ pub enum ProjectEvent {
 
 /// Why a project's pull requests do not open.
 pub(crate) const NO_FORGE_REMOTE: &str = "No GitHub remote for this project";
+
+#[cfg(test)]
+thread_local! {
+    /// Set by a test that drives a whole shell: the disk watch's thread and a real agent's would wake it off its clock,
+    /// so there is no watch and its sessions talk to a fake agent on the test's thread.
+    pub(crate) static TEST_THREAD_ONLY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}

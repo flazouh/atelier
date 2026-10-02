@@ -107,6 +107,14 @@ fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
     assert_eq!(dark.primary, colour(PRIMARIES[2].1), "the pick is worn by the new theme");
     assert_eq!(wait_for(&file, |s| s.mode.as_deref() == Some("dark")).mode.as_deref(), Some("dark"));
 
+    // A switch in Agents makes a picked skill run at once, and it is kept.
+    let runs = |cx: &mut VisualTestContext| cx.update(|_, cx| crate::agent_session::runs_picked_skills(cx));
+    assert!(!runs(cx), "a picked skill waits by default");
+    click(cx, "section-agents");
+    click(cx, "skills-run-when-picked");
+    assert!(runs(cx));
+    assert_eq!(wait_for(&file, |s| s.run_picked_skills.is_some()).run_picked_skills, Some(true));
+
     // Escape asks to close.
     cx.simulate_keystrokes("escape");
     assert_eq!(closed.get(), 1);
@@ -209,15 +217,4 @@ fn the_sidebar_section_edits_the_layout_and_says_so_once(cx: &mut TestAppContext
     assert_eq!(looks.len(), 2, "one event for each change");
     assert_eq!((looks[1].project_badge, looks[1].fold_after), (BadgeShow::Always, 12));
     assert_eq!(pane.read_with(cx, |p, _| p.look.project_badge), BadgeShow::Always);
-}
-
-/// Agents has a switch for skills picked from the `/` list: off, a skill waits in the box; on, it runs at once.
-#[gpui_kit::test]
-fn a_switch_in_agents_makes_a_picked_skill_run_at_once(cx: &mut TestAppContext) {
-    let (_pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
-    let runs = |cx: &mut VisualTestContext| cx.update(|_, cx| crate::agent_session::runs_picked_skills(cx));
-    assert!(!runs(cx), "a picked skill waits by default");
-    click(cx, "section-agents");
-    click(cx, "skills-run-when-picked");
-    assert!(runs(cx));
 }

@@ -18,6 +18,8 @@ pub use structs::OpenProject;
 pub use types::{Deleted, Listing, ProjectEvent};
 #[cfg(test)]
 pub use types::Git;
+#[cfg(test)]
+pub(crate) use types::TEST_THREAD_ONLY;
 pub(crate) use types::NO_FORGE_REMOTE;
 
 #[cfg(test)]

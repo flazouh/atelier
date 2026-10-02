@@ -235,6 +235,8 @@ impl OpenProject {
     fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         let project = self.project.clone();
         let chips = self.pr_chips.clone();
+        #[cfg(test)]
+        let agent = if super::TEST_THREAD_ONLY.get() { Agent { backend: crate::fake_agent::fake_agent("fake").backend, ..agent } } else { agent };
         let session = cx.new(|cx| {
             let mut session = AgentSession::start(key, agent, project, resume, window, cx);
             session.pr_chips = chips;
@@ -462,13 +464,6 @@ impl OpenProject {
     #[cfg(test)]
     pub fn chips(&self) -> std::rc::Rc<Vec<atelier_ui::PrChipData>> {
         self.pr_chips.clone()
-    }
-
-    /// Stops watching the disk, for a test that would have the watch's thread wake it off its clock.
-    #[cfg(test)]
-    pub fn stop_watching(&mut self) {
-        self.watching = Task::ready(());
-        self._watch = None;
     }
 
     /// The forge the chip lookups ask, in place of GitHub through gh.
@@ -765,6 +760,10 @@ impl OpenProject {
     }
 
     pub(super) fn watch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        #[cfg(test)]
+        if super::TEST_THREAD_ONLY.get() {
+            return;
+        }
         let (tx, mut rx) = mpsc::unbounded::<Vec<Change>>();
         match self.project.watch(Box::new(move |batch| drop(tx.unbounded_send(batch)))) {
             Ok(watch) => self._watch = Some(watch),

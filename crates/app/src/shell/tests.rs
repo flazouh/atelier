@@ -40,6 +40,7 @@ fn quit_has_its_key(cx: &mut TestAppContext) {
 }
 
 fn open_shell(cx: &mut TestAppContext) -> (Entity<Shell>, &mut gpui_kit::VisualTestContext) {
+    crate::open_project::TEST_THREAD_ONLY.set(true);
     cx.update(|cx| {
         gpui_kit::init(cx);
         atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
@@ -661,10 +662,84 @@ fn a_long_conversation_has_a_rail_and_a_latest_button(cx: &mut TestAppContext) {
     cx.simulate_click(tick.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("latest").is_some(), "a press on a tick lets go of the end, so Latest shows");
+    let view = session.read_with(cx, |s, _| s.list.viewport_bounds());
+    let message = cx.debug_bounds("row-6").expect("message 3 is in view");
+    assert!((message.center().y - view.center().y).abs() < px(2.), "and it is in the middle: {message:?} in {view:?}");
     let latest = cx.debug_bounds("latest").unwrap();
     cx.simulate_click(latest.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("latest").is_none(), "Latest takes hold of the end again");
+}
+
+/// With motion on, a press on a tick glides to its message over a few frames, as beui's smooth scroll does, and a message
+/// sent then rises into its place.
+#[gpui_kit::test]
+fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
+    use atelier_agents::session::{BlockId, Event};
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
+    session.update(cx, |s, cx| {
+        for n in 0..30 {
+            s.conversation.user_sent(format!("message number {n}"));
+            s.conversation.apply(&Event::Text { block: BlockId(n), delta: format!("answer to {n}") });
+        }
+        s.refresh_rows();
+        s.arrived.clear();
+        cx.notify();
+    });
+    settle(&shell, cx);
+    settle(&shell, cx);
+    cx.update(|_, cx| cx.set_reduce_motion(false));
+    let tick = cx.debug_bounds("rail-tick-3").unwrap();
+    cx.simulate_click(tick.center(), gpui_kit::Modifiers::default());
+    let view = session.read_with(cx, |s, _| s.list.viewport_bounds());
+    let off = |cx: &mut gpui_kit::VisualTestContext| cx.debug_bounds("row-6").map_or(f32::MAX, |m| f32::from((m.center().y - view.center().y).abs()));
+    cx.run_until_parked();
+    assert!(off(cx) > 2., "one frame in, it is still on its way");
+    let mut frames = 0;
+    while off(cx) > 2. && frames < 60 {
+        std::thread::sleep(std::time::Duration::from_millis(16));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        frames += 1;
+    }
+    assert!(off(cx) <= 2., "it lands in the middle");
+    assert!(frames > 3, "over several frames, not at once: {frames}");
+    // Back at the end, as a reader who sends is.
+    session.update(cx, |s, cx| {
+        s.glide.follow();
+        cx.notify();
+    });
+    let at_end = |cx: &mut gpui_kit::VisualTestContext| {
+        let last = session.read_with(cx, |s, _| s.shown.len() - 1);
+        cx.debug_bounds(format!("row-{last}").leak()).is_some_and(|r| r.bottom() <= view.bottom() + px(1.))
+    };
+    frames = 0;
+    while !at_end(cx) && frames < 120 {
+        std::thread::sleep(std::time::Duration::from_millis(8));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        frames += 1;
+    }
+    session.update(cx, |s, cx| {
+        s.conversation.user_sent("one more");
+        s.refresh_rows();
+        s.glide.follow();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let last = session.read_with(cx, |s, _| s.shown.len() - 1);
+    let row_selector: &'static str = format!("row-{last}").leak();
+    for _ in 0..20 {
+        if cx.debug_bounds(row_selector).is_some() {
+            break;
+        }
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+    let (row, rising) = (cx.debug_bounds(format!("row-{last}").leak()), cx.debug_bounds(format!("entering-{last}").leak()));
+    let (row, rising) = (row.expect("the new message is drawn"), rising.expect("and it is entering"));
+    assert!(rising.top() > row.top(), "it starts below its place: {rising:?} in {row:?}");
 }
 
 /// A review takes the place of the session bar and the panels, not of the sidebar or the right pane; when it
@@ -672,8 +747,6 @@ fn a_long_conversation_has_a_rail_and_a_latest_button(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_review_takes_the_place_of_the_panels_and_the_sidebar_stays(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
-    // The disk watch's own thread would wake the test off its clock while the review opens.
-    shell.update(cx, |s, cx| s.active().cloned().unwrap().update(cx, |p, _| p.stop_watching()));
     let right_before = shell.read_with(cx, |s, _| (s.right, s.right_width));
     assert!(cx.debug_bounds("panel-close").is_some() && cx.debug_bounds("review-in-place").is_none());
     let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
