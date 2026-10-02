@@ -26,6 +26,8 @@ mod pr_view_story;
 mod motion_story;
 mod tasks_story;
 mod streaming_story;
+mod voice_sound;
+mod voice_story;
 mod variants_story;
 mod replay_story;
 mod merge_story;
@@ -58,6 +60,7 @@ enum Story {
     Typography,
     Icons,
     Spark,
+    Voice,
     Buttons,
     Badges,
     Messages,
@@ -80,7 +83,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 34] = [
+    const ALL: [Story; 35] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::SubagentCard,
@@ -96,6 +99,7 @@ impl Story {
         Story::Typography,
         Story::Icons,
         Story::Spark,
+        Story::Voice,
         Story::Buttons,
         Story::Badges,
         Story::Messages,
@@ -134,6 +138,7 @@ impl Story {
             Story::Typography => "Typography",
             Story::Icons => "Icons",
             Story::Spark => "Spark",
+            Story::Voice => "Voice",
             Story::Buttons => "Buttons",
             Story::Badges => "Badges and keys",
             Story::Messages => "Messages",
@@ -214,6 +219,7 @@ struct Gallery {
     agent_sidebar: Option<Entity<sidebar_story::SidebarStory>>,
     agent_panels: Option<Entity<panels_story::PanelsStory>>,
     agent_replay: Option<Entity<replay_story::ReplayStory>>,
+    voice: Option<Entity<voice_story::VoiceStory>>,
     pr_view: Option<Entity<pr_view_story::PrViewStory>>,
     tasks: Option<Entity<tasks_story::TasksStory>>,
     variants: Option<Entity<variants_story::VariantsStory>>,
@@ -329,6 +335,7 @@ impl Gallery {
             motion: None,
             agent_panels: None,
             agent_replay: None,
+            voice: None,
             focus: cx.focus_handle(), prompt, panel_prompt, notice: None, started: Instant::now(), replay: None, replays: 0, tick: 0, live: None, _system };
         if gallery.story == Story::Editor {
             gallery.editors.open(cx);
@@ -369,6 +376,9 @@ impl Gallery {
         }
         if self.story == Story::AgentPanels && self.agent_panels.is_none() {
             self.agent_panels = Some(cx.new(|cx| panels_story::PanelsStory::new(window, cx)));
+        }
+        if self.story == Story::Voice && self.voice.is_none() {
+            self.voice = Some(cx.new(|_| voice_story::VoiceStory::new()));
         }
         if self.story == Story::AgentReplay && self.agent_replay.is_none() {
             self.agent_replay = Some(cx.new(|cx| replay_story::ReplayStory::new(window, cx)));
@@ -489,6 +499,7 @@ impl Gallery {
             Story::Streaming => self.streaming.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Motion => self.motion.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequestView => self.pr_view.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::Voice => self.voice.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequests => pr_story::pull_requests().into_any_element(),
             Story::Merge => self.merge.clone().into_any_element(),
