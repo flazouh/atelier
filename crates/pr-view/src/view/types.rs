@@ -1,19 +1,15 @@
-use std::{
-    collections::{HashMap},
-    rc::Rc,
-    sync::Arc,
-};
+use std::{collections::HashMap, rc::Rc, sync::Arc};
 
 use gpui_kit::AnyElement;
 use atelier_forge::{ForgeError, PullRef, PullState, Side, ThreadId};
 
 use crate::{
     base::{Base, BaseChoice},
-    checks::{JobLog},
+    checks::JobLog,
     data::{Part, PullData},
     diff::FileView,
     git::{Blob, Commit, FileEntry, Prepared},
-    sync::{Refreshed},
+    sync::Refreshed,
 };
 
 /// What the view tells its owner.

@@ -4,7 +4,7 @@ pub(super) const CONFIG: &str = "use std::time::Duration;\n\n/// How long a clie
 
 pub(super) const LIB: &str = "//! A small HTTP relay: it forwards a request upstream and streams the answer back.\n\npub mod config;\npub mod request;\npub mod response;\npub mod stream;\n";
 
-pub(super) const REQUEST: &str = "use crate::config;
+const REQUEST: &str = "use crate::config;
 use crate::response::Response;
 use crate::stream::ByteStream;
 
@@ -36,7 +36,7 @@ impl RequestContext {
 }
 ";
 
-pub(super) const RESPONSE: &str = "/// What the relay has told the client so far.
+const RESPONSE: &str = "/// What the relay has told the client so far.
 #[derive(Default)]
 pub struct Flags {
     pub aborted: bool,
@@ -60,7 +60,7 @@ impl Response {
 }
 ";
 
-pub(super) const STREAM: &str = "/// A body the upstream sends in chunks.
+const STREAM: &str = "/// A body the upstream sends in chunks.
 #[derive(Default)]
 pub struct ByteStream {
     pub sink: Option<Vec<u8>>,
@@ -76,7 +76,7 @@ impl ByteStream {
 }
 ";
 
-pub(super) const ABORT_TEST: &str = "use relay::request::RequestContext;
+const ABORT_TEST: &str = "use relay::request::RequestContext;
 use relay::response::Response;
 use relay::stream::ByteStream;
 

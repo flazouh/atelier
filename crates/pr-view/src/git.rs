@@ -6,7 +6,7 @@
 //! needs real files, so a **checkout** of the head, made with `git archive`, sits beside the cache. Never
 //! `git worktree`: a machine may refuse it, and a worktree belongs to the repository it came from.
 //!
-//! Everything goes through [`Project::spawn`], so a remote project keeps its cache and checkouts on its
+//! Everything goes through [`Project::spawn`](atelier_project::Project::spawn), so a remote project keeps its cache and checkouts on its
 //! own host. Arguments are passed as arguments, never joined into a shell line, except in the one script
 //! that pipes `git archive` into `tar`, which reads its values from positional parameters.
 

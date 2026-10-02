@@ -1,7 +1,4 @@
-use std::{
-    path::{Path},
-    process::Command,
-};
+use std::{path::Path, process::Command};
 
 pub fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")

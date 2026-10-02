@@ -5,15 +5,15 @@ use atelier_forge::{ForgeError, PullState};
 /// How often to ask, as the last answers say.
 #[derive(Clone, Debug)]
 pub struct Cadence {
-    pub(super) base: Duration,
+    base: Duration,
     /// The slowest a quiet pull request is asked about.
-    pub(super) quiet_max: Duration,
+    quiet_max: Duration,
     /// The slowest after failures.
-    pub(super) error_max: Duration,
-    pub(super) unchanged: u32,
+    error_max: Duration,
+    unchanged: u32,
     pub(super) failures: u32,
     /// The wait the last answer or failure asked for.
-    pub(super) wait: Duration,
+    wait: Duration,
 }
 
 impl Cadence {
@@ -60,7 +60,7 @@ impl Cadence {
         }
     }
 
-    pub(super) fn backoff(&self) -> Duration {
+    fn backoff(&self) -> Duration {
         (self.base * 2u32.saturating_pow(self.failures)).min(self.error_max)
     }
 }

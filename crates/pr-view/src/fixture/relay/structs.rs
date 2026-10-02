@@ -33,7 +33,7 @@ impl Changed {
         (rows != head && !(self.hunks.len() == 1 && self.hunks[0].1.is_empty() && self.hunks[0].2 == head.len())).then(|| rows.join("\n") + "\n")
     }
 
-    pub(super) fn counts(&self) -> (u32, u32) {
+    fn counts(&self) -> (u32, u32) {
         (self.hunks.iter().map(|h| h.2 as u32).sum(), self.hunks.iter().map(|h| h.1.len() as u32).sum())
     }
 }

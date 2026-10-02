@@ -20,7 +20,7 @@ pub struct PullData {
     /// Seconds since the Unix epoch when the newest part arrived. `0` before any.
     pub fetched_at: u64,
     /// Which parts have arrived.
-    pub(super) loaded: Vec<PartKind>,
+    loaded: Vec<PartKind>,
 }
 
 impl PullData {

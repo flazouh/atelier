@@ -33,10 +33,10 @@ pub fn remote_for(listing: &str, repo: &RepoRef) -> Option<String> {
     let mut found: Option<String> = None;
     for line in listing.lines() {
         let mut parts = line.split_whitespace();
-        let (Some(_name), Some(url), Some(kind)) = (parts.next(), parts.next(), parts.next()) else { continue };
+        let (Some(name), Some(url), Some(kind)) = (parts.next(), parts.next(), parts.next()) else { continue };
         if kind == "(fetch)" && RepoRef::from_remote(url).as_ref() == Some(repo) {
             // A remote called `origin` wins over the others that name the same repository.
-            if line.starts_with("origin") || found.is_none() {
+            if name == "origin" || found.is_none() {
                 found = Some(url.to_string());
             }
         }
@@ -50,14 +50,15 @@ pub fn parse_commits(output: &str) -> Vec<Commit> {
         .split('\0')
         .filter_map(|record| {
             let record = record.trim_start_matches('\n');
-            let mut fields = record.split('\u{1f}');
+            // The subject is last and may hold the separator itself, so it is the rest of the record.
+            let mut fields = record.splitn(4, '\u{1f}');
             let (sha, author, at, title) = (fields.next()?, fields.next()?, fields.next()?, fields.next()?);
             is_sha(sha).then(|| Commit { sha: sha.into(), title: title.into(), author: author.into(), at: at.parse().unwrap_or(0) })
         })
         .collect()
 }
 
-pub(super) fn change_of(letter: char) -> Change {
+fn change_of(letter: char) -> Change {
     match letter {
         'A' => Change::Added,
         'D' => Change::Deleted,

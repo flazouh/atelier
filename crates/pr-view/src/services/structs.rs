@@ -1,8 +1,4 @@
-use std::{
-    path::PathBuf,
-    sync::Arc,
-    time::{Duration},
-};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use atelier_forge::Forge;
 use atelier_lsp::Workers;

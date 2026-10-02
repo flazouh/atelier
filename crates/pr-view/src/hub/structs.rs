@@ -28,20 +28,20 @@ use crate::{
 use super::types::PrEvent;
 
 pub(super) struct Open {
-    pub(super) reference: PullRef,
-    pub(super) view: Entity<PullView>,
-    pub(super) _events: Subscription,
+    reference: PullRef,
+    view: Entity<PullView>,
+    _events: Subscription,
 }
 
 pub struct PrHub {
-    pub(super) services: Arc<Services>,
+    services: Arc<Services>,
     pub(super) list: Entity<PullList>,
     pub(super) open: Option<Open>,
     /// A session the app linked to a pull request, by the words it shows on the button.
     pub(super) linked: Vec<(PullRef, SharedString)>,
     /// Pull requests whose checkout has been cleaned already.
-    pub(super) swept: HashSet<PullRef>,
-    pub(super) _subscriptions: Vec<Subscription>,
+    swept: HashSet<PullRef>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl EventEmitter<PrEvent> for PrHub {}
@@ -131,7 +131,7 @@ impl PrHub {
     }
 
     /// After the list is read: pull requests it shows as merged or closed lose their checkout.
-    pub(super) fn sweep(&mut self, list: &Entity<PullList>, cx: &mut Context<Self>) {
+    fn sweep(&mut self, list: &Entity<PullList>, cx: &mut Context<Self>) {
         let closed = list.read(cx).model().closed();
         for reference in closed {
             if !self.swept.contains(&reference) {

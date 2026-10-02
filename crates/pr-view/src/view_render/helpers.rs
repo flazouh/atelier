@@ -1,6 +1,6 @@
 use atelier_forge::PullState;
 
-/// Whether a description is long enough to be clipped at [`BODY_CLIP`], so it needs the "Show the whole description"
+/// Whether a description is long enough to be clipped at [`BODY_CLIP`](super::types::BODY_CLIP), so it needs the "Show the whole description"
 /// button: about seven lines of a rail's width, or more than six lines of its own.
 pub(crate) fn body_needs_fold(body: &str) -> bool {
     let lines: usize = body.lines().map(|l| l.chars().count().div_ceil(48).max(1)).sum();

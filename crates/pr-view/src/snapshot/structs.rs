@@ -10,13 +10,13 @@ use crate::data::PullData;
 use super::types::VERSION;
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(super) struct Envelope {
-    pub(super) version: u32,
+struct Envelope {
+    version: u32,
     pub(super) data: PullData,
 }
 
 pub struct Snapshots {
-    pub(super) dir: PathBuf,
+    dir: PathBuf,
 }
 
 impl Snapshots {
@@ -62,10 +62,10 @@ pub struct ListSnapshot {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(super) struct ListEnvelope {
-    pub(super) version: u32,
-    pub(super) fetched_at: u64,
-    pub(super) items: Vec<atelier_forge::Involved>,
+struct ListEnvelope {
+    version: u32,
+    fetched_at: u64,
+    items: Vec<atelier_forge::Involved>,
 }
 
 impl ListSnapshot {

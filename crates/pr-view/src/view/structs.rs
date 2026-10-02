@@ -41,11 +41,11 @@ use super::helpers::placeholder_job;
 
 /// What the editor holds now, to know when to change it.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct ShownKey {
+struct ShownKey {
     pub(super) path: String,
-    pub(super) brought_in: bool,
+    brought_in: bool,
     pub(super) file: Option<FileKey>,
-    pub(super) checkout: bool,
+    checkout: bool,
 }
 
 /// A comment being written, and where.
@@ -53,49 +53,49 @@ pub(crate) struct Draft {
     pub(crate) row: usize,
     /// The file it belongs to.
     pub(super) path: String,
-    pub(super) kind: DraftKind,
-    pub(super) composer: Entity<LineComposer>,
-    pub(super) _events: Subscription,
+    kind: DraftKind,
+    composer: Entity<LineComposer>,
+    _events: Subscription,
 }
 
 /// A finder over the pull request: the bases the reader can pick, or the files of the head.
-pub(super) struct Lookup {
-    pub(super) finder: Entity<Finder>,
-    pub(super) kind: LookupKind,
-    pub(super) _events: Subscription,
+struct Lookup {
+    finder: Entity<Finder>,
+    kind: LookupKind,
+    _events: Subscription,
 }
 
 pub struct PullView {
     pub(crate) services: Arc<Services>,
     pub(crate) model: PrModel,
-    pub(super) tx: mpsc::UnboundedSender<Msg>,
+    tx: mpsc::UnboundedSender<Msg>,
     pub(super) epoch: u64,
     pub(super) prepared: Option<Prepared>,
     pub(crate) checkout: Option<String>,
     /// The diffs read so far, oldest first; a few files are kept.
-    pub(super) views: Vec<(FileKey, Arc<FileView>)>,
-    pub(super) loading: HashSet<FileKey>,
-    pub(super) failed: HashMap<FileKey, String>,
-    pub(super) brought: HashMap<String, Blob>,
-    pub(super) brought_loading: HashSet<String>,
+    views: Vec<(FileKey, Arc<FileView>)>,
+    loading: HashSet<FileKey>,
+    failed: HashMap<FileKey, String>,
+    brought: HashMap<String, Blob>,
+    brought_loading: HashSet<String>,
     pub(crate) editor: Entity<EditorState>,
-    pub(super) shown: Option<ShownKey>,
+    shown: Option<ShownKey>,
     pub(crate) session: Option<Entity<EditorSession>>,
-    pub(super) _session: Option<Subscription>,
+    _session: Option<Subscription>,
     pub(crate) composer: Entity<CommentComposer>,
     pub(crate) verdict: Entity<VerdictBox>,
     pub(crate) merge: Entity<MergeBox>,
     pub(crate) draft: Option<Draft>,
-    pub(super) picker: Option<Lookup>,
+    picker: Option<Lookup>,
     /// A line to put the caret on once the file it belongs to is shown.
-    pub(super) pending_caret: Option<Position>,
+    pending_caret: Option<Position>,
     /// The words under the header: what changed, what is being sent, what went wrong.
     pub(crate) notice: Option<String>,
     /// The reader picked a base themselves, so the opening choice no longer applies.
-    pub(super) chose_base: bool,
-    pub(super) opening_checked: bool,
+    chose_base: bool,
+    opening_checked: bool,
     /// A copy of the data before a refresh, to tell what changed.
-    pub(super) before_refresh: Option<PullData>,
+    before_refresh: Option<PullData>,
     pub(crate) first_load_done: bool,
     /// When the first of each step happened, since the view was made: the numbers of the opening.
     /// The rail's scroll, held so a measuring run can move it.
@@ -105,14 +105,14 @@ pub struct PullView {
     /// The description is shown whole, not clipped.
     pub(crate) body_open: bool,
     /// Long threads the reader opened up in the diff.
-    pub(super) unfolded: HashSet<ThreadId>,
+    unfolded: HashSet<ThreadId>,
     pub timeline: Vec<(&'static str, std::time::Duration)>,
     pub(super) opened: std::time::Instant,
     /// The notice is the error of a failed read, so the next good read clears it.
-    pub(super) sync_failed: bool,
-    pub(super) cadence: Cadence,
-    pub(super) refreshing: bool,
-    pub(super) stopped: bool,
+    sync_failed: bool,
+    cadence: Cadence,
+    refreshing: bool,
+    stopped: bool,
     pub(crate) focus: FocusHandle,
     pub(crate) details: bool,
     /// In a narrow pane, the one part that shows.
@@ -121,9 +121,9 @@ pub struct PullView {
     pub(crate) width: f32,
     pub(crate) height: f32,
     pub(crate) review_mode: bool,
-    pub(super) _subscriptions: Vec<Subscription>,
-    pub(super) _pump: Task<()>,
-    pub(super) _loop: Task<()>,
+    _subscriptions: Vec<Subscription>,
+    _pump: Task<()>,
+    _loop: Task<()>,
 }
 
 impl EventEmitter<PullEvent> for PullView {}
@@ -225,7 +225,7 @@ impl PullView {
     }
 
     /// The disk first, then the forge; after that, on the cadence.
-    pub(super) fn start(&mut self, cx: &mut Context<Self>) {
+    fn start(&mut self, cx: &mut Context<Self>) {
         let (services, tx, reference) = (self.services.clone(), self.tx.clone(), self.model.reference.clone());
         cx.background_spawn(async move {
             let marks = services.reviewed.marks(&reference).unwrap_or_default();
@@ -254,7 +254,7 @@ impl PullView {
     }
 
     /// How long to wait before the next refresh; `None` when asking cannot help until the reader acts.
-    pub(super) fn wait(&mut self) -> Option<Duration> {
+    fn wait(&mut self) -> Option<Duration> {
         if self.stopped {
             return None;
         }
@@ -280,7 +280,7 @@ impl PullView {
     }
 
     /// Reads the parts that change while people work, whatever the header says. After a write.
-    pub(super) fn read_now(&mut self, cx: &mut Context<Self>) {
+    fn read_now(&mut self, cx: &mut Context<Self>) {
         let (services, tx, reference) = (self.services.clone(), self.tx.clone(), self.model.reference.clone());
         self.before_refresh = Some(self.model.data.clone());
         cx.background_spawn(async move {
@@ -453,7 +453,7 @@ impl PullView {
     }
 
     /// The data changed under the reader: tell them what, refresh the boxes, keep their place.
-    pub(super) fn after_change(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn after_change(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(before) = self.before_refresh.take() {
             let change = delta(&before, &self.model.data);
             if let Some(words) = change.words() {
@@ -468,7 +468,7 @@ impl PullView {
         cx.notify();
     }
 
-    pub(super) fn save_snapshot(&self, cx: &mut Context<Self>) {
+    fn save_snapshot(&self, cx: &mut Context<Self>) {
         let (services, data) = (self.services.clone(), self.model.data.clone());
         cx.background_spawn(async move {
             let _ = services.snapshots.save(&data);
@@ -477,7 +477,7 @@ impl PullView {
     }
 
     /// The verdict and merge boxes follow the pull request's header.
-    pub(super) fn sync_boxes(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+    fn sync_boxes(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let Some(pull) = self.model.pull().cloned() else { return };
         let stated = crate::present::stated_verdict(&pull, &self.model.me);
         let mine = self.model.mine();
@@ -494,7 +494,7 @@ impl PullView {
     // ---- git ----
 
     /// Prepares git for the header the reader has: the cache, the files, the commits and the checkout.
-    pub(super) fn prepare_git(&mut self, cx: &mut Context<Self>) {
+    fn prepare_git(&mut self, cx: &mut Context<Self>) {
         let Some(pull) = self.model.pull().cloned() else { return };
         self.epoch += 1;
         let epoch = self.epoch;
@@ -527,7 +527,7 @@ impl PullView {
     }
 
     /// The first time the reader's last review point is known, open since it if there is anything new.
-    pub(super) fn maybe_open_since_review(&mut self, cx: &mut Context<Self>) {
+    fn maybe_open_since_review(&mut self, cx: &mut Context<Self>) {
         if self.opening_checked || self.chose_base {
             return;
         }
@@ -550,7 +550,7 @@ impl PullView {
     }
 
     /// Reads the logs of the failing checks, a few at a time, so their Fault shows.
-    pub(super) fn read_jobs(&mut self, cx: &mut Context<Self>) {
+    fn read_jobs(&mut self, cx: &mut Context<Self>) {
         let jobs = self.model.jobs_to_read(MAX_LOGS);
         for job in jobs {
             // A job is asked for once; an empty answer keeps it from being asked again.
@@ -566,7 +566,7 @@ impl PullView {
 
     // ---- files ----
 
-    pub(super) fn key_of(&self, path: &str) -> Option<FileKey> {
+    fn key_of(&self, path: &str) -> Option<FileKey> {
         let base = self.model.base.as_ref()?;
         let entry = self.model.entry(path)?;
         Some((base.sha.clone(), path.to_string(), entry.version().to_string()))
@@ -588,7 +588,7 @@ impl PullView {
     }
 
     /// Reads a file's diff in the background, unless it is read or being read.
-    pub(super) fn ensure_file(&mut self, path: &str, cx: &mut Context<Self>) {
+    fn ensure_file(&mut self, path: &str, cx: &mut Context<Self>) {
         let (Some(prepared), Some(key)) = (self.prepared.clone(), self.key_of(path)) else { return };
         if self.view_of(&key).is_some() || self.loading.contains(&key) || self.failed.contains_key(&key) {
             return;
@@ -612,7 +612,7 @@ impl PullView {
     }
 
     /// Reads the file the reader is likely to open next, so Next feels immediate.
-    pub(super) fn prefetch(&mut self, cx: &mut Context<Self>) {
+    fn prefetch(&mut self, cx: &mut Context<Self>) {
         let order = self.model.order();
         let Some(current) = self.model.place.as_ref().map(|p| p.path.clone()) else { return };
         let at = order.iter().position(|p| p.as_ref() == current).unwrap_or(0);
@@ -624,7 +624,7 @@ impl PullView {
         }
     }
 
-    pub(super) fn ensure_brought(&mut self, path: &str, cx: &mut Context<Self>) {
+    fn ensure_brought(&mut self, path: &str, cx: &mut Context<Self>) {
         let Some(prepared) = self.prepared.clone() else { return };
         if self.brought.contains_key(path) || self.brought_loading.contains(path) {
             return;
@@ -681,7 +681,7 @@ impl PullView {
     }
 
     /// A language server on the file in the head's checkout, when there is a checkout and servers.
-    pub(super) fn start_session(&mut self, path: &str, rows: atelier_ui::RowMap, cx: &mut Context<Self>) {
+    fn start_session(&mut self, path: &str, rows: atelier_ui::RowMap, cx: &mut Context<Self>) {
         self.session = None;
         self._session = None;
         let (Some(workers), Some(dir)) = (self.services.config.workers.clone(), self.checkout.clone()) else { return };
@@ -704,7 +704,7 @@ impl PullView {
     }
 
     /// Follows a jump out of the file on screen: to another changed file, or Brought In.
-    pub(super) fn jump(&mut self, jump: Jump, window: &mut Window, cx: &mut Context<Self>) {
+    fn jump(&mut self, jump: Jump, window: &mut Window, cx: &mut Context<Self>) {
         let Some(dir) = self.checkout.clone() else { return };
         let root = canonical(&PathBuf::from(&dir));
         let Ok(relative) = canonical(&jump.path).strip_prefix(&root).map(|p| p.to_string_lossy().into_owned()) else {
@@ -844,7 +844,7 @@ impl PullView {
         .detach();
     }
 
-    pub(super) fn open_lookup(&mut self, finder: Entity<Finder>, kind: LookupKind, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_lookup(&mut self, finder: Entity<Finder>, kind: LookupKind, window: &mut Window, cx: &mut Context<Self>) {
         let events = cx.subscribe_in(&finder, window, |view, _, event: &FinderEvent, window, cx| match event {
             FinderEvent::Pick(at) => {
                 let picked = view.picker.take();
@@ -903,7 +903,7 @@ impl PullView {
 
     /// Sends a change to the forge in the background. `words` is what the notice says while it is on its
     /// way. A read-only view sends nothing and says so.
-    pub(super) fn write(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn atelier_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) -> Option<Task<Result<String, ForgeError>>> {
+    fn write(&mut self, words: &str, cx: &mut Context<Self>, send: impl FnOnce(&dyn atelier_forge::Forge, &PullRef) -> Result<String, ForgeError> + Send + 'static) -> Option<Task<Result<String, ForgeError>>> {
         if self.model.read_only {
             self.notice = Some("Read-only: nothing was sent.".into());
             cx.notify();
@@ -1053,7 +1053,7 @@ impl PullView {
         self.start_draft(row.unwrap_or(0), t.path, DraftKind::Reply(thread.clone()), window, cx);
     }
 
-    pub(super) fn start_draft(&mut self, row: usize, path: String, kind: DraftKind, window: &mut Window, cx: &mut Context<Self>) {
+    fn start_draft(&mut self, row: usize, path: String, kind: DraftKind, window: &mut Window, cx: &mut Context<Self>) {
         let in_review = self.model.in_review();
         let is_line = matches!(kind, DraftKind::Line { .. });
         let composer = cx.new(|cx| {

@@ -73,12 +73,12 @@ pub fn steps(job: &Job, log: &str) -> Vec<JobStep> {
         .collect()
 }
 
-pub(super) fn is_error(line: &str) -> bool {
+fn is_error(line: &str) -> bool {
     line.contains("##[error]")
 }
 
 /// The runner's own markers, after the timestamp.
-pub(super) fn body(line: &str) -> &str {
+fn body(line: &str) -> &str {
     let line = line.strip_prefix('\u{feff}').unwrap_or(line);
     match line.split_once(' ') {
         Some((stamp, rest)) if stamp.len() > 20 && stamp.ends_with('Z') && stamp.as_bytes()[4] == b'-' => rest,
@@ -86,7 +86,7 @@ pub(super) fn body(line: &str) -> &str {
     }
 }
 
-pub(super) fn starts_step(body: &str) -> bool {
+fn starts_step(body: &str) -> bool {
     body.starts_with("##[group]Run ") || body.starts_with("Post job cleanup.") || body.starts_with("Cleaning up orphan processes")
 }
 

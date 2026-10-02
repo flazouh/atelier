@@ -63,20 +63,20 @@ pub struct PrGit {
     /// the `pr-view` folder of the project's data folder when the project has one, else [`LEGACY_DATA`].
     pub(super) given: String,
     /// Where an older atelier kept the cache and the checkouts, moved into the data folder on first use.
-    pub(super) legacy: String,
+    legacy: String,
     /// The same, absolute, once the host has been asked for its home. Asking starts a process, so it waits
     /// for the first use, which is on a background thread.
-    pub(super) data: std::sync::OnceLock<Result<String, GitError>>,
+    data: std::sync::OnceLock<Result<String, GitError>>,
     /// The URL to fetch from, when it is not the one the project's remotes give.
     pub(super) remote: Option<String>,
     /// One thing at a time touches the cache and the checkouts: two views of one repository must not both
     /// make the cache, or both make a checkout.
-    pub(super) busy: std::sync::Mutex<()>,
+    busy: std::sync::Mutex<()>,
 }
 
 pub(super) struct Ran {
-    pub(super) code: Option<i32>,
-    pub(super) stdout: Vec<u8>,
+    code: Option<i32>,
+    stdout: Vec<u8>,
     pub(super) stderr: String,
 }
 
@@ -130,7 +130,7 @@ impl PrGit {
     /// Moves the folder an older atelier used to `target`, when there is one and the target is not there yet. One
     /// rename on the host, so the cache and the checkouts come whole. A failure leaves both as they are: the
     /// next open makes a new cache.
-    pub(super) fn move_legacy(&self, target: &str) {
+    fn move_legacy(&self, target: &str) {
         let script = "old=\"$1\"; case \"$old\" in '~/'*) old=\"$HOME/${old#'~/'}\" ;; '$HOME/'*) old=\"$HOME/${old#'$HOME/'}\" ;; esac; \
                       if [ -d \"$old\" ] && [ ! -e \"$2\" ]; then mkdir -p \"$(dirname \"$2\")\" && mv -- \"$old\" \"$2\"; fi";
         let _ = self.sh(script, &[self.legacy.as_str(), target]);
@@ -148,14 +148,14 @@ impl PrGit {
     }
 
     /// `sh -c script sh args...`: the values are positional parameters, never part of the script.
-    pub(super) fn sh(&self, script: &str, args: &[&str]) -> GitResult<Ran> {
+    fn sh(&self, script: &str, args: &[&str]) -> GitResult<Ran> {
         let mut all = vec!["-c".to_string(), script.to_string(), "sh".to_string()];
         all.extend(args.iter().map(|a| a.to_string()));
         let command = Command { program: "sh".into(), args: all, cwd: None, env: Vec::new() };
         self.launch(&command, None, QUICK)
     }
 
-    pub(super) fn launch(&self, command: &Command, input: Option<Vec<u8>>, timeout: Duration) -> GitResult<Ran> {
+    fn launch(&self, command: &Command, input: Option<Vec<u8>>, timeout: Duration) -> GitResult<Ran> {
         let mut process = self.project.spawn(command).map_err(|e| GitError::Spawn(e.to_string()))?;
         let mut stdin = std::mem::replace(&mut process.stdin, Box::new(std::io::sink()));
         let writer = thread::spawn(move || {
@@ -190,7 +190,7 @@ impl PrGit {
     }
 
     /// A git command against a cache repository that must succeed.
-    pub(super) fn cached(&self, cache: &str, what: &'static str, args: &[&str]) -> GitResult<Ran> {
+    fn cached(&self, cache: &str, what: &'static str, args: &[&str]) -> GitResult<Ran> {
         let mut all = vec!["--git-dir", cache];
         all.extend_from_slice(args);
         let ran = self.run(&all, None, QUICK)?;
@@ -207,17 +207,17 @@ impl PrGit {
         raw.chars().map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '-' }).collect()
     }
 
-    pub(super) fn cache_path(&self, repo: &RepoRef) -> GitResult<String> {
+    fn cache_path(&self, repo: &RepoRef) -> GitResult<String> {
         Ok(format!("{}/{}/cache.git", self.data()?, Self::key(repo)))
     }
 
-    pub(super) fn checkout_path(&self, reference: &PullRef) -> GitResult<String> {
+    fn checkout_path(&self, reference: &PullRef) -> GitResult<String> {
         Ok(format!("{}/{}/head-{}", self.data()?, Self::key(&reference.repo), reference.number))
     }
 
     /// The URL to fetch `repo` from: the one told to [`PrGit::with_remote`], else the project's own remote
     /// that names this repository, else the plain `https` one.
-    pub(super) fn fetch_url(&self, repo: &RepoRef) -> GitResult<String> {
+    fn fetch_url(&self, repo: &RepoRef) -> GitResult<String> {
         if let Some(url) = &self.remote {
             return Ok(url.clone());
         }
@@ -227,7 +227,7 @@ impl PrGit {
     }
 
     /// Makes the cache repository if it is not there.
-    pub(super) fn ensure_cache(&self, repo: &RepoRef) -> GitResult<String> {
+    fn ensure_cache(&self, repo: &RepoRef) -> GitResult<String> {
         let cache = self.cache_path(repo)?;
         let exists = self.run(&["--git-dir", &cache, "rev-parse", "--is-bare-repository"], None, QUICK)?;
         if exists.code == Some(0) {
@@ -247,7 +247,7 @@ impl PrGit {
         Ok(cache)
     }
 
-    pub(super) fn has_commit(&self, cache: &str, sha: &str) -> bool {
+    fn has_commit(&self, cache: &str, sha: &str) -> bool {
         let spec = format!("{sha}^{{commit}}");
         self.run(&["--git-dir", cache, "cat-file", "-e", &spec], None, QUICK).is_ok_and(|r| r.code == Some(0))
     }
@@ -371,7 +371,7 @@ impl PrGit {
         Ok(dir)
     }
 
-    pub(super) fn launch_sh(&self, script: &str, args: &[&str]) -> GitResult<Ran> {
+    fn launch_sh(&self, script: &str, args: &[&str]) -> GitResult<Ran> {
         let mut all = vec!["-c".to_string(), script.to_string(), "sh".to_string()];
         all.extend(args.iter().map(|a| a.to_string()));
         let command = Command { program: "sh".into(), args: all, cwd: None, env: vec![("LC_ALL".into(), "C".into())] };

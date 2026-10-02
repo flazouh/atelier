@@ -31,6 +31,6 @@ pub fn place(threads: &[Thread], view: &FileView) -> Placement {
     placement
 }
 
-pub(super) fn belongs(thread: &Thread, view: &FileView) -> bool {
+fn belongs(thread: &Thread, view: &FileView) -> bool {
     thread.path == view.path || view.old_path.as_deref() == Some(thread.path.as_str())
 }

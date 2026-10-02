@@ -16,12 +16,12 @@ use super::helpers::missing;
 
 #[derive(Default)]
 pub(super) struct State {
-    pub(super) pulls: HashMap<PullRef, PullData>,
+    pulls: HashMap<PullRef, PullData>,
     pub(super) involved: Vec<Involved>,
     pub(super) repository: Option<Repository>,
-    pub(super) jobs: HashMap<u64, (Job, String)>,
-    pub(super) failures: HashMap<&'static str, VecDeque<ForgeError>>,
-    pub(super) calls: Vec<&'static str>,
+    jobs: HashMap<u64, (Job, String)>,
+    failures: HashMap<&'static str, VecDeque<ForgeError>>,
+    calls: Vec<&'static str>,
     pub(super) writes: Vec<Write>,
     pub(super) next: u64,
 }
@@ -91,7 +91,7 @@ impl FixtureForge {
     }
 
     /// Logs the call and fails it if a failure is queued.
-    pub(super) fn enter(&self, call: &'static str) -> ForgeResult<MutexGuard<'_, State>> {
+    fn enter(&self, call: &'static str) -> ForgeResult<MutexGuard<'_, State>> {
         let mut state = self.state();
         state.calls.push(call);
         match state.failures.get_mut(call).and_then(VecDeque::pop_front) {

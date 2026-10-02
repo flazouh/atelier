@@ -67,9 +67,9 @@ impl FileView {
 #[derive(Clone, Debug, Default)]
 pub struct LineMap {
     /// `head[i]` is the row of the head's line `i + 1`.
-    pub(super) head: Vec<usize>,
+    head: Vec<usize>,
     /// `base[i]` is the row of the old file's line `i + 1`.
-    pub(super) base: Vec<usize>,
+    base: Vec<usize>,
 }
 
 impl LineMap {

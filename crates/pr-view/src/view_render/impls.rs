@@ -21,7 +21,7 @@ use super::types::{BODY_CLIP, PARTS_HEIGHT, RAIL_FADE, STATUS_HEIGHT};
 use super::helpers::{body_needs_fold, state_word};
 
 impl PullView {
-    pub(super) fn header(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+    fn header(&mut self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(pull) = self.model.pull().cloned() else { return div().into_any_element() };
@@ -192,12 +192,12 @@ impl PullView {
     }
 
     /// What stands where the diff goes when there is no diff to draw.
-    pub(super) fn empty_card(&self, words: impl Into<SharedString>, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+    fn empty_card(&self, words: impl Into<SharedString>, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let theme = cx.theme().clone();
         div().flex_1().flex().items_center().justify_center().text_color(theme.muted_foreground).child(words.into()).into_any_element()
     }
 
-    pub(super) fn file_card(&mut self, body: f32, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
+    fn file_card(&mut self, body: f32, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(place_now) = self.model.place.clone() else {
@@ -282,7 +282,7 @@ impl PullView {
             .into_any_element()
     }
 
-    pub(super) fn failed_or_loading(&self, path: &str) -> String {
+    fn failed_or_loading(&self, path: &str) -> String {
         match self.model.entry(path) {
             None => "Reading the files…".into(),
             Some(_) => "Reading the diff…".into(),

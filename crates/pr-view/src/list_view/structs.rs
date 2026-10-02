@@ -19,15 +19,15 @@ use super::types::{ListEvent, Msg};
 use super::helpers::read_involved;
 
 pub struct PullList {
-    pub(super) services: Arc<Services>,
-    pub(super) model: ListModel,
-    pub(super) cadence: Cadence,
+    services: Arc<Services>,
+    model: ListModel,
+    cadence: Cadence,
     /// Why refreshing stopped for good (a sign-in is missing), or `None`.
-    pub(super) stopped: bool,
-    pub(super) reading: bool,
-    pub(super) tx: mpsc::UnboundedSender<Msg>,
-    pub(super) _pump: Task<()>,
-    pub(super) _loop: Task<()>,
+    stopped: bool,
+    reading: bool,
+    tx: mpsc::UnboundedSender<Msg>,
+    _pump: Task<()>,
+    _loop: Task<()>,
 }
 
 impl EventEmitter<ListEvent> for PullList {}
@@ -61,7 +61,7 @@ impl PullList {
     }
 
     /// The disk first, then the forge; after that, on the cadence.
-    pub(super) fn start(&mut self, cx: &mut Context<Self>) {
+    fn start(&mut self, cx: &mut Context<Self>) {
         let (services, tx) = (self.services.clone(), self.tx.clone());
         cx.background_spawn(async move {
             let opened = services.reviewed.opened_at().unwrap_or_default();
@@ -85,7 +85,7 @@ impl PullList {
         });
     }
 
-    pub(super) fn wait(&self) -> Option<std::time::Duration> {
+    fn wait(&self) -> Option<std::time::Duration> {
         (!self.stopped).then_some(self.services.config.list_refresh)
     }
 
@@ -109,7 +109,7 @@ impl PullList {
         self.read(cx);
     }
 
-    pub(super) fn take(&mut self, msg: Msg, cx: &mut Context<Self>) {
+    fn take(&mut self, msg: Msg, cx: &mut Context<Self>) {
         match msg {
             Msg::Cached(cached, opened) => {
                 self.model.set_opened(opened);

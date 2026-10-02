@@ -370,3 +370,18 @@ fn what_an_older_atelier_left_moves_into_the_data_folder_once() {
     assert_eq!(again.data().unwrap(), data);
     assert!(old.join("later").exists(), "the folder that is already there is never overwritten");
 }
+
+/// Only a remote called exactly `origin` wins; `origin2` or `origin-old` is one of the others.
+#[test]
+fn a_remote_that_only_starts_with_origin_does_not_win() {
+    let repo = atelier_forge::RepoRef::new("github.com", "flazouh", "relay");
+    let listing = "fork\thttps://github.com/flazouh/relay.git (fetch)\norigin2\tgit@github.com:flazouh/relay.git (fetch)\n";
+    assert_eq!(remote_for(listing, &repo).as_deref(), Some("https://github.com/flazouh/relay.git"), "the first remote wins when none is origin");
+}
+
+/// A subject may hold the field separator itself: the title is the rest of the record.
+#[test]
+fn a_commit_subject_with_the_field_separator_keeps_all_of_it() {
+    let commits = parse_commits("aaaa111\u{1f}Ada\u{1f}1700000000\u{1f}Split on \u{1f} then \u{1f} again\0");
+    assert_eq!(commits[0].title, "Split on \u{1f} then \u{1f} again");
+}
