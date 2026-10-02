@@ -220,7 +220,7 @@ impl Mapper {
                 Block::ToolUse { id, name, .. } => {
                     let deferred = tools::starts_subagent(&name) || tools::todo_tool(&name).is_some();
                     // A deferred call never names a file the review needs, so its input is not followed.
-                    self.open.insert(index, Open::Tool { id: ToolId::new(&id), json: String::new(), targeted: deferred });
+                    self.open.insert(index, Open::Tool { id: ToolId::new(&id), name: name.clone(), json: String::new(), targeted: deferred, shown: None });
                     if deferred {
                         return Vec::new();
                     }
@@ -229,15 +229,23 @@ impl Mapper {
                 Block::ToolResult { .. } | Block::Other => Vec::new(),
             },
             StreamEvent::ContentBlockDelta { index, delta } => match (self.open.get_mut(&index), delta) {
-                (Some(Open::Tool { id, json, targeted: targeted @ false }), Delta::InputJson { partial_json }) => {
+                (Some(Open::Tool { id, name, json, targeted, shown }), Delta::InputJson { partial_json }) if !*targeted || tools::streams_input(name) => {
                     json.push_str(&partial_json);
-                    match tools::file_in_partial_input(json) {
-                        Some(file) => {
-                            *targeted = true;
-                            vec![Event::ToolTarget { id: id.clone(), file }]
-                        }
-                        None => Vec::new(),
+                    let mut events = Vec::new();
+                    if !*targeted && let Some(file) = tools::file_in_partial_input(json) {
+                        *targeted = true;
+                        events.push(Event::ToolTarget { id: id.clone(), file });
                     }
+                    // An edit's text is told as it arrives, so the panel can show it being written, once its file is named.
+                    if *targeted
+                        && tools::streams_input(name)
+                        && let Some(input) = tools::partial_input(json)
+                        && shown.as_ref() != Some(&input)
+                    {
+                        events.push(Event::ToolInput { id: id.clone(), file: tools::file(&input), input: input.clone() });
+                        *shown = Some(input);
+                    }
+                    events
                 }
                 (Some(Open::Text(block)), Delta::Text { text }) if !text.is_empty() => {
                     vec![Event::Text { block: *block, delta: text }]
