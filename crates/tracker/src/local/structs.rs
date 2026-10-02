@@ -45,7 +45,7 @@ impl LocalTracker {
         Self::with_connection(Connection::open_in_memory()?, prefix)
     }
 
-    pub(super) fn with_connection(mut conn: Connection, prefix: &str) -> TrackerResult<Self> {
+    fn with_connection(mut conn: Connection, prefix: &str) -> TrackerResult<Self> {
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.pragma_update(None, "foreign_keys", true)?;
         // WAL is refused for an in-memory database, which is fine: the answer is "memory".
@@ -88,7 +88,7 @@ impl LocalTracker {
         self.conn.lock().map_err(|_| TrackerError::Storage("the task store lock was poisoned".into()))
     }
 
-    pub(super) fn emit(&self, events: Vec<Event>) {
+    fn emit(&self, events: Vec<Event>) {
         if let Ok(mut subscribers) = self.subscribers.lock() {
             for event in events {
                 subscribers.retain(|(send, stop)| !stop.is_stopped() && send.send(event.clone()).is_ok());

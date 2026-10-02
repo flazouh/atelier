@@ -60,7 +60,7 @@ pub struct Decision {
     pub to: Status,
 }
 
-/// What [`handle`] did to one task.
+/// What [`handle`](super::handle) did to one task.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Handled {
     /// The task as it is now.

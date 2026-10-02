@@ -48,7 +48,7 @@ pub fn handle(tracker: &dyn Tracker, rules: &RuleSet, signal: &Signal) -> Tracke
     }
 }
 
-pub(super) fn decide_and_move(tracker: &dyn Tracker, rules: &RuleSet, id: &TaskId, signal: &Signal) -> TrackerResult<Handled> {
+fn decide_and_move(tracker: &dyn Tracker, rules: &RuleSet, id: &TaskId, signal: &Signal) -> TrackerResult<Handled> {
     let task = tracker.get(id)?.ok_or_else(|| crate::TrackerError::NotFound(id.clone()))?;
     match rules.decide(task.status, signal) {
         Some(decision) => {

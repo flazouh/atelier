@@ -3,13 +3,13 @@ use std::{
     sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc::Receiver},
 };
 
-use crate::{Event};
+use crate::Event;
 
-/// The changes a [`Tracker`] tells, until this is dropped. It reads as the receiver it holds
+/// The changes a [`Tracker`](super::Tracker) tells, until this is dropped. It reads as the receiver it holds
 /// (`recv`, `recv_timeout`, `try_recv`). Dropping it tells the tracker to stop: a backend that polls a
 /// service stops the poll at its next tick, and reads nothing after it.
 pub struct Subscription {
-    pub(super) events: Receiver<Event>,
+    events: Receiver<Event>,
     pub(super) stop: Arc<AtomicBool>,
 }
 

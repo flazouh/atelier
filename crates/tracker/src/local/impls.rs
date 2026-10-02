@@ -1,4 +1,4 @@
-use crate::{TrackerError};
+use crate::TrackerError;
 
 impl From<rusqlite::Error> for TrackerError {
     fn from(error: rusqlite::Error) -> Self {

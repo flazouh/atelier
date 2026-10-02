@@ -1,6 +1,6 @@
 //! The automation that moves a task along, from the neutral events of sessions and pull requests. Each rule
 //! is data: a name, a plain sentence for the settings, and an on/off switch in a [`RuleSet`]. The decision
-//! ([`RuleSet::decide`]) is pure; [`handle`] reads the task, decides, and writes through a [`Tracker`].
+//! ([`RuleSet::decide`]) is pure; [`handle`] reads the task, decides, and writes through a [`Tracker`](crate::Tracker).
 
 mod helpers;
 mod structs;
