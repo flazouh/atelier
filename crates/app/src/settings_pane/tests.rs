@@ -115,6 +115,16 @@ fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
     assert!(runs(cx));
     assert_eq!(wait_for(&file, |s| s.run_picked_skills.is_some()).run_picked_skills, Some(true));
 
+    // The tool-call density is a choice of three in Agents: kept, and in force at once.
+    let density = |cx: &mut VisualTestContext| cx.update(|_, cx| crate::tool_density::tool_density(cx));
+    assert_eq!(density(cx), crate::tool_density::ToolDensity::Grouped, "grouped by default");
+    click(cx, "tool-density-lines");
+    assert_eq!(density(cx), crate::tool_density::ToolDensity::Lines);
+    assert_eq!(wait_for(&file, |s| s.tool_density.is_some()).tool_density.as_deref(), Some("lines"));
+    click(cx, "tool-density-detailed");
+    assert_eq!(density(cx), crate::tool_density::ToolDensity::Detailed);
+    assert_eq!(wait_for(&file, |s| s.tool_density.as_deref() == Some("detailed")).tool_density.as_deref(), Some("detailed"));
+
     // Escape asks to close.
     cx.simulate_keystrokes("escape");
     assert_eq!(closed.get(), 1);

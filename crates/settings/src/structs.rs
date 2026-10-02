@@ -57,6 +57,8 @@ pub struct Settings {
     pub ui_zoom: Option<f32>,
     /// A skill picked from the composer's `/` list runs at once; unset or false, it waits in the box.
     pub run_picked_skills: Option<bool>,
+    /// How much of the agent's tool calls a session shows: "grouped", "lines" or "detailed". Unset: grouped.
+    pub tool_density: Option<String>,
     /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
     pub sidebar_layout: SidebarSaved,
     /// Keys a newer or older atelier wrote, kept as they are.
