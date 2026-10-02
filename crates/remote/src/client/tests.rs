@@ -498,3 +498,15 @@ fn a_worktree_keeps_the_link_open_and_comes_back_with_it() {
     drop((_watch, there));
     assert!(shared.upgrade().is_none(), "the link goes with the last of them");
 }
+
+#[test]
+fn a_remote_projects_worktrees_read_as_they_do_locally() {
+    let (_dir, main, tree) = repo_with_worktree();
+    let (_host, dial) = host();
+    let remote = RemoteProject::connect("test", main.display().to_string(), dial, Timeouts::default()).unwrap();
+    let here = atelier_project::worktrees(&atelier_project::LocalProject::open(&main).unwrap()).unwrap();
+    let there = atelier_project::worktrees(&remote).unwrap();
+    assert_eq!(there, here);
+    assert_eq!(there.iter().map(|w| w.path.clone()).collect::<Vec<_>>(), [main, tree.clone()]);
+    assert_eq!(there[1].state.as_ref().map(|s| s.changed), Some(1), "its a.txt was changed");
+}

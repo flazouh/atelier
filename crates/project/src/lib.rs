@@ -14,6 +14,7 @@ mod structs;
 mod tracker_slot;
 mod traits;
 mod types;
+mod worktrees;
 
 pub use data::{DataEntry, adopt_old_data};
 pub use local::LocalProject;
@@ -24,4 +25,5 @@ pub use helpers::{expand_home, host_path, read_local_dir};
 pub use structs::{Change, DirEntry, Entry, GitOutput, Match, Query, Watch};
 pub use traits::Project;
 pub use types::{ChangeKind, ChangeSink, Link, LinkSink, TRACKER_FILE};
+pub use worktrees::{TreeState, Upstream, Worktree, worktrees};
 
