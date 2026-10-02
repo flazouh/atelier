@@ -57,6 +57,12 @@ pub struct Settings {
     pub ui_zoom: Option<f32>,
     /// A skill picked from the composer's `/` list runs at once; unset or false, it waits in the box.
     pub run_picked_skills: Option<bool>,
+    /// The microphone chosen for dictation, by `atelier_voice::Device::id`. Unset: the system's default.
+    pub dictation_device: Option<String>,
+    /// Dictation records only while the microphone button is held down, and stops when it is let go.
+    pub dictation_hold: Option<bool>,
+    /// The key that dictates while held: `fn` (the default), `right-option` or `left-option`.
+    pub dictation_key: Option<String>,
     /// How much of the agent's tool calls a session shows: "grouped", "lines" or "detailed". Unset: grouped.
     pub tool_density: Option<String>,
     /// How the sidebar looks, as the Settings page sets it; a field left out is the default.

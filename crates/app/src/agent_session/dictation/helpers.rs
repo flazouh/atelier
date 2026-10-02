@@ -1,46 +1,121 @@
-use std::rc::Rc;
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
-use atelier_voice::{Cue, Engine, Event};
+use atelier_ui::{PromptInput, SetupPhase, VoiceDevice};
+use atelier_voice::{Cue, Device, Engine, Event, Press, files};
 use futures_channel::mpsc::unbounded;
 use futures_util::StreamExt;
-use gpui_kit::App;
+use gpui_kit::{App, AsyncApp, Context};
 
-use super::structs::Speech;
-use super::types::Owner;
+use atelier_voice::hotkey::{Action, Input, Key, Tracker};
+use gpui_kit::{AnyWindowHandle, Entity, Focusable, Window};
+
+use super::structs::{KeyRoute, Prefs, Speech};
+use super::types::{Owner, Presses};
 
 /// The engine, started on first use.
-pub(super) fn speech(cx: &mut App) -> (Rc<Engine>, Owner) {
+pub(super) fn speech(cx: &mut App) -> (Rc<Engine>, Presses) {
     if let Some(speech) = cx.try_global::<Speech>() {
-        return (speech.engine.clone(), speech.owner.clone());
+        return (speech.engine.clone(), speech.presses.clone());
     }
     let (tx, mut events) = unbounded::<Event>();
     let engine = Rc::new(Engine::spawn(move |event| {
         tx.unbounded_send(event).ok();
     }));
-    let owner = Owner::default();
-    let serving = owner.clone();
+    let presses = Presses::default();
+    let installed = files::dir().is_some_and(|dir| files::installed(&dir, &files::FILES));
+    let phase = Rc::new(Cell::new((!engine.ready()).then_some(if installed { SetupPhase::Prepare } else { SetupPhase::Download(0.) })));
+    let total_mb = Rc::new(Cell::new(files::total_bytes(&files::FILES) as f32 / 1e6));
+    let (serving, at, size) = (presses.clone(), phase.clone(), total_mb.clone());
     App::spawn(cx, async move |cx| {
         while let Some(event) = events.next().await {
-            let Some((session, window)) = serving.borrow().clone() else { continue };
-            let ended = matches!(event, Event::Transcript(_) | Event::Failed(_));
-            window
-                .update(cx, |_, window, cx| {
-                    session.update(cx, |session, cx| session.dictation_event(event, window, cx)).ok();
-                })
-                .ok();
-            if ended {
-                *serving.borrow_mut() = None;
-            }
+            dispatch(event, &serving, &at, &size, cx);
         }
     })
     .detach();
-    cx.set_global(Speech { engine: engine.clone(), owner: owner.clone() });
-    (engine, owner)
+    let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
+    let prefs = Rc::new(RefCell::new(Prefs { device: saved.dictation_device, hold: saved.dictation_hold.unwrap_or(false) }));
+    cx.set_global(Speech { engine: engine.clone(), presses: presses.clone(), phase, total_mb, prefs });
+    (engine, presses)
 }
 
-/// Loads the model in the background if it is on this machine, so the first press does not wait for it.
+/// Hands one event to the session it is about: a press's to its owner, the setup's to every session whose words wait for it.
+fn dispatch(event: Event, presses: &Presses, phase: &Cell<Option<SetupPhase>>, total_mb: &Cell<f32>, cx: &mut AsyncApp) {
+    if let Some(step) = setup_step(&event, total_mb) {
+        phase.set(step.filter(|p| *p != SetupPhase::Ready));
+        let owners: Vec<Owner> = presses.borrow().values().cloned().collect();
+        for (session, window) in owners {
+            let event = event.clone();
+            window
+                .update(cx, |_, window, cx| {
+                    session.update(cx, |s, cx| s.dictation_setup(step, event, window, cx)).ok();
+                })
+                .ok();
+        }
+        return;
+    }
+    let Some(press) = press_of(&event) else { return };
+    let Some((session, window)) = presses.borrow().get(&press).cloned() else { return };
+    if ends(&event) {
+        presses.borrow_mut().remove(&press);
+    }
+    window
+        .update(cx, |_, window, cx| {
+            session.update(cx, |s, cx| s.dictation_event(event, window, cx)).ok();
+        })
+        .ok();
+}
+
+/// For an event about the model's setup, the step it shows (`None` inside: the setup failed); for any other, `None`. Keeps the
+/// download's size up to date in `total_mb`.
+pub(super) fn setup_step(event: &Event, total_mb: &Cell<f32>) -> Option<Option<SetupPhase>> {
+    match event {
+        Event::Download { done, total } => {
+            total_mb.set(*total as f32 / 1e6);
+            Some(Some(SetupPhase::Download(if *total == 0 { 0. } else { *done as f32 / *total as f32 })))
+        }
+        Event::Prepare => Some(Some(SetupPhase::Prepare)),
+        Event::Ready => Some(Some(SetupPhase::Ready)),
+        Event::SetupFailed(_) => Some(None),
+        _ => None,
+    }
+}
+
+pub(super) fn press_of(event: &Event) -> Option<Press> {
+    match event {
+        Event::Listening(p)
+        | Event::Level(p, _)
+        | Event::Waiting(p)
+        | Event::Transcribing(p)
+        | Event::Transcript(p, _)
+        | Event::Failed(p, _)
+        | Event::Cancelled(p) => Some(*p),
+        _ => None,
+    }
+}
+
+/// Whether the press is over after this event: nothing more will come about it.
+pub(super) fn ends(event: &Event) -> bool {
+    matches!(event, Event::Transcript(..) | Event::Failed(..) | Event::Cancelled(_))
+}
+
+/// Loads the model in the background if it is on this machine, so its first words come at once.
 pub fn warm(cx: &mut App) {
     speech(cx).0.warm();
+}
+
+/// Fetches the model if it is missing, then loads it: the person opened the microphone's menu, so they mean to dictate.
+pub(super) fn fetch(cx: &mut App) {
+    speech(cx).0.fetch();
+}
+
+/// The setup's step now and the download's size, for a press that ends before the model is ready.
+pub(super) fn setup_now(cx: &mut App) -> (Option<SetupPhase>, f32) {
+    speech(cx);
+    let speech = cx.global::<Speech>();
+    (speech.phase.get(), speech.total_mb.get())
 }
 
 pub(super) fn play(cue: &Option<Cue>) {
@@ -48,3 +123,127 @@ pub(super) fn play(cue: &Option<Cue>) {
         cue.play();
     }
 }
+
+/// Gives a new composer what the person chose before: whether the microphone records while held.
+pub fn start_up(input: &mut PromptInput, cx: &mut Context<PromptInput>) {
+    let hold = prefs(cx).hold;
+    input.set_voice_hold(hold, cx);
+}
+
+/// Lets the dictation key reach `composer`, in `window`, for as long as it lives. The first composer starts listening for the
+/// key, which is Fn unless the settings file names another.
+pub fn hear_key(composer: &Entity<PromptInput>, window: &mut Window, cx: &mut App) -> gpui_kit::Subscription {
+    if cx.try_global::<KeyRoute>().is_none() {
+        let mut route = KeyRoute::default();
+        let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
+        let key: Key = saved.dictation_key.as_deref().and_then(|k| k.parse().ok()).unwrap_or_default();
+        let (tx, mut inputs) = unbounded::<(Input, std::time::Instant)>();
+        let heard = tx.clone();
+        if atelier_voice::hotkey::listen(key, move |input| {
+            heard.unbounded_send((input, std::time::Instant::now())).ok();
+        }) {
+            route.away = Some(tx);
+            App::spawn(cx, async move |cx| {
+                let mut tracker = Tracker::default();
+                while let Some((input, at)) = inputs.next().await {
+                    if let Some(action) = tracker.feed(input, at) {
+                        cx.update(|cx| act(action, cx));
+                    }
+                }
+            })
+            .detach();
+        }
+        cx.set_global(route);
+    }
+    let handle = window.window_handle();
+    let route = cx.global_mut::<KeyRoute>();
+    route.composers.retain(|(c, _)| c.upgrade().is_some());
+    route.composers.push((composer.downgrade(), handle));
+    let focus = composer.read(cx).focus_handle(cx);
+    let weak = composer.downgrade();
+    window.on_focus_in(&focus, cx, move |_, cx| cx.global_mut::<KeyRoute>().last = Some(weak.clone()))
+}
+
+/// The window lost focus: a press of the key may never see its release.
+pub fn key_away(cx: &mut App) {
+    if let Some(tx) = cx.try_global::<KeyRoute>().and_then(|r| r.away.clone()) {
+        tx.unbounded_send((Input::Away, std::time::Instant::now())).ok();
+    }
+}
+
+/// Does what the key asked: a press goes to the focused composer in the front window, or the one last focused there; its end
+/// goes wherever the press went.
+fn act(action: Action, cx: &mut App) {
+    if action == Action::Press {
+        let target = press_target(cx);
+        cx.global_mut::<KeyRoute>().target = target.clone();
+        let Some((composer, window)) = target.and_then(|c| c.upgrade()).zip(cx.active_window()) else { return };
+        window.update(cx, |_, _, cx| composer.update(cx, |c, cx| c.press_mic(cx))).ok();
+        return;
+    }
+    let Some(composer) = cx.global_mut::<KeyRoute>().target.take().and_then(|c| c.upgrade()) else { return };
+    composer.update(cx, |c, cx| match action {
+        Action::Cancel => c.cancel_mic(cx),
+        _ => c.release_mic(cx),
+    });
+}
+
+fn press_target(cx: &mut App) -> Option<gpui_kit::WeakEntity<PromptInput>> {
+    let active: AnyWindowHandle = cx.active_window()?;
+    let route = cx.global::<KeyRoute>();
+    let here: Vec<_> = route.composers.iter().filter(|(_, w)| *w == active).map(|(c, _)| c.clone()).collect();
+    let last = route.last.clone();
+    let focused = active
+        .update(cx, |_, window, cx| {
+            here.iter().find(|c| c.upgrade().is_some_and(|c| c.read(cx).focus_handle(cx).contains_focused(window, cx))).cloned()
+        })
+        .ok()
+        .flatten();
+    focused.or_else(|| last.filter(|l| here.iter().any(|c| c == l) && l.upgrade().is_some()))
+}
+
+/// What the person chose, as of now.
+pub(super) fn prefs(cx: &mut App) -> Prefs {
+    speech(cx);
+    cx.global::<Speech>().prefs.borrow().clone()
+}
+
+/// Changes what the person chose and writes it to the settings file, off the UI thread.
+pub(super) fn choose(cx: &mut App, change: impl FnOnce(&mut Prefs)) {
+    speech(cx);
+    let now = {
+        let mut prefs = cx.global::<Speech>().prefs.borrow_mut();
+        change(&mut prefs);
+        prefs.clone()
+    };
+    let Some(path) = atelier_settings::path() else { return };
+    cx.background_executor()
+        .spawn(async move {
+            if let Err(error) = atelier_settings::update(&path, |s| {
+                s.dictation_device = now.device;
+                s.dictation_hold = Some(now.hold).filter(|hold| *hold);
+            }) {
+                eprintln!("could not save the dictation settings: {error}");
+            }
+        })
+        .detach();
+}
+
+/// The row that means "whichever microphone the system uses".
+pub(super) const DEFAULT_ID: &str = "default";
+
+/// The menu's rows for the microphones found: the system's default first, named after the one it is now, then each microphone;
+/// and which row is chosen. A choice that is no longer plugged in falls back to the default row.
+pub(super) fn device_rows(found: &[Device], chosen: Option<&str>) -> (Vec<VoiceDevice>, String) {
+    let default = match found.iter().find(|d| d.is_default) {
+        Some(d) => format!("Default - {}", d.label),
+        None => "Default".to_string(),
+    };
+    let mut rows = vec![VoiceDevice::new(DEFAULT_ID, default)];
+    rows.extend(found.iter().map(|d| VoiceDevice::new(d.id.clone(), d.label.clone())));
+    let selected = chosen.filter(|id| found.iter().any(|d| d.id == *id)).unwrap_or(DEFAULT_ID);
+    (rows, selected.to_string())
+}
+
+#[cfg(test)]
+mod tests;
