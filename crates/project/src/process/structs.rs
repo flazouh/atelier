@@ -67,7 +67,7 @@ impl Tail {
     }
 
     /// Waits for the stream to end, so every byte its process wrote is kept; for at most
-    /// [`FINISH_WAIT`].
+    /// `FINISH_WAIT`.
     pub fn finish(&self) {
         let Some(reader) = self.reader.lock().unwrap_or_else(|p| p.into_inner()).take() else { return };
         let deadline = Instant::now() + FINISH_WAIT;

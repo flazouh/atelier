@@ -5,7 +5,7 @@ use std::{
 /// How much of a process's stderr is kept: enough for a crash's message and its backtrace.
 pub const STDERR_KEEP: usize = 64 * 1024;
 
-/// How long [`Tail::finish`] waits for the stream to end after its process did: a grandchild that
+/// How long [`Tail::finish`](crate::process::Tail::finish) waits for the stream to end after its process did: a grandchild that
 /// kept the stream open must not hold up a wait for long.
 pub(super) const FINISH_WAIT: Duration = Duration::from_millis(500);
 

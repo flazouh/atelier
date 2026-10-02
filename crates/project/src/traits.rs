@@ -61,7 +61,7 @@ pub trait Project: Send + Sync {
         None
     }
 
-    /// The project's tasks, kept on its host in its data folder ([`TRACKER_FILE`]), so every machine that
+    /// The project's tasks, kept on its host in its data folder ([`TRACKER_FILE`](crate::TRACKER_FILE)), so every machine that
     /// opens the project sees the same ones. The first call opens the store and later calls get the same
     /// one. It blocks, so it is never called on the UI thread.
     fn tracker(&self) -> TrackerResult<Arc<dyn Tracker>> {

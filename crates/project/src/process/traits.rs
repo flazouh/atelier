@@ -9,6 +9,6 @@ pub trait Control: Send {
     fn wait(&mut self) -> io::Result<Option<i32>>;
     /// Whether it still runs, without blocking.
     fn running(&mut self) -> bool;
-    /// The last of what it wrote to stderr, up to [`STDERR_KEEP`] bytes, as text.
+    /// The last of what it wrote to stderr, up to [`STDERR_KEEP`](crate::process::STDERR_KEEP) bytes, as text.
     fn stderr(&self) -> String;
 }
