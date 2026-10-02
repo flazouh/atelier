@@ -85,6 +85,9 @@ fn tool_calls_arrive_in_fragments_by_index() {
     );
     assert_eq!(reply.stop, StopReason::ToolUse);
     assert!(matches!(&deltas[0], Delta::ToolStart { id, name } if id == "call_a" && name == "read"));
+    let pieces = |of: &str| deltas.iter().filter_map(|d| if let Delta::ToolInput { id, piece } = d { (id == of).then_some(piece.as_str()) } else { None }).collect::<String>();
+    assert_eq!(pieces("call_a"), "{\"path\": \"x.rs\"}", "each piece of the input is passed on as it comes");
+    assert_eq!(pieces("call_b"), "{}");
 }
 
 #[test]

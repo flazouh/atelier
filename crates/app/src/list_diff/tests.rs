@@ -45,6 +45,7 @@ fn tool(name: &str) -> Item {
     Item::Tool(Call {
         call: ToolCall { id: ToolId::new(name), name: name.into(), kind: ToolKind::Other, input: serde_json::json!({}), file: None, parent: None, status: ToolStatus::Done },
         output: None,
+        edit: None,
     })
 }
 
@@ -116,6 +117,7 @@ fn a_tool_calls_fingerprint_follows_its_input_as_it_streams() {
                 status: ToolStatus::Running,
             },
             output: None,
+            edit: None,
         })
     };
     assert_ne!(fingerprint(&edit("b")), fingerprint(&edit("b\nc")));

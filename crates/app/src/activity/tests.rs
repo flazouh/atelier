@@ -12,6 +12,7 @@ fn kind_of(name: &str, kind: ToolKind) -> Item {
     Item::Tool(Call {
         call: ToolCall { id: ToolId::new(name), name: name.into(), kind, input: serde_json::json!({}), file: None, parent: None, status: ToolStatus::Done },
         output: None,
+        edit: None,
     })
 }
 

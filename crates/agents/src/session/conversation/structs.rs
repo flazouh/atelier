@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::super::event::{
-    ChoiceKind, EndReason, Event, RequestId, Started, Todo, ToolCall, ToolId, ToolOutput,
+    ChoiceKind, EndReason, Event, FileEdit, RequestId, Started, Todo, ToolCall, ToolId, ToolOutput,
     ToolStatus, TurnEnd, TurnOutcome, Usage,
 };
 use super::types::{Answer, Item, Slot, SubagentStatus};
@@ -11,6 +11,8 @@ use super::types::{Answer, Item, Slot, SubagentStatus};
 pub struct Call {
     pub call: ToolCall,
     pub output: Option<ToolOutput>,
+    /// The text the call changes, when it is an edit or a write whose agent told it.
+    pub edit: Option<FileEdit>,
 }
 
 #[derive(Debug, Default)]
@@ -114,6 +116,11 @@ impl Conversation {
                     call.call.input = input.clone();
                 }
             }
+            Event::ToolEdit { id, edit } => {
+                if let Some(call) = self.call_mut(id) {
+                    call.edit = Some(edit.clone());
+                }
+            }
             Event::ToolStatus { id, status } => {
                 if let Some(call) = self.call_mut(id) {
                     call.call.status = *status;
@@ -191,7 +198,7 @@ impl Conversation {
 
     fn tool_started(&mut self, call: &ToolCall) {
         let inside = call.parent.as_ref().and_then(|parent| self.subagents.get(parent).copied());
-        let entry = Call { call: call.clone(), output: None };
+        let entry = Call { call: call.clone(), output: None, edit: None };
         match inside {
             Some(item) => {
                 let Item::Subagent { calls, .. } = &mut self.items[item] else { return };

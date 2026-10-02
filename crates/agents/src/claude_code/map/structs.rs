@@ -238,12 +238,11 @@ impl Mapper {
                     }
                     // An edit's text is told as it arrives, so the panel can show it being written, once its file is named.
                     if *targeted
-                        && tools::streams_input(name)
-                        && let Some(input) = tools::partial_input(json)
-                        && shown.as_ref() != Some(&input)
+                        && let Some(edit) = crate::partial_json::fields(json).and_then(|input| tools::edit_of(name, &input))
+                        && shown.as_ref() != Some(&edit)
                     {
-                        events.push(Event::ToolInput { id: id.clone(), file: tools::file(&input), input: input.clone() });
-                        *shown = Some(input);
+                        events.push(Event::ToolEdit { id: id.clone(), edit: edit.clone() });
+                        *shown = Some(edit);
                     }
                     events
                 }
@@ -410,10 +409,14 @@ impl Mapper {
             self.hidden.insert(id.clone());
             return self.edit_todos(id, tool, &input);
         }
-        if self.running.contains(&id) {
-            return vec![Event::ToolInput { id, file: tools::file(&input), input }];
-        }
-        self.announce(id, name, input, parent)
+        let edit = tools::edit_of(&name, &input).map(|edit| Event::ToolEdit { id: id.clone(), edit });
+        let mut events = if self.running.contains(&id) {
+            vec![Event::ToolInput { id, file: tools::file(&input), input }]
+        } else {
+            self.announce(id, name, input, parent)
+        };
+        events.extend(edit);
+        events
     }
 
     fn edit_todos(&mut self, id: ToolId, tool: TodoTool, input: &Value) -> Vec<Event> {

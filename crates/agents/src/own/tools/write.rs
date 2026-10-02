@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
 use super::{Access, Tool, ToolContext, ToolResult, make_parent, object, project_path};
-use crate::session::ToolKind;
+use crate::session::{FileEdit, ToolKind};
 
 pub struct Write;
 
@@ -22,6 +22,11 @@ impl Tool for Write {
             }),
             &["path", "content"],
         )
+    }
+
+    fn edit(&self, input: &Value) -> Option<FileEdit> {
+        let text = |key: &str| input[key].as_str().unwrap_or("").to_string();
+        Some(FileEdit { path: self.file(input)?, old: String::new(), new: text("content") })
     }
 
     fn kind(&self) -> ToolKind {

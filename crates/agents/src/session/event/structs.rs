@@ -23,6 +23,16 @@ text_id!(
     ChoiceId
 );
 
+/// The text an edit changes, in the same words for every agent: the file, the text it replaces and the text it puts in
+/// its place. A write that makes or replaces a whole file has no old text. While the agent still writes the call, each
+/// text holds what has come so far.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FileEdit {
+    pub path: String,
+    pub old: String,
+    pub new: String,
+}
+
 /// One streamed block of text or thinking. Deltas of a block share its id.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BlockId(pub u64);

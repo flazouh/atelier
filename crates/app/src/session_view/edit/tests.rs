@@ -8,7 +8,7 @@ const ROOT: &str = "/w";
 
 fn call(name: &str, input: serde_json::Value, status: ToolStatus) -> Call {
     let kind = if name == "Write" { ToolKind::Write } else if name == "Bash" { ToolKind::Shell } else { ToolKind::Edit };
-    Call { call: ToolCall { id: ToolId::new("t"), name: name.into(), kind, input, file: None, parent: None, status }, output: None }
+    Call { call: ToolCall { id: ToolId::new("t"), name: name.into(), kind, input, file: None, parent: None, status }, output: None, edit: None }
 }
 
 fn edit(status: ToolStatus) -> Call {

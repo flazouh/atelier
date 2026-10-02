@@ -8,6 +8,7 @@ pub(super) fn join_or_push(pending: &mut Vec<Event>, event: Event) {
         (Some(Event::Thinking { block, delta }), Event::Thinking { block: next, delta: more }) if *block == next => {
             delta.push_str(&more)
         }
+        (Some(Event::ToolEdit { id, edit }), Event::ToolEdit { id: next, edit: newer }) if *id == next => *edit = newer,
         (_, event) => pending.push(event),
     }
 }

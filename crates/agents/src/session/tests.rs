@@ -115,6 +115,18 @@ fn thinking_deltas_join_but_text_and_thinking_stay_apart() {
     );
 }
 
+/// An edit is told again with each piece of its text; in one frame only the newest telling of a call counts.
+#[test]
+fn the_tellings_of_an_edit_in_one_batch_keep_only_the_newest() {
+    let queue = EventQueue::new(|| {});
+    let edit = |id: &str, new: &str| Event::ToolEdit { id: ToolId::new(id), edit: FileEdit { path: "a".into(), old: String::new(), new: new.into() } };
+    queue.push(edit("t1", "a"));
+    queue.push(edit("t1", "ab"));
+    queue.push(edit("t2", "x"));
+    queue.push(edit("t1", "abc"));
+    assert_eq!(queue.drain(), vec![edit("t1", "ab"), edit("t2", "x"), edit("t1", "abc")]);
+}
+
 mod conversation {
     use std::time::Duration;
 
@@ -178,6 +190,21 @@ mod conversation {
         assert_eq!((done.call.status, done.call.file.as_deref()), (ToolStatus::Done, Some("/a.rs")));
         assert_eq!(done.call.input, json!({"a": 1}));
         assert_eq!(done.output.as_ref().unwrap().text, "x");
+    }
+
+    /// An edit's text, as far as the agent has written it, is kept on its call; each telling replaces the last, and a
+    /// subagent's call keeps its own.
+    #[test]
+    fn the_text_of_an_edit_is_kept_on_its_call_as_it_grows() {
+        let edit = |new: &str| FileEdit { path: "/w/a.rs".into(), old: "a".into(), new: new.into() };
+        let conversation = fold(vec![
+            Event::ToolStarted(call("t1", "Edit", None)),
+            Event::ToolEdit { id: ToolId::new("t1"), edit: edit("b") },
+            Event::ToolEdit { id: ToolId::new("t1"), edit: edit("b\nc") },
+        ]);
+        let [Item::Tool(call)] = conversation.items() else { panic!("{:?}", conversation.items()) };
+        assert_eq!(call.edit, Some(edit("b\nc")));
+        assert_eq!(call.call.input, serde_json::Value::Null, "the input stays the agent's own, unknown until it is whole");
     }
 
     #[test]

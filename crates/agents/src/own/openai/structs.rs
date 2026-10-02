@@ -154,16 +154,24 @@ impl ChatState {
                 if let Some(name) = call["function"]["name"].as_str().filter(|s| !s.is_empty()) {
                     fragment.name.push_str(name);
                 }
-                fragment.args.push_str(call["function"]["arguments"].as_str().unwrap_or(""));
-                if !fragment.announced && !fragment.id.is_empty() && !fragment.name.is_empty() {
+                let piece = call["function"]["arguments"].as_str().unwrap_or("");
+                fragment.args.push_str(piece);
+                if fragment.announced {
+                    if !piece.is_empty() {
+                        sink(Delta::ToolInput { id: fragment.id.clone(), piece: piece.to_string() });
+                    }
+                } else if !fragment.id.is_empty() && !fragment.name.is_empty() {
                     fragment.announced = true;
-                    let (id, name) = (fragment.id.clone(), fragment.name.clone());
+                    let (id, name, so_far) = (fragment.id.clone(), fragment.name.clone(), fragment.args.clone());
                     // Text or thinking before the calls ends here.
                     if self.open.is_some_and(|o| o != Open::None) {
                         sink(Delta::BlockEnd);
                         self.open = Some(Open::None);
                     }
-                    sink(Delta::ToolStart { id, name });
+                    sink(Delta::ToolStart { id: id.clone(), name });
+                    if !so_far.is_empty() {
+                        sink(Delta::ToolInput { id, piece: so_far });
+                    }
                 }
             }
         }

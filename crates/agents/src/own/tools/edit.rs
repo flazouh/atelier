@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
 use super::{Access, Tool, ToolContext, ToolResult, object, project_path};
-use crate::session::ToolKind;
+use crate::session::{FileEdit, ToolKind};
 
 pub struct Edit;
 
@@ -24,6 +24,11 @@ impl Tool for Edit {
             }),
             &["path", "old_string", "new_string"],
         )
+    }
+
+    fn edit(&self, input: &Value) -> Option<FileEdit> {
+        let text = |key: &str| input[key].as_str().unwrap_or("").to_string();
+        Some(FileEdit { path: self.file(input)?, old: text("old_string"), new: text("new_string") })
     }
 
     fn kind(&self) -> ToolKind {

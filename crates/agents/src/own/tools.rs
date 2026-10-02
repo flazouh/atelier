@@ -13,7 +13,7 @@ mod traits;
 mod types;
 mod write;
 
-pub use helpers::{all, brief, cap, definitions, describe};
+pub use helpers::{all, brief, cap, definitions, describe, edit_of};
 pub(crate) use helpers::{make_parent, object, project_path};
 pub use structs::{ToolContext, ToolResult};
 pub use traits::Tool;
