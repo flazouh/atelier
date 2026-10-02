@@ -3,18 +3,13 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 use cpal::{
     SampleFormat,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use super::helpers::{feed, label};
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use super::types::MAX_SECONDS;
-use super::helpers::{to_16k, wav};
-use super::types::Device;
+use super::helpers::{feed, label, one_row_per_device, to_16k, wav};
+use super::types::{Device, MAX_SECONDS};
 use crate::Error;
 
 /// What the audio thread leaves for the rest: the audio so far, and the energy since the level was last read.
@@ -57,14 +52,12 @@ pub struct Recorder {
 
 /// Where the audio comes from: the microphone, or a file played as if spoken (see [`replay_path`]).
 enum Source {
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     Microphone { _stream: cpal::Stream },
     Replay(Arc<AtomicBool>),
 }
 
 impl Drop for Source {
     fn drop(&mut self) {
-        #[allow(irrefutable_let_patterns, reason = "the microphone is not built on every system")]
         if let Source::Replay(stop) = self {
             stop.store(true, Ordering::Relaxed);
         }
@@ -112,7 +105,6 @@ impl Recorder {
         Ok(Self { _source: Source::Replay(stop), heard, rate })
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     fn microphone(id: Option<&str>) -> Result<Self, Error> {
         let mic = Error::Microphone;
         let host = cpal::default_host();
@@ -133,11 +125,6 @@ impl Recorder {
         .map_err(|why| mic(why.to_string()))?;
         stream.play().map_err(|why| mic(why.to_string()))?;
         Ok(Self { _source: Source::Microphone { _stream: stream }, heard, rate })
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    fn microphone(_: Option<&str>) -> Result<Self, Error> {
-        Err(Error::Microphone("recording is not built for this system yet".into()))
     }
 
     /// The RMS of the audio since this was last asked, 0 when there was none.
@@ -167,18 +154,13 @@ impl Recorder {
 
 /// Wakes the audio system and asks for the default microphone's format, without opening it, so the first press opens it
 /// faster.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn prime() {
     if let Some(device) = cpal::default_host().default_input_device() {
         device.default_input_config().ok();
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub fn prime() {}
-
 /// The microphones the system offers now, the default first.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn devices() -> Vec<Device> {
     use cpal::{DeviceDescription, InterfaceType};
     let host = cpal::default_host();
@@ -203,12 +185,7 @@ pub fn devices() -> Vec<Device> {
             .collect()
         })
         .unwrap_or_default();
+    found = one_row_per_device(found);
     found.sort_by_key(|d| !d.is_default);
     found
 }
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub fn devices() -> Vec<Device> {
-    Vec::new()
-}
-

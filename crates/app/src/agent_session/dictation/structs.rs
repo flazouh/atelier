@@ -52,8 +52,12 @@ pub(super) struct KeyRoute {
     pub(super) composers: Vec<(WeakEntity<PromptInput>, AnyWindowHandle)>,
     pub(super) last: Option<WeakEntity<PromptInput>>,
     pub(super) target: Option<WeakEntity<PromptInput>>,
-    /// Sends `Input::Away` to the key's tracker; none where there is no key.
-    pub(super) away: Option<futures_channel::mpsc::UnboundedSender<(atelier_voice::hotkey::Input, std::time::Instant)>>,
+    /// Sends to the key's tracker.
+    pub(super) inputs: Option<futures_channel::mpsc::UnboundedSender<(atelier_voice::hotkey::Input, std::time::Instant)>>,
+    /// The system's own listener hears the key (macOS); elsewhere the shell's modifier events feed the tracker.
+    pub(super) native: bool,
+    /// Whether the key is down, as the shell's modifier events last said.
+    pub(super) down: bool,
 }
 
 impl Global for KeyRoute {}

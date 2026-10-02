@@ -214,20 +214,20 @@ pub fn hear_key(composer: &Entity<PromptInput>, window: &mut Window, cx: &mut Ap
         let prefs = cx.global::<Speech>().prefs.clone();
         let (tx, mut inputs) = unbounded::<(Input, std::time::Instant)>();
         let heard = tx.clone();
-        if atelier_voice::hotkey::listen(move || prefs.borrow().key, move |input| {
+        // Off macOS this hears nothing, and the shell feeds the tracker instead (see `key_modifiers`).
+        route.native = atelier_voice::hotkey::listen(move || prefs.borrow().key, move |input| {
             heard.unbounded_send((input, std::time::Instant::now())).ok();
-        }) {
-            route.away = Some(tx);
-            App::spawn(cx, async move |cx| {
-                let mut tracker = Tracker::default();
-                while let Some((input, at)) = inputs.next().await {
-                    if let Some(action) = tracker.feed(input, at) {
-                        cx.update(|cx| act(action, cx));
-                    }
+        });
+        route.inputs = Some(tx);
+        App::spawn(cx, async move |cx| {
+            let mut tracker = Tracker::default();
+            while let Some((input, at)) = inputs.next().await {
+                if let Some(action) = tracker.feed(input, at) {
+                    cx.update(|cx| act(action, cx));
                 }
-            })
-            .detach();
-        }
+            }
+        })
+        .detach();
         cx.set_global(route);
     }
     let handle = window.window_handle();
@@ -241,8 +241,43 @@ pub fn hear_key(composer: &Entity<PromptInput>, window: &mut Window, cx: &mut Ap
 
 /// The window lost focus: a press of the key may never see its release.
 pub fn key_away(cx: &mut App) {
-    if let Some(tx) = cx.try_global::<KeyRoute>().and_then(|r| r.away.clone()) {
-        tx.unbounded_send((Input::Away, std::time::Instant::now())).ok();
+    if cx.has_global::<KeyRoute>() {
+        cx.global_mut::<KeyRoute>().down = false;
+    }
+    send_key(Input::Away, cx);
+}
+
+/// The modifiers held changed in a window, for a system with no listener of its own: the chosen key went down or up.
+pub fn key_modifiers(modifiers: &gpui_kit::Modifiers, cx: &mut App) {
+    if cx.try_global::<KeyRoute>().is_none_or(|r| r.native) {
+        return;
+    }
+    let key = prefs(cx).key;
+    let route = cx.global_mut::<KeyRoute>();
+    let (down, input) = key_edge(key, route.down, modifiers);
+    route.down = down;
+    if let Some(input) = input {
+        send_key(input, cx);
+    }
+}
+
+/// Whether `key` is down now that `modifiers` are held, and what that is to the tracker when it changed. Unheld, or no key,
+/// reads as up.
+pub(super) fn key_edge(key: Option<Key>, was_down: bool, modifiers: &gpui_kit::Modifiers) -> (bool, Option<Input>) {
+    let down = key.and_then(|k| k.held(modifiers.alt, modifiers.control)).unwrap_or(false);
+    (down, (down != was_down).then_some(if down { Input::Down } else { Input::Up }))
+}
+
+/// Another key went down, or a click, in a window: a shortcut, not dictation, when the key went down just before.
+pub fn key_other(cx: &mut App) {
+    if cx.try_global::<KeyRoute>().is_some_and(|r| !r.native && r.down) {
+        send_key(Input::Other, cx);
+    }
+}
+
+fn send_key(input: Input, cx: &mut App) {
+    if let Some(tx) = cx.try_global::<KeyRoute>().and_then(|r| r.inputs.clone()) {
+        tx.unbounded_send((input, std::time::Instant::now())).ok();
     }
 }
 
@@ -313,20 +348,21 @@ pub fn choose(cx: &mut App, change: impl FnOnce(&mut Prefs)) {
         .detach();
 }
 
-/// The dictation key the settings file names: Fn when it names none, no key for `off`.
+/// The dictation key the settings file names: this system's default when it names none or a key not heard here, no key for
+/// `off`.
 pub(super) fn key_from(saved: Option<&str>) -> Option<Key> {
     match saved {
         Some("off") => None,
-        Some(name) => Some(name.parse().unwrap_or_default()),
-        None => Some(Key::default()),
+        Some(name) => name.parse().ok().or(Key::DEFAULT),
+        None => Key::DEFAULT,
     }
 }
 
 /// How the settings file names the key: left out for the default.
 pub(super) fn key_name(key: Option<Key>) -> Option<String> {
     match key {
+        _ if key == Key::DEFAULT => None,
         None => Some("off".into()),
-        Some(Key::Fn) => None,
         Some(key) => Some(key.name().into()),
     }
 }

@@ -21,7 +21,7 @@ use atelier_ui::scale::px;
 
 use crate::tool_density::ToolDensity;
 use crate::agent_session::dictation;
-use super::types::{DICTATION_KEYS, Mode, PRIMARIES, Section, SettingsEvent};
+use super::types::{Mode, PRIMARIES, Section, SettingsEvent, dictation_keys};
 use super::helpers::{colour, font_size_words, rule_switch, save};
 
 /// An agent the build can start, as the pane lists it.
@@ -346,17 +346,21 @@ impl Render for SettingsPane {
         let speech = dictation::prefs(cx);
         let dictation_pane = {
             let (key_pane, mic_pane, hold_pane) = (this.clone(), this.clone(), this.clone());
+            let choices = dictation_keys();
             let keys = Segmented::new(
                 "dictation-key",
-                DICTATION_KEYS.into_iter().map(|k| Segment::new(k.map_or("Off", |k| k.words())).debug_name(k.map_or("dictation-key-off", |k| match k {
+                choices.iter().map(|k| Segment::new(k.map_or("Off", |k| k.words())).debug_name(k.map_or("dictation-key-off", |k| match k {
                     atelier_voice::hotkey::Key::Fn => "dictation-key-fn",
                     atelier_voice::hotkey::Key::RightOption => "dictation-key-right-option",
                     atelier_voice::hotkey::Key::LeftOption => "dictation-key-left-option",
+                    atelier_voice::hotkey::Key::Alt => "dictation-key-alt",
+                    atelier_voice::hotkey::Key::Control => "dictation-key-ctrl",
                 }))),
-                DICTATION_KEYS.iter().position(|k| *k == speech.key).unwrap_or(0),
+                choices.iter().position(|k| *k == speech.key).unwrap_or(0),
             )
             .on_change(move |i, _, cx| {
-                key_pane.update(cx, |p, cx| p.choose_dictation(|d| d.key = DICTATION_KEYS[i], cx)).ok();
+                let key = choices[i];
+                key_pane.update(cx, |p, cx| p.choose_dictation(|d| d.key = key, cx)).ok();
             });
             let chosen = speech.device.as_deref().unwrap_or(dictation::DEFAULT_ID);
             let at = self.mics.iter().position(|m| m.id.as_ref() == chosen).unwrap_or(0);
@@ -372,8 +376,9 @@ impl Render for SettingsPane {
                     "Hold it to talk; tap it to keep talking, and tap again to stop. In System Settings, Keyboard, set \"Press 🌐 key to\" to \"Do nothing\", or macOS takes the key for its own dictation."
                 }
                 Some(_) if cfg!(target_os = "macos") => "Hold it to talk; tap it to keep talking, and tap again to stop. A shortcut with the key still works.",
-                Some(_) => "Hold it to talk; tap it to keep talking, and tap again to stop. The key works on macOS for now.",
-                None => "The microphone button still dictates.",
+                Some(_) => "Hold it to talk; tap it to keep talking, and tap again to stop. Either side's key works, and a shortcut with it still does.",
+                None if cfg!(target_os = "macos") => "The microphone button still dictates.",
+                None => "Pick a key to dictate by holding it. The microphone button dictates either way.",
             };
             div()
                 .flex()

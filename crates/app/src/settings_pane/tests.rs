@@ -259,10 +259,12 @@ fn the_dictation_section_sets_the_key_and_hold_at_once(cx: &mut TestAppContext) 
     let (_pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
     click(cx, "section-dictation");
     assert!(cx.debug_bounds("dictation-mic").is_some(), "the microphone is chosen here too");
-    assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), Some(atelier_voice::hotkey::Key::Fn), "Fn by default");
+    use atelier_voice::hotkey::Key;
+    assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), Key::DEFAULT);
 
-    click(cx, "dictation-key-right-option");
-    assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), Some(atelier_voice::hotkey::Key::RightOption));
+    let (button, key) = if cfg!(target_os = "macos") { ("dictation-key-right-option", Key::RightOption) } else { ("dictation-key-alt", Key::Alt) };
+    click(cx, button);
+    assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), Some(key));
     click(cx, "dictation-key-off");
     assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), None);
 

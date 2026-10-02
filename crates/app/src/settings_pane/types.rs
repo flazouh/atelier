@@ -113,10 +113,7 @@ impl Section {
     }
 }
 
-/// The dictation key's choices, as the page offers them: each key, then none.
-pub const DICTATION_KEYS: [Option<atelier_voice::hotkey::Key>; 4] = [
-    Some(atelier_voice::hotkey::Key::Fn),
-    Some(atelier_voice::hotkey::Key::RightOption),
-    Some(atelier_voice::hotkey::Key::LeftOption),
-    None,
-];
+/// The dictation key's choices, as the page offers them: each key this system hears, then none.
+pub fn dictation_keys() -> Vec<Option<atelier_voice::hotkey::Key>> {
+    atelier_voice::hotkey::Key::ALL.iter().copied().map(Some).chain([None]).collect()
+}

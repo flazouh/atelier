@@ -66,7 +66,7 @@ impl Tracker {
 
 /// Hears the key `key` names, asked at every event so a new choice applies at once (`None`: no key), in this app's windows,
 /// and hands each change to `on`, for as long as the app runs. Only on macOS; elsewhere it does nothing and says so with
-/// `false`.
+/// `false`, and the app feeds the [`Tracker`] from its own modifier events through [`Key::held`].
 pub fn listen(key: impl Fn() -> Option<Key> + 'static, on: impl Fn(Input) + 'static) -> bool {
     #[cfg(target_os = "macos")]
     return mac::listen(key, on);
@@ -101,6 +101,7 @@ mod mac {
             Key::Fn => (code == FN_CODE).then_some(flags & FN_FLAG != 0),
             Key::RightOption => Some(flags & RIGHT_OPTION_BIT != 0),
             Key::LeftOption => Some(flags & LEFT_OPTION_BIT != 0),
+            Key::Alt | Key::Control => None,
         }
     }
 

@@ -78,6 +78,34 @@ fn a_device_is_named_with_how_it_connects() {
 }
 
 #[test]
+fn alsa_names_for_one_card_make_one_row_and_the_null_device_none() {
+    let alsa = |id: &str, label: &str| Device { id: format!("alsa:{id}"), label: label.into(), is_default: false };
+    let card = "HDA Intel PCH, ALC897 Analog";
+    let found = vec![
+        alsa("null", "Discard all samples (playback) or generate zero samples (capture)"),
+        alsa("hw:CARD=PCH,DEV=0", card),
+        alsa("plughw:CARD=PCH,DEV=0", card),
+        alsa("pipewire", "PipeWire Sound Server"),
+        alsa("default:CARD=PCH", card),
+        alsa("dsnoop:CARD=PCH,DEV=0", card),
+        alsa("hw:CARD=0,DEV=0", card),
+        alsa("plughw:CARD=Webcam,DEV=0", "USB Webcam"),
+        alsa("hw:CARD=Webcam,DEV=0", "USB Webcam"),
+    ];
+    let ids: Vec<String> = one_row_per_device(found).into_iter().map(|d| d.id).collect();
+    assert_eq!(ids, ["alsa:default:CARD=PCH", "alsa:pipewire", "alsa:plughw:CARD=Webcam,DEV=0"]);
+}
+
+#[test]
+fn a_system_that_names_each_device_once_keeps_them_all() {
+    let found = vec![
+        Device { id: "a".into(), label: "MacBook Pro Microphone (Built-in)".into(), is_default: true },
+        Device { id: "b".into(), label: "BlackHole 2ch (Virtual)".into(), is_default: false },
+    ];
+    assert_eq!(one_row_per_device(found.clone()), found);
+}
+
+#[test]
 fn the_peak_is_the_loudest_sample_either_way_up() {
     assert_eq!(peak(&[0.1, -0.7, 0.3]), 0.7);
     assert_eq!(peak(&[]), 0.);

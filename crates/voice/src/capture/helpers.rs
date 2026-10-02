@@ -1,10 +1,8 @@
 use crate::recognizer::SAMPLE_RATE;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 use cpal::{FromSample, SizedSample};
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::sync::Mutex;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 use super::structs::Heard;
+use super::types::Device;
 
 /// `samples` of `channels` interleaved channels, mixed down to one by averaging.
 pub fn mono(samples: &[f32], channels: usize) -> Vec<f32> {
@@ -49,7 +47,6 @@ pub fn level_from_rms(rms: f32) -> f32 {
     ((db + 55.) / 45.).clamp(0., 1.).powf(0.8)
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub(super) fn feed<T: SizedSample>(data: &[T], channels: usize, heard: &Mutex<Heard>, cap: usize)
 where
     f32: FromSample<T>,
@@ -68,6 +65,27 @@ pub fn label(name: &str, connection: Option<&str>) -> String {
         Some(how) => format!("{name} ({how})"),
         None => name.to_string(),
     }
+}
+
+/// One row for each microphone. ALSA names each card many ways ("hw:", "plughw:", "default:CARD=", "dsnoop:", by name and
+/// by number), all with the card's own label, and offers "null", which hears nothing. The row kept for a card is the name
+/// that converts the format and shares the card with other apps, so a press neither fails on a format nor takes the card.
+pub(super) fn one_row_per_device(found: Vec<Device>) -> Vec<Device> {
+    let rank = |d: &Device| {
+        let pcm = d.id.strip_prefix("alsa:").unwrap_or(&d.id);
+        let kind = pcm.split(':').next().unwrap_or(pcm);
+        let at = ["default", "pipewire", "pulse", "sysdefault", "plughw", "hw"].iter().position(|k| *k == kind);
+        (!d.is_default, at.unwrap_or(usize::MAX))
+    };
+    let mut rows: Vec<Device> = Vec::new();
+    for device in found.into_iter().filter(|d| d.id != "alsa:null") {
+        match rows.iter_mut().find(|row| row.label == device.label) {
+            Some(row) if rank(&device) < rank(row) => *row = device,
+            Some(_) => {}
+            None => rows.push(device),
+        }
+    }
+    rows
 }
 
 /// The loudest sample, 0 to 1.
