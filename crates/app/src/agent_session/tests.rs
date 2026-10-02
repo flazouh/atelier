@@ -1,3 +1,4 @@
+use gpui_kit::AppContext;
 use gpui_kit::TestAppContext;
 use atelier_agents::session::{Choice, ChoiceId, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
 

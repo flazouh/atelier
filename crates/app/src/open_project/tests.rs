@@ -1,3 +1,4 @@
+use gpui_kit::AppContext;
 use std::{
     io,
     path::Path,

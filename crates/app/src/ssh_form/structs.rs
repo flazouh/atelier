@@ -1,0 +1,169 @@
+use atelier_ui::{
+    TextInput,
+    button::{Button, ButtonVariant},
+    spinner::Spinner,
+    theme::ActiveTheme,
+    typography::TextSize,
+};
+use gpui_kit::{
+    AppContext,
+    Context,
+    Entity,
+    EventEmitter,
+    FocusHandle,
+    Focusable,
+    InteractiveElement,
+    IntoElement,
+    ParentElement,
+    Render,
+    Styled,
+    Window,
+    base::input::Escape,
+    component::input::{InputEvent, InputState},
+    div,
+};
+use atelier_ui::scale::px;
+
+use super::types::{HOST_CHIPS, Phase, SshFormEvent};
+
+pub struct SshForm {
+    pub(super) hosts: Vec<String>,
+    pub(super) host: Entity<InputState>,
+    pub phase: Phase,
+    _enter: gpui_kit::Subscription,
+}
+
+impl EventEmitter<SshFormEvent> for SshForm {}
+
+impl Focusable for SshForm {
+    fn focus_handle(&self, cx: &gpui_kit::App) -> FocusHandle {
+        self.host.focus_handle(cx)
+    }
+}
+
+impl SshForm {
+    pub fn new(hosts: Vec<String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let host = cx.new(|cx| InputState::new(window, cx).placeholder("user@host, or a host from ~/.ssh/config"));
+        let enter = |this: &mut Self, _: &Entity<InputState>, event: &InputEvent, _: &mut Window, cx: &mut Context<Self>| {
+            if matches!(event, InputEvent::PressEnter { .. }) {
+                this.connect(cx);
+            }
+        };
+        let _enter = cx.subscribe_in(&host, window, enter);
+        Self { hosts, host, phase: Phase::Idle, _enter }
+    }
+
+    /// The config's hosts, once they have been read off the UI thread.
+    pub fn set_hosts(&mut self, hosts: Vec<String>, _: &mut Window, cx: &mut Context<Self>) {
+        self.hosts = hosts;
+        cx.notify();
+    }
+
+    pub(super) fn connect(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.phase, Phase::Connecting(_)) {
+            return;
+        }
+        let host = self.host.read(cx).value().trim().to_string();
+        if host.is_empty() {
+            self.phase = Phase::Failed("Name a host.".into());
+            cx.notify();
+            return;
+        }
+        self.phase = Phase::Connecting(format!("Reaching {host}…").into());
+        cx.emit(SshFormEvent::Connect { host });
+        cx.notify();
+    }
+}
+
+impl SshForm {
+    /// Which view the dialog shows, for the modal that frames it: the panel morphs to a new height when it changes.
+    pub fn view_key(&self) -> u8 {
+        match self.phase {
+            Phase::Idle => 0,
+            Phase::Connecting(_) => 1,
+            Phase::Failed(_) => 2,
+        }
+    }
+}
+
+impl Render for SshForm {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let field = TextInput::new("ssh-host-field", &self.host).debug_name("ssh-field").label("Host").surface(theme.popover);
+        let this = cx.entity().downgrade();
+        // The config's hosts, as chips under the field: a press puts the name in it. They are filled chips that
+        // change on hover, and the ones that do not fit the first line wrap under the first chip, not under the label.
+        let chips = self.hosts.iter().enumerate().map(|(i, name)| {
+            let (host, name) = (self.host.clone(), name.clone());
+            Button::new(("ssh-host", i))
+                .debug_name(HOST_CHIPS[i.min(HOST_CHIPS.len() - 1)])
+                .label(name.clone())
+                .variant(ButtonVariant::Secondary)
+                .pill(true)
+                .on_click(move |_, window, cx| {
+                    host.update(cx, |h, cx| {
+                        h.set_value(name.clone(), window, cx);
+                        h.focus(window, cx);
+                    })
+                })
+        });
+        let hosts = (!self.hosts.is_empty()).then(|| {
+            div()
+                .flex()
+                .items_start()
+                .gap(px(8.))
+                .child(div().flex_none().h(px(28.)).flex().items_center().text_size(TextSize::Xs.font_size()).text_color(muted).child("From ~/.ssh/config"))
+                .child(div().debug_selector(|| "ssh-hosts".into()).flex().flex_1().min_w_0().flex_wrap().gap(px(8.)).children(chips))
+        });
+        let status = match &self.phase {
+            Phase::Idle => None,
+            Phase::Connecting(step) => Some(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .text_size(TextSize::Xs.font_size())
+                    .text_color(muted)
+                    .child(Spinner::new("ssh-connecting").size(px(12.)).color(muted))
+                    .child(step.clone())
+                    .into_any_element(),
+            ),
+            Phase::Failed(why) => Some(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(why.clone()).into_any_element()),
+        };
+        let connecting = matches!(self.phase, Phase::Connecting(_));
+        let (go, cancel) = (this.clone(), this);
+        div()
+            .id("ssh-form")
+            .key_context("SshForm")
+            .on_action(cx.listener(|_, _: &Escape, _, cx| cx.emit(SshFormEvent::Cancel)))
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .w_full()
+            .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Open over SSH"))
+            .child(field)
+            .children(hosts)
+            .children(status)
+            .child(
+                div()
+                    .flex()
+                    .justify_end()
+                    .gap(px(8.))
+                    .child(Button::new("ssh-cancel").debug_name("ssh-cancel").label("Cancel").variant(ButtonVariant::Ghost).cap("Esc").on_click(move |_, _, cx| {
+                        cancel.update(cx, |_, cx| cx.emit(SshFormEvent::Cancel)).ok();
+                    }))
+                    .child(
+                        Button::new("ssh-connect")
+                            .debug_name("ssh-connect")
+                            .label("Connect")
+                            .variant(ButtonVariant::Primary)
+                            .cap("↵")
+                            .disabled(connecting)
+                            .on_click(move |_, _, cx| {
+                                go.update(cx, |f, cx| f.connect(cx)).ok();
+                            }),
+                    ),
+            )
+    }
+}

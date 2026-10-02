@@ -1,3 +1,4 @@
+use gpui_kit::Focusable;
 use std::sync::Arc;
 
 use atelier_ui::task_model::TaskStatus;
