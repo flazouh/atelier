@@ -3,6 +3,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc,
+        Mutex,
         atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc::{self, RecvTimeoutError},
     },
@@ -18,8 +19,8 @@ use crate::{
     kept,
     recognizer::Recognizer,
 };
-use super::helpers::verdict;
-use super::types::{Command, Event, LEVEL_EVERY, MAX_PRESS, PROGRESS_EVERY, Press};
+use super::helpers::{join, pause_end, verdict};
+use super::types::{Command, Event, LEVEL_EVERY, MAX_PRESS, PARTIAL_EVERY, PROGRESS_EVERY, Press, Reading};
 
 pub struct Engine {
     commands: mpsc::Sender<Command>,
@@ -97,6 +98,13 @@ struct Live {
     tag: String,
     recorder: Recorder,
     since: Instant,
+    /// Where the stretch still going starts, in 16 kHz samples; what came before was cut at pauses and read.
+    cut: usize,
+    /// The words of the stretches before the cut.
+    said: Vec<String>,
+    /// A reading is on its way; the next waits for it.
+    reading: bool,
+    next_reading: Instant,
 }
 
 /// A recording that waits for the model, and its file on disk if it has one.
@@ -120,7 +128,8 @@ struct Worker {
     /// The setup thread reports back through this.
     outbox: mpsc::Sender<Command>,
     emit: Box<dyn Fn(Event) + Send>,
-    recognizer: Option<Recognizer>,
+    /// Shared with the thread that reads a press while it records.
+    recognizer: Option<Arc<Mutex<Recognizer>>>,
     loaded: Arc<AtomicBool>,
     setting_up: bool,
     live: Option<Live>,
@@ -153,6 +162,35 @@ impl Worker {
             return self.stop(press);
         }
         (self.emit)(Event::Level(press, level_from_rms(live.recorder.take_rms())));
+        self.read_live();
+    }
+
+    /// Reads what the live press has said so far, on a thread of its own so the level and a stop never wait for the model.
+    fn read_live(&mut self) {
+        let (Some(live), Some(recognizer)) = (self.live.as_mut(), self.recognizer.clone()) else { return };
+        if live.reading || Instant::now() < live.next_reading {
+            return;
+        }
+        let samples = live.recorder.snapshot();
+        let (press, from) = (live.press, live.cut);
+        if samples.len() <= from {
+            return;
+        }
+        live.reading = true;
+        let tx = self.outbox.clone();
+        thread::Builder::new()
+            .name("atelier-dictation-read".into())
+            .spawn(move || {
+                let mut recognizer = recognizer.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                let mut read = |s: &[f32]| recognizer.transcribe(s).unwrap_or_default();
+                let going = &samples[from..];
+                let reading = match pause_end(going) {
+                    Some(end) => Reading { cut: Some((from + end, read(&going[..end]))), tail: read(&going[end..]) },
+                    None => Reading { cut: None, tail: read(going) },
+                };
+                tx.send(Command::Read { press, from, reading }).ok();
+            })
+            .ok();
     }
 
     fn handle(&mut self, command: Command) {
@@ -171,11 +209,24 @@ impl Worker {
                 (self.emit)(Event::Cancelled(press));
             }
             Command::Progress(event) => (self.emit)(event),
+            Command::Read { press, from, reading } => {
+                let Some(live) = self.live.as_mut().filter(|l| l.press == press && l.cut == from) else { return };
+                live.reading = false;
+                live.next_reading = Instant::now() + PARTIAL_EVERY;
+                if let Some((cut, words)) = reading.cut {
+                    live.cut = cut;
+                    live.said.push(words);
+                }
+                let words = join(&[live.said.as_slice(), &[reading.tail]].concat());
+                if !words.is_empty() {
+                    (self.emit)(Event::Partial(press, words));
+                }
+            }
             Command::Loaded(result) => {
                 self.setting_up = false;
                 match result {
                     Ok(recognizer) => {
-                        self.recognizer = Some(*recognizer);
+                        self.recognizer = Some(Arc::new(Mutex::new(*recognizer)));
                         self.loaded.store(true, Ordering::Relaxed);
                         // The model that came before is of no use once this one has loaded; it was 735 MB.
                         if let Some(old) = files::legacy_dir() {
@@ -199,7 +250,9 @@ impl Worker {
         if self.live.is_some() {
             return (self.emit)(Event::Cancelled(press));
         }
-        match access::status() {
+        // A replay hears a file, not the microphone, so it needs no access.
+        let access = if capture::replay_path().is_some() { Access::Granted } else { access::status() };
+        match access {
             Access::Granted => {}
             // The system's question goes up now and blocks until it is answered, so it is asked off this thread. This press
             // cannot record; the next one can.
@@ -211,7 +264,8 @@ impl Worker {
         }
         match Recorder::start(device) {
             Ok(recorder) => {
-                self.live = Some(Live { press, tag, recorder, since: Instant::now() });
+                let now = Instant::now();
+                self.live = Some(Live { press, tag, recorder, since: now, cut: 0, said: Vec::new(), reading: false, next_reading: now + PARTIAL_EVERY });
                 (self.emit)(Event::Listening(press));
                 self.set_up(true);
             }
@@ -223,7 +277,8 @@ impl Worker {
         let Some(live) = self.live.take_if(|l| l.press == press) else { return };
         let samples = live.recorder.finish();
         if self.recognizer.is_some() {
-            return self.transcribe(press, &samples);
+            // The stretches cut at pauses were read already: only the last one is left.
+            return self.transcribe_from(press, &samples, live.cut, live.said);
         }
         let file = self.kept.as_deref().and_then(|dir| kept::save(dir, &live.tag, &samples).inspect_err(|why| eprintln!("could not keep a recording: {why}")).ok());
         self.waiting.push_back(Waiting { press, samples, file });
@@ -252,9 +307,19 @@ impl Worker {
     }
 
     fn transcribe(&mut self, press: Press, samples: &[f32]) {
-        let Some(recognizer) = self.recognizer.as_mut() else { return };
+        self.transcribe_from(press, samples, 0, Vec::new());
+    }
+
+    /// The words of `samples`: `said` for what comes before `cut`, read already, and the rest read now.
+    fn transcribe_from(&mut self, press: Press, samples: &[f32], cut: usize, mut said: Vec<String>) {
+        let Some(recognizer) = self.recognizer.clone() else { return };
         (self.emit)(Event::Transcribing(press));
-        let event = match recognizer.transcribe(samples).map(|words| verdict(samples, words)) {
+        let tail = recognizer.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).transcribe(&samples[cut.min(samples.len())..]);
+        let words = tail.map(|tail| {
+            said.push(tail);
+            join(&said)
+        });
+        let event = match words.map(|words| verdict(samples, words)) {
             Ok(Ok(words)) => Event::Transcript(press, words),
             Ok(Err(why)) => Event::Failed(press, why.to_string()),
             Err(why) => Event::Failed(press, why.to_string()),

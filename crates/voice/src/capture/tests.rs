@@ -82,3 +82,30 @@ fn the_peak_is_the_loudest_sample_either_way_up() {
     assert_eq!(peak(&[0.1, -0.7, 0.3]), 0.7);
     assert_eq!(peak(&[]), 0.);
 }
+
+fn wav_bytes(rate: u32, channels: u16, samples: &[i16]) -> Vec<u8> {
+    let data: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+    let mut b = b"RIFF".to_vec();
+    b.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
+    b.extend_from_slice(b"WAVEfmt ");
+    b.extend_from_slice(&16u32.to_le_bytes());
+    b.extend_from_slice(&1u16.to_le_bytes());
+    b.extend_from_slice(&channels.to_le_bytes());
+    b.extend_from_slice(&rate.to_le_bytes());
+    b.extend_from_slice(&(rate * channels as u32 * 2).to_le_bytes());
+    b.extend_from_slice(&(channels * 2).to_le_bytes());
+    b.extend_from_slice(&16u16.to_le_bytes());
+    b.extend_from_slice(b"data");
+    b.extend_from_slice(&(data.len() as u32).to_le_bytes());
+    b.extend_from_slice(&data);
+    b
+}
+
+#[test]
+fn a_wav_to_replay_is_read_as_mono_at_its_rate() {
+    let (rate, samples) = super::helpers::wav(&wav_bytes(16_000, 1, &[16384, -16384])).unwrap();
+    assert_eq!((rate, samples), (16_000, vec![0.5, -0.5]));
+    let (rate, samples) = super::helpers::wav(&wav_bytes(48_000, 2, &[16384, 0, -16384, 0])).unwrap();
+    assert_eq!((rate, samples), (48_000, vec![0.25, -0.25]), "two channels mix down");
+    assert!(super::helpers::wav(b"not a wav at all").is_none());
+}

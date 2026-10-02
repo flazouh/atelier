@@ -74,3 +74,31 @@ pub fn label(name: &str, connection: Option<&str>) -> String {
 pub fn peak(samples: &[f32]) -> f32 {
     samples.iter().fold(0., |loudest, s| s.abs().max(loudest))
 }
+
+/// The sample rate and mono samples (-1 to 1) of a 16-bit PCM WAV; `None` for anything else.
+pub(super) fn wav(bytes: &[u8]) -> Option<(u32, Vec<f32>)> {
+    if bytes.get(..4)? != b"RIFF" || bytes.get(8..12)? != b"WAVE" {
+        return None;
+    }
+    let (mut at, mut format) = (12, None);
+    while at + 8 <= bytes.len() {
+        let size = u32::from_le_bytes(bytes[at + 4..at + 8].try_into().ok()?) as usize;
+        let body = bytes.get(at + 8..(at + 8 + size).min(bytes.len()))?;
+        match &bytes[at..at + 4] {
+            b"fmt " => {
+                let channels = u16::from_le_bytes(body.get(2..4)?.try_into().ok()?) as usize;
+                let rate = u32::from_le_bytes(body.get(4..8)?.try_into().ok()?);
+                let bits = u16::from_le_bytes(body.get(14..16)?.try_into().ok()?);
+                format = (bits == 16 && channels > 0).then_some((rate, channels));
+            }
+            b"data" => {
+                let (rate, channels) = format?;
+                let samples: Vec<f32> = body.as_chunks::<2>().0.iter().map(|b| i16::from_le_bytes(*b) as f32 / 32768.).collect();
+                return Some((rate, mono(&samples, channels)));
+            }
+            _ => {}
+        }
+        at += 8 + size + size % 2;
+    }
+    None
+}
