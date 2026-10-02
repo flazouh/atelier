@@ -1,4 +1,4 @@
-//! GitHub as a [`Forge`]: GraphQL where it can, REST where GraphQL lacks the thing (a job's steps and
+//! GitHub as a [`Forge`](crate::Forge): GraphQL where it can, REST where GraphQL lacks the thing (a job's steps and
 //! log, review requests, deleting a branch). Requests go through `gh api` run by the project, so a
 //! remote project uses its host's `gh` and its sign-in. `docs/forge.md` has the mapping and the limits.
 

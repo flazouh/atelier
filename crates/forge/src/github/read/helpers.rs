@@ -67,7 +67,7 @@ pub(super) fn merge_method(name: &str) -> Option<MergeMethod> {
     }
 }
 
-pub(in super::super) fn merge_settings(repo: &Repo) -> MergeSettings {
+pub(super) fn merge_settings(repo: &Repo) -> MergeSettings {
     let allowed = [
         (repo.merge_commit_allowed, MergeMethod::Merge),
         (repo.squash_merge_allowed, MergeMethod::Squash),
@@ -144,7 +144,7 @@ pub(super) fn verdict(state: &str) -> Option<Verdict> {
 }
 
 /// How the counts of check runs and commit statuses split into passed, failed and running.
-pub(in super::super) fn counts(contexts: &Contexts) -> CheckCounts {
+pub(super) fn counts(contexts: &Contexts) -> CheckCounts {
     let mut counts = CheckCounts::default();
     let states = contexts.check_run_counts_by_state.iter().chain(&contexts.status_context_counts_by_state);
     for StateCount { state, count } in states {
