@@ -36,3 +36,21 @@ fn a_failure_keeps_its_kind_across() {
     assert_eq!(back.kind(), io::ErrorKind::NotFound);
     assert_eq!(back.to_string(), "no such file");
 }
+
+/// A pipe that closes inside the four bytes of a length is a cut frame, not a pipe that closed between frames.
+#[test]
+fn a_pipe_that_closes_inside_a_length_is_an_error() {
+    for cut in 1..4 {
+        let bytes = [7u8; 4];
+        let error = read_frame(&mut &bytes[..cut]).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::UnexpectedEof, "{cut} bytes");
+    }
+    assert_eq!(read_frame(&mut &[][..]).unwrap(), None);
+}
+
+/// The writer refuses what the reader refuses, so a big frame fails where it is written.
+#[test]
+fn a_frame_over_the_limit_is_refused_by_the_writer() {
+    assert!(frame_length(MAX_FRAME).is_ok());
+    assert_eq!(frame_length(MAX_FRAME + 1).unwrap_err().kind(), io::ErrorKind::InvalidInput);
+}
