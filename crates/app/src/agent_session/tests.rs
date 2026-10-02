@@ -323,3 +323,33 @@ fn a_run_of_work_is_one_group_that_folds_when_the_turn_ends(cx: &mut TestAppCont
     cx.update(|_, cx| session.update(cx, |s, cx| s.toggle_group(1, cx)));
     assert!(!cx.update(|_, cx| session.read(cx).group_is_open(1, 4)), "and folds it again");
 }
+
+/// With the density at one line per call (or full detail), a run of work is not folded into a group: every item has its own
+/// row. A change of the setting reaches a session that is open, both ways.
+#[gpui_kit::test]
+fn a_density_of_lines_gives_each_call_its_own_row_and_follows_the_setting(cx: &mut TestAppContext) {
+    use crate::tool_density::ToolDensity;
+    let block = atelier_agents::session::BlockId(1);
+    let work = vec![
+        Event::Thinking { block, delta: "hm".into() },
+        Event::ThinkingDone { block, took: std::time::Duration::from_secs(3) },
+        started_tool("a"),
+        finished_tool("a"),
+        started_tool("b"),
+        finished_tool("b"),
+        ended(),
+    ];
+    let (session, _fake, cx) = start(cx, vec![work], false);
+    cx.update(|_, cx| cx.set_global(ToolDensity::Lines));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("go".into(), cx)));
+    cx.run_until_parked();
+    let rows = |cx: &mut gpui_kit::VisualTestContext| cx.update(|_, cx| session.read(cx).shown.clone());
+    let items = (0..4).map(list_diff::Row::Item).collect::<Vec<_>>();
+    assert_eq!(rows(cx), items, "one row each, the user's message first");
+    cx.update(|_, cx| cx.set_global(ToolDensity::Detailed));
+    cx.run_until_parked();
+    assert_eq!(rows(cx), items, "full detail is also one row each");
+    cx.update(|_, cx| cx.set_global(ToolDensity::Grouped));
+    cx.run_until_parked();
+    assert_eq!(rows(cx), [list_diff::Row::Item(0), list_diff::Row::Activity { from: 1, to: 4 }], "grouped again");
+}
