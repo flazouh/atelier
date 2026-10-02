@@ -30,7 +30,7 @@ pub fn lines(stream: impl Read) -> impl Iterator<Item = String> {
     })
 }
 
-/// The last [`STDERR_LINES`] lines of `stderr`, trailing blank lines dropped.
+/// The last `STDERR_LINES` lines of `stderr`, trailing blank lines dropped.
 pub fn stderr_tail(stderr: &str) -> String {
     let lines: Vec<&str> = stderr.trim_end().lines().collect();
     lines[lines.len().saturating_sub(STDERR_LINES)..].join("\n")

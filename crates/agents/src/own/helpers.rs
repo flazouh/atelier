@@ -7,7 +7,7 @@ pub(super) fn choice(id: &str, label: &str) -> ModelChoice {
     ModelChoice { id: id.into(), label: label.into() }
 }
 
-/// The Claude models to offer before the account's own list is known (see [`Anthropic::models`]).
+/// The Claude models to offer before the account's own list is known (see [`Anthropic::models`](crate::own::anthropic::Anthropic::models)).
 pub fn anthropic_models() -> Vec<ModelChoice> {
     vec![choice("claude-opus-5-5", "Opus 5.5"), choice("claude-fable-5-1", "Fable 5.1"), choice("claude-sonnet-5-5", "Sonnet 5.5"), choice("claude-sonnet-5", "Sonnet 5"), choice("claude-haiku-4-5", "Haiku 4.5")]
 }

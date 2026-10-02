@@ -1,5 +1,5 @@
 //! atelier's own agent: an agent loop that runs inside atelier and calls a model API directly. No child
-//! process and no wire format of ours; it is a [`Backend`] like the others, and the UI cannot tell.
+//! process and no wire format of ours; it is a [`Backend`](crate::session::Backend) like the others, and the UI cannot tell.
 //!
 //! - [`Model`] is the one seam to a model API: a streaming chat call with tools. [`Anthropic`] is the
 //!   Messages API; [`OpenAiCompatible`] is Chat Completions, which covers OpenAI, OpenRouter and the many
