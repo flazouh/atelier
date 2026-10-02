@@ -93,6 +93,7 @@ impl AgentSession {
         let listening = self.composer.read(cx).voice_mode() == VoiceMode::Listening;
         match event {
             Event::Level(press, level) if self.dictation.live == Some(press) => self.composer.update(cx, |c, cx| c.set_voice_level(level, cx)),
+            Event::Partial(press, words) if self.dictation.live == Some(press) => self.composer.update(cx, |c, cx| c.set_live_transcript(&words, window, cx)),
             Event::Waiting(press) => {
                 self.dictation.waiting.insert(press);
                 let (phase, total_mb) = setup_now(cx);
@@ -108,12 +109,16 @@ impl AgentSession {
                 self.composer.update(cx, |c, cx| c.insert_transcript(words.trim(), window, cx));
             }
             Event::Failed(press, why) => {
+                self.composer.update(cx, |c, cx| c.end_live_transcript(window, cx));
                 self.press_over(press, true, cx);
                 if !listening {
                     self.dictation_failed(why, cx);
                 }
             }
-            Event::Cancelled(press) => self.press_over(press, listening, cx),
+            Event::Cancelled(press) => {
+                self.composer.update(cx, |c, cx| c.end_live_transcript(window, cx));
+                self.press_over(press, listening, cx);
+            }
             _ => {}
         }
     }

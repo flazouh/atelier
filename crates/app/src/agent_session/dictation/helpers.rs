@@ -157,6 +157,7 @@ pub(super) fn press_of(event: &Event) -> Option<Press> {
     match event {
         Event::Listening(p)
         | Event::Level(p, _)
+        | Event::Partial(p, _)
         | Event::Waiting(p)
         | Event::Transcribing(p)
         | Event::Transcript(p, _)

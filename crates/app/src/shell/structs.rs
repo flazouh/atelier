@@ -409,6 +409,12 @@ impl Shell {
                     self.show_tasks(window, cx);
                 }
             }
+            SidebarEvent::Worktrees { project } => {
+                if let Some(at) = self.project_by_id(project, cx) {
+                    self.active = at;
+                    self.show_git(window, cx);
+                }
+            }
             SidebarEvent::PullRequests { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
                     self.active = at;
