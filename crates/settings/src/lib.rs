@@ -7,171 +7,17 @@
 //! A change loads the file, changes it and writes it back ([`update`]), and keys this version does not
 //! know are kept, so the gallery setting the theme never drops the app's recent projects.
 
-use std::{
-    io,
-    path::{Path, PathBuf},
-};
+mod helpers;
+mod structs;
+mod types;
 
-use serde::{Deserialize, Serialize};
+pub use helpers::{load, path, update};
+pub use structs::{OpenSession, Panels, Settings, SidebarSaved};
+pub use types::{Location, RECENT_LIMIT};
 
-/// How many recent projects the list keeps.
-pub const RECENT_LIMIT: usize = 10;
 
-/// What the Settings page keeps of the sidebar's layout (the mode is `Settings::sidebar`; the filter is not kept).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct SidebarSaved {
-    /// "auto", "always" or "never".
-    pub project_badge: Option<String>,
-    pub show_time: Option<bool>,
-    pub show_agent_icon: Option<bool>,
-    pub fold_after: Option<u8>,
-    pub earlier_shown: Option<u8>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Settings {
-    /// The theme's name, as the picker lists it.
-    pub theme: Option<String>,
-    /// Light, dark, or the system's: `"light"`, `"dark"` or `"system"`. `None`: the theme as it stands.
-    pub mode: Option<String>,
-    /// The primary colour the reader picked, as red, green and blue bytes. `None`: the theme's own, its ink.
-    pub primary: Option<[u8; 3]>,
-    /// Newest first.
-    pub recent: Vec<Location>,
-    /// design preview: remove after Alex picks. The design in force for the editor tabs (0 to 3).
-    pub design_tabs: Option<u8>,
-    /// design preview: remove after Alex picks. The elevation of floating panels (0 to 3).
-    pub design_elevation: Option<u8>,
-    /// design preview: remove after Alex picks. How strong the elevation is, 0 to 100.
-    pub design_strength: Option<u8>,
-    /// The badge colour (an index into the palette) the reader gave a project, by its place. A project with none has
-    /// the one its place gives it.
-    pub project_colors: std::collections::BTreeMap<String, u8>,
-    /// The image file kept for a project's badge, by its place.
-    pub project_icons: std::collections::BTreeMap<String, String>,
-    /// The ids of the task rules the reader turned off (`atelier_tracker::Rule::id`).
-    pub task_rules_off: Vec<String>,
-    /// Names the reader gave sessions, by the agent's id for the session.
-    pub session_names: std::collections::BTreeMap<String, String>,
-    /// The sessions the reader archived, by the agent's id for each. An archived session leaves the list until the
-    /// filter asks for it.
-    pub archived_sessions: Vec<String>,
-    /// How the agent panels were laid out last.
-    pub panels: Panels,
-    /// The sessions open at quit, in their panels' order, for the next launch to open again.
-    pub open: Vec<OpenSession>,
-    /// The session in front at quit, by the agent's id.
-    pub front: Option<String>,
-    /// The window's view at quit: "sessions" or "files".
-    pub view: Option<String>,
-    /// How the sidebar lists sessions: "projects" or "priority".
-    pub sidebar: Option<String>,
-    /// How far the interface is zoomed (1 is as designed), set by ⌘+, ⌘− and ⌘0.
-    pub ui_zoom: Option<f32>,
-    /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
-    pub sidebar_layout: SidebarSaved,
-    /// Keys a newer or older atelier wrote, kept as they are.
-    #[serde(flatten)]
-    pub other: serde_json::Map<String, serde_json::Value>,
-}
-
-/// The agent panels' layout, as the window left it.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Panels {
-    /// One panel with tabs, rather than side by side.
-    pub single: bool,
-    /// Grouped by project.
-    pub grouped: bool,
-    /// Each panel's width, by its session.
-    pub widths: Vec<(String, f32)>,
-}
-
-/// A session open at quit: its project, the agent's id for it, its title as the panel showed it, and the
-/// backend of the agent that runs it (`None` in a file from before, for the default agent).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct OpenSession {
-    pub location: Location,
-    pub id: String,
-    pub title: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent: Option<String>,
-}
-
-/// Where a project lives.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
-pub enum Location {
-    Local { path: PathBuf },
-    /// A folder on an SSH host, as `ssh` names the host (an alias from ~/.ssh/config works).
-    Ssh { host: String, path: PathBuf },
-}
-
-impl Location {
-    /// The folder's own name, for a list.
-    pub fn name(&self) -> String {
-        let path = match self {
-            Location::Local { path } | Location::Ssh { path, .. } => path,
-        };
-        path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path.display().to_string())
-    }
-
-    /// Where it is, under the name: the folder's path, and the host for a remote one.
-    pub fn place(&self) -> String {
-        match self {
-            Location::Local { path } => tilde(path),
-            Location::Ssh { host, path } => format!("{host}:{}", path.display()),
-        }
-    }
-}
-
-/// `path` with the home folder as `~`.
-fn tilde(path: &Path) -> String {
-    match dirs::home_dir().and_then(|home| path.strip_prefix(home).ok().map(Path::to_path_buf)) {
-        Some(rest) if rest.as_os_str().is_empty() => "~".into(),
-        Some(rest) => format!("~/{}", rest.display()),
-        None => path.display().to_string(),
-    }
-}
-
-impl Settings {
-    /// Puts `location` first in the recent list, once, keeping at most [`RECENT_LIMIT`].
-    pub fn opened(&mut self, location: Location) {
-        self.recent.retain(|l| *l != location);
-        self.recent.insert(0, location);
-        self.recent.truncate(RECENT_LIMIT);
-    }
-}
-
-/// Where the settings live: `ATELIER_SETTINGS` when set, for tests and scripts, else the data folder.
-pub fn path() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("ATELIER_SETTINGS") {
-        return Some(PathBuf::from(path));
-    }
-    Some(dirs::data_dir()?.join("atelier").join("settings.json"))
-}
-
-/// The settings at `path`; the defaults when the file is missing or unreadable.
-pub fn load(path: &Path) -> Settings {
-    std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
-}
-
-/// Loads the settings at `path`, applies `change`, and writes them back whole. Call it off the UI
-/// thread.
-pub fn update(path: &Path, change: impl FnOnce(&mut Settings)) -> io::Result<Settings> {
-    let mut settings = load(path);
-    change(&mut settings);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let text = serde_json::to_string_pretty(&settings).map_err(io::Error::other)?;
-    let temporary = path.with_extension("json.saving");
-    std::fs::write(&temporary, text)?;
-    std::fs::rename(&temporary, path)?;
-    Ok(settings)
-}
+#[cfg(test)]
+use std::path::PathBuf;
 
 #[cfg(test)]
 mod tests;

@@ -36,6 +36,20 @@ errors, the gallery build, and the tests of the patched copies in `vendor`.
   value. The sidebar's is `SidebarLayout`: the sidebar reads its rows and head from it, the Settings page edits
   it, and `crates/app/src/sidebar_layout.rs` alone maps it to the settings file. A new option is a new field of
   that value, never a constant or a flag elsewhere.
-- One file per concept. No inline `mod tests { ... }`: put tests in `<module>/tests.rs` with
-  `#[cfg(test)] mod tests;`.
+- Split a module by kind of item, one file per kind. A module with items of more than one kind becomes a
+  folder of kind files: `<module>.rs` next to a `<module>/` folder (`lib.rs` at a crate root; a module that
+  already has a `mod.rs` keeps it). The root file holds only its docs, its `mod` lines and its `pub use` lines,
+  and the `#[cfg(test)] use` lines its `tests.rs` needs. Each kind has one file:
+  - `structs.rs`: structs, with their `impl` blocks.
+  - `types.rs`: enums and type aliases, with their `impl` blocks, and constants.
+  - `traits.rs`: traits (the interfaces), and their blanket `impl` blocks.
+  - `impls.rs`: `impl` blocks for a type that is not the module's own: a type of another crate or of another
+    module, such as `impl From<Own> for io::Error`.
+  - `helpers.rs`: free functions.
+  - `tests.rs`, or `tests/<topic>.rs` when it grows: tests only.
+  An `impl Trait for Type` stays with `Type` when the module defines `Type`. Create a file only when it has
+  something in it. A module with one kind needs no split. The paths other code uses do not change: the root
+  re-exports with `pub use`.
+- One concept for each module: a kind file may hold several types of that one concept. No inline
+  `mod tests { ... }`: put tests in `<module>/tests.rs` with `#[cfg(test)] mod tests;`.
 - A bug fix comes with a test that fails without it.
