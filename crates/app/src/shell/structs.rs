@@ -412,7 +412,8 @@ impl Shell {
             SidebarEvent::Worktrees { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
                     self.active = at;
-                    self.show_git(window, cx);
+                    self.projects[at].update(cx, |p, cx| p.read_worktrees(cx));
+                    self.show_view(ShellView::Git, window, cx);
                 }
             }
             SidebarEvent::PullRequests { project } => {

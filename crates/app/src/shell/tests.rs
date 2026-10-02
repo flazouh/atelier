@@ -802,3 +802,46 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
     assert!(shell.read_with(cx, |s, _| s.sidebar), "another view comes with the sidebar");
     assert!(cx.debug_bounds("panel-close").is_some(), "the panels are back");
 }
+
+/// The project menu's Worktrees opens the Git view, which lists the main checkout and each worktree.
+#[gpui_kit::test]
+fn the_project_menu_opens_the_worktrees_in_the_git_view(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let main = dir.path().join("main");
+    std::fs::create_dir(&main).unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&main)
+            .args(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q", "-b", "main"]);
+    std::fs::write(main.join("a.txt"), "a").unwrap();
+    git(&["add", "."]);
+    git(&["commit", "-qm", "first"]);
+    let fix = dir.path().join("fix");
+    git(&["worktree", "add", "-q", "-b", "fix", fix.to_str().unwrap()]);
+    std::fs::write(fix.join("b.txt"), "b").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    shell.update_in(cx, |s, window, cx| s.open_local(main.clone(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| {
+        let project = crate::agents_view::project_id(s.active().unwrap().read(cx));
+        let sidebar = s.agents_sidebar.clone();
+        s.sidebar_event(&sidebar, &atelier_ui::sidebar::SidebarEvent::Worktrees { project }, window, cx);
+    });
+    settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
+    assert!(cx.debug_bounds("worktrees").is_some(), "the Git view lists the worktrees");
+    let rows = shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).worktree_rows());
+    let seen: Vec<(Option<&str>, bool)> = rows.iter().map(|r| (r.branch.as_deref(), r.main)).collect();
+    assert_eq!(seen, [(Some("main"), true), (Some("fix"), false)]);
+    assert!(rows[1].notes.iter().any(|n| n.words == "1 uncommitted"), "{:?}", rows[1].notes);
+    let main_row = std::fs::canonicalize(&main).unwrap().to_string_lossy().into_owned();
+    assert!(cx.debug_bounds(format!("worktree-{main_row}").leak()).is_some());
+}

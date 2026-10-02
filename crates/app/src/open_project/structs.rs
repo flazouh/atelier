@@ -67,6 +67,8 @@ pub struct OpenProject {
     pub listed_in: Option<Duration>,
     pub open_folders: HashSet<String>,
     pub git: Git,
+    /// The repository's worktrees, the main checkout first; none until read, or when it is no repository.
+    pub worktrees: Vec<atelier_project::Worktree>,
     /// Whether the project's host can be reached; always up for a folder on this machine.
     pub link: Link,
     pub tabs: Tabs,
@@ -136,6 +138,7 @@ impl OpenProject {
             listed_in: None,
             open_folders: HashSet::new(),
             git: Git::Unknown,
+            worktrees: Vec::new(),
             link: Link::Up,
             tabs: Tabs::default(),
             buffers: HashMap::new(),
@@ -337,6 +340,7 @@ impl OpenProject {
 
     fn read_git(&mut self, cx: &mut Context<Self>) {
         self.read_dirty(cx);
+        self.read_worktrees(cx);
         let project = self.project.clone();
         let remote = cx.background_spawn(async move { project.git(&["remote", "get-url", "origin"]) });
         cx.spawn(async move |this, cx| {
@@ -362,6 +366,30 @@ impl OpenProject {
                 cx.notify();
             });
         }).detach();
+    }
+
+    /// The worktrees as the Git view lists them. Every session works in the project's own folder for now.
+    pub fn worktree_rows(&self) -> Vec<atelier_ui::worktree_list::WorktreeRow> {
+        let home = if self.project.host().is_none() { std::env::var_os("HOME").map(std::path::PathBuf::from) } else { None };
+        let root = self.project.root().to_path_buf();
+        let open = self.sessions.len();
+        crate::worktrees::rows(&self.worktrees, home.as_deref(), |path| if path == root { open } else { 0 })
+    }
+
+    /// Reads the repository's worktrees and what each one holds, off the UI thread.
+    pub fn read_worktrees(&mut self, cx: &mut Context<Self>) {
+        let project = self.project.clone();
+        let asked = cx.background_spawn(async move { atelier_project::worktrees(project.as_ref()) });
+        cx.spawn(async move |this, cx| {
+            let trees = asked.await.unwrap_or_default();
+            _ = this.update(cx, |this, cx| {
+                if this.worktrees != trees {
+                    this.worktrees = trees;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     /// Counts the files that differ from the last commit, off the UI thread. A burst of changes asks
