@@ -26,7 +26,6 @@ mod pr_view_story;
 mod motion_story;
 mod tasks_story;
 mod streaming_story;
-mod voice_sound;
 mod voice_story;
 mod variants_story;
 mod replay_story;

@@ -1,5 +1,7 @@
-//! SPIKE: a sound cue that starts the moment it is asked to. On macOS it is an `NSSound` made from the clip's bytes
+//! SPIKE: dictation sound cues. A sound cue that starts the moment it is asked to. On macOS it is an `NSSound` made from the clip's bytes
 //! up front, so `play` only starts a sound that is already decoded. Elsewhere it is silent.
+
+pub mod demo;
 
 #[cfg(target_os = "macos")]
 mod mac {
@@ -39,5 +41,5 @@ impl Cue {
 }
 
 /// The tutor's dictation cues from fluentai: a 0.18 s start and a 0.22 s stop.
-pub const START: &[u8] = include_bytes!("../assets/voice/dictation-start.wav");
-pub const STOP: &[u8] = include_bytes!("../assets/voice/dictation-stop.wav");
+pub const START: &[u8] = include_bytes!("../assets/dictation-start.wav");
+pub const STOP: &[u8] = include_bytes!("../assets/dictation-stop.wav");

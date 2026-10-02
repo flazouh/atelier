@@ -12,6 +12,7 @@
 //! turn's end `finish`es it there too. The panel shows the turn's changed files after its last row.
 
 mod composer_lists;
+mod dictation;
 
 use std::{sync::Arc, time::SystemTime};
 
@@ -152,6 +153,8 @@ pub struct AgentSession {
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
+    /// SPIKE: the made-up dictation, when `ATELIER_DICTATION_SPIKE` is set.
+    dictation: dictation::Dictation,
     /// The project's badge, as the sidebar draws it.
     pub badge: Option<atelier_ui::sidebar_model::Badge>,
     /// The activity groups the reader opened, by the index of their first item.
@@ -223,8 +226,14 @@ impl AgentSession {
             })
             .collect();
         let modes: Vec<SharedString> = agent.backend.capabilities().permission_modes.into_iter().map(|m| mode_word(m).into()).collect();
-        let composer = cx.new(|cx| PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes));
-        let _composer = cx.subscribe(&composer, |this, _, event: &PromptInputEvent, cx| match event {
+        let composer = cx.new(|cx| {
+            let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
+            if dictation::enabled() {
+                input.set_dictation(true, cx);
+            }
+            input
+        });
+        let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
             PromptInputEvent::Submit(text) => this.send(text.to_string(), cx),
             PromptInputEvent::Stop => this.interrupt(cx),
             PromptInputEvent::ModelChanged(model) => this.set_model(model.to_string(), cx),
@@ -233,8 +242,9 @@ impl AgentSession {
                     this.set_mode(mode, cx)
                 }
             }
-            // Dictation is not switched on for this composer yet.
-            PromptInputEvent::Action(_) | PromptInputEvent::DictationStart | PromptInputEvent::DictationStop => {}
+            PromptInputEvent::DictationStart => this.dictation_start(cx),
+            PromptInputEvent::DictationStop => this.dictation_stop(window, cx),
+            PromptInputEvent::Action(_) => {}
             PromptInputEvent::Command { name, args } => this.run_command(name, args, cx),
         });
         let (id, title) = match &resume {
@@ -281,6 +291,7 @@ impl AgentSession {
             _pull_card: None,
             _saving: Task::ready(()),
             composer,
+            dictation: dictation::Dictation::new(),
             badge: None,
             opened_groups: std::collections::HashSet::new(),
             project_commands: Vec::new(),

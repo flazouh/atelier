@@ -15,12 +15,11 @@ use atelier_ui::{
 };
 use gpui_kit::{AppContext, Context, Entity, IntoElement, ParentElement, Render, Styled, Task, Window, div, px};
 
-use crate::voice_sound::{Cue, START, STOP};
+use atelier_voice::{
+    Cue, START, STOP,
+    demo::{DOWNLOAD, PREPARE, READY, TRANSCRIPT, download_at, level},
+};
 
-/// How long the made-up download, load and ready beat take.
-const DOWNLOAD: f32 = 4.4;
-const PREPARE: f32 = 1.8;
-const READY: f32 = 0.7;
 const FRAME: Duration = Duration::from_millis(33);
 
 /// Which face the made-up session drives.
@@ -29,9 +28,6 @@ enum Face {
     Bar,
     Composer,
 }
-
-/// What the made-up voice "said", for the composer.
-const TRANSCRIPT: &str = "Make the tool cards share one header, and keep the read and search rows flat.";
 
 pub struct VoiceStory {
     voice: Entity<VoiceInput>,
@@ -45,18 +41,6 @@ pub struct VoiceStory {
     setup: Option<Task<()>>,
     _ticker: Task<()>,
     _events: [gpui_kit::Subscription; 2],
-}
-
-/// The made-up download: quick, a stall at about 60%, quick again. `t` is 0 to 1 through it.
-fn download_at(t: f32) -> f32 {
-    let t = t.clamp(0., 1.);
-    if t < 0.55 {
-        (t / 0.55).powf(0.9) * 0.6
-    } else if t < 0.72 {
-        0.6 + (t - 0.55) * 0.05
-    } else {
-        0.6085 + (t - 0.72) / 0.28 * (1. - 0.6085)
-    }
 }
 
 impl VoiceStory {
@@ -204,13 +188,8 @@ impl VoiceStory {
         }
     }
 
-    /// A made-up voice: words of a few syllables with a breath between them.
     fn level(&self) -> f32 {
-        let t = self.since.elapsed().as_secs_f32();
-        let speaking = ((t * 1.15).sin() + 0.35 * (t * 0.37).sin()) > -0.25;
-        let syllables = (t * 5.3).sin().abs() * (0.6 + 0.4 * (t * 1.7 + 1.).sin());
-        let grit = 0.06 * (t * 31.).sin().abs();
-        if speaking { (0.22 + 0.7 * syllables + grit).min(1.) } else { 0.04 }
+        level(self.since.elapsed().as_secs_f32())
     }
 }
 
