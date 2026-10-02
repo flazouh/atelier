@@ -12,11 +12,24 @@ use super::types::Presses;
 
 /// What the person chose for dictation, kept in the settings file between runs.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(super) struct Prefs {
+pub struct Prefs {
     /// The microphone, by `atelier_voice::Device::id`; none: the system's default.
-    pub(super) device: Option<String>,
+    pub device: Option<String>,
     /// The microphone button records only while it is held down.
-    pub(super) hold: bool,
+    pub hold: bool,
+    /// The key that dictates; none: no key.
+    pub key: Option<atelier_voice::hotkey::Key>,
+}
+
+/// Words kept on disk by an earlier run, on their way back to a session.
+#[derive(Default)]
+pub(super) struct Recovery {
+    /// Presses the engine took up from disk, and the key of the session each was spoken in.
+    pub(super) orphans: std::collections::HashMap<Press, String>,
+    /// Their words, and that key, until a session is open to take them.
+    pub(super) unclaimed: Vec<(String, String)>,
+    /// The sessions open now, by key.
+    pub(super) sessions: Vec<(gpui_kit::SharedString, WeakEntity<super::super::AgentSession>, AnyWindowHandle)>,
 }
 
 /// The app's one engine, the presses it is serving, where the model's setup is, and the person's choices.
@@ -27,6 +40,7 @@ pub(super) struct Speech {
     pub(super) phase: Rc<Cell<Option<SetupPhase>>>,
     pub(super) total_mb: Rc<Cell<f32>>,
     pub(super) prefs: Rc<RefCell<Prefs>>,
+    pub(super) recovery: Rc<RefCell<Recovery>>,
 }
 
 impl Global for Speech {}

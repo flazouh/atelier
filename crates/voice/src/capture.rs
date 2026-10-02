@@ -11,7 +11,7 @@ mod structs;
 mod types;
 
 pub use helpers::{label, level_from_rms, mono, peak, to_16k};
-pub use structs::{Recorder, devices};
+pub use structs::{Recorder, devices, prime};
 pub use types::{Device, MAX_SECONDS};
 
 #[cfg(test)]

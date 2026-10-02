@@ -15,7 +15,7 @@ fn main() {
         eprintln!("{} {} [{}]", if device.is_default { "*" } else { " " }, device.label, device.id);
     }
     let pressed = std::time::Instant::now();
-    let press = engine.start(std::env::args().nth(2));
+    let press = engine.start(std::env::args().nth(2), "dictate");
     let mut peak = 0f32;
     let mut last_percent = u64::MAX;
     loop {

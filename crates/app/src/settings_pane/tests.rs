@@ -253,3 +253,19 @@ fn the_interface_font_size_is_the_zoom_and_says_so_once(cx: &mut TestAppContext)
     assert_eq!(heard.borrow().as_slice(), &[1.3]);
     assert_eq!(pane.read_with(cx, |p, _| p.zoom_preview), None, "the release applies it and the preview is gone");
 }
+
+#[gpui_kit::test]
+fn the_dictation_section_sets_the_key_and_hold_at_once(cx: &mut TestAppContext) {
+    let (_pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
+    click(cx, "section-dictation");
+    assert!(cx.debug_bounds("dictation-mic").is_some(), "the microphone is chosen here too");
+    assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), Some(atelier_voice::hotkey::Key::Fn), "Fn by default");
+
+    click(cx, "dictation-key-right-option");
+    assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), Some(atelier_voice::hotkey::Key::RightOption));
+    click(cx, "dictation-key-off");
+    assert_eq!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).key), None);
+
+    click(cx, "dictation-hold");
+    assert!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).hold));
+}

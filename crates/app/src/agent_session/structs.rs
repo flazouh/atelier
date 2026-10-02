@@ -238,6 +238,7 @@ impl AgentSession {
             PromptInputEvent::DictationStart => this.dictation_start(window, cx),
             PromptInputEvent::DictationStop => this.dictation_stop(cx),
             PromptInputEvent::DictationCancel => this.dictation_cancel(cx),
+            PromptInputEvent::DictationDiscard => this.dictation_discard(cx),
             PromptInputEvent::DictationDevices => this.dictation_devices(cx),
             PromptInputEvent::DictationDevice(id) => this.dictation_device(id.clone(), cx),
             PromptInputEvent::DictationHold(hold) => this.dictation_hold(*hold, cx),
@@ -246,6 +247,7 @@ impl AgentSession {
         });
         super::dictation::warm(cx);
         let _key = super::dictation::hear_key(&composer, window, cx);
+        super::dictation::take_recovered(key.clone(), cx.weak_entity(), window.window_handle(), cx);
         let _away = cx.observe_window_activation(window, |_, window, cx| {
             if !window.is_window_active() {
                 super::dictation::key_away(cx);

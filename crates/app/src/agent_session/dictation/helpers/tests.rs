@@ -32,3 +32,22 @@ fn with_no_microphone_there_is_still_a_default_row() {
     assert_eq!(rows.len(), 1);
     assert_eq!((rows[0].label.as_ref(), selected.as_str()), ("Default", DEFAULT_ID));
 }
+
+#[test]
+fn the_settings_file_names_the_key_and_leaves_the_default_out() {
+    use atelier_voice::hotkey::Key;
+    assert_eq!(key_from(None), Some(Key::Fn));
+    assert_eq!(key_from(Some("off")), None);
+    assert_eq!(key_from(Some("caps-lock")), Some(Key::Fn), "a name this build does not know is the default");
+    for key in [None, Some(Key::Fn), Some(Key::RightOption), Some(Key::LeftOption)] {
+        assert_eq!(key_from(key_name(key).as_deref()), key);
+    }
+    assert_eq!(key_name(Some(Key::Fn)), None);
+}
+
+#[test]
+fn recovered_words_go_back_to_their_session_or_else_the_first() {
+    assert_eq!(recovered_home(&["a", "b"], "b"), Some(1));
+    assert_eq!(recovered_home(&["a", "b"], "gone"), Some(0));
+    assert_eq!(recovered_home(&[], "b"), None);
+}

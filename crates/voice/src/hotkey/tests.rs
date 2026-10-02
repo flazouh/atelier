@@ -79,4 +79,7 @@ fn the_keys_are_named_as_the_settings_file_names_them() {
     assert_eq!("left-option".parse(), Ok(Key::LeftOption));
     assert_eq!("caps-lock".parse::<Key>(), Err(()));
     assert_eq!(Key::default(), Key::Fn);
+    for key in Key::ALL {
+        assert_eq!(key.name().parse(), Ok(key));
+    }
 }

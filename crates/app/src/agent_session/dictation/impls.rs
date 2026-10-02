@@ -21,7 +21,7 @@ impl AgentSession {
             }
         }
         let (engine, presses) = speech(cx);
-        let press = engine.start(prefs(cx).device);
+        let press = engine.start(prefs(cx).device, self.key.to_string());
         presses.borrow_mut().insert(press, (cx.weak_entity(), window.window_handle()));
         self.dictation.live = Some(press);
     }
@@ -37,6 +37,14 @@ impl AgentSession {
     pub(in super::super) fn dictation_cancel(&mut self, cx: &mut Context<Self>) {
         let Some(press) = self.dictation.live.take() else { return };
         speech(cx).0.cancel(press);
+    }
+
+    /// The person threw away the words waiting for the model.
+    pub(in super::super) fn dictation_discard(&mut self, cx: &mut Context<Self>) {
+        let engine = speech(cx).0;
+        for press in self.dictation.waiting.drain() {
+            engine.cancel(press);
+        }
     }
 
     /// The microphone menu is about to show: bring its rows and its choices up to date, and start fetching the model, since

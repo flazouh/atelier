@@ -31,8 +31,11 @@ pub enum Event {
     Listening(Press),
     /// How loud it is now, 0 to 1.
     Level(Press, f32),
-    /// The press ended before the model was ready; its recording waits for it.
+    /// The press ended before the model was ready; its recording waits for it, kept on disk until its words are out.
     Waiting(Press),
+    /// A recording kept from an earlier run, for the press `tag` named (see [`Engine::start`](super::Engine::start)). It waits
+    /// for the model like any other, under this new press.
+    Recovered(Press, String),
     /// The recording is being turned into words.
     Transcribing(Press),
     /// The words. Never empty: a press with no words ends in [`Event::Failed`] with the reason.
@@ -48,8 +51,8 @@ pub(super) enum Command {
     Warm,
     /// Fetch the model if it is missing, then load it.
     Fetch,
-    /// Listen on this microphone, or the system's default.
-    Start(Press, Option<String>),
+    /// Listen on this microphone, or the system's default; the tag says whose the press is.
+    Start(Press, Option<String>, String),
     Stop(Press),
     Cancel(Press),
     /// From the setup thread: an event to pass on.

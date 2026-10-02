@@ -12,7 +12,7 @@
 //! turn's end `finish`es it there too. The panel shows the turn's changed files after its last row.
 
 mod composer_lists;
-mod dictation;
+pub(crate) mod dictation;
 mod helpers;
 mod structs;
 mod types;
