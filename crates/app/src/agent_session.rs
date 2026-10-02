@@ -153,7 +153,7 @@ pub struct AgentSession {
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
-    /// SPIKE: the made-up dictation, when `ATELIER_DICTATION_SPIKE` is set.
+    /// Dictation: the cues, and the clearing of a failed press's words.
     dictation: dictation::Dictation,
     /// The project's badge, as the sidebar draws it.
     pub badge: Option<atelier_ui::sidebar_model::Badge>,
@@ -228,9 +228,7 @@ impl AgentSession {
         let modes: Vec<SharedString> = agent.backend.capabilities().permission_modes.into_iter().map(|m| mode_word(m).into()).collect();
         let composer = cx.new(|cx| {
             let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
-            if dictation::enabled() {
-                input.set_dictation(true, cx);
-            }
+            input.set_dictation(true, cx);
             input
         });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
@@ -242,11 +240,12 @@ impl AgentSession {
                     this.set_mode(mode, cx)
                 }
             }
-            PromptInputEvent::DictationStart => this.dictation_start(cx),
-            PromptInputEvent::DictationStop => this.dictation_stop(window, cx),
+            PromptInputEvent::DictationStart => this.dictation_start(window, cx),
+            PromptInputEvent::DictationStop => this.dictation_stop(cx),
             PromptInputEvent::Action(_) => {}
             PromptInputEvent::Command { name, args } => this.run_command(name, args, cx),
         });
+        dictation::warm(cx);
         let (id, title) = match &resume {
             Some((id, title)) => (Some(id.clone()), title.clone()),
             None => (None, "New session".into()),

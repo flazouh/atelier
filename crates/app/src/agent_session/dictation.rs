@@ -1,38 +1,81 @@
-//! SPIKE: dictation in the session composer, run against a made-up model and a made-up voice (`atelier_voice::demo`), so the look
-//! can be judged in the real app before the real speech model is wired in. It is off unless `ATELIER_DICTATION_SPIKE` is set.
+//! Dictation in the session composer: the microphone, the speech model on this machine (`atelier_voice`), and what the box shows
+//! meanwhile.
 //!
-//! The first press finds no model, so the composer shows the setup and "downloads" it, then listens. Later presses listen at
-//! once. Stop writes a made-up transcript into the box. The sound cue plays with the press, or when listening begins after the
-//! setup, as fluentai's timing contract asks.
-use std::time::{Duration, Instant};
+//! One [`Engine`] serves the whole app, because the model takes about a gigabyte of memory. It lives in a global; the session whose
+//! microphone was pressed is its owner until the press ends, and the engine's events go to that session.
+//!
+//! The first press fetches the model, so the composer shows the setup with real progress, then it listens. Later presses listen
+//! at once. The sound cue plays when the microphone opens, as fluentai's timing contract asks, and when stop is pressed. A press
+//! that ends without words says why for a few seconds and then clears.
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use atelier_ui::SetupPhase;
-use atelier_voice::{
-    Cue, START, STOP,
-    demo::{DOWNLOAD, PREPARE, READY, TRANSCRIPT, download_at, level},
-};
-use gpui_kit::{Context, Task, Window};
+use atelier_ui::{SetupPhase, VoiceMode};
+use atelier_voice::{Cue, Engine, Event, START, STOP, files};
+use futures_channel::mpsc::unbounded;
+use futures_util::StreamExt;
+use gpui_kit::{AnyWindowHandle, App, Context, Global, Task, WeakEntity, Window};
 
 use super::AgentSession;
 
-const FRAME: Duration = Duration::from_millis(33);
+/// How long the reason for a failed press stays in the box.
+const ERROR_SHOWN: Duration = Duration::from_secs(6);
 
-/// Whether the spike is on.
-pub fn enabled() -> bool {
-    std::env::var_os("ATELIER_DICTATION_SPIKE").is_some()
+/// The session whose press the engine is serving, and its window; none between presses.
+type Owner = Rc<RefCell<Option<(WeakEntity<AgentSession>, AnyWindowHandle)>>>;
+
+/// The app's one engine and the session it is serving.
+struct Speech {
+    engine: Rc<Engine>,
+    owner: Owner,
+}
+
+impl Global for Speech {}
+
+/// The engine, started on first use.
+fn speech(cx: &mut App) -> (Rc<Engine>, Owner) {
+    if let Some(speech) = cx.try_global::<Speech>() {
+        return (speech.engine.clone(), speech.owner.clone());
+    }
+    let (tx, mut events) = unbounded::<Event>();
+    let engine = Rc::new(Engine::spawn(move |event| {
+        tx.unbounded_send(event).ok();
+    }));
+    let owner = Owner::default();
+    let serving = owner.clone();
+    App::spawn(cx, async move |cx| {
+        while let Some(event) = events.next().await {
+            let Some((session, window)) = serving.borrow().clone() else { continue };
+            let ended = matches!(event, Event::Transcript(_) | Event::Failed(_));
+            window
+                .update(cx, |_, window, cx| {
+                    session.update(cx, |session, cx| session.dictation_event(event, window, cx)).ok();
+                })
+                .ok();
+            if ended {
+                *serving.borrow_mut() = None;
+            }
+        }
+    })
+    .detach();
+    cx.set_global(Speech { engine: engine.clone(), owner: owner.clone() });
+    (engine, owner)
+}
+
+/// Loads the model in the background if it is on this machine, so the first press does not wait for it.
+pub fn warm(cx: &mut App) {
+    speech(cx).0.warm();
 }
 
 pub struct Dictation {
-    installed: bool,
     start: Option<Cue>,
     stop: Option<Cue>,
-    /// The setup, or the level feed, in flight; dropping it cancels it.
-    task: Task<()>,
+    /// Clears a failed press's words after a while; dropping it cancels that.
+    dismiss: Task<()>,
 }
 
 impl Dictation {
     pub fn new() -> Self {
-        Self { installed: false, start: Cue::new(START), stop: Cue::new(STOP), task: Task::ready(()) }
+        Self { start: Cue::new(START), stop: Cue::new(STOP), dismiss: Task::ready(()) }
     }
 }
 
@@ -44,64 +87,65 @@ fn play(cue: &Option<Cue>) {
 
 impl AgentSession {
     /// The user pressed the microphone.
-    pub(super) fn dictation_start(&mut self, cx: &mut Context<Self>) {
-        if self.dictation.installed {
-            play(&self.dictation.start);
-            return self.dictation_listen(cx);
+    pub(super) fn dictation_start(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (engine, owner) = speech(cx);
+        *owner.borrow_mut() = Some((cx.weak_entity(), window.window_handle()));
+        self.dictation.dismiss = Task::ready(());
+        if !engine.ready() {
+            // The model has to come first; say so at once rather than when the worker gets to it.
+            let fetched = files::dir().is_some_and(|dir| files::installed(&dir, &files::FILES));
+            let total_mb = files::total_bytes(&files::FILES) as f32 / 1e6;
+            self.composer.update(cx, |c, cx| {
+                c.set_voice_total_mb(total_mb, cx);
+                c.set_voice_setup(if fetched { SetupPhase::Prepare } else { SetupPhase::Download(0.) }, cx);
+            });
         }
-        // First use: the model has to come first.
-        self.composer.update(cx, |c, cx| c.set_voice_setup(SetupPhase::Download(0.), cx));
-        self.dictation.task = cx.spawn(async move |this, cx| {
-            let begun = Instant::now();
-            for (length, step) in [(DOWNLOAD, 0), (PREPARE, 1), (READY, 2)] {
-                let at = begun.elapsed().as_secs_f32();
-                loop {
-                    cx.background_executor().timer(FRAME).await;
-                    let t = ((begun.elapsed().as_secs_f32() - at) / length).min(1.);
-                    let phase = match step {
-                        0 => SetupPhase::Download(download_at(t)),
-                        1 => SetupPhase::Prepare,
-                        _ => SetupPhase::Ready,
-                    };
-                    if this.update(cx, |this, cx| this.composer.update(cx, |c, cx| c.set_voice_setup(phase, cx))).is_err() {
-                        return;
-                    }
-                    if t >= 1. {
-                        break;
-                    }
-                }
-            }
-            this.update(cx, |this, cx| {
-                this.dictation.installed = true;
-                play(&this.dictation.start);
-                this.dictation_listen(cx);
-            })
-            .ok();
-        });
-    }
-
-    /// Listening begins: the bars follow a made-up voice until the task is dropped.
-    fn dictation_listen(&mut self, cx: &mut Context<Self>) {
-        self.composer.update(cx, |c, cx| c.set_voice_listening(cx));
-        self.dictation.task = cx.spawn(async move |this, cx| {
-            let begun = Instant::now();
-            loop {
-                cx.background_executor().timer(FRAME).await;
-                let level = level(begun.elapsed().as_secs_f32());
-                if this.update(cx, |this, cx| this.composer.update(cx, |c, cx| c.set_voice_level(level, cx))).is_err() {
-                    return;
-                }
-            }
-        });
+        engine.start();
     }
 
     /// The user pressed the stop square.
-    pub(super) fn dictation_stop(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn dictation_stop(&mut self, cx: &mut Context<Self>) {
         play(&self.dictation.stop);
-        self.dictation.task = Task::ready(());
-        self.composer.update(cx, |c, cx| {
-            c.set_voice_idle(cx);
-            c.insert_transcript(TRANSCRIPT, window, cx);
-        });
+        speech(cx).0.stop();
+    }
+
+    /// The engine said something about the press this session owns.
+    fn dictation_event(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
+        let composer = self.composer.clone();
+        match event {
+            Event::Download { done, total } => composer.update(cx, |c, cx| {
+                c.set_voice_total_mb(total as f32 / 1e6, cx);
+                c.set_voice_setup(SetupPhase::Download(if total == 0 { 0. } else { done as f32 / total as f32 }), cx);
+            }),
+            Event::Prepare => composer.update(cx, |c, cx| c.set_voice_setup(SetupPhase::Prepare, cx)),
+            Event::Ready => composer.update(cx, |c, cx| c.set_voice_setup(SetupPhase::Ready, cx)),
+            Event::Listening => {
+                play(&self.dictation.start);
+                composer.update(cx, |c, cx| c.set_voice_listening(cx));
+            }
+            Event::Level(level) => composer.update(cx, |c, cx| c.set_voice_level(level, cx)),
+            // The words come a moment after; the box is the user's again meanwhile.
+            Event::Transcribing => composer.update(cx, |c, cx| c.set_voice_idle(cx)),
+            Event::Transcript(words) => composer.update(cx, |c, cx| {
+                c.set_voice_idle(cx);
+                if !words.trim().is_empty() {
+                    c.insert_transcript(words.trim(), window, cx);
+                }
+            }),
+            Event::Failed(why) => {
+                composer.update(cx, |c, cx| c.set_voice_error(why, cx));
+                self.dictation.dismiss = cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(ERROR_SHOWN).await;
+                    this.update(cx, |this, cx| {
+                        this.composer.update(cx, |c, cx| {
+                            if c.voice_mode() == VoiceMode::Failed {
+                                c.set_voice_idle(cx);
+                            }
+                        })
+                    })
+                    .ok();
+                });
+            }
+        }
     }
 }
