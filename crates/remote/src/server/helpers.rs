@@ -1,7 +1,7 @@
 use std::{
     io::{self, Read, Write},
     path::PathBuf,
-    sync::{Arc, Mutex, atomic::{Ordering}, mpsc},
+    sync::{Arc, Mutex, atomic::Ordering, mpsc},
     thread,
     time::Duration,
 };

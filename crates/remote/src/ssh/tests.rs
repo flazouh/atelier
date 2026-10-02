@@ -94,3 +94,28 @@ fn a_helper_in_the_mac_bundle_is_found() {
     std::fs::remove_dir_all(&root).ok();
     assert_eq!(found, Some(bundled));
 }
+
+/// The copy is written under a name of its own, so two connections to one host never share the file they
+/// write, and the command leaves the finished helper and nothing else.
+#[test]
+fn an_upload_writes_a_file_of_its_own_and_leaves_only_the_helper() {
+    let command = upload_command("bin/atelier-remote");
+    assert!(command.contains(".part.$$"), "{command}");
+    let dir = tempfile::tempdir().unwrap();
+    let run = |bytes: &[u8]| {
+        use std::io::Write;
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", &command])
+            .current_dir(dir.path())
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(bytes).unwrap();
+        assert!(child.wait().unwrap().success());
+    };
+    run(b"first");
+    run(b"second");
+    let names: Vec<_> = std::fs::read_dir(dir.path().join("bin")).unwrap().map(|e| e.unwrap().file_name()).collect();
+    assert_eq!(names, ["atelier-remote"]);
+    assert_eq!(std::fs::read(dir.path().join("bin/atelier-remote")).unwrap(), b"second");
+}

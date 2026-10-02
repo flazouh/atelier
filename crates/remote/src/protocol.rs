@@ -2,8 +2,8 @@
 //! its length as four little-endian bytes. postcard is binary, so a file's bytes cross as they are,
 //! and it is serde, so the frames reuse the Project interface's own types.
 //!
-//! The app sends [`Request`]s; the host answers each with a [`Response`] of the same id, and on its
-//! own sends [`Event`]s: a watch's changes, a process's output, a process's end. The first request
+//! The app sends [`Request`](Frame::Request)s; the host answers each with a [`Response`](Frame::Response) of the same id, and on its
+//! own sends [`Event`](Frame::Event)s: a watch's changes, a process's output, a process's end. The first request
 //! is always [`Call::Hello`], which checks both ends speak this [`VERSION`].
 
 mod helpers;
@@ -17,7 +17,9 @@ pub use structs::Failure;
 pub use types::{Call, Event, FailureKind, Frame, MAX_FRAME, Pid, Reply, STAMP, VERSION};
 
 #[cfg(test)]
-use std::io::self;
+use helpers::frame_length;
+#[cfg(test)]
+use std::io;
 
 #[cfg(test)]
 mod tests;

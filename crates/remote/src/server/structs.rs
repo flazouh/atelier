@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex, atomic::{AtomicU64}, mpsc},
-};
+use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex, atomic::AtomicU64, mpsc}};
 
 use atelier_project::{Control, LocalProject, Watch};
 

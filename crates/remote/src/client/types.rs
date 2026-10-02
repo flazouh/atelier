@@ -1,6 +1,4 @@
-use std::{
-    io::{self},
-    };
+use std::io;
 
 use crate::protocol::{Failure, Reply};
 use super::structs::Connection;

@@ -177,13 +177,20 @@ pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Resu
         return Ok(path);
     }
     say(format!("Putting atelier-remote on {host}…"));
-    let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
-    run(host, &format!("mkdir -p {dir} && cat > {path}.part && chmod +x {path}.part && mv {path}.part {path}"), Some(&bytes))?;
+    run(host, &upload_command(&path), Some(&bytes))?;
     let version = run(host, &format!("{path} --version"), None)?;
     if version.trim() != version_line() {
         return Err(io::Error::other(format!("{host}: the helper atelier put there does not start as it should")));
     }
     Ok(path)
+}
+
+/// The command that puts the bytes on its stdin at `path`, run by the host's shell. The copy is written under
+/// a name of its own (`$$` is the shell's pid), so two connections to one host never write the same file, and
+/// it is moved into place whole.
+pub(super) fn upload_command(path: &str) -> String {
+    let dir = path.rsplit_once('/').map_or(".", |(d, _)| d);
+    format!("mkdir -p {dir} && cat > {path}.part.$$ && chmod +x {path}.part.$$ && mv {path}.part.$$ {path}")
 }
 
 /// Dials `ssh <host> <binary> --stdio`, once for each connection.

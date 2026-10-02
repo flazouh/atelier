@@ -151,7 +151,7 @@ impl Tracker for RemoteTracker {
     }
 
     /// Changes made through this tracker at once, and changes made elsewhere by a poll of the host every
-    /// [`POLL`]. It blocks for one listing, the start the poll compares with. The poll runs while a
+    /// [`POLL`](super::POLL). It blocks for one listing, the start the poll compares with. The poll runs while a
     /// receiver is kept: drop it when the tasks are out of sight.
     fn subscribe(&self) -> Subscription {
         let (send, receive) = channel();

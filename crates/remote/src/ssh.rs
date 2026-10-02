@@ -31,4 +31,7 @@ pub use structs::Platform;
 pub use types::VERSION;
 
 #[cfg(test)]
+use helpers::upload_command;
+
+#[cfg(test)]
 mod tests;
