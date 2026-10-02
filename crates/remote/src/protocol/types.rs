@@ -5,12 +5,13 @@ use super::tracker::{TrackerCall, TrackerReply};
 use super::structs::Failure;
 
 /// The protocol's version: both ends must agree, or the hello fails.
-/// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`. 5: `Tracker`.
-pub const VERSION: u32 = 5;
+/// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`. 5: `Tracker`. 6: worktrees (`Open`, `At`,
+/// `ChangesAt`).
+pub const VERSION: u32 = 6;
 
 /// The protocol, as bytes a helper binary carries, so the app reads a copy's protocol from the file
 /// with no need to run it (it may be built for another machine). Keep it in step with [`VERSION`].
-pub const STAMP: &[u8] = b"atelier-remote-protocol:5;";
+pub const STAMP: &[u8] = b"atelier-remote-protocol:6;";
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -48,6 +49,11 @@ pub enum Call {
     ReadDir { dir: String },
     /// A call of the project's tracker, which the host opens in its data folder.
     Tracker(TrackerCall),
+    /// Opens `root`, a worktree of the project's repository: [`Reply::Hello`] with the host's name for it.
+    Open { root: String },
+    /// `call`, answered in the worktree `root` (as the host named it) instead of the project's folder. The host
+    /// opens the worktree on first use, so a new connection needs no `Open` again.
+    At { root: String, call: Box<Call> },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -78,6 +84,8 @@ pub enum FailureKind {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Event {
     Changes(Vec<Change>),
+    /// Changes in the worktree `root`, which a [`Call::Watch`] inside [`Call::At`] asked for.
+    ChangesAt { root: String, changes: Vec<Change> },
     /// Bytes a process wrote to its stdout.
     Output { pid: Pid, bytes: Vec<u8> },
     /// A process's stdout closed and it ended, with its exit code.
