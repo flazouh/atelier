@@ -20,6 +20,7 @@ pub struct DataEntry {
     pub modified_ms: u64,
 }
 
+#[derive(Clone)]
 pub struct DataFolder {
     pub(super) dir: PathBuf,
 }

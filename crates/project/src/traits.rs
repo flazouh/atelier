@@ -67,4 +67,11 @@ pub trait Project: Send + Sync {
     fn tracker(&self) -> TrackerResult<Arc<dyn Tracker>> {
         Err(TrackerError::Unsupported("keep tasks".into()))
     }
+
+    /// The same project seen from `folder`, a worktree of its repository as the host names it (the main
+    /// checkout is one too). Files, search, watch, git and spawn act there; the host, the link, the data
+    /// folder and the tracker stay the project's. A folder that is not such a worktree is refused.
+    fn at(&self, folder: &Path) -> io::Result<Arc<dyn Project>> {
+        Err(unsupported("at", &folder.to_string_lossy()))
+    }
 }

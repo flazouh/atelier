@@ -76,8 +76,14 @@ fn redial(shared: Weak<Shared>) {
         let was = lock(&shared.down).take();
         match shared.hello() {
             Ok(_) => {
-                if !lock(&shared.watchers).is_empty() {
-                    let _ = shared.request(Call::Watch);
+                let mut watched: Vec<Option<String>> = lock(&shared.watchers).values().map(|(at, _)| at.clone()).collect();
+                watched.sort();
+                watched.dedup();
+                for at in watched {
+                    let _ = shared.request(match at {
+                        Some(root) => Call::At { root, call: Box::new(Call::Watch) },
+                        None => Call::Watch,
+                    });
                 }
                 shared.report(Link::Up);
                 return;

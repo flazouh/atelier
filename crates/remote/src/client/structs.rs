@@ -45,6 +45,7 @@ impl Timeouts {
     pub(super) fn of(&self, call: &Call) -> Duration {
         match call {
             Call::List | Call::Search { .. } | Call::Git { .. } => self.slow,
+            Call::At { call, .. } => self.of(call),
             _ => self.quick,
         }
     }
@@ -89,7 +90,8 @@ pub(super) struct Shared {
     pending: Mutex<HashMap<u64, mpsc::Sender<Answer>>>,
     next_id: AtomicU64,
     pub(super) processes: Mutex<HashMap<Pid, Pipes>>,
-    pub(super) watchers: Mutex<HashMap<u64, ChangeSink>>,
+    /// Each sink with the folder it watches: `None` for the project's, a worktree's by its name.
+    pub(super) watchers: Mutex<HashMap<u64, (Option<String>, ChangeSink)>>,
     pub(super) links: Mutex<Vec<LinkSink>>,
     pub(super) down: Mutex<Option<String>>,
 }
@@ -159,11 +161,8 @@ impl Shared {
                     let _ = tx.send(result);
                 }
             }
-            Frame::Event(Event::Changes(changes)) => {
-                for sink in lock(&self.watchers).values() {
-                    sink(changes.clone());
-                }
-            }
+            Frame::Event(Event::Changes(changes)) => self.changed(None, changes),
+            Frame::Event(Event::ChangesAt { root, changes }) => self.changed(Some(&root), changes),
             Frame::Event(Event::Output { pid, bytes }) => {
                 let mut processes = lock(&self.processes);
                 let pipes = processes.entry(pid).or_default();
@@ -173,6 +172,12 @@ impl Shared {
             }
             Frame::Event(Event::Exited { pid, code }) => lock(&self.processes).entry(pid).or_default().end(code),
             Frame::Request { .. } => {}
+        }
+    }
+
+    fn changed(&self, root: Option<&str>, changes: Vec<atelier_project::Change>) {
+        for (_, sink) in lock(&self.watchers).values().filter(|(at, _)| at.as_deref() == root) {
+            sink(changes.clone());
         }
     }
 
@@ -192,14 +197,29 @@ impl Shared {
     }
 }
 
+/// Ends the connection when the project and every worktree seen from it are gone.
+pub(super) struct Open(Arc<Shared>);
+
+impl Drop for Open {
+    fn drop(&mut self) {
+        *lock(&self.0.writer) = None;
+        if let Some(mut close) = lock(&self.0.closer).take() {
+            close();
+        }
+    }
+}
+
 pub struct RemoteProject {
     pub(super) shared: Arc<Shared>,
+    _open: Arc<Open>,
     /// The folder on the host, as the host resolved it.
     pub(super) root: PathBuf,
+    /// `None` for the project's own folder; a worktree's name on the host, which each call is sent `At`.
+    scope: Option<String>,
     /// The data folder on the host, once the host has said: it never moves, so it is asked once. A call
-    /// that failed (the link was down) is asked again next time.
-    pub(super) data_path: Mutex<Option<Option<PathBuf>>>,
-    pub(super) tracker: atelier_project::TrackerSlot,
+    /// that failed (the link was down) is asked again next time. Shared with the project's worktrees.
+    pub(super) data_path: Arc<Mutex<Option<Option<PathBuf>>>>,
+    pub(super) tracker: Arc<atelier_project::TrackerSlot>,
     /// How often the tracker asks the host for changes made elsewhere, while someone listens.
     poll_tasks: Duration,
 }
@@ -224,11 +244,22 @@ impl RemoteProject {
         });
         attach(&shared, connection);
         let root = shared.hello()?;
-        Ok(Self { shared, root: PathBuf::from(root), data_path: Mutex::default(), tracker: Default::default(), poll_tasks: tracker::POLL })
+        Ok(Self {
+            _open: Arc::new(Open(shared.clone())),
+            shared,
+            root: PathBuf::from(root),
+            scope: None,
+            data_path: Arc::default(),
+            tracker: Arc::default(),
+            poll_tasks: tracker::POLL,
+        })
     }
 
     pub(super) fn call(&self, call: Call) -> io::Result<Reply> {
-        self.shared.request(call)
+        match &self.scope {
+            Some(root) => self.shared.request(Call::At { root: root.clone(), call: Box::new(call) }),
+            None => self.shared.request(call),
+        }
     }
 
     /// A tracker that asks the host for changes this often, as a test wants.
@@ -239,14 +270,6 @@ impl RemoteProject {
     }
 }
 
-impl Drop for RemoteProject {
-    fn drop(&mut self) {
-        *lock(&self.shared.writer) = None;
-        if let Some(mut close) = lock(&self.shared.closer).take() {
-            close();
-        }
-    }
-}
 
 impl Project for RemoteProject {
     fn root(&self) -> &Path {
@@ -328,9 +351,9 @@ impl Project for RemoteProject {
     }
 
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
-        let first = lock(&self.shared.watchers).is_empty();
+        let first = !lock(&self.shared.watchers).values().any(|(at, _)| *at == self.scope);
         let id = self.shared.next_id.fetch_add(1, Ordering::Relaxed) + 1;
-        lock(&self.shared.watchers).insert(id, sink);
+        lock(&self.shared.watchers).insert(id, (self.scope.clone(), sink));
         if first && let Err(error) = self.call(Call::Watch) {
             lock(&self.shared.watchers).remove(&id);
             return Err(error);
@@ -387,6 +410,22 @@ impl Project for RemoteProject {
 
     fn host(&self) -> Option<&str> {
         Some(&self.shared.host)
+    }
+
+    fn at(&self, folder: &Path) -> io::Result<Arc<dyn Project>> {
+        let root = match self.shared.request(Call::Open { root: folder.to_string_lossy().into_owned() })? {
+            Reply::Hello { root } => root,
+            other => return Err(unexpected(other)),
+        };
+        Ok(Arc::new(Self {
+            shared: self.shared.clone(),
+            _open: self._open.clone(),
+            root: PathBuf::from(&root),
+            scope: Some(root),
+            data_path: self.data_path.clone(),
+            tracker: self.tracker.clone(),
+            poll_tasks: self.poll_tasks,
+        }))
     }
 }
 
