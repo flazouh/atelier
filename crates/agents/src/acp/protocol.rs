@@ -13,7 +13,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use serde::de::DeserializeOwned;
@@ -63,6 +63,9 @@ pub(super) struct Step {
     pub done: bool,
 }
 
+/// How long a mode or model request holds the next message while the agent has not answered it.
+const SETTINGS_WAIT: Duration = Duration::from_secs(10);
+
 /// atelier's requests waiting for their answer, by what each was.
 enum Asked {
     Initialize,
@@ -89,6 +92,11 @@ pub(super) struct Protocol {
     phase: Phase,
     next_id: u64,
     waiting: HashMap<u64, Asked>,
+    /// When each waiting mode or model request was written, by id: an agent that never answers one does not
+    /// hold the user's messages for good.
+    settings_at: HashMap<u64, Instant>,
+    /// The time of the last line or command, which a request written now is stamped with.
+    now: Instant,
     /// The sign-in methods the agent offered, and whether atelier has used one.
     auth_methods: Vec<String>,
     authenticated: bool,
@@ -129,6 +137,8 @@ impl Protocol {
             phase: Phase::Starting,
             next_id: 0,
             waiting: HashMap::new(),
+            settings_at: HashMap::new(),
+            now: Instant::now(),
             auth_methods: Vec::new(),
             authenticated: false,
             can_load: false,
@@ -159,6 +169,7 @@ impl Protocol {
 
     /// Reads one line of the agent's stdout. A line that is not JSON-RPC gives a warning.
     pub fn line(&mut self, line: &str, now: Instant) -> Step {
+        self.now = now;
         let line = line.trim();
         if line.is_empty() || self.phase == Phase::Over {
             return Step::default();
@@ -168,13 +179,18 @@ impl Protocol {
             Ok(Incoming::Request { id, method, params }) => self.request_from_agent(id, &method, params, now),
             Ok(Incoming::Notification { method, params }) if method == "session/update" => self.update(params, now),
             Ok(Incoming::Notification { .. }) => Step::default(),
-            Err(error) => warning(format!("a line from the agent did not parse: {error}")),
+            Err(error) => {
+                let mut step = warning(format!("a line from the agent did not parse: {error}"));
+                self.prompt_next(&mut step);
+                step
+            }
         }
     }
 
     /// Takes one of the app's commands. It never waits for the agent: a message sent before the session
     /// is ready, or while a turn runs, is prompted in its turn.
-    pub fn command(&mut self, command: Command) -> Result<Step, SessionError> {
+    pub fn command(&mut self, command: Command, now: Instant) -> Result<Step, SessionError> {
+        self.now = now;
         if self.phase == Phase::Over {
             return Err(SessionError::Closed);
         }
@@ -228,7 +244,14 @@ impl Protocol {
     }
 
     fn response(&mut self, id: &Value, outcome: Result<Value, RpcError>, now: Instant) -> Step {
-        let Some(asked) = id.as_u64().and_then(|id| self.waiting.remove(&id)) else { return Step::default() };
+        // An id atelier wrote as a number may come back as text.
+        let number = id.as_u64().or_else(|| id.as_str()?.parse().ok());
+        let Some(asked) = number.and_then(|id| {
+            self.settings_at.remove(&id);
+            self.waiting.remove(&id)
+        }) else {
+            return Step::default();
+        };
         let mut step = Step::default();
         match (asked, outcome) {
             (Asked::Initialize, Ok(result)) => {
@@ -400,13 +423,18 @@ impl Protocol {
     /// Prompts the next message, unless a turn runs or a model or mode atelier asked for is not answered yet:
     /// a turn runs on the settings the user chose.
     fn prompt_next(&mut self, step: &mut Step) {
-        if self.in_turn || self.waiting.values().any(|asked| matches!(asked, Asked::SetMode(_) | Asked::SetModel(_))) {
+        if self.in_turn || self.settings_open() {
             return;
         }
         let Some(session) = self.ready_session() else { return };
         let Some(text) = self.queued.pop_front() else { return };
         self.in_turn = true;
         step.lines.push(self.request(Asked::Prompt, client::prompt(session.as_str(), &text)));
+    }
+
+    /// Whether a mode or model request is waiting for its answer and is not older than [`SETTINGS_WAIT`].
+    fn settings_open(&self) -> bool {
+        self.settings_at.values().any(|at| self.now.saturating_duration_since(*at) < SETTINGS_WAIT)
     }
 
     fn end_turn(&mut self, step: &mut Step, outcome: TurnOutcome, usage: Option<Usage>, now: Instant) {
@@ -483,6 +511,9 @@ impl Protocol {
     fn request(&mut self, asked: Asked, outgoing: Outgoing) -> String {
         let id = self.next_id;
         self.next_id += 1;
+        if matches!(asked, Asked::SetMode(_) | Asked::SetModel(_)) {
+            self.settings_at.insert(id, self.now);
+        }
         self.waiting.insert(id, asked);
         rpc::request(id, outgoing.method, outgoing.params)
     }

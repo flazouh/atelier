@@ -26,11 +26,15 @@ pub(super) fn epoch_seconds(text: &str) -> Option<u64> {
         "" | "Z" | "z" => 0,
         _ => {
             let sign = if zone.starts_with('-') { -1 } else { 1 };
-            let digits = zone[1..].replacen(':', "", 1);
-            if digits.len() != 4 || !digits.bytes().all(|b| b.is_ascii_digit()) {
-                return None;
-            }
-            let (hours, minutes) = (digits[..2].parse::<i64>().ok()?, digits[2..].parse::<i64>().ok()?);
+            // ISO 8601 writes an offset as `±hh`, `±hhmm` or `±hh:mm`, two digits for each part.
+            let (hours, minutes) = match zone[1..].split_once(':') {
+                Some((hours, minutes)) => (hours, minutes),
+                None if zone.len() == 3 => (&zone[1..], "00"),
+                None if zone.len() == 5 => zone[1..].split_at(2),
+                None => return None,
+            };
+            let two_digits = |part: &str| (part.len() == 2 && part.bytes().all(|b| b.is_ascii_digit())).then(|| part.parse::<i64>().ok()).flatten();
+            let (hours, minutes) = (two_digits(hours)?, two_digits(minutes)?);
             if hours > 23 || minutes > 59 {
                 return None;
             }

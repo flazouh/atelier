@@ -57,5 +57,7 @@ fn a_malformed_frame_is_an_error_and_not_an_empty_answer() {
     assert!(parse(r#"{"jsonrpc":"2.0","id":3,"result":{},"error":{"code":1,"message":"x"}}"#).is_err(), "both");
     assert!(parse(r#"{"id":3,"result":{}}"#).is_err(), "no version");
     assert!(parse(r#"{"jsonrpc":"1.0","id":3,"result":{}}"#).is_err(), "another version");
+    assert!(parse(r#"{"jsonrpc":"2.0","id":3,"result":{},"error":null}"#).is_err(), "a null error is still an error member");
+    assert!(parse(r#"{"jsonrpc":"2.0","id":3,"error":null}"#).is_err(), "an error that is null is no error");
     assert_eq!(parse(r#"{"jsonrpc":"2.0","id":4,"result":null}"#).unwrap(), Incoming::Response { id: json!(4), outcome: Ok(json!(null)) });
 }

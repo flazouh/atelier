@@ -162,6 +162,9 @@ fn a_raw_output_object_gives_its_text_not_its_json() {
         (json!({ "exitCode": 1, "stdout": "half", "stderr": "then failed" }), "half\nthen failed"),
         (json!({ "exitCode": 0, "stdout": "", "stderr": "" }), ""),
         (json!({ "exitCode": 0, "stdout": "" }), ""),
+        (json!({ "output": "" }), ""),
+        (json!({ "content": "" }), ""),
+        (json!({ "text": "", "stderr": "" }), ""),
     ]
     .into_iter()
     .enumerate()

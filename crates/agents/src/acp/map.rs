@@ -387,12 +387,14 @@ fn raw_text(raw: &Value) -> String {
         Value::String(text) => text.clone(),
         Value::Null => String::new(),
         Value::Object(_) => {
-            let text = ["content", "output", "stdout", "text"].into_iter().filter_map(field).find(|t| !t.is_empty());
+            let fields = ["content", "output", "stdout", "text"];
+            let text = fields.into_iter().filter_map(field).find(|t| !t.is_empty());
+            let named = fields.into_iter().any(|key| field(key).is_some());
             match (text, field("stderr")) {
                 (Some(text), Some(stderr)) if !stderr.is_empty() => format!("{}\n{stderr}", text.trim_end_matches('\n')),
                 (Some(text), _) => text.to_string(),
                 (None, Some(stderr)) => stderr.to_string(),
-                (None, None) if field("stdout").is_some() => String::new(),
+                (None, None) if named => String::new(),
                 (None, None) => raw.to_string(),
             }
         }

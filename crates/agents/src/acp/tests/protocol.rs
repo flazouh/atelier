@@ -77,7 +77,7 @@ fn an_agent_still_signed_out_after_the_sign_in_ends_the_session_with_its_own_wor
     assert!(matches!(&events[0], Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("Run 'agent login' first.".into())), "the message sent fails");
     assert_eq!(events.last(), Some(&Event::Ended(EndReason::Failed("Run 'agent login' first.".into()))));
     assert!(run.done, "the agent is stopped");
-    assert!(matches!(run.protocol.command(Command::send("again")), Err(SessionError::Closed)));
+    assert!(matches!(run.protocol.command(Command::send("again"), std::time::Instant::now()), Err(SessionError::Closed)));
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn a_permission_question_carries_its_call_and_the_agents_choices_and_takes_one_a
 
     run.command(Command::Answer { request: RequestId::new("p-7"), choice: ChoiceId::new("allow-always") });
     assert_eq!(run.last(), &json!({ "jsonrpc": "2.0", "id": "p-7", "result": { "outcome": { "outcome": "selected", "optionId": "allow-always" } } }));
-    let again = run.protocol.command(Command::Answer { request: RequestId::new("p-7"), choice: ChoiceId::new("allow-once") });
+    let again = run.protocol.command(Command::Answer { request: RequestId::new("p-7"), choice: ChoiceId::new("allow-once") }, std::time::Instant::now());
     assert!(matches!(again, Err(SessionError::Unsupported(_))), "answered once");
 }
 
@@ -354,7 +354,7 @@ fn a_model_and_mode_already_in_force_are_not_set_again() {
 #[test]
 fn a_mode_the_agent_has_no_name_for_is_unsupported() {
     let mut run = Run::ready();
-    assert!(matches!(run.protocol.command(Command::SetPermissionMode { mode: PermissionMode::Bypass }), Err(SessionError::Unsupported(_))));
+    assert!(matches!(run.protocol.command(Command::SetPermissionMode { mode: PermissionMode::Bypass }, std::time::Instant::now()), Err(SessionError::Unsupported(_))));
     run.command(Command::SetPermissionMode { mode: PermissionMode::Plan });
     assert_eq!(run.last()["params"], json!({ "sessionId": "s1", "modeId": "plan" }));
 }
@@ -411,7 +411,7 @@ fn a_session_atelier_closes_ends_once() {
     assert_eq!(run.protocol.closed(), vec![Event::Ended(EndReason::Closed)]);
     assert!(run.protocol.closed().is_empty());
     assert!(run.protocol.exited(Some(0), "", run.start).is_empty());
-    assert!(matches!(run.protocol.command(Command::send("late")), Err(SessionError::Closed)));
+    assert!(matches!(run.protocol.command(Command::send("late"), std::time::Instant::now()), Err(SessionError::Closed)));
 }
 
 #[test]
@@ -497,4 +497,42 @@ fn a_history_that_cannot_load_is_an_error() {
     run.initialized(json!({ "loadSession": true }));
     run.agent(fail(1, -32602, "no such session"));
     assert!(matches!(run.protocol.found(), Some(Err(SessionError::Start(why))) if why == "no such session"));
+}
+
+/// A model and a mode asked for one after the other: the turn waits for both answers, whichever comes first,
+/// so it never runs on the setting of an older request.
+#[test]
+fn a_turn_waits_for_every_setting_the_user_asked_for() {
+    let mut run = Run::ready();
+    run.command(Command::SetModel { model: "fast".into() });
+    run.command(Command::SetPermissionMode { mode: PermissionMode::Plan });
+    run.command(Command::send("go"));
+    assert!(run.sent("session/prompt").is_empty(), "the settings are not answered");
+    run.agent(respond(3, json!(null)));
+    assert!(run.sent("session/prompt").is_empty(), "one setting is still open");
+    run.agent(respond(2, json!(null)));
+    assert_eq!(run.sent("session/prompt").len(), 1);
+}
+
+/// An id that comes back as text, `"2"` for 2, answers the request.
+#[test]
+fn an_answer_whose_id_is_text_still_answers_a_setting() {
+    let mut run = Run::ready();
+    run.command(Command::SetModel { model: "fast".into() });
+    run.command(Command::send("go"));
+    run.agent(json!({ "jsonrpc": "2.0", "id": "2", "result": null }));
+    assert_eq!(run.sent("session/prompt").len(), 1);
+}
+
+/// An agent that never answers a setting must not hold the user's messages for good: after ten seconds the
+/// next message goes out, on the setting the agent last said.
+#[test]
+fn a_setting_the_agent_never_answers_stops_holding_the_turn() {
+    let mut run = Run::ready();
+    run.command(Command::SetModel { model: "fast".into() });
+    run.command(Command::send("go"));
+    assert!(run.sent("session/prompt").is_empty());
+    run.wait(30_000).command(Command::send("again"));
+    assert_eq!(run.sent("session/prompt").len(), 1, "the held message goes out");
+    assert_eq!(run.sent("session/prompt")[0]["params"]["prompt"][0]["text"], "go");
 }

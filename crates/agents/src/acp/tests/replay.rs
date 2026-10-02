@@ -46,7 +46,7 @@ fn replay(name: &str, goal: Goal) -> Replay {
                 captured.push(request(message));
             }
             match command(message) {
-                Some(command) => protocol.command(command).expect("the command is taken"),
+                Some(command) => protocol.command(command, start + Duration::from_millis(i as u64)).expect("the command is taken"),
                 None => continue,
             }
         };

@@ -22,7 +22,7 @@ use crate::{
 
 /// The way to the writer thread, shared by the reader and the caller. Emptying it ends the writer and closes
 /// the agent's stdin, whatever the reader is waiting on.
-type Lines = Arc<Mutex<Option<mpsc::Sender<String>>>>;
+pub(super) type Lines = Arc<Mutex<Option<mpsc::Sender<String>>>>;
 
 pub(super) struct AcpSession {
     lines: Lines,
@@ -79,12 +79,12 @@ impl AcpSession {
 /// Writes a step's lines, then hands its events to the sink. The caller holds the protocol's lock, so the
 /// lines and events of two steps never interleave. A writer that is gone, because the agent stopped reading
 /// or the session closed, is `Closed`.
-fn deliver(step: Step, lines: &Lines, sink: &EventSink) -> Result<(), SessionError> {
+pub(super) fn deliver(step: Step, lines: &Lines, sink: &EventSink) -> Result<(), SessionError> {
     let written = {
         let mut lines = lock(lines);
         let sent = match lines.as_ref() {
             Some(sender) => step.lines.into_iter().try_for_each(|line| sender.send(line)).is_ok(),
-            None => step.lines.is_empty(),
+            None => false,
         };
         if !sent {
             *lines = None;
@@ -115,7 +115,7 @@ impl Session for AcpSession {
             return Err(SessionError::Closed);
         }
         let mut protocol = lock(&self.protocol);
-        let step = protocol.command(command)?;
+        let step = protocol.command(command, Instant::now())?;
         deliver(step, &self.lines, &self.sink)
     }
 }
