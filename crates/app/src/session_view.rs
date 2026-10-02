@@ -6,6 +6,7 @@
 //! conversation, and its answer goes back through the session.
 
 pub(crate) mod calls;
+mod edit;
 mod helpers;
 mod preview;
 mod rail;
