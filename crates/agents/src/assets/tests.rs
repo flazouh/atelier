@@ -1,3 +1,4 @@
+use gpui_kit::AssetSource;
 use super::*;
 
 #[test]
