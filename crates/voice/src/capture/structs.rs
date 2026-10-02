@@ -8,9 +8,10 @@ use cpal::{
 };
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-use super::helpers::{feed, to_16k};
+use super::helpers::{feed, label, to_16k};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use super::types::MAX_SECONDS;
+use super::types::Device;
 use crate::Error;
 
 /// What the audio thread leaves for the rest: the audio so far, and the energy since the level was last read.
@@ -54,10 +55,13 @@ pub struct Recorder {
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 impl Recorder {
-    /// Opens the default microphone and starts listening.
-    pub fn start() -> Result<Self, Error> {
+    /// Opens the microphone `id` (from [`devices`]) and starts listening; the system's default when `id` is `None`, or is no
+    /// longer plugged in.
+    pub fn start(id: Option<&str>) -> Result<Self, Error> {
         let mic = Error::Microphone;
-        let device = cpal::default_host().default_input_device().ok_or_else(|| mic("no microphone found".into()))?;
+        let host = cpal::default_host();
+        let chosen = id.and_then(|id| id.parse::<cpal::DeviceId>().ok()).and_then(|id| host.device_by_id(&id));
+        let device = chosen.or_else(|| host.default_input_device()).ok_or_else(|| mic("no microphone found".into()))?;
         let config = device.default_input_config().map_err(|why| mic(why.to_string()))?;
         let (rate, channels, format) = (config.sample_rate(), config.channels() as usize, config.sample_format());
         let heard = Arc::new(Mutex::new(Heard::default()));
@@ -89,12 +93,47 @@ impl Recorder {
     }
 }
 
+/// The microphones the system offers now, the default first.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub fn devices() -> Vec<Device> {
+    use cpal::{DeviceDescription, InterfaceType};
+    let host = cpal::default_host();
+    let default = host.default_input_device().and_then(|d| d.id().ok()).map(|id| id.to_string());
+    let connection = |d: &DeviceDescription| match d.interface_type() {
+        InterfaceType::BuiltIn => Some("Built-in"),
+        InterfaceType::Usb => Some("USB"),
+        InterfaceType::Bluetooth => Some("Bluetooth"),
+        InterfaceType::Virtual => Some("Virtual"),
+        InterfaceType::Aggregate => Some("Aggregate"),
+        _ => None,
+    };
+    let mut found: Vec<Device> = host
+        .input_devices()
+        .map(|all| {
+            all.filter_map(|d| {
+                let id = d.id().ok()?.to_string();
+                let description = d.description().ok()?;
+                let is_default = default.as_deref() == Some(id.as_str());
+                Some(Device { id, label: label(description.name(), connection(&description)), is_default })
+            })
+            .collect()
+        })
+        .unwrap_or_default();
+    found.sort_by_key(|d| !d.is_default);
+    found
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub fn devices() -> Vec<Device> {
+    Vec::new()
+}
+
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub struct Recorder;
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 impl Recorder {
-    pub fn start() -> Result<Self, Error> {
+    pub fn start(_: Option<&str>) -> Result<Self, Error> {
         Err(Error::Microphone("recording is not built for this system yet".into()))
     }
 

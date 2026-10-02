@@ -11,8 +11,12 @@
 //! Stop turns the recording into words ([`Event::Transcribing`], then [`Event::Transcript`]). Anything that fails ends the
 //! press with [`Event::Failed`], in words for the person.
 
+mod helpers;
 mod structs;
 mod types;
 
 pub use structs::Engine;
-pub use types::{Event, LEVEL_EVERY, PROGRESS_EVERY, READY_BEAT};
+pub use types::{Event, LEVEL_EVERY, PROGRESS_EVERY, READY_BEAT, SILENT_BELOW};
+
+#[cfg(test)]
+mod tests;

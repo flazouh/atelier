@@ -5,6 +5,8 @@ use std::fmt;
 pub enum Error {
     /// No microphone, or the system will not let atelier use it.
     Microphone(String),
+    /// The person refused the microphone, or a policy does.
+    Access,
     /// The model could not be fetched.
     Network(String),
     /// A fetched file is not the file that was pinned.
@@ -19,6 +21,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Microphone(why) => write!(f, "Microphone unavailable: {why}"),
+            Self::Access => write!(f, "Microphone access is off. Allow Atelier in System Settings > Privacy."),
             Self::Network(why) => write!(f, "Could not download the speech model: {why}"),
             Self::Checksum(file) => write!(f, "The downloaded {file} is damaged. Try again."),
             Self::Disk(why) => write!(f, "Could not save the speech model: {why}"),

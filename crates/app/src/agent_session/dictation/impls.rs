@@ -1,10 +1,11 @@
 use atelier_ui::{SetupPhase, VoiceMode};
+use gpui_kit::SharedString;
 use atelier_voice::{Event, files};
 use gpui_kit::{Context, Task, Window};
 
 use super::super::AgentSession;
 use super::types::ERROR_SHOWN;
-use super::helpers::{play, speech};
+use super::helpers::{DEFAULT_ID, choose, device_rows, play, prefs, speech};
 
 impl AgentSession {
     /// The user pressed the microphone.
@@ -21,7 +22,28 @@ impl AgentSession {
                 c.set_voice_setup(if fetched { SetupPhase::Prepare } else { SetupPhase::Download(0.) }, cx);
             });
         }
-        engine.start();
+        engine.start(prefs(cx).device);
+    }
+
+    /// The microphone menu is about to show: bring its rows and its choices up to date.
+    pub(in super::super) fn dictation_devices(&mut self, cx: &mut Context<Self>) {
+        let chosen = prefs(cx);
+        let (rows, selected) = device_rows(&atelier_voice::devices(), chosen.device.as_deref());
+        let hold = chosen.hold;
+        self.composer.update(cx, |c, cx| {
+            c.set_voice_devices(rows, Some(selected.into()), cx);
+            c.set_voice_hold(hold, cx);
+        });
+    }
+
+    /// The user chose a microphone, or the default row.
+    pub(in super::super) fn dictation_device(&mut self, id: Option<SharedString>, cx: &mut Context<Self>) {
+        choose(cx, |prefs| prefs.device = id.filter(|id| id != DEFAULT_ID).map(|id| id.to_string()));
+    }
+
+    /// The user turned "Hold to record" on or off.
+    pub(in super::super) fn dictation_hold(&mut self, hold: bool, cx: &mut Context<Self>) {
+        choose(cx, |prefs| prefs.hold = hold);
     }
 
     /// The user pressed the stop square.

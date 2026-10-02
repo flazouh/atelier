@@ -6,10 +6,12 @@ use std::{
 
 use crate::{
     Error,
+    access::{self, Access},
     capture::{Recorder, level_from_rms},
     files::{self, BASE, FILES},
     recognizer::Recognizer,
 };
+use super::helpers::verdict;
 use super::types::{Command, Event, LEVEL_EVERY, PROGRESS_EVERY, READY_BEAT};
 
 pub struct Engine {
@@ -37,9 +39,10 @@ impl Engine {
         self.commands.send(Command::Warm).ok();
     }
 
-    /// The microphone was pressed.
-    pub fn start(&self) {
-        self.commands.send(Command::Start).ok();
+    /// The microphone was pressed. `device` is the id of the microphone to listen on (see [`crate::devices`]); `None` for the
+    /// system's default.
+    pub fn start(&self, device: Option<String>) {
+        self.commands.send(Command::Start(device)).ok();
     }
 
     /// The stop square was pressed.
@@ -64,8 +67,8 @@ impl Worker {
                         self.load(&dir).ok();
                     }
                 }
-                Command::Start => {
-                    if let Err(why) = self.press() {
+                Command::Start(device) => {
+                    if let Err(why) = self.press(device.as_deref()) {
                         (self.emit)(Event::Failed(why.to_string()));
                     }
                 }
@@ -87,7 +90,11 @@ impl Worker {
     }
 
     /// Everything from a press to the words.
-    pub(super) fn press(&mut self) -> Result<(), Error> {
+    pub(super) fn press(&mut self, device: Option<&str>) -> Result<(), Error> {
+        // Ask for the microphone first: the question is the person's to answer, and it should not wait behind a download.
+        if access::ensure() != Access::Granted {
+            return Err(Error::Access);
+        }
         let dir = files::dir().ok_or_else(|| Error::Model("this system has no folder for app data".into()))?;
         let mut set_up = false;
         if !files::installed(&dir, &FILES) {
@@ -112,7 +119,7 @@ impl Worker {
             thread::sleep(READY_BEAT);
         }
 
-        let recorder = Recorder::start()?;
+        let recorder = Recorder::start(device)?;
         (self.emit)(Event::Listening);
         loop {
             match self.inbox.recv_timeout(LEVEL_EVERY) {
@@ -128,7 +135,10 @@ impl Worker {
             Some(recognizer) => recognizer.transcribe(&samples)?,
             None => String::new(),
         };
-        (self.emit)(Event::Transcript(words));
+        match verdict(&samples, words) {
+            Ok(words) => (self.emit)(Event::Transcript(words)),
+            Err(why) => (self.emit)(Event::Failed(why.to_string())),
+        }
         Ok(())
     }
 }

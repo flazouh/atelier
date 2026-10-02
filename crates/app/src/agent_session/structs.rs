@@ -199,6 +199,7 @@ impl AgentSession {
         let composer = cx.new(|cx| {
             let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
             input.set_dictation(true, cx);
+            super::dictation::start_up(&mut input, cx);
             input.set_run_picked_skills(runs_picked_skills(cx));
             input
         });
@@ -217,6 +218,9 @@ impl AgentSession {
             }
             PromptInputEvent::DictationStart => this.dictation_start(window, cx),
             PromptInputEvent::DictationStop => this.dictation_stop(cx),
+            PromptInputEvent::DictationDevices => this.dictation_devices(cx),
+            PromptInputEvent::DictationDevice(id) => this.dictation_device(id.clone(), cx),
+            PromptInputEvent::DictationHold(hold) => this.dictation_hold(*hold, cx),
             PromptInputEvent::Action(_) => {}
             PromptInputEvent::Command { name, args } => this.run_command(name, args, cx),
         });

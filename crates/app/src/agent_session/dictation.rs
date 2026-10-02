@@ -13,5 +13,5 @@ mod impls;
 mod structs;
 mod types;
 
-pub use helpers::warm;
+pub use helpers::{start_up, warm};
 pub use structs::Dictation;

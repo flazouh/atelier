@@ -61,3 +61,16 @@ where
         heard.push(&mixed, cap);
     }
 }
+
+/// A device's name with how it connects in brackets, as the system's own sound settings say it ("Built-in", "USB", "Virtual").
+pub fn label(name: &str, connection: Option<&str>) -> String {
+    match connection {
+        Some(how) => format!("{name} ({how})"),
+        None => name.to_string(),
+    }
+}
+
+/// The loudest sample, 0 to 1.
+pub fn peak(samples: &[f32]) -> f32 {
+    samples.iter().fold(0., |loudest, s| s.abs().max(loudest))
+}

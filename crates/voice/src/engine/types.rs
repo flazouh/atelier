@@ -26,7 +26,7 @@ pub enum Event {
     Level(f32),
     /// The recording is being turned into words.
     Transcribing,
-    /// The words. Empty when nothing was said.
+    /// The words. Never empty: a press with no words ends in [`Event::Failed`] with the reason.
     Transcript(String),
     /// The press ended without words, for this reason.
     Failed(String),
@@ -34,6 +34,11 @@ pub enum Event {
 
 pub(super) enum Command {
     Warm,
-    Start,
+    /// Listen on this microphone, or the system's default.
+    Start(Option<String>),
     Stop,
 }
+
+/// Below this, a recording is not sound at all but silence the system hands over: a microphone that was refused, or a virtual
+/// one with nothing routed to it. A quiet room reads about ten times louder.
+pub const SILENT_BELOW: f32 = 1e-4;

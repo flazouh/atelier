@@ -1,5 +1,5 @@
 //! Runs one press from a terminal: fetches and loads the model if need be, listens for the seconds given (default 4), then prints
-//! the words. `cargo run --release -p atelier-voice --example dictate -- 5`
+//! the words. `cargo run --release -p atelier-voice --example dictate -- 5 [device id]`; it lists the microphones first
 use std::{sync::mpsc, time::Duration};
 
 use atelier_voice::{Engine, Event};
@@ -10,7 +10,11 @@ fn main() {
     let engine = Engine::spawn(move |event| {
         tx.send(event).ok();
     });
-    engine.start();
+    eprintln!("microphone access: {:?}", atelier_voice::access::status());
+    for device in atelier_voice::devices() {
+        eprintln!("{} {} [{}]", if device.is_default { "*" } else { " " }, device.label, device.id);
+    }
+    engine.start(std::env::args().nth(2));
     let mut peak = 0f32;
     let mut last_percent = u64::MAX;
     loop {

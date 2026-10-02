@@ -70,3 +70,15 @@ fn a_long_recording_keeps_only_the_newest_audio() {
     heard.push(&[5., 6., 7., 8.], 6);
     assert_eq!(heard.samples, [3., 4., 5., 6., 7., 8.]);
 }
+
+#[test]
+fn a_device_is_named_with_how_it_connects() {
+    assert_eq!(label("MacBook Pro Microphone", Some("Built-in")), "MacBook Pro Microphone (Built-in)");
+    assert_eq!(label("Headset", None), "Headset");
+}
+
+#[test]
+fn the_peak_is_the_loudest_sample_either_way_up() {
+    assert_eq!(peak(&[0.1, -0.7, 0.3]), 0.7);
+    assert_eq!(peak(&[]), 0.);
+}
