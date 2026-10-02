@@ -378,7 +378,7 @@ impl AgentSession {
     /// has not got it (`read_history`), then the agent.
     pub(super) fn open(&mut self, resume: Option<SessionId>, read_history: bool, cx: &mut Context<Self>) {
         let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink());
-        let request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode };
+        let request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode, provider: None };
         let opening = cx.background_spawn(async move {
             let (history, record) = match &resume {
                 Some(id) if read_history => {

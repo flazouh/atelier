@@ -12,7 +12,7 @@ mod event;
 mod fake;
 
 pub use backend::{
-    Backend, Capabilities, EventSink, ModelChoice, OpenRequest, Session, SessionError, SessionSummary,
+    ApiKey, Backend, Capabilities, EventSink, ModelChoice, OpenRequest, Provider, Session, SessionError, SessionSummary,
 };
 pub use coalesce::EventQueue;
 pub use conversation::{Answer, Call, Conversation, Item, SubagentStatus};

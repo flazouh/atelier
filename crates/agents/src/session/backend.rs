@@ -8,4 +8,4 @@ mod types;
 
 pub use structs::{Capabilities, ModelChoice, OpenRequest, SessionSummary};
 pub use traits::{Backend, Session};
-pub use types::{EventSink, SessionError};
+pub use types::{ApiKey, EventSink, Provider, SessionError};
