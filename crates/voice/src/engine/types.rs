@@ -8,6 +8,15 @@ pub const LEVEL_EVERY: Duration = Duration::from_millis(33);
 /// How often the download's progress is reported, at most.
 pub const PROGRESS_EVERY: Duration = Duration::from_millis(50);
 
+/// How often the words so far are read while it listens, once the model is ready.
+pub const PARTIAL_EVERY: Duration = Duration::from_millis(500);
+
+/// A quiet this long ends a stretch of speech; the stretch is read once, and kept.
+pub(super) const PAUSE: Duration = Duration::from_millis(200);
+
+/// No stretch is cut shorter than this: the model reads a few words worse than a sentence.
+pub(super) const STRETCH_AT_LEAST: Duration = Duration::from_millis(1000);
+
 /// The longest a press records. A key whose release never came (the window lost focus, the app hung) stops here.
 pub const MAX_PRESS: Duration = Duration::from_secs(120);
 
@@ -31,6 +40,9 @@ pub enum Event {
     Listening(Press),
     /// How loud it is now, 0 to 1.
     Level(Press, f32),
+    /// The words heard so far while the press still records; each replaces the one before. The final words come as
+    /// [`Event::Transcript`].
+    Partial(Press, String),
     /// The press ended before the model was ready; its recording waits for it, kept on disk until its words are out.
     Waiting(Press),
     /// A recording kept from an earlier run, for the press `tag` named (see [`Engine::start`](super::Engine::start)). It waits
@@ -59,6 +71,16 @@ pub(super) enum Command {
     Progress(Event),
     /// From the setup thread: the model, or why there is none.
     Loaded(Result<Box<Recognizer>, Error>),
+    /// From a reading thread: the press's words so far, read from the cut at `from`.
+    Read { press: Press, from: usize, reading: Reading },
+}
+
+/// What one reading of a press still recording found.
+pub(super) struct Reading {
+    /// A pause ended a stretch: where the next cut is, and the stretch's words, kept from now on.
+    pub(super) cut: Option<(usize, String)>,
+    /// The words of the stretch still going.
+    pub(super) tail: String,
 }
 
 /// Below this, a recording is not sound at all but silence the system hands over: a microphone that was refused, or a virtual

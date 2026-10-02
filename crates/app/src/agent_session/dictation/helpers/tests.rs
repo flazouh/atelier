@@ -46,6 +46,24 @@ fn the_settings_file_names_the_key_and_leaves_the_default_out() {
 }
 
 #[test]
+fn every_event_about_a_press_reaches_the_session_that_made_it() {
+    let about_press = [
+        Event::Listening(7),
+        Event::Level(7, 0.5),
+        Event::Partial(7, "so far".into()),
+        Event::Waiting(7),
+        Event::Transcribing(7),
+        Event::Transcript(7, "done".into()),
+        Event::Failed(7, "why".into()),
+        Event::Cancelled(7),
+    ];
+    for event in &about_press {
+        assert_eq!(press_of(event), Some(7), "{event:?}");
+    }
+    assert_eq!(press_of(&Event::Ready), None);
+}
+
+#[test]
 fn recovered_words_go_back_to_their_session_or_else_the_first() {
     assert_eq!(recovered_home(&["a", "b"], "b"), Some(1));
     assert_eq!(recovered_home(&["a", "b"], "gone"), Some(0));

@@ -1,5 +1,7 @@
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use cpal::{
@@ -8,9 +10,10 @@ use cpal::{
 };
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-use super::helpers::{feed, label, to_16k};
+use super::helpers::{feed, label};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use super::types::MAX_SECONDS;
+use super::helpers::{to_16k, wav};
 use super::types::Device;
 use crate::Error;
 
@@ -45,19 +48,72 @@ impl Heard {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub struct Recorder {
     // Dropping it ends the capture.
-    stream: cpal::Stream,
+    _source: Source,
     heard: Arc<Mutex<Heard>>,
     rate: u32,
 }
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+/// Where the audio comes from: the microphone, or a file played as if spoken (see [`replay_path`]).
+enum Source {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    Microphone { _stream: cpal::Stream },
+    Replay(Arc<AtomicBool>),
+}
+
+impl Drop for Source {
+    fn drop(&mut self) {
+        #[allow(irrefutable_let_patterns, reason = "the microphone is not built on every system")]
+        if let Source::Replay(stop) = self {
+            stop.store(true, Ordering::Relaxed);
+        }
+    }
+}
+
+/// `ATELIER_DICTATION_REPLAY`: a 16-bit WAV that every press "hears" in real time instead of the microphone, and no
+/// microphone access is asked for. For trying dictation where no one can speak: a test machine, a session over ssh, a box
+/// with no recording built.
+pub fn replay_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("ATELIER_DICTATION_REPLAY").map(Into::into)
+}
+
 impl Recorder {
     /// Opens the microphone `id` (from [`devices`]) and starts listening; the system's default when `id` is `None`, or is no
     /// longer plugged in.
     pub fn start(id: Option<&str>) -> Result<Self, Error> {
+        if let Some(path) = replay_path() {
+            return Self::replay(&path);
+        }
+        Self::microphone(id)
+    }
+
+    /// Plays the WAV at `path` into the recording as fast as it would be spoken.
+    fn replay(path: &std::path::Path) -> Result<Self, Error> {
+        let (rate, samples) = wav(&std::fs::read(path).map_err(|why| Error::Microphone(format!("{}: {why}", path.display())))?)
+            .ok_or_else(|| Error::Microphone(format!("{} is not a 16-bit WAV", path.display())))?;
+        let heard = Arc::new(Mutex::new(Heard::default()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let (sink, stopped) = (heard.clone(), stop.clone());
+        std::thread::spawn(move || {
+            let step = rate as usize / 50;
+            let begun = std::time::Instant::now();
+            for (i, chunk) in samples.chunks(step).enumerate() {
+                if stopped.load(Ordering::Relaxed) {
+                    return;
+                }
+                let due = begun + std::time::Duration::from_millis(20 * i as u64);
+                std::thread::sleep(due.saturating_duration_since(std::time::Instant::now()));
+                if let Ok(mut h) = sink.lock() {
+                    h.push(chunk, usize::MAX);
+                }
+            }
+        });
+        Ok(Self { _source: Source::Replay(stop), heard, rate })
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    fn microphone(id: Option<&str>) -> Result<Self, Error> {
         let mic = Error::Microphone;
         let host = cpal::default_host();
         let chosen = id.and_then(|id| id.parse::<cpal::DeviceId>().ok()).and_then(|id| host.device_by_id(&id));
@@ -76,7 +132,12 @@ impl Recorder {
         }
         .map_err(|why| mic(why.to_string()))?;
         stream.play().map_err(|why| mic(why.to_string()))?;
-        Ok(Self { stream, heard, rate })
+        Ok(Self { _source: Source::Microphone { _stream: stream }, heard, rate })
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    fn microphone(_: Option<&str>) -> Result<Self, Error> {
+        Err(Error::Microphone("recording is not built for this system yet".into()))
     }
 
     /// The RMS of the audio since this was last asked, 0 when there was none.
@@ -89,10 +150,16 @@ impl Recorder {
         self.heard.lock().map_or(0, |h| h.samples.len())
     }
 
+    /// Everything heard so far, at 16 kHz mono, while it goes on listening.
+    pub fn snapshot(&self) -> Vec<f32> {
+        let samples = self.heard.lock().map(|h| h.samples.clone()).unwrap_or_default();
+        to_16k(&samples, self.rate)
+    }
+
     /// Stops listening and gives back everything heard, at 16 kHz mono.
     pub fn finish(self) -> Vec<f32> {
-        let Self { stream, heard, rate } = self;
-        drop(stream);
+        let Self { _source, heard, rate } = self;
+        drop(_source);
         let samples = heard.lock().map(|mut h| std::mem::take(&mut h.samples)).unwrap_or_default();
         to_16k(&samples, rate)
     }
@@ -145,24 +212,3 @@ pub fn devices() -> Vec<Device> {
     Vec::new()
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-pub struct Recorder;
-
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
-impl Recorder {
-    pub fn start(_: Option<&str>) -> Result<Self, Error> {
-        Err(Error::Microphone("recording is not built for this system yet".into()))
-    }
-
-    pub fn take_rms(&self) -> f32 {
-        0.
-    }
-
-    pub fn heard(&self) -> usize {
-        0
-    }
-
-    pub fn finish(self) -> Vec<f32> {
-        Vec::new()
-    }
-}
