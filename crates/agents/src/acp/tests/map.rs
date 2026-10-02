@@ -5,7 +5,7 @@ use serde_json::json;
 
 use super::{Run, chunk, update};
 use crate::session::{
-    BlockId, Command, Event, TodoStatus, ToolId, ToolKind, ToolOutput, ToolStatus, TurnOutcome,
+    BlockId, Command, Event, FileEdit, TodoStatus, ToolId, ToolKind, ToolOutput, ToolStatus, TurnOutcome,
 };
 
 /// A session with a turn running: atelier's prompt is request 2.
@@ -95,13 +95,33 @@ fn a_diff_with_no_old_text_is_a_write_and_its_output_says_what_changed() {
     assert_eq!(call.kind, ToolKind::Write);
     assert_eq!(call.status, ToolStatus::Running, "a call announced as done still starts as running");
     assert_eq!(call.file.as_deref(), Some("/work/project/new.rs"), "a diff names the file");
-    assert!(matches!(&events[1], Event::ToolFinished { output, .. } if output.text == "Created /work/project/new.rs"));
+    assert!(matches!(events.last(), Some(Event::ToolFinished { output, .. }) if output.text == "Created /work/project/new.rs"));
 
     let edit = json!([{ "type": "diff", "path": "/work/project/a.rs", "oldText": "a", "newText": "b" }]);
     run.agent(tool_call(json!({ "toolCallId": "t2", "title": "Edit a.rs", "kind": "edit", "status": "completed", "content": edit })));
     let events = run.events();
     assert!(matches!(&events[0], Event::ToolStarted(call) if call.kind == ToolKind::Edit));
-    assert!(matches!(&events[1], Event::ToolFinished { output, .. } if output.text == "Changed /work/project/a.rs"));
+    assert!(matches!(events.last(), Some(Event::ToolFinished { output, .. }) if output.text == "Changed /work/project/a.rs"));
+}
+
+/// A diff is the call's edit in the words every agent shares: a new file has no old text, Cursor's `-- /dev/null`
+/// included, and the edit is told before the call ends, so it shows with the call.
+#[test]
+fn a_diff_is_told_as_the_calls_edit_before_it_ends() {
+    let mut run = turn();
+    let edit = json!([{ "type": "diff", "path": "/work/project/a.rs", "oldText": "a", "newText": "b" }]);
+    run.agent(tool_call(json!({ "toolCallId": "t1", "title": "Edit a.rs", "kind": "edit", "status": "completed", "content": edit })));
+    let events = run.events();
+    let told = events.iter().position(|e| matches!(e, Event::ToolEdit { id, edit } if id.as_str() == "t1" && *edit == FileEdit { path: "/work/project/a.rs".into(), old: "a".into(), new: "b".into() }));
+    let finished = events.iter().position(|e| matches!(e, Event::ToolFinished { .. }));
+    assert!(told.is_some() && told < finished, "{events:?}");
+
+    run.agent(tool_call(json!({ "toolCallId": "t2", "title": "Edit File", "kind": "edit", "status": "pending" })));
+    assert!(!run.events().iter().any(|e| matches!(e, Event::ToolEdit { .. })), "no diff, no edit");
+    let created = json!([{ "type": "diff", "path": "/work/project/new.rs", "oldText": "-- /dev/null", "newText": "x" }]);
+    run.agent(tool_update(json!({ "toolCallId": "t2", "status": "completed", "content": created })));
+    let events = run.events();
+    assert!(events.iter().any(|e| matches!(e, Event::ToolEdit { edit, .. } if *edit == FileEdit { path: "/work/project/new.rs".into(), old: String::new(), new: "x".into() })), "{events:?}");
 }
 
 #[test]

@@ -51,6 +51,8 @@ fn text_thinking_and_a_tool_call_build_a_reply_in_order_with_usage() {
             Delta::Text("lo".into()),
             Delta::BlockEnd,
             Delta::ToolStart { id: "t1".into(), name: "read".into() },
+            Delta::ToolInput { id: "t1".into(), piece: "{\"path".into() },
+            Delta::ToolInput { id: "t1".into(), piece: "\":\"a\"}".into() },
             Delta::ToolDone { id: "t1".into(), input: json!({"path": "a"}) },
         ]
     );

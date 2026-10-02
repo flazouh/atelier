@@ -12,7 +12,7 @@ use crate::session::{
 };
 use super::types::Open;
 use super::helpers::{
-    choice_kind, content_text, diff_path, file_of, open_status, output, status, todo, tool_kind,
+    choice_kind, content_text, diff_path, edit_of, file_of, open_status, output, status, todo, tool_kind,
 };
 
 /// A call as far as the updates have told it: the call atelier shows, and what it returned so far.
@@ -180,6 +180,9 @@ impl Mapper {
             status: status(update.status.as_deref()).unwrap_or(ToolStatus::Pending),
         };
         events.push(Event::ToolStarted(ToolCall { status: open_status(call.status), ..call.clone() }));
+        if let Some(edit) = edit_of(&content) {
+            events.push(Event::ToolEdit { id: id.clone(), edit });
+        }
         self.order.push(id.clone());
         self.calls.insert(id.clone(), Seen { call, content, raw_output: update.raw_output });
         if let Some(end) = self.finish_if_ended(&id) {
@@ -195,7 +198,9 @@ impl Mapper {
         }
         let mut events = self.settle(now);
         let before = self.calls[&id].call.clone();
+        let edit_before = edit_of(&self.calls[&id].content);
         self.merge(&id, &update);
+        let edit = edit_of(&self.calls[&id].content).filter(|edit| Some(edit) != edit_before.as_ref());
         let after = &self.calls[&id].call;
         if after.input != before.input {
             events.push(Event::ToolInput { id: id.clone(), input: after.input.clone(), file: after.file.clone() });
@@ -204,6 +209,9 @@ impl Mapper {
         }
         if after.kind != before.kind {
             events.push(Event::ToolKind { id: id.clone(), kind: after.kind });
+        }
+        if let Some(edit) = edit {
+            events.push(Event::ToolEdit { id: id.clone(), edit });
         }
         match after.status {
             ToolStatus::Done | ToolStatus::Failed if before.status != after.status => events.extend(self.finish_if_ended(&id)),

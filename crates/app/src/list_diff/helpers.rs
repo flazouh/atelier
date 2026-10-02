@@ -16,7 +16,7 @@ pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
         Item::User { text } => (0, text.len(), 0),
         Item::Text { text, .. } => (1, text.len(), 0),
         Item::Thinking { text, took, .. } => (2, text.len(), usize::from(took.is_some())),
-        Item::Tool(call) => (3, tool(call.call.status), call.output.as_ref().map_or(0, |o| o.text.len() + 1)),
+        Item::Tool(call) => (3, tool(call.call.status) + 4 * call.edit.as_ref().map_or(0, |e| e.old.len() + e.new.len() + 1), call.output.as_ref().map_or(0, |o| o.text.len() + 1)),
         Item::Subagent { status, activity, calls, summary, .. } => {
             let status = match status {
                 SubagentStatus::Running => 0,

@@ -22,6 +22,7 @@ use crate::{
     list_diff,
     review_state::{Record, ReviewState, record_path},
     status,
+    tool_density::{ToolDensity, tool_density},
 };
 use super::types::{ARRIVAL_KEPT, OVERDRAW, SAVE_AFTER, SessionEvent};
 use super::helpers::{is_activity, mode_from, mode_word, now, problem_words};
@@ -123,6 +124,9 @@ pub struct AgentSession {
     _skills: Subscription,
     _key: Subscription,
     _away: Subscription,
+    /// How the list shows tool calls, as the Settings page set it: [`ToolDensity::Grouped`] folds a run of work into one row.
+    density: ToolDensity,
+    _density: Subscription,
     _pump: Task<()>,
     _start: Task<()>,
 }
@@ -209,6 +213,19 @@ impl AgentSession {
             let run = runs_picked_skills(cx);
             this.composer.update(cx, |c, _| c.set_run_picked_skills(run));
         });
+        let _density = cx.observe_global::<ToolDensity>(|this: &mut Self, cx| {
+            let density = tool_density(cx);
+            if density == this.density {
+                return;
+            }
+            this.density = density;
+            // Every row is drawn another way: the list measures them all again, and none of them arrives anew.
+            this.list.splice(0..this.rows.len(), 0);
+            this.rows.clear();
+            this.refresh_rows();
+            this.arrived.clear();
+            cx.notify();
+        });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
             PromptInputEvent::Submit(text) => this.send(text.to_string(), cx),
             PromptInputEvent::Stop => this.interrupt(cx),
@@ -293,6 +310,8 @@ impl AgentSession {
             _skills,
             _key,
             _away,
+            density: tool_density(cx),
+            _density,
             changed: std::rc::Rc::default(),
             _changed: Task::ready(()),
             _pump,
@@ -535,7 +554,10 @@ impl AgentSession {
     /// Tells the list which rows to measure again.
     pub(crate) fn refresh_rows(&mut self) {
         let items = self.conversation.items();
-        let shown = list_diff::grouped(items, &|ix| crate::session_view::calls::shows(items, ix), &self.reviews.turn_marks);
+        let shown = match self.density {
+            ToolDensity::Grouped => list_diff::grouped(items, &|ix| crate::session_view::calls::shows(items, ix), &self.reviews.turn_marks),
+            ToolDensity::Lines | ToolDensity::Detailed => list_diff::rows(items.len(), &self.reviews.turn_marks),
+        };
         let after: Vec<_> = shown
             .iter()
             .map(|row| match *row {

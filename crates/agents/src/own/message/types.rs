@@ -65,6 +65,8 @@ pub enum Delta {
     Text(String),
     Thinking(String),
     ToolStart { id: String, name: String },
+    /// The next piece of a call's input, as JSON text that is not whole yet.
+    ToolInput { id: String, piece: String },
     /// A call's input is whole.
     ToolDone { id: String, input: Value },
     BlockEnd,

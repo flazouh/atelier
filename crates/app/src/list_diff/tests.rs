@@ -45,6 +45,7 @@ fn tool(name: &str) -> Item {
     Item::Tool(Call {
         call: ToolCall { id: ToolId::new(name), name: name.into(), kind: ToolKind::Other, input: serde_json::json!({}), file: None, parent: None, status: ToolStatus::Done },
         output: None,
+        edit: None,
     })
 }
 
@@ -98,4 +99,27 @@ fn a_row_arrives_once_even_when_it_joins_a_group() {
     let after = [Row::Item(0), Row::Activity { from: 1, to: 3 }, Row::Changes { turn: 0 }, Row::Item(3)];
     assert_eq!(arrivals(&before, &after), vec![Arrival::Card(0), Arrival::Item(3)]);
     assert!(arrivals(&after, &after).is_empty(), "a group that grows is the same row");
+}
+
+/// An edit's text streams into its call, so the row measures again as the text grows.
+#[test]
+fn a_tool_calls_fingerprint_follows_its_edit_as_it_streams() {
+    use atelier_agents::session::{Call, FileEdit, ToolCall, ToolId, ToolKind, ToolStatus};
+    let edit = |new: &str| {
+        Item::Tool(Call {
+            call: ToolCall {
+                id: ToolId::new("t"),
+                name: "Edit".into(),
+                kind: ToolKind::Edit,
+                input: serde_json::Value::Null,
+                file: None,
+                parent: None,
+                status: ToolStatus::Running,
+            },
+            output: None,
+            edit: Some(FileEdit { path: "/w/a.rs".into(), old: "a".into(), new: new.into() }),
+        })
+    };
+    assert_ne!(fingerprint(&edit("b")), fingerprint(&edit("b\nc")));
+    assert_eq!(fingerprint(&edit("b")), fingerprint(&edit("b")));
 }

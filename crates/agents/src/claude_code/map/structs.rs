@@ -220,7 +220,7 @@ impl Mapper {
                 Block::ToolUse { id, name, .. } => {
                     let deferred = tools::starts_subagent(&name) || tools::todo_tool(&name).is_some();
                     // A deferred call never names a file the review needs, so its input is not followed.
-                    self.open.insert(index, Open::Tool { id: ToolId::new(&id), json: String::new(), targeted: deferred });
+                    self.open.insert(index, Open::Tool { id: ToolId::new(&id), name: name.clone(), json: String::new(), targeted: deferred, shown: None });
                     if deferred {
                         return Vec::new();
                     }
@@ -229,15 +229,22 @@ impl Mapper {
                 Block::ToolResult { .. } | Block::Other => Vec::new(),
             },
             StreamEvent::ContentBlockDelta { index, delta } => match (self.open.get_mut(&index), delta) {
-                (Some(Open::Tool { id, json, targeted: targeted @ false }), Delta::InputJson { partial_json }) => {
+                (Some(Open::Tool { id, name, json, targeted, shown }), Delta::InputJson { partial_json }) if !*targeted || tools::streams_input(name) => {
                     json.push_str(&partial_json);
-                    match tools::file_in_partial_input(json) {
-                        Some(file) => {
-                            *targeted = true;
-                            vec![Event::ToolTarget { id: id.clone(), file }]
-                        }
-                        None => Vec::new(),
+                    let mut events = Vec::new();
+                    if !*targeted && let Some(file) = tools::file_in_partial_input(json) {
+                        *targeted = true;
+                        events.push(Event::ToolTarget { id: id.clone(), file });
                     }
+                    // An edit's text is told as it arrives, so the panel can show it being written, once its file is named.
+                    if *targeted
+                        && let Some(edit) = crate::partial_json::fields(json).and_then(|input| tools::edit_of(name, &input))
+                        && shown.as_ref() != Some(&edit)
+                    {
+                        events.push(Event::ToolEdit { id: id.clone(), edit: edit.clone() });
+                        *shown = Some(edit);
+                    }
+                    events
                 }
                 (Some(Open::Text(block)), Delta::Text { text }) if !text.is_empty() => {
                     vec![Event::Text { block: *block, delta: text }]
@@ -402,10 +409,14 @@ impl Mapper {
             self.hidden.insert(id.clone());
             return self.edit_todos(id, tool, &input);
         }
-        if self.running.contains(&id) {
-            return vec![Event::ToolInput { id, file: tools::file(&input), input }];
-        }
-        self.announce(id, name, input, parent)
+        let edit = tools::edit_of(&name, &input).map(|edit| Event::ToolEdit { id: id.clone(), edit });
+        let mut events = if self.running.contains(&id) {
+            vec![Event::ToolInput { id, file: tools::file(&input), input }]
+        } else {
+            self.announce(id, name, input, parent)
+        };
+        events.extend(edit);
+        events
     }
 
     fn edit_todos(&mut self, id: ToolId, tool: TodoTool, input: &Value) -> Vec<Event> {

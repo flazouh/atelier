@@ -18,6 +18,7 @@ A session pushes **events** into a sink and takes **commands**. Both are plain d
 | `UserMessage` | A user message atelier did not send: history, or another client. |
 | `Text`, `Thinking` | Streamed deltas of a block. `ThinkingDone` carries the time it took. |
 | `ToolStarted`, `ToolInput`, `ToolStatus`, `ToolFinished` | One tool call: its name, its `ToolKind`, its input, its file, its output. |
+| `ToolEdit` | The text an edit or a write changes, as a `FileEdit` (path, old text, new text): told again as it grows while the agent writes the call. |
 | `SubagentStarted`, `SubagentProgress`, `SubagentEnded` | A subagent: its task, kind and model. Its calls carry it as `parent`. |
 | `Todos` | The whole todo list, each time it changes. |
 | `Permission`, `PermissionCancelled` | A question with its tool call and its choices as data. |
@@ -36,6 +37,18 @@ text writes them out with `message_text`. `crates/review` makes the comments (`d
 input is whole and before the tool runs. Claude Code sends the input as `input_json_delta` chunks; the
 mapper reads the file out of the first top-level `file_path`, `notebook_path` or `path` key whose value has
 closed. A review takes the file's text before the edit lands from this event.
+
+`ToolEdit { id, edit }` is the one way the UI learns what an edit changes. Each backend fills the `FileEdit` from
+its own words, and the UI reads only it and the call's `ToolKind`, never a tool's name or its input's keys:
+
+| Backend | Where the edit comes from | Streams as it is written |
+| --- | --- | --- |
+| Claude Code | `Edit` (`file_path`, `old_string`, `new_string`) and `Write` (`content`), read from the `input_json_delta` chunks once the file has closed, and again from the whole input. `MultiEdit` has none. | Yes |
+| Own agent | Each tool's `Tool::edit` (`edit`, `write`), from the Anthropic `input_json_delta` chunks or the OpenAI argument pieces once the path has closed, and again from the whole input. | Yes |
+| ACP | The first `diff` in a call's content. A new file (no old text, or Cursor's `-- /dev/null`) has no old text. | No: Cursor sends the path while the call runs and the diff only when it is done (checked on 2026.10.01-14929f9). |
+
+`crate::partial_json` reads the string fields of an input that is not whole yet, for every backend that gets it in
+pieces. When `ToolEdit`s of one call come back to back in one frame, only the newest is kept.
 
 A tool call names its tool as data. `ToolKind` (read, edit, write, search, shell, fetch, other) lets the
 UI pick a look without knowing the agent's names. A permission request carries its choices, each with a
@@ -129,7 +142,8 @@ again with the new model.
 | `stream_event`: `content_block_start` (`text`, `thinking`, `tool_use`) | `Text`, `Thinking` (empty, "the agent thinks now"), `ToolStarted` with no input yet. |
 | `stream_event`: `content_block_delta` (`text_delta`, `thinking_delta`) | `Text`, `Thinking`. Empty deltas are dropped. |
 | `stream_event`: `content_block_stop` | `ThinkingDone` with the time atelier measured. |
-| `assistant` (one line per finished block) | `ToolInput` for a streamed call. Text and thinking only when the message did not stream (a transcript). |
+| `stream_event`: `content_block_delta` (`input_json_delta`) | `ToolTarget` once the file key has closed, then `ToolEdit` for an `Edit` or a `Write` each time its text grows. |
+| `assistant` (one line per finished block) | `ToolInput` for a streamed call, and `ToolEdit` for an `Edit` or a `Write`. Text and thinking only when the message did not stream (a transcript). |
 | `user` with a `tool_result` | `ToolFinished`. |
 | `control_request` `can_use_tool` | `Permission` |
 | `control_cancel_request` | `PermissionCancelled` |
@@ -219,7 +233,7 @@ over the protocol. The agent starts through `Project::spawn`, on the host.
 | `SetPermissionMode` | `session/set_mode` with the agent's name for the mode. A mode it has no name for is `Unsupported`. |
 | `SetModel` | The agent's `model` config option when it has one, else `session/set_model` (unstable). A model given by its name is set by the full id the agent listed. |
 | `Text`, `Thinking` | `agent_message_chunk`, `agent_thought_chunk`. |
-| `ToolStarted`, `ToolInput`, `ToolTarget`, `ToolFinished` | `tool_call` and `tool_call_update`, merged by id. The kind maps to `ToolKind` (read, edit, search, execute as shell, fetch; delete and move as edit; others as other). An edit whose diff has no old text is a write. Locations and diffs give `file`. |
+| `ToolStarted`, `ToolInput`, `ToolTarget`, `ToolFinished` | `tool_call` and `tool_call_update`, merged by id. The kind maps to `ToolKind` (read, edit, search, execute as shell, fetch; delete and move as edit; others as other). An edit whose diff has no old text is a write. Locations and diffs give `file`, and a diff gives `ToolEdit`. |
 | `Todos` | `plan` updates: the whole list each time. |
 | `Permission` | The agent's request `session/request_permission`. Its options become `Choice`s, the call's content is the reason, and `Answer` is the response. |
 | `Started` | The session's id, mode and model, again each time the agent changes them (`current_mode_update`, `config_option_update`) or names its commands (`available_commands_update`). |
@@ -342,7 +356,8 @@ keeps no tool call that has no result.
 `retry-after` the API gave. Only when nothing of the reply has been shown: a reply that broke halfway is a
 failed turn, not a repeat of text. A refused key, a bad request and a missing model are not retried.
 **Tools and events.** A call emits `ToolStarted` (kind, `Pending`) as the model names it, `ToolInput` and
-`ToolTarget` when its input is whole (before the tool runs), `ToolStatus` `Running`, and `ToolFinished`. `list`
+`ToolTarget` when its input is whole (before the tool runs), `ToolEdit` for `edit` and `write` while the input streams
+and when it is whole, `ToolStatus` `Running`, and `ToolFinished`. `list`
 and `search` are kind `Search`. Paths are checked to be inside the project. `write` makes the folder. `edit` fails
 when the text is missing or appears more than once. `shell` runs `sh -c` with stderr joined to stdout, stops at
 `timeout_secs` (120, at most 600) or an interrupt, kills the command's whole process tree (through the project, so

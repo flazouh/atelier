@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use super::structs::{
-    BlockId, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
+    BlockId, FileEdit, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
     ToolOutput, TurnEnd, Usage,
 };
 
@@ -76,6 +76,9 @@ pub enum Event {
     ToolTarget { id: ToolId, file: String },
     /// The whole input of a call announced before its input was known, and the file it names.
     ToolInput { id: ToolId, input: Value, file: Option<String> },
+    /// The text of an edit or a write, as far as it is known: told again as it grows while the agent writes the call, and
+    /// when the call is whole. Each telling replaces the last.
+    ToolEdit { id: ToolId, edit: FileEdit },
     ToolStatus { id: ToolId, status: ToolStatus },
     /// What a call does, when an update shows more than its start did: an edit that makes a new file is a write.
     ToolKind { id: ToolId, kind: ToolKind },

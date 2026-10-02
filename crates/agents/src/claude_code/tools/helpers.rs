@@ -1,6 +1,8 @@
 use serde_json::Value;
 
-use crate::session::ToolKind;
+use crate::partial_json::string_end;
+
+use crate::session::{FileEdit, ToolKind};
 use super::types::{FILE_KEYS, TodoTool};
 
 pub(in super::super) fn kind(name: &str) -> ToolKind {
@@ -12,6 +14,23 @@ pub(in super::super) fn kind(name: &str) -> ToolKind {
         "Bash" | "BashOutput" | "KillShell" => ToolKind::Shell,
         "WebFetch" | "WebSearch" => ToolKind::Fetch,
         _ => ToolKind::Other,
+    }
+}
+
+/// Whether a tool's input is text the reader can watch being written: an edit's old and new text, a file's content.
+pub(in super::super) fn streams_input(name: &str) -> bool {
+    matches!(name, "Edit" | "Write")
+}
+
+/// The text an Edit or a Write changes, in the words every agent shares; a text not there yet is empty. `None` for
+/// another tool, and until the file is named. A MultiEdit has no one text and shows as its row.
+pub(in super::super) fn edit_of(name: &str, input: &Value) -> Option<FileEdit> {
+    let text = |key: &str| input.get(key).and_then(Value::as_str).unwrap_or("").to_string();
+    let path = input.get("file_path")?.as_str()?.to_string();
+    match name {
+        "Edit" => Some(FileEdit { path, old: text("old_string"), new: text("new_string") }),
+        "Write" => Some(FileEdit { path, old: String::new(), new: text("content") }),
+        _ => None,
     }
 }
 
@@ -46,20 +65,6 @@ pub(in super::super) fn file_in_partial_input(json: &str) -> Option<String> {
                 }
                 i = end;
             }
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
-
-/// The index of the quote that closes the string opening at `start`, or `None` while it is still open.
-fn string_end(bytes: &[u8], start: usize) -> Option<usize> {
-    let mut i = start + 1;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\\' => i += 1,
-            b'"' => return Some(i),
             _ => {}
         }
         i += 1;

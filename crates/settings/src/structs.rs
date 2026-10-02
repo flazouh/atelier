@@ -63,6 +63,8 @@ pub struct Settings {
     pub dictation_hold: Option<bool>,
     /// The key that dictates while held: `fn` (the default), `right-option` or `left-option`.
     pub dictation_key: Option<String>,
+    /// How much of the agent's tool calls a session shows: "grouped", "lines" or "detailed". Unset: grouped.
+    pub tool_density: Option<String>,
     /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
     pub sidebar_layout: SidebarSaved,
     /// Keys a newer or older atelier wrote, kept as they are.
