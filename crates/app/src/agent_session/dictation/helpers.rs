@@ -126,8 +126,16 @@ pub(super) fn recovered_home(keys: &[&str], tag: &str) -> Option<usize> {
 pub fn take_recovered(key: gpui_kit::SharedString, session: gpui_kit::WeakEntity<super::super::AgentSession>, window: AnyWindowHandle, cx: &mut App) {
     speech(cx);
     let recovery = cx.global::<Speech>().recovery.clone();
-    recovery.borrow_mut().sessions.push((key, session, window));
-    cx.defer(move |cx| deliver(&recovery, cx));
+    let waiting = {
+        let mut r = recovery.borrow_mut();
+        r.sessions.push((key, session, window));
+        !r.unclaimed.is_empty()
+    };
+    // Deferred, since the session is still being built; and only when there are words, as a deferred update on every new
+    // session shifts when its rows first draw.
+    if waiting {
+        cx.defer(move |cx| deliver(&recovery, cx));
+    }
 }
 
 /// For an event about the model's setup, the step it shows (`None` inside: the setup failed); for any other, `None`. Keeps the
