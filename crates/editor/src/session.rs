@@ -4,9 +4,9 @@
 //! for its hover card; problems are checked on open and again whenever typing pauses.
 //!
 //! Nothing here names a language: the file's path picks the server from `atelier_lsp::servers`, and
-//! [`LspWorker`] runs it on a thread of its own, so no answer ever holds the window.
+//! [`LspWorker`](atelier_lsp::LspWorker) runs it on a thread of its own, so no answer ever holds the window.
 //!
-//! A pull request's diff shows removed rows the file does not have. Its session holds a [`RowMap`]:
+//! A pull request's diff shows removed rows the file does not have. Its session holds a [`RowMap`](atelier_ui::RowMap):
 //! the server reads the file without them, and every row in this file is mapped across at this
 //! boundary, so everything else here counts shown rows. A jump into another file goes to the owner
 //! ([`Elsewhere`]) when there is one; otherwise the status line names the place.

@@ -1,8 +1,4 @@
-use std::{
-    path::PathBuf,
-    rc::Rc,
-    sync::{Arc},
-};
+use std::{path::PathBuf, rc::Rc, sync::Arc};
 
 use futures_channel::{mpsc, oneshot};
 use gpui_kit::{
@@ -12,7 +8,7 @@ use gpui_kit::{
     SharedString,
     Task,
     Window,
-    base::input::{self},
+    base::input,
     component::input::EditorState,
 };
 use atelier_lsp::{LspError, LspWorker, Reply, Target, Workers, client::uri_to_path};
