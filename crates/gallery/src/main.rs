@@ -378,7 +378,7 @@ impl Gallery {
             self.agent_panels = Some(cx.new(|cx| panels_story::PanelsStory::new(window, cx)));
         }
         if self.story == Story::Voice && self.voice.is_none() {
-            self.voice = Some(cx.new(|_| voice_story::VoiceStory::new()));
+            self.voice = Some(cx.new(voice_story::VoiceStory::new));
         }
         if self.story == Story::AgentReplay && self.agent_replay.is_none() {
             self.agent_replay = Some(cx.new(|cx| replay_story::ReplayStory::new(window, cx)));
