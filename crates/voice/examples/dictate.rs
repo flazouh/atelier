@@ -1,5 +1,5 @@
-//! Runs one press from a terminal: fetches and loads the model if need be, listens for the seconds given (default 4), then prints
-//! the words. `cargo run --release -p atelier-voice --example dictate -- 5 [device id]`; it lists the microphones first
+//! Runs one press from a terminal: listens at once for the seconds given (default 4) while the model is fetched and loaded if
+//! need be, then prints the words. `cargo run --release -p atelier-voice --example dictate -- 5 [device id]`; it lists the microphones first
 use std::{sync::mpsc, time::Duration};
 
 use atelier_voice::{Engine, Event};
@@ -14,7 +14,8 @@ fn main() {
     for device in atelier_voice::devices() {
         eprintln!("{} {} [{}]", if device.is_default { "*" } else { " " }, device.label, device.id);
     }
-    engine.start(std::env::args().nth(2));
+    let pressed = std::time::Instant::now();
+    let press = engine.start(std::env::args().nth(2));
     let mut peak = 0f32;
     let mut last_percent = u64::MAX;
     loop {
@@ -26,20 +27,20 @@ fn main() {
                     eprintln!("download {percent}% ({} / {} MB)", done / 1_000_000, total / 1_000_000);
                 }
             }
-            Ok(Event::Level(level)) => peak = peak.max(level),
-            Ok(Event::Listening) => {
-                eprintln!("listening for {seconds} s: speak now");
+            Ok(Event::Level(_, level)) => peak = peak.max(level),
+            Ok(Event::Listening(_)) => {
+                eprintln!("listening {} ms after the press, for {seconds} s: speak now", pressed.elapsed().as_millis());
                 let engine_stop = std::time::Instant::now() + Duration::from_secs(seconds);
                 while std::time::Instant::now() < engine_stop {
-                    if let Ok(Event::Level(level)) = events.recv_timeout(Duration::from_millis(50)) {
+                    if let Ok(Event::Level(_, level)) = events.recv_timeout(Duration::from_millis(50)) {
                         peak = peak.max(level);
                     }
                 }
                 eprintln!("peak level {peak:.2}");
-                engine.stop();
+                engine.stop(press);
             }
-            Ok(Event::Transcript(words)) => return println!("transcript: {words:?}"),
-            Ok(Event::Failed(why)) => return println!("failed: {why}"),
+            Ok(Event::Transcript(_, words)) => return println!("transcript: {words:?} ({} ms after the press)", pressed.elapsed().as_millis()),
+            Ok(Event::Failed(_, why)) => return println!("failed: {why}"),
             Ok(other) => eprintln!("{other:?}"),
             Err(_) => {}
         }

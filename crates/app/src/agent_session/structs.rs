@@ -121,6 +121,8 @@ pub struct AgentSession {
     pub thinking_since: HashMap<atelier_agents::session::BlockId, Instant>,
     _composer: Subscription,
     _skills: Subscription,
+    _key: Subscription,
+    _away: Subscription,
     _pump: Task<()>,
     _start: Task<()>,
 }
@@ -218,6 +220,7 @@ impl AgentSession {
             }
             PromptInputEvent::DictationStart => this.dictation_start(window, cx),
             PromptInputEvent::DictationStop => this.dictation_stop(cx),
+            PromptInputEvent::DictationCancel => this.dictation_cancel(cx),
             PromptInputEvent::DictationDevices => this.dictation_devices(cx),
             PromptInputEvent::DictationDevice(id) => this.dictation_device(id.clone(), cx),
             PromptInputEvent::DictationHold(hold) => this.dictation_hold(*hold, cx),
@@ -225,6 +228,12 @@ impl AgentSession {
             PromptInputEvent::Command { name, args } => this.run_command(name, args, cx),
         });
         super::dictation::warm(cx);
+        let _key = super::dictation::hear_key(&composer, window, cx);
+        let _away = cx.observe_window_activation(window, |_, window, cx| {
+            if !window.is_window_active() {
+                super::dictation::key_away(cx);
+            }
+        });
         let (id, title) = match &resume {
             Some((id, title)) => (Some(id.clone()), title.clone()),
             None => (None, "New session".into()),
@@ -282,6 +291,8 @@ impl AgentSession {
             thinking_since: HashMap::new(),
             _composer,
             _skills,
+            _key,
+            _away,
             changed: std::rc::Rc::default(),
             _changed: Task::ready(()),
             _pump,

@@ -13,11 +13,12 @@ pub mod demo;
 pub mod engine;
 pub mod error;
 pub mod files;
+pub mod hotkey;
 pub mod recognizer;
 mod types;
 
 pub use cue::Cue;
 pub use capture::{Device, devices};
-pub use engine::{Engine, Event};
+pub use engine::{Engine, Event, Press};
 pub use error::Error;
 pub use types::{START, STOP};

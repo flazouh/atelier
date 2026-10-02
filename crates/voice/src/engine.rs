@@ -1,22 +1,22 @@
-//! The one worker thread dictation runs on. The app says [`Engine::start`] and [`Engine::stop`] and hears [`Event`]s; the
-//! fetching, the loading, the listening and the recognizing all happen here, off the UI thread.
+//! The one worker thread dictation runs on. The app says [`Engine::start`], [`Engine::stop`] and [`Engine::cancel`] and hears
+//! [`Event`]s; the listening and the recognizing happen here, and the fetching and loading on a thread beside it, all off the UI
+//! thread.
 //!
-//! A press of the microphone goes through up to four steps, and the app is told of each:
+//! A press opens the microphone at once ([`Event::Listening`], then [`Event::Level`]), whether or not the model is here yet:
+//! the person talks while it comes. The model is fetched if it is missing ([`Event::Download`]), checked and kept, then
+//! loaded ([`Event::Prepare`], [`Event::Ready`]). [`Engine::fetch`] starts that early, when the person shows they mean to
+//! dictate.
 //!
-//! 1. The model is not on this machine: it is fetched ([`Event::Download`]), checked, and kept.
-//! 2. The model is not in memory: it loads ([`Event::Prepare`], a few seconds).
-//! 3. If either of those ran, [`Event::Ready`], and a beat for the person to see it.
-//! 4. The microphone opens ([`Event::Listening`]) and its level streams in ([`Event::Level`]) until stop.
-//!
-//! Stop turns the recording into words ([`Event::Transcribing`], then [`Event::Transcript`]). Anything that fails ends the
-//! press with [`Event::Failed`], in words for the person.
+//! Stop turns the recording into words ([`Event::Transcribing`], then [`Event::Transcript`]) at once if the model is ready.
+//! If not, the recording waits ([`Event::Waiting`]) and is read the moment it is. Anything that fails ends the press with
+//! [`Event::Failed`], in words for the person; a failed setup ([`Event::SetupFailed`]) keeps the recordings for the next try.
 
 mod helpers;
 mod structs;
 mod types;
 
 pub use structs::Engine;
-pub use types::{Event, LEVEL_EVERY, PROGRESS_EVERY, READY_BEAT, SILENT_BELOW};
+pub use types::{Event, LEVEL_EVERY, MAX_PRESS, PROGRESS_EVERY, Press, SILENT_BELOW};
 
 #[cfg(test)]
 mod tests;
