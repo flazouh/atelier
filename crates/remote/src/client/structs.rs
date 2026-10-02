@@ -52,7 +52,7 @@ impl Timeouts {
 
 /// A process on the host, as the client sees it.
 pub(super) struct Pipes {
-    pub(super) output: Option<mpsc::Sender<Vec<u8>>>,
+    output: Option<mpsc::Sender<Vec<u8>>>,
     pub(super) reader: Option<mpsc::Receiver<Vec<u8>>>,
     pub(super) exit: Arc<(Mutex<Option<Option<i32>>>, Condvar)>,
 }
@@ -82,12 +82,12 @@ pub(super) struct Shared {
     pub(super) host: String,
     pub(super) timeouts: Timeouts,
     /// The folder the app asked for, as it asked (`~/code/atelier`), for each hello.
-    pub(super) asked_root: String,
+    asked_root: String,
     pub(super) dial: Dial,
     pub(super) writer: Mutex<Option<Box<dyn Write + Send>>>,
     pub(super) closer: Mutex<Option<Box<dyn FnMut() + Send>>>,
-    pub(super) pending: Mutex<HashMap<u64, mpsc::Sender<Answer>>>,
-    pub(super) next_id: AtomicU64,
+    pending: Mutex<HashMap<u64, mpsc::Sender<Answer>>>,
+    next_id: AtomicU64,
     pub(super) processes: Mutex<HashMap<Pid, Pipes>>,
     pub(super) watchers: Mutex<HashMap<u64, ChangeSink>>,
     pub(super) links: Mutex<Vec<LinkSink>>,
@@ -201,7 +201,7 @@ pub struct RemoteProject {
     pub(super) data_path: Mutex<Option<Option<PathBuf>>>,
     pub(super) tracker: atelier_project::TrackerSlot,
     /// How often the tracker asks the host for changes made elsewhere, while someone listens.
-    pub(super) poll_tasks: Duration,
+    poll_tasks: Duration,
 }
 
 impl RemoteProject {
@@ -390,9 +390,9 @@ impl Project for RemoteProject {
     }
 }
 
-pub(super) struct RemoteStdin {
+struct RemoteStdin {
     pub(super) shared: Weak<Shared>,
-    pub(super) pid: Pid,
+    pid: Pid,
 }
 
 impl Write for RemoteStdin {
@@ -415,7 +415,7 @@ impl Drop for RemoteStdin {
     }
 }
 
-pub(super) struct RemoteStdout {
+struct RemoteStdout {
     pub(super) rx: mpsc::Receiver<Vec<u8>>,
     pub(super) left: Vec<u8>,
 }
@@ -436,9 +436,9 @@ impl Read for RemoteStdout {
     }
 }
 
-pub(super) struct RemoteControl {
+struct RemoteControl {
     pub(super) shared: Weak<Shared>,
-    pub(super) pid: Pid,
+    pid: Pid,
     pub(super) exit: Arc<(Mutex<Option<Option<i32>>>, Condvar)>,
 }
 

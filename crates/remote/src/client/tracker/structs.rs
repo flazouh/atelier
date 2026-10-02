@@ -11,9 +11,7 @@ use atelier_tracker::{
 };
 
 use super::super::{Shared, lock};
-use crate::protocol::{
-    tracker::{TrackerCall, TrackerReply},
-};
+use crate::protocol::tracker::{TrackerCall, TrackerReply};
 use super::helpers::{ask, poll, unexpected};
 
 /// One receiver, and what it knows: each task's last change. `None` until its first listing.
@@ -31,7 +29,7 @@ pub(super) struct Listeners {
 
 pub struct RemoteTracker {
     pub(super) shared: Arc<Shared>,
-    pub(super) name: String,
+    name: String,
     pub(super) poll: Duration,
     pub(super) listeners: Arc<Mutex<Listeners>>,
 }
@@ -48,7 +46,7 @@ impl RemoteTracker {
     }
 
     /// Tells each receiver of a change made through this tracker, at once, as the local tracker does.
-    pub(super) fn tell(&self, event: Event) {
+    fn tell(&self, event: Event) {
         let mut listeners = lock(&self.listeners);
         if let Event::Created(task) | Event::Updated(task) = &event {
             for listener in &mut listeners.all {

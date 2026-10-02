@@ -11,7 +11,7 @@ use crate::protocol::{Call, Reply, read_frame};
 use super::structs::{Connection, Shared};
 
 /// The waits between dials after a drop: a quick retry first, then up to 30 s apart.
-pub(super) fn backoff(attempt: u32) -> Duration {
+fn backoff(attempt: u32) -> Duration {
     Duration::from_millis((500u64 << attempt.min(6)).min(30_000))
 }
 
@@ -32,7 +32,7 @@ pub(super) fn not_connected(host: &str, why: &str) -> io::Error {
 }
 
 /// Reads frames until the connection ends, then starts dialing again.
-pub(super) fn read_loop(shared: Weak<Shared>, mut reader: Box<dyn Read + Send>, last_words: Box<dyn Fn() -> String + Send>) {
+fn read_loop(shared: Weak<Shared>, mut reader: Box<dyn Read + Send>, last_words: Box<dyn Fn() -> String + Send>) {
     let ended = loop {
         match read_frame(&mut reader) {
             Ok(Some(frame)) => match shared.upgrade() {
@@ -64,7 +64,7 @@ pub(super) fn attach(shared: &Arc<Shared>, connection: Connection) {
 }
 
 /// Dials until a connection says hello, for as long as the project lives.
-pub(super) fn redial(shared: Weak<Shared>) {
+fn redial(shared: Weak<Shared>) {
     let mut attempt = 0;
     loop {
         thread::sleep(backoff(attempt));

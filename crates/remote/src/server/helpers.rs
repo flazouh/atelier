@@ -13,7 +13,7 @@ use super::structs::{Running, State};
 use super::types::{Out, UPDATE_WORDS};
 use super::tracker;
 
-pub(super) fn send(out: &Out, frame: &Frame) {
+fn send(out: &Out, frame: &Frame) {
     let mut out = out.lock().unwrap_or_else(|p| p.into_inner());
     // A write that fails means the app went away; the read loop ends on its own.
     let _ = write_frame(&mut *out, frame);
@@ -62,7 +62,7 @@ pub fn serve_with_data(mut input: impl Read, output: impl Write + Send + 'static
     Ok(())
 }
 
-pub(super) fn with_running(state: &State, pid: Pid, f: impl FnOnce(&mut Running) -> io::Result<Reply>) -> io::Result<Reply> {
+fn with_running(state: &State, pid: Pid, f: impl FnOnce(&mut Running) -> io::Result<Reply>) -> io::Result<Reply> {
     let mut running = state.running.lock().unwrap_or_else(|p| p.into_inner());
     let r = running.get_mut(&pid).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no process {pid}")))?;
     f(r)
@@ -73,7 +73,7 @@ pub(super) fn project(state: &State) -> io::Result<Arc<LocalProject>> {
 }
 
 /// `~` and `~/…` as the host's home folder.
-pub(super) fn expand(root: &str) -> PathBuf {
+fn expand(root: &str) -> PathBuf {
     match (root.strip_prefix('~'), std::env::var_os("HOME")) {
         (Some(rest), Some(home)) if rest.is_empty() || rest.starts_with('/') => PathBuf::from(home).join(rest.trim_start_matches('/')),
         _ => PathBuf::from(root),
@@ -133,12 +133,12 @@ pub(super) fn answer(call: Call, state: &Arc<State>, out: &Out) -> io::Result<Re
     }
 }
 
-pub(super) fn with_control(state: &State, pid: Pid) -> io::Result<Arc<Mutex<Box<dyn Control>>>> {
+fn with_control(state: &State, pid: Pid) -> io::Result<Arc<Mutex<Box<dyn Control>>>> {
     let running = state.running.lock().unwrap_or_else(|p| p.into_inner());
     running.get(&pid).map(|r| r.control.clone()).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no process {pid}")))
 }
 
-pub(super) fn spawn(state: &Arc<State>, out: &Out, command: &atelier_project::Command) -> io::Result<Reply> {
+fn spawn(state: &Arc<State>, out: &Out, command: &atelier_project::Command) -> io::Result<Reply> {
     let process = project(state)?.spawn(command)?;
     let pid = state.next_pid.fetch_add(1, Ordering::Relaxed) + 1;
     let control = Arc::new(Mutex::new(process.control));
