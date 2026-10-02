@@ -174,6 +174,10 @@ pub(super) fn ends(event: &Event) -> bool {
 
 /// Loads the model in the background if it is on this machine, so its first words come at once.
 pub fn warm(cx: &mut App) {
+    // A test never loads a model this machine happens to have: the load reports from a thread the test does not drive.
+    if cfg!(test) {
+        return;
+    }
     speech(cx).0.warm();
 }
 
