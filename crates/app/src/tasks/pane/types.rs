@@ -20,8 +20,6 @@ pub(super) enum Load {
 pub enum TasksEvent {
     /// The reader asked for a session for this task.
     Start(TaskId),
-    /// The tasks were read: this many are open (not Done, not Canceled).
-    Counted(usize),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

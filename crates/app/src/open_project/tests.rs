@@ -521,29 +521,6 @@ fn a_session_opened_again_finds_its_task(cx: &mut TestAppContext) {
     assert_eq!(found.map(|t| t.key.to_string()), Some(task.key));
 }
 
-/// The sidebar hears how many tasks are open: a closed task does not count.
-#[gpui_kit::test]
-fn the_project_counts_its_open_tasks(cx: &mut TestAppContext) {
-    use atelier_tracker::{NewTask, Patch, Status};
-    let (_dir, project, _, cx) = open(cx, &[]);
-    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
-    cx.run_until_parked();
-    assert_eq!(cx.update(|_, cx| project.read(cx).tasks_open()), Some(0));
-    let (pane, tracker) = cx.update(|_, cx| {
-        let slot = project.read(cx).tasks.as_ref().unwrap();
-        (slot.pane.clone(), slot.pane.read(cx).tracker().unwrap())
-    });
-    let a = tracker.create(&NewTask::titled("A"), "me").unwrap();
-    tracker.create(&NewTask::titled("B"), "me").unwrap();
-    cx.update(|_, cx| pane.update(cx, |p, cx| p.reload(cx)));
-    cx.run_until_parked();
-    assert_eq!(cx.update(|_, cx| project.read(cx).tasks_open()), Some(2));
-    tracker.update(&a.id, &Patch::status(Status::Done), "me").unwrap();
-    cx.update(|_, cx| pane.update(cx, |p, cx| p.reload(cx)));
-    cx.run_until_parked();
-    assert_eq!(cx.update(|_, cx| project.read(cx).tasks_open()), Some(1));
-}
-
 /// The session tells its task whether or not the Tasks pane is open: the tracker is found from the project.
 #[gpui_kit::test]
 fn a_session_tells_its_task_while_the_tasks_pane_is_closed(cx: &mut TestAppContext) {

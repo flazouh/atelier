@@ -497,7 +497,7 @@ fn a_panel_names_its_project_and_a_press_on_its_close_button_closes_it(cx: &mut 
     assert!(cx.debug_bounds("panel-close").is_none());
 }
 
-/// The sidebar's head holds the two ways to add a project and the filter, each a button with a menu.
+/// The sidebar's head holds the two ways to add a project and, behind its ⋯, the filter: each a button with a menu.
 #[gpui_kit::test]
 fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
@@ -508,8 +508,8 @@ fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) 
     assert!(cx.debug_bounds("add-folder").is_some() && cx.debug_bounds("add-ssh").is_some(), "the add menu offers a folder and SSH");
     cx.simulate_keystrokes("escape");
     settle(&shell, cx);
-    let filter = cx.debug_bounds("filter-button").expect("the filter button is drawn");
-    cx.simulate_click(filter.center(), gpui_kit::Modifiers::default());
+    let options = cx.debug_bounds("sidebar-options").expect("the ⋯ is drawn");
+    cx.simulate_click(options.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     for choice in atelier_ui::sidebar_filter::SessionFilter::ALL {
         assert!(cx.debug_bounds(choice.row()).is_some(), "{} is on the menu", choice.words());
@@ -574,16 +574,22 @@ fn the_sidebar_marks_the_open_session_in_the_single_view_only(cx: &mut TestAppCo
     assert!(!marked(&shell, cx), "back side by side: none");
 }
 
-/// The sidebar lists by project, or in one list by priority with a heading for each section; the switch is in its head.
+/// The sidebar lists by project, or in one list by priority with a heading for each section; the choice is behind
+/// the ⋯ in its head.
 #[gpui_kit::test]
 fn the_sidebar_switches_between_projects_and_the_priority_list(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let press = |name: &'static str, cx: &mut gpui_kit::VisualTestContext| {
+        let at = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
+        cx.simulate_click(at.center(), gpui_kit::Modifiers::default());
+        settle(&shell, cx);
+    };
     assert!(cx.debug_bounds("section-Earlier").is_none(), "by project: no headings");
-    let priority = cx.debug_bounds("list-mode-priority").expect("the switch is in the sidebar's head");
-    cx.simulate_click(priority.center(), gpui_kit::Modifiers::default());
-    settle(&shell, cx);
+    press("sidebar-options", cx);
+    press("list-mode-priority", cx);
     assert!(cx.debug_bounds("section-Earlier").is_some(), "by priority: the session is under Earlier");
     assert!(cx.debug_bounds("row-project").is_some(), "and its row wears the project's badge");
+    press("sidebar-options", cx);
     let projects = cx.debug_bounds("list-mode-projects").unwrap();
     cx.simulate_click(projects.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
@@ -773,7 +779,7 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
         settle(&shell, cx);
     };
     let rail = cx.debug_bounds("view-rail").expect("the rail is drawn");
-    let sidebar = cx.debug_bounds("sidebar-tasks").expect("the sidebar is drawn");
+    let sidebar = cx.debug_bounds("sidebar").expect("the sidebar is drawn");
     assert!(rail.right() <= sidebar.left(), "the rail is left of the sidebar: {rail:?} {sidebar:?}");
     let tasks = cx.debug_bounds("rail-tasks").unwrap();
     let git = cx.debug_bounds("rail-git").unwrap();

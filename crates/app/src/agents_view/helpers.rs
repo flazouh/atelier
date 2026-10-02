@@ -85,10 +85,8 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                     Link::Up => Connection::Connected,
                     Link::Down(_) => Connection::Reconnecting,
                 },
-                branch: p.git.branch().cloned(),
                 sessions: open.chain(past).collect(),
                 pulls_unavailable: p.pulls_unavailable().map(SharedString::from),
-                tasks_open: p.tasks_open(),
                 badge: {
                     let place = project_id(p);
                     badge_of(&place, labels.get(place.as_ref()).map_or("", String::as_str), badges)

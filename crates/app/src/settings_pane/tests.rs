@@ -228,3 +228,28 @@ fn the_sidebar_section_edits_the_layout_and_says_so_once(cx: &mut TestAppContext
     assert_eq!((looks[1].project_badge, looks[1].fold_after), (BadgeShow::Always, 12));
     assert_eq!(pane.read_with(cx, |p, _| p.look.project_badge), BadgeShow::Always);
 }
+
+/// The interface font size is the zoom, told in points of the body text; a choice reaches the shell as one event.
+#[gpui_kit::test]
+fn the_interface_font_size_is_the_zoom_and_says_so_once(cx: &mut TestAppContext) {
+    let (pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
+    assert!(cx.debug_bounds("font-size").is_some(), "the slider is in Appearance");
+    assert_eq!(super::helpers::font_size_words(1.), "14 pt");
+    assert_eq!(super::helpers::font_size_words(1.2), "17 pt");
+    let heard = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let log = heard.clone();
+    cx.update(|_, cx| {
+        let sub = cx.subscribe(&pane, move |_, event: &SettingsEvent, _| {
+            if let SettingsEvent::Zoom(zoom) = event {
+                log.borrow_mut().push(*zoom);
+            }
+        });
+        std::mem::forget(sub);
+    });
+    pane.update(cx, |p, cx| p.preview_zoom(1.8, cx));
+    assert!(heard.borrow().is_empty(), "a drag in progress does not zoom the window under the pointer");
+    assert_eq!(pane.read_with(cx, |p, _| p.shown_zoom()), 1.8, "but the slider and its label follow it");
+    pane.update(cx, |p, cx| p.choose_zoom(1.3, cx));
+    assert_eq!(heard.borrow().as_slice(), &[1.3]);
+    assert_eq!(pane.read_with(cx, |p, _| p.zoom_preview), None, "the release applies it and the preview is gone");
+}

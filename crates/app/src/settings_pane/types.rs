@@ -59,6 +59,8 @@ pub enum SettingsEvent {
     Close,
     /// The sidebar's look changed (what a row shows, how much folds): the new layout, whose mode and filter the shell ignores.
     Sidebar(SidebarLayout),
+    /// The interface font size was chosen: the zoom it takes, which the shell sets and keeps.
+    Zoom(f32),
 }
 
 /// The sections of the page, in the order the list at its left shows them.

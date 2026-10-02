@@ -43,7 +43,7 @@ use crate::{
     agent_session::{AgentSession, SessionEvent},
     list_diff::Row,
 };
-use super::types::{Block, MenuAction};
+use super::types::{Block, MenuAction, READING_WIDTH};
 
 fn row_status(status: ToolStatus) -> RowToolStatus {
     match status {
@@ -56,6 +56,11 @@ fn row_status(status: ToolStatus) -> RowToolStatus {
 /// Reading and searching show as flat rows, close together, not as cards.
 pub(super) fn is_lookup(kind: atelier_agents::session::ToolKind) -> bool {
     matches!(kind, atelier_agents::session::ToolKind::Read | atelier_agents::session::ToolKind::Search)
+}
+
+/// A read's output is the file it read, which the agent and not the reader needs; only a failed one shows why.
+pub(super) fn shows_output(kind: atelier_agents::session::ToolKind, status: ToolStatus) -> bool {
+    kind != atelier_agents::session::ToolKind::Read || status == ToolStatus::Failed
 }
 
 fn block_of(item: &Item) -> Block {
@@ -105,7 +110,7 @@ fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: O
     if let Some(mark) = mark {
         row = row.meta(mark);
     }
-    if let Some(output) = &call.output {
+    if let Some(output) = call.output.as_ref().filter(|_| shows_output(about.kind, call.call.status)) {
         let note = match (&output.full_at, output.truncated) {
             (Some(path), _) => format!("\n… the whole output is at {path}"),
             (None, true) => "\n… cut; the agent keeps the rest".into(),
@@ -370,7 +375,7 @@ pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
     let session = session.clone();
     let list = list(list_state.clone(), {
         let session = session.clone();
-        move |ix, window, cx| div().debug_selector(move || format!("row-{ix}")).child(entering(&session, ix, window, cx)).into_any_element()
+        move |ix, window, cx| div().debug_selector(move || format!("row-{ix}")).child(reading_width(entering(&session, ix, window, cx))).into_any_element()
     })
     .size_full();
     let rail = (overflowing && entries.len() >= 2).then(|| {
@@ -565,8 +570,27 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         .child(header)
         .child(body)
         .children(failure)
-        .child(div().flex().flex_col().gap(px(atelier_ui::STACK_GAP)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).children(changed).child(composer))
+        .child(reading_width(
+            div()
+                .debug_selector(|| "session-foot".into())
+                .flex()
+                .flex_col()
+                .gap(px(atelier_ui::STACK_GAP))
+                .px(px(12.))
+                .pb(px(12.))
+                .children(todos)
+                .child(strip)
+                .children(pull_card)
+                .children(changed)
+                .child(composer)
+                .into_any_element(),
+        ))
         .into_any_element()
+}
+
+/// `content` at most [`READING_WIDTH`] wide, centred in the width it has.
+fn reading_width(content: AnyElement) -> AnyElement {
+    div().w_full().flex().justify_center().child(div().w_full().max_w(px(READING_WIDTH)).child(content)).into_any_element()
 }
 
 /// The files the whole session changed, folded to a header with Review, which opens the session's review.

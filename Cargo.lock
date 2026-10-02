@@ -501,6 +501,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "ttf-parser",
 ]
 
 [[package]]
@@ -639,7 +640,7 @@ dependencies = [
 [[package]]
 name = "atelier-ui"
 version = "0.1.0"
-source = "git+https://github.com/flazouh/atelier-ui#46ab2129e37e26bffa37a17cbb9dc0171b5d5767"
+source = "git+https://github.com/flazouh/atelier-ui#9ad87ef0f3c89e0999c2f851c8fbe7f9287f8efd"
 dependencies = [
  "core-foundation 0.9.4",
  "core-foundation-sys",
