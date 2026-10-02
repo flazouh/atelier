@@ -51,6 +51,7 @@ mod tasks;
 mod tree;
 mod tree_view;
 mod view_cache;
+mod worktrees;
 
 fn main() {
     exit_log::install();
