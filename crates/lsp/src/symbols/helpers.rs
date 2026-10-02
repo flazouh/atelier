@@ -40,7 +40,7 @@ pub fn from_information(list: Vec<SymbolInformation>) -> Vec<Symbol> {
 }
 
 /// By file, then by where in it.
-pub(super) fn sort(symbols: &mut [Symbol]) {
+fn sort(symbols: &mut [Symbol]) {
     symbols.sort_by(|a, b| {
         (a.uri.as_str(), a.range.start.line, a.range.start.character).cmp(&(b.uri.as_str(), b.range.start.line, b.range.start.character))
     });

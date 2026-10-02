@@ -175,14 +175,14 @@ pub(super) struct Session {
     pub(super) ask: Duration,
     pub(super) encoding: Encoding,
     /// Whether the server answers `textDocument/diagnostic`.
-    pub(super) pulls: bool,
-    pub(super) documents: HashMap<PathBuf, DocumentSync>,
+    pulls: bool,
+    documents: HashMap<PathBuf, DocumentSync>,
     /// What the server published on its own, for a server that does not answer pulls.
     published: Published,
     /// `None` until the server says; a server that never does is taken as ready.
-    pub(super) quiescent: Option<bool>,
+    quiescent: Option<bool>,
     /// Set once the server has stopped, so later jobs fail at once instead of timing out.
-    pub(super) exited: bool,
+    exited: bool,
 }
 
 impl Session {
@@ -237,7 +237,7 @@ impl Session {
         Ok(Navigation { found: Found::References, targets: self.references(doc, position)? })
     }
 
-    pub(super) fn references(&mut self, doc: &Doc, position: Position) -> Result<Vec<Target>, LspError> {
+    fn references(&mut self, doc: &Doc, position: Position) -> Result<Vec<Target>, LspError> {
         self.sync(doc)?;
         let (ask, at) = (self.ask, to_server(&doc.text, position, self.encoding));
         let answer = until_settled(ask, || self.client.references(&doc.path, at, false, ask))?;
@@ -260,7 +260,7 @@ impl Session {
         Ok(found.into_iter().map(|s| self.symbol_in_characters(doc, s)).collect())
     }
 
-    pub(super) fn project_symbols(&mut self, doc: &Doc, query: &str) -> Result<Vec<Symbol>, LspError> {
+    fn project_symbols(&mut self, doc: &Doc, query: &str) -> Result<Vec<Symbol>, LspError> {
         self.sync(doc)?;
         let ask = self.ask;
         let found = match until_settled(ask, || self.client.workspace_symbols(query, ask))? {
@@ -290,7 +290,7 @@ impl Session {
     }
 
     /// `symbol` with its range counted in characters, read against the text it is in.
-    pub(super) fn symbol_in_characters(&self, doc: &Doc, symbol: Symbol) -> Symbol {
+    fn symbol_in_characters(&self, doc: &Doc, symbol: Symbol) -> Symbol {
         let target = self.target(doc, symbol.uri.clone(), symbol.range);
         Symbol { range: target.range, ..symbol }
     }
@@ -327,7 +327,7 @@ impl Session {
     /// The newest set the server published for the document's current text. It waits for the first
     /// such set, then keeps taking newer ones until [`DEFAULT_SETTLE`] passes with none: a server can
     /// publish a quick guess before its real answer.
-    pub(super) fn published_for(&mut self, doc: &Doc) -> Result<Vec<Diagnostic>, LspError> {
+    fn published_for(&mut self, doc: &Doc) -> Result<Vec<Diagnostic>, LspError> {
         let version = self.documents[&doc.path].version();
         let current = |session: &Session| session.published.current(&doc.path, version).map(<[Diagnostic]>::to_vec);
         let deadline = Instant::now() + self.ask;
@@ -356,7 +356,7 @@ impl Session {
     /// Where an answer points, with its range in characters and its line's text. The document's own
     /// text is used for itself, and a file on disk for any other; a file that cannot be read keeps the
     /// server's columns and no line text.
-    pub(super) fn target(&self, doc: &Doc, uri: Uri, range: Range) -> Target {
+    fn target(&self, doc: &Doc, uri: Uri, range: Range) -> Target {
         let path = uri_to_path(&uri).map(|p| canonical(&p));
         let disk;
         let text = if path.as_deref() == Some(doc.path.as_path()) {
@@ -377,13 +377,13 @@ impl Session {
     }
 
     /// Reads what the server said on its own since the last look.
-    pub(super) fn hear(&mut self) {
+    fn hear(&mut self) {
         while let Ok(message) = self.client.messages.try_recv() {
             self.note(message);
         }
     }
 
-    pub(super) fn note(&mut self, message: ServerMessage) {
+    fn note(&mut self, message: ServerMessage) {
         match message {
             ServerMessage::Status { quiescent } => self.quiescent = Some(quiescent),
             ServerMessage::Exited => {
@@ -400,7 +400,7 @@ impl Session {
     }
 
     /// Waits, up to `ask`, for a server that said it is busy to say it is done.
-    pub(super) fn wait_until_quiet(&mut self) {
+    fn wait_until_quiet(&mut self) {
         let deadline = Instant::now() + self.ask;
         while self.quiescent == Some(false) && !self.exited {
             let left = deadline.saturating_duration_since(Instant::now());

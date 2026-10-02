@@ -44,7 +44,7 @@ pub fn find_program_in(program: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
     dirs.iter().map(|dir| dir.join(program)).find(|path| is_executable(path))
 }
 
-pub(super) fn is_executable(path: &Path) -> bool {
+fn is_executable(path: &Path) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

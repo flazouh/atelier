@@ -16,11 +16,11 @@ pub struct Workers {
     pub(super) project: Arc<dyn Project>,
     /// Every server runs at the project's root, instead of the folder of the marker nearest a file,
     /// which only a local disk can be searched for.
-    pub(super) at_project_root: bool,
+    at_project_root: bool,
     pub(super) running: Mutex<HashMap<(&'static str, PathBuf), LspWorker>>,
     pub(super) store: Store,
-    pub(super) ready: Duration,
-    pub(super) ask: Duration,
+    ready: Duration,
+    ask: Duration,
 }
 
 impl Workers {

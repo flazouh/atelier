@@ -64,7 +64,7 @@ pub const SERVERS: &[ServerSpec] = &[
 ];
 
 /// rust-analyzer's own release builds, one gzipped binary per platform.
-pub(super) const RUST_ANALYZER: Download = Download {
+const RUST_ANALYZER: Download = Download {
     version: "2026-09-21",
     kind: Kind::Platform {
         files: &[
@@ -96,7 +96,7 @@ pub(super) const RUST_ANALYZER: Download = Download {
 
 /// TypeScript 7's native compiler, from its per-platform npm packages. The tarball's top folder is
 /// `package`, which unpacking drops, so the binary lands at `lib/tsc` beside the `lib.*.d.ts` it reads.
-pub(super) const TSGO: Download = Download {
+const TSGO: Download = Download {
     version: "7.0.2",
     kind: Kind::Platform {
         files: &[
@@ -127,7 +127,7 @@ pub(super) const TSGO: Download = Download {
 };
 
 /// Astral's ty, a Python type checker in Rust. The checksums match the release's own `sha256.sum`.
-pub(super) const TY: Download = Download {
+const TY: Download = Download {
     version: "0.0.84",
     kind: Kind::Platform {
         files: &[

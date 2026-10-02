@@ -69,7 +69,7 @@ pub struct Store {
     pub(super) offline: bool,
     /// The servers live on another host, whose `PATH` finds them; nothing is looked up or
     /// downloaded here.
-    pub(super) on_host: bool,
+    on_host: bool,
     /// One download at a time, so two files never fetch the same server twice.
     pub(super) downloading: Mutex<()>,
 }
@@ -115,7 +115,7 @@ impl Store {
     }
 
     /// The folder holding `name` at `download`'s version, downloaded first if it is not there.
-    pub(super) fn ensure(&self, name: &str, download: &Download, report: &dyn Fn(String)) -> Result<PathBuf, Unavailable> {
+    fn ensure(&self, name: &str, download: &Download, report: &dyn Fn(String)) -> Result<PathBuf, Unavailable> {
         let folder = self.dir.join(name).join(download.version);
         if folder.exists() {
             return Ok(folder);
@@ -145,7 +145,7 @@ impl Store {
     }
 
     /// Fills `into` with the server.
-    pub(super) fn fetch(&self, kind: &Kind, version: &str, into: &Path) -> Result<(), Unavailable> {
+    fn fetch(&self, kind: &Kind, version: &str, into: &Path) -> Result<(), Unavailable> {
         match kind {
             Kind::Platform { files, unpack, program } => {
                 let here = platform().ok_or(Unavailable::NotInstalled)?;

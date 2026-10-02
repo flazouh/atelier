@@ -25,8 +25,8 @@ use super::helpers::{path_to_uri, read_loop, send_on};
 
 pub struct LspClient {
     pub(super) control: Box<dyn Control>,
-    pub(super) stdin: Writer<BufWriter<Box<dyn Write + Send>>>,
-    pub(super) next_id: AtomicI64,
+    stdin: Writer<BufWriter<Box<dyn Write + Send>>>,
+    next_id: AtomicI64,
     pub(super) pending: Pending,
     /// What the server says on its own. The caller drains it.
     pub messages: Receiver<ServerMessage>,
@@ -64,7 +64,7 @@ impl LspClient {
         Ok((client, result))
     }
 
-    pub(super) fn initialize(&mut self, root: &Path, options: Option<Value>, timeout: Duration) -> Result<InitializeResult, LspError> {
+    fn initialize(&mut self, root: &Path, options: Option<Value>, timeout: Duration) -> Result<InitializeResult, LspError> {
         let uri = path_to_uri(root)?;
         #[allow(deprecated)] // `root_uri` is the field every server still reads.
         let params = InitializeParams {
@@ -272,7 +272,7 @@ impl LspClient {
         serde_json::from_value(value).map_err(|e| LspError::Protocol(e.to_string()))
     }
 
-    pub(super) fn notify<N: lsp_types::notification::Notification>(&mut self, params: N::Params) -> Result<(), LspError>
+    fn notify<N: lsp_types::notification::Notification>(&mut self, params: N::Params) -> Result<(), LspError>
     where
         N::Params: serde::Serialize,
     {
