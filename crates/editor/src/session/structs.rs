@@ -54,11 +54,11 @@ impl Rows {
         Some(Position { line: self.map().to_head(position.line as usize)? as u32, ..position })
     }
 
-    pub(super) fn to_view(&self, position: Position) -> Position {
+    fn to_view(&self, position: Position) -> Position {
         Position { line: self.map().to_view(position.line as usize) as u32, ..position }
     }
 
-    pub(super) fn range_to_view(&self, range: lsp_types::Range) -> lsp_types::Range {
+    fn range_to_view(&self, range: lsp_types::Range) -> lsp_types::Range {
         lsp_types::Range { start: self.to_view(range.start), end: self.to_view(range.end) }
     }
 
@@ -88,20 +88,20 @@ pub struct EditorSession {
     pub(super) editor: Entity<EditorState>,
     pub(super) path: PathBuf,
     pub(super) rows: Rows,
-    pub(super) elsewhere: Option<Elsewhere>,
+    elsewhere: Option<Elsewhere>,
     pub(super) worker: Option<LspWorker>,
     /// The server's state, or where the last definition outside this file is.
     pub(super) server: SharedString,
     /// What the last check found.
     pub(super) problems: SharedString,
     /// The uses of a symbol, when there is more than one to choose from.
-    pub(super) references: Vec<Target>,
+    references: Vec<Target>,
     pub(super) last: LastNavigation,
-    pub(super) checking: Task<()>,
-    pub(super) recheck: Task<()>,
-    pub(super) finding: Task<()>,
-    pub(super) _start: Task<()>,
-    pub(super) _edits: Subscription,
+    checking: Task<()>,
+    recheck: Task<()>,
+    finding: Task<()>,
+    _start: Task<()>,
+    _edits: Subscription,
 }
 
 impl EditorSession {
@@ -242,7 +242,7 @@ impl EditorSession {
         &self.references
     }
 
-    pub(super) fn show_references(&mut self, targets: Vec<Target>, cx: &mut Context<Self>) {
+    fn show_references(&mut self, targets: Vec<Target>, cx: &mut Context<Self>) {
         self.references = targets;
         cx.notify();
     }
@@ -321,7 +321,7 @@ impl EditorSession {
     }
 
     /// The file as the server reads it, and the caret in its rows; `None` on a removed row.
-    pub(super) fn doc_and_caret(&self, cx: &App) -> Option<(Doc, Position)> {
+    fn doc_and_caret(&self, cx: &App) -> Option<(Doc, Position)> {
         let state = self.editor.read(cx);
         Some((self.rows.doc(&state.value()), self.rows.to_head(state.cursor_position())?))
     }
@@ -357,7 +357,7 @@ impl EditorSession {
     }
 
     /// Checks the buffer again once typing pauses for [`RECHECK_AFTER`], as Zed does.
-    pub(super) fn schedule_recheck(&mut self, cx: &mut Context<Self>) {
+    fn schedule_recheck(&mut self, cx: &mut Context<Self>) {
         if self.worker.is_none() {
             return;
         }
@@ -377,7 +377,7 @@ pub(super) struct EditorLsp {
 
 impl EditorLsp {
     /// The file as the server reads it, and the offset's place in its rows; `None` on a removed row.
-    pub(super) fn ask_at(&self, text: &Rope, offset: usize) -> Option<(Doc, Position)> {
+    fn ask_at(&self, text: &Rope, offset: usize) -> Option<(Doc, Position)> {
         Some((self.rows.doc(&text.to_string()), self.rows.to_head(text.offset_to_position(offset))?))
     }
 }
