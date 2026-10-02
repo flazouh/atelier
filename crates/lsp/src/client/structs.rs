@@ -1,6 +1,6 @@
 use std::{
     io::{BufReader, BufWriter, Write},
-    path::{Path},
+    path::Path,
     sync::{Arc, Mutex, atomic::{AtomicI64, Ordering}, mpsc::{self, Receiver, RecvTimeoutError}},
     thread,
     time::Duration,

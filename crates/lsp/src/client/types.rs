@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex, mpsc::{Sender}},
-    time::Duration,
-};
+use std::{collections::HashMap, sync::{Arc, Mutex, mpsc::Sender}, time::Duration};
 
 use lsp_types::{DocumentDiagnosticReportResult, PublishDiagnosticsParams, request::Request};
 use serde_json::Value;

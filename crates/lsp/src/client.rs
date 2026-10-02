@@ -20,9 +20,7 @@ use structs::PullDiagnosticsParams;
 use types::{Pending, Routed};
 
 #[cfg(test)]
-use std::{
-    sync::{Arc, Mutex, mpsc::{self}},
-};
+use std::sync::{Arc, Mutex, mpsc};
 #[cfg(test)]
 use lsp_types::{TextDocumentIdentifier, Uri};
 #[cfg(test)]

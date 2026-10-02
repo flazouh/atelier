@@ -28,10 +28,7 @@ use helpers::triage;
 use types::Job;
 
 #[cfg(test)]
-use std::{
-    path::{Path, PathBuf},
-    time::{Duration},
-};
+use std::{path::{Path, PathBuf}, time::Duration};
 #[cfg(test)]
 use lsp_types::Position;
 #[cfg(test)]

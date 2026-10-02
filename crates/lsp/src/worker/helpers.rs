@@ -1,6 +1,6 @@
 use std::{
     path::{Path, PathBuf},
-    sync::{atomic::{Ordering}, mpsc::{Receiver}},
+    sync::{atomic::Ordering, mpsc::Receiver},
     thread,
     time::{Duration, Instant},
 };

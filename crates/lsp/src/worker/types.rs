@@ -1,10 +1,6 @@
 use lsp_types::{Diagnostic, Hover, Position};
 
-use crate::{
-    LspError,
-    navigation::{Navigation, Target},
-    symbols::{Symbol},
-};
+use crate::{LspError, navigation::{Navigation, Target}, symbols::Symbol};
 use super::structs::Doc;
 use super::helpers::canonical;
 

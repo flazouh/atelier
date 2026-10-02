@@ -1,8 +1,4 @@
-use std::{
-    io::{Write},
-    path::{Path, PathBuf},
-    sync::{mpsc::{Sender}},
-};
+use std::{io::Write, path::{Path, PathBuf}, sync::mpsc::Sender};
 
 use lsp_types::Uri;
 use serde_json::{Value, json};
