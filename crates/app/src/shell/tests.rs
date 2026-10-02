@@ -40,6 +40,7 @@ fn quit_has_its_key(cx: &mut TestAppContext) {
 }
 
 fn open_shell(cx: &mut TestAppContext) -> (Entity<Shell>, &mut gpui_kit::VisualTestContext) {
+    crate::open_project::TEST_THREAD_ONLY.set(true);
     cx.update(|cx| {
         gpui_kit::init(cx);
         atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
@@ -116,9 +117,7 @@ fn the_tasks_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
     shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
     settle(&shell, cx);
     let chord = if cfg!(target_os = "macos") { "cmd-shift-l" } else { "ctrl-shift-l" };
-    let front = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| {
-        shell.read_with(cx, |s, cx| s.active().map(|p| p.read(cx).front()))
-    };
+    let front = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, _| s.view);
     type Place = fn(&mut Shell, &mut Window, &mut Context<Shell>);
     let places: [(&str, Place); 4] = [
         ("nothing", |_, window, cx| window.blur(cx)),
@@ -126,7 +125,7 @@ fn the_tasks_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
         ("the sidebar", |s, window, cx| s.agents_sidebar.read(cx).focus_handle(cx).focus(window, cx)),
         ("a session's composer", |s, window, cx| s.new_session_key(&NewSession, window, cx)),
     ];
-    let tasks = Some(crate::open_project::front::Front::Tasks);
+    let tasks = ShellView::Tasks;
     let mut lost = Vec::new();
     for (name, place) in places {
         shell.update_in(cx, place);
@@ -661,8 +660,139 @@ fn a_long_conversation_has_a_rail_and_a_latest_button(cx: &mut TestAppContext) {
     cx.simulate_click(tick.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("latest").is_some(), "a press on a tick lets go of the end, so Latest shows");
+    let view = session.read_with(cx, |s, _| s.list.viewport_bounds());
+    let message = cx.debug_bounds("row-6").expect("message 3 is in view");
+    assert!((message.center().y - view.center().y).abs() < px(2.), "and it is in the middle: {message:?} in {view:?}");
     let latest = cx.debug_bounds("latest").unwrap();
     cx.simulate_click(latest.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("latest").is_none(), "Latest takes hold of the end again");
+}
+
+/// With motion on, a press on a tick glides to its message over a few frames, as beui's smooth scroll does, and a message
+/// sent then rises into its place.
+#[gpui_kit::test]
+fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
+    use atelier_agents::session::{BlockId, Event};
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
+    session.update(cx, |s, cx| {
+        for n in 0..30 {
+            s.conversation.user_sent(format!("message number {n}"));
+            s.conversation.apply(&Event::Text { block: BlockId(n), delta: format!("answer to {n}") });
+        }
+        s.refresh_rows();
+        s.arrived.clear();
+        cx.notify();
+    });
+    settle(&shell, cx);
+    settle(&shell, cx);
+    cx.update(|_, cx| cx.set_reduce_motion(false));
+    let tick = cx.debug_bounds("rail-tick-3").unwrap();
+    cx.simulate_click(tick.center(), gpui_kit::Modifiers::default());
+    let view = session.read_with(cx, |s, _| s.list.viewport_bounds());
+    let off = |cx: &mut gpui_kit::VisualTestContext| cx.debug_bounds("row-6").map_or(f32::MAX, |m| f32::from((m.center().y - view.center().y).abs()));
+    cx.run_until_parked();
+    assert!(off(cx) > 2., "one frame in, it is still on its way");
+    let mut frames = 0;
+    while off(cx) > 2. && frames < 60 {
+        std::thread::sleep(std::time::Duration::from_millis(16));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        frames += 1;
+    }
+    assert!(off(cx) <= 2., "it lands in the middle");
+    assert!(frames > 3, "over several frames, not at once: {frames}");
+    // Back at the end, as a reader who sends is.
+    session.update(cx, |s, cx| {
+        s.glide.follow();
+        cx.notify();
+    });
+    let at_end = |cx: &mut gpui_kit::VisualTestContext| {
+        let last = session.read_with(cx, |s, _| s.shown.len() - 1);
+        cx.debug_bounds(format!("row-{last}").leak()).is_some_and(|r| r.bottom() <= view.bottom() + px(1.))
+    };
+    frames = 0;
+    while !at_end(cx) && frames < 120 {
+        std::thread::sleep(std::time::Duration::from_millis(8));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        frames += 1;
+    }
+    session.update(cx, |s, cx| {
+        s.conversation.user_sent("one more");
+        s.refresh_rows();
+        s.glide.follow();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let last = session.read_with(cx, |s, _| s.shown.len() - 1);
+    let row_selector: &'static str = format!("row-{last}").leak();
+    for _ in 0..20 {
+        if cx.debug_bounds(row_selector).is_some() {
+            break;
+        }
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+    let (row, rising) = (cx.debug_bounds(format!("row-{last}").leak()), cx.debug_bounds(format!("entering-{last}").leak()));
+    let (row, rising) = (row.expect("the new message is drawn"), rising.expect("and it is entering"));
+    assert!(rising.top() > row.top(), "it starts below its place: {rising:?} in {row:?}");
+}
+
+/// A review opens in the Git view: in place of the panels, with the session's changes in the sidebar, and
+/// the right pane as it was; when it closes, Sessions comes back.
+#[gpui_kit::test]
+fn a_review_opens_in_the_git_view_and_closing_it_goes_back(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let right_before = shell.read_with(cx, |s, _| (s.right, s.right_width));
+    assert!(cx.debug_bounds("panel-close").is_some() && cx.debug_bounds("review-in-place").is_none());
+    let session = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions[0].clone());
+    session.update(cx, |_, cx| cx.emit(crate::agent_session::SessionEvent::Review { turn: Some(0), path: None }));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("review-in-place").is_some(), "the review is where the panels were");
+    assert!(cx.debug_bounds("panel-close").is_none(), "the panels make way");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
+    assert!(cx.debug_bounds("git-panel").is_some(), "the sidebar shows the session's changes");
+    assert_eq!(shell.read_with(cx, |s, _| (s.right, s.right_width)), right_before, "the right pane neither opens nor widens");
+    let pane = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).review.as_ref().map(|(p, _)| p.clone()).unwrap());
+    pane.update(cx, |_, cx| cx.emit(crate::review_pane::PaneEvent::Close));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("review-in-place").is_none() && cx.debug_bounds("panel-close").is_some(), "closed: the panels are back");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Sessions);
+}
+
+/// The rail goes Tasks, Sessions, Git. A press on another view shows it; a press on the view in front
+/// hides the sidebar, and the next press shows it again.
+#[gpui_kit::test]
+fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let press = |name: &'static str, cx: &mut gpui_kit::VisualTestContext| {
+        let at = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
+        cx.simulate_click(at.center(), gpui_kit::Modifiers::default());
+        settle(&shell, cx);
+    };
+    let rail = cx.debug_bounds("view-rail").expect("the rail is drawn");
+    let sidebar = cx.debug_bounds("sidebar-tasks").expect("the sidebar is drawn");
+    assert!(rail.right() <= sidebar.left(), "the rail is left of the sidebar: {rail:?} {sidebar:?}");
+    let tasks = cx.debug_bounds("rail-tasks").unwrap();
+    let git = cx.debug_bounds("rail-git").unwrap();
+    assert!(tasks.top() < cx.debug_bounds("rail-sessions").unwrap().top() && cx.debug_bounds("rail-sessions").unwrap().top() < git.top());
+
+    press("rail-tasks", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks);
+    assert!(cx.debug_bounds("tasks-view").is_some() && cx.debug_bounds("panel-close").is_none(), "the board is in the main area");
+    press("rail-tasks", cx);
+    assert!(!shell.read_with(cx, |s, _| s.sidebar), "a second press hides the sidebar");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks, "and the view stays");
+    press("rail-tasks", cx);
+    assert!(shell.read_with(cx, |s, _| s.sidebar), "a third shows it again");
+
+    press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
+    assert!(cx.debug_bounds("git-panel").is_some() && cx.debug_bounds("git-empty").is_some(), "no change yet: nothing to review");
+    press("rail-git", cx);
+    press("rail-sessions", cx);
+    assert!(shell.read_with(cx, |s, _| s.sidebar), "another view comes with the sidebar");
+    assert!(cx.debug_bounds("panel-close").is_some(), "the panels are back");
 }

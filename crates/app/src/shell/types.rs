@@ -11,12 +11,12 @@ pub(super) const TRAFFIC_LIGHTS: f32 = if cfg!(target_os = "macos") { 78. } else
 /// How often the sidebar's ages are brought up to date.
 pub(super) const AGE_TICK: std::time::Duration = std::time::Duration::from_secs(60);
 
-/// The right pane's width a review opens at, room for its tree beside the file: less when the window
-/// has not got it, since the agent panel keeps its least width.
-pub(super) const REVIEW_WIDTH: f32 = 860.;
+/// The right pane's width the tasks and the pull requests open at: less when the window has not got
+/// it, since the agent panel keeps its least width.
+pub(super) const WIDE_RIGHT: f32 = 860.;
 
-/// What a review leaves the agent panel: a session panel at its default width, and its margins.
-pub(super) const AGENT_BESIDE_REVIEW: f32 = atelier_ui::panel_layout::DEFAULT_WIDTH + 2. * atelier_ui::panel_layout::GAP + 4.;
+/// What a wide right pane leaves the agent panel: a session panel at its default width, and its margins.
+pub(super) const AGENT_BESIDE_RIGHT: f32 = atelier_ui::panel_layout::DEFAULT_WIDTH + 2. * atelier_ui::panel_layout::GAP + 4.;
 
 /// What the first launch says atelier is, in one line.
 pub(super) const WHAT_ATELIER_IS: &str = "Run coding agents on your code, review every change they make, and commit what you keep.";

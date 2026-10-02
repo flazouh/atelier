@@ -340,30 +340,35 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
 pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
     let s = session.read(cx);
     let list_state = s.list.clone();
+    let glide = s.glide.clone();
     let key = s.key.clone();
     let overflowing = f32::from(list_state.max_offset_for_scrollbar().y) > 1.;
-    let following = list_state.is_following_tail();
+    let following = glide.following();
     let entries = super::rail::entries(s.conversation.items(), &s.shown);
     let session = session.clone();
     let list = list(list_state.clone(), {
         let session = session.clone();
-        move |ix, _, cx| div().debug_selector(move || format!("row-{ix}")).child(row(&session, ix, cx)).into_any_element()
+        move |ix, window, cx| div().debug_selector(move || format!("row-{ix}")).child(entering(&session, ix, window, cx)).into_any_element()
     })
     .size_full();
     let rail = (overflowing && entries.len() >= 2).then(|| {
         let rows: Vec<usize> = entries.iter().map(|e| e.1).collect();
         let active = super::rail::active(&rows, list_state.logical_scroll_top().item_ix, following);
-        let jump = list_state.clone();
+        let (jump, told) = (glide.clone(), session.clone());
         MessageRail::new(gpui_kit::ElementId::Name(format!("{key}-rail").into()), entries.into_iter().map(|e| e.0).collect(), active).on_select(
-            move |i, _, _| {
-                // The reader chose a message: the list goes to it and stops following the output.
-                jump.pause_following_tail();
-                jump.scroll_to(gpui_kit::ListOffset { item_ix: rows[i], offset_in_item: px(0.) });
+            move |i, _, cx| {
+                // The reader chose a message: the list glides to it and stops following the output, unless it is the last.
+                if i + 1 == rows.len() {
+                    jump.follow();
+                } else {
+                    jump.go_to(rows[i]);
+                }
+                told.update(cx, |_, cx| cx.notify());
             },
         )
     });
     let latest = (overflowing && !following).then(|| {
-        let state = list_state.clone();
+        let (state, told) = (glide.clone(), session.clone());
         div().absolute().bottom(px(8.)).left_0().right_0().flex().justify_center().child(
             Button::new(gpui_kit::ElementId::Name(format!("{key}-latest").into()))
                 .debug_name("latest")
@@ -371,10 +376,29 @@ pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
                 .label("Latest")
                 .variant(ButtonVariant::Secondary)
                 .size(atelier_ui::ButtonSize::Sm)
-                .on_click(move |_, _, _| state.set_follow_mode(gpui_kit::FollowMode::Tail)),
+                .on_click(move |_, _, cx| {
+                    state.follow();
+                    told.update(cx, |_, cx| cx.notify());
+                }),
         )
     });
-    div().relative().size_full().child(list).children(rail).children(latest).into_any_element()
+    // Runs after the list has laid out, so the glide sees this frame's heights.
+    let tick = gpui_kit::canvas(move |_, window, cx| glide.tick(&list_state, cx.reduce_motion(), window), |_, _, _, _| {}).absolute().size_0();
+    div().relative().size_full().child(list).child(tick).children(rail).children(latest).into_any_element()
+}
+
+/// Row `ix`, rising and fading in as beui's messages do when it came in live a moment ago.
+fn entering(session: &Entity<AgentSession>, ix: usize, window: &mut Window, cx: &App) -> AnyElement {
+    let s = session.read(cx);
+    let arrived = s.shown.get(ix).and_then(|&row| s.arrived.get(&crate::list_diff::Arrival::of(row))).copied();
+    let body = row(session, ix, cx);
+    let Some(at) = arrived else { return body };
+    let f = atelier_ui::message_pop::frame(at.elapsed().as_secs_f32(), cx.reduce_motion());
+    if f.settled {
+        return body;
+    }
+    window.request_animation_frame();
+    div().debug_selector(move || format!("entering-{ix}")).relative().top(px(f.y)).opacity(f.opacity).child(body).into_any_element()
 }
 
 /// The panel for `session`, rows and all.
@@ -498,6 +522,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         div().flex_1().min_h_0().pt(px(12.)).child(rows).into_any_element()
     };
     let composer = s.composer.clone();
+    let changed = changed_files(session, cx);
     let pull_card = session.read(cx).pull_card.clone();
     let header = header(session, window, cx);
     let interrupt = session.clone();
@@ -518,8 +543,26 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         .child(header)
         .child(body)
         .children(failure)
-        .child(div().flex().flex_col().gap(px(atelier_ui::STACK_GAP)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).child(composer))
+        .child(div().flex().flex_col().gap(px(atelier_ui::STACK_GAP)).px(px(12.)).pb(px(12.)).children(todos).child(strip).children(pull_card).children(changed).child(composer))
         .into_any_element()
+}
+
+/// The files the whole session changed, folded to a header with Review, which opens the session's review.
+fn changed_files(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
+    let s = session.read(cx);
+    let files = s.changed_files();
+    if files.is_empty() {
+        return None;
+    }
+    let (review, open) = (session.clone(), session.clone());
+    Some(
+        atelier_ui::ChangedFiles::new(gpui_kit::ElementId::Name(format!("{}-changed", s.key).into()), files.to_vec())
+            .collapsible()
+            .running(s.conversation.working())
+            .on_review(move |path, _, cx| review.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: Some(path.to_string()) })))
+            .on_open_file(move |path, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: Some(path.to_string()) })))
+            .into_any_element(),
+    )
 }
 
 /// The agents this build can start, as a picker a new session shows until its first message.
@@ -567,7 +610,7 @@ pub(super) fn shows_stop(running: bool, status: &SessionStatus) -> bool {
 
 pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, task, project, badge, reviewable, session_id) = {
+    let (key, renaming, shown_title, running, task, project, badge, session_id) = {
         let s = session.read(cx);
         (
             s.key.clone(),
@@ -577,7 +620,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             s.task.clone(),
             s.project_name(),
             s.badge.clone(),
-            !s.reviews.turns.turns().is_empty(),
             s.id.as_ref().map(|i| i.as_str().to_string()),
         )
     };
@@ -628,16 +670,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             .tooltip("Open the task")
             .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenTask)))
     });
-    // What the session has to show for itself: the changes its turns made, ready to review.
-    let review = reviewable.then(|| {
-        let open = session.clone();
-        Button::new(gpui_kit::ElementId::Name(format!("{key}-review").into()))
-            .debug_name("panel-review")
-            .label("Review")
-            .variant(ButtonVariant::Ghost)
-            .tooltip("Review what this session changed")
-            .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: None })))
-    });
     let more = panel_menu(session, &key, session_id, window, cx);
     let close = {
         let close = session.clone();
@@ -671,7 +703,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
         })
         .child(title)
         .children(chip)
-        .children(review)
         .children(stop)
         .child(more)
         .child(close)

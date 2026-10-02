@@ -1,6 +1,6 @@
 //! The right pane as a view of its own, so it is drawn from its last frame until its project changes
-//!. It shows the front the project names: the review, the pull requests, the tasks,
-//! or the editor. The review, the hub, the Tasks pane and the editors are entities that redraw themselves; the
+//!. It shows the front the project names: the pull requests, the tasks,
+//! or the editor. The hub, the Tasks pane and the editors are entities that redraw themselves; the
 //! rest (the front, the tabs, a buffer's banners) is the project's, which it observes.
 
 use atelier_ui::theme::{ActiveTheme, radius};
@@ -35,11 +35,10 @@ impl Render for RightPane {
         let Some((project, _)) = &self.shown else { return div().size_full() };
         let p = project.read(cx);
         let pulls = p.pulls.as_ref().filter(|pulls| pulls.shown).map(|pulls| pulls.hub.clone());
-        // The review and the pull requests draw their own cards on the page; the last one asked shows.
-        let inner = match (p.front(), p.review.as_ref(), pulls) {
-            (Front::Review, Some((pane, _)), _) => div().size_full().pt(px(8.)).child(pane.clone()),
-            (Front::Pulls, _, Some(hub)) => div().size_full().pt(px(8.)).child(hub),
-            (Front::Tasks, _, _) if p.tasks.is_some() => div().size_full().children(p.tasks.as_ref().map(|t| t.pane.clone())),
+        // The pull requests draw their own cards on the page; the last one asked shows.
+        let inner = match (p.front(), pulls) {
+            (Front::Pulls, Some(hub)) => div().size_full().pt(px(8.)).child(hub),
+            (Front::Tasks, _) if p.tasks.is_some() => div().size_full().children(p.tasks.as_ref().map(|t| t.pane.clone())),
             _ => div().size_full().pt(px(8.)).rounded(radius::lg()).bg(theme.card).child(editor_pane(project, cx)),
         };
         div().size_full().pr(px(8.)).pb(px(4.)).child(inner)

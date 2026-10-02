@@ -4,5 +4,5 @@
 mod helpers;
 mod structs;
 
-pub use helpers::{ended, fake_agent, git_project, git_project_in, scripted_agent, start, start_in};
+pub use helpers::{ended, fake_agent, git_project, git_project_in, scripted_agent, start, start_in, start_shown_in};
 pub use structs::Fake;

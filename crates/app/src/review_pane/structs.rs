@@ -554,7 +554,7 @@ impl ReviewPane {
         cx.notify();
     }
 
-    pub(super) fn open(&mut self, path: &SharedString, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn open(&mut self, path: &SharedString, window: &mut Window, cx: &mut Context<Self>) {
         let Some(at) = self.files.iter().position(|f| f.review.path == path.as_ref()) else { return };
         if at == self.current {
             return;

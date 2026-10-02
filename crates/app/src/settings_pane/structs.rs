@@ -94,6 +94,11 @@ impl SettingsPane {
         save(cx, move |s| s.task_rules_off = off);
         cx.notify();
     }
+    fn set_run_picked_skills(&mut self, on: bool, cx: &mut Context<Self>) {
+        cx.set_global(crate::agent_session::RunPickedSkills(on));
+        save(cx, move |s| s.run_picked_skills = Some(on));
+        cx.notify();
+    }
     fn choose_primary(&mut self, name: &SharedString, cx: &mut Context<Self>) {
         let bytes = PRIMARIES.iter().find(|(n, _, _)| *n == name.as_ref()).map(|(_, b, _)| *b);
         self.primary = name.clone();
@@ -251,9 +256,19 @@ impl Render for SettingsPane {
                     .into_any_element(),
             )
         }));
+        let skills_pane = this.clone();
         let agents = div()
             .flex()
             .flex_col()
+            .child(row(
+                "Run a skill when you pick it",
+                atelier_ui::Switch::new("skills-run-when-picked", crate::agent_session::runs_picked_skills(cx))
+                    .debug_name("skills-run-when-picked")
+                    .on_change(move |on, _, cx| {
+                        skills_pane.update(cx, |p, cx| p.set_run_picked_skills(on, cx)).ok();
+                    })
+                    .into_any_element(),
+            ))
             .children(agent_rows)
             .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available.")));
         let keys_list = div().flex().flex_col().children(key_rows);

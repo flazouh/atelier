@@ -83,3 +83,36 @@ fn cards_and_flat_rows_stack_close_and_prose_keeps_its_room() {
     assert_eq!(super::gap_between(Prose, Some(Card), 14.), 14.);
     assert_eq!(super::gap_between(Card, None, 14.), 14.);
 }
+
+/// After a turn changed a file, the files the session changed show folded above the composer, with
+/// Review; the panel's head has no Review of its own. Review opens the whole session's review.
+#[gpui_kit::test]
+fn the_changed_files_sit_above_the_composer_and_review_opens_the_session(cx: &mut TestAppContext) {
+    use std::{cell::RefCell, rc::Rc};
+    let dir = crate::fake_agent::git_project(&[("a.txt", "one\n")]);
+    let (session, fake, cx) = crate::fake_agent::start_shown_in(cx, dir.clone(), vec![vec![crate::fake_agent::ended()]]);
+    cx.simulate_resize(gpui_kit::size(px(600.), px(800.)));
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let log = heard.clone();
+    cx.update(|_, cx| {
+        cx.subscribe(&session, move |_, event: &crate::agent_session::SessionEvent, _| {
+            if let crate::agent_session::SessionEvent::Review { turn, path } = event {
+                log.borrow_mut().push((*turn, path.clone()));
+            }
+        })
+        .detach()
+    });
+    assert!(cx.debug_bounds("changed-files-review").is_none(), "nothing changed yet");
+    let root = dir.clone();
+    fake.work.lock().unwrap().push(Box::new(move || std::fs::write(root.join("a.txt"), "two\n").unwrap()));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).changed_files().iter().map(|f| f.path.to_string()).collect::<Vec<_>>()), ["a.txt"]);
+    assert!(cx.debug_bounds("panel-review").is_none(), "the head has no Review");
+    let composer = cx.debug_bounds("prompt-frame").expect("the composer is drawn");
+    let review = cx.debug_bounds("changed-files-review").expect("Review is over the composer");
+    assert!(review.bottom() <= composer.top(), "the list sits above the composer");
+    cx.simulate_click(review.center(), gpui_kit::Modifiers::default());
+    cx.run_until_parked();
+    assert_eq!(heard.borrow().as_slice(), [(None, Some("a.txt".to_string()))]);
+}

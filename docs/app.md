@@ -53,9 +53,17 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 
 - The window draws its own title bar area. On macOS the traffic lights sit inset in the page, as in
   Zed and Cursor. On Linux the layout is the same, without them.
-- Left: the sidebar, with the projects open in this window and each project's sessions (empty until
-  M2), then its file tree.
-- Middle: the agent panel. Right: the editor tabs, or the review.
+- Far left: the view rail, in the order a change lives: Tasks, Sessions and Git
+  (`crates/app/src/shell/rail.rs`). A press on another view shows it with the sidebar; a press on the
+  view in front hides the sidebar, and the next press shows it again. The view in front has a wash, or
+  an edge bar while its sidebar is hidden.
+  - **Tasks:** the sidebar, and the task board in the main area.
+  - **Sessions:** the sidebar with the projects open in this window and each project's sessions, the
+    agent panels, and the right pane.
+  - **Git:** the focused session's repository, branch and changed files in the sidebar, and the
+    review in the main area. A press on a file opens the review at it; a review opened anywhere opens
+    here, and closing it goes back to Sessions.
+- Right: the pull requests, or a task opened from a session.
 - A pane's edge is a handle that shows only as a wash on hover; a drag sizes the pane beside it.
 - Foot: the status line: the project, its branch, and the language server's state.
 - Keys: GitQuiet's table where a command applies (⌘B the left pane, ⌘⇧B the right pane), ⌘O open
@@ -74,8 +82,8 @@ them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
 - **From 1100 px:** the sidebar, the session column and the right pane, side by side.
 - **From 900 to 1099 px:** the session column and the right pane. The sidebar shows on ⌘B.
 - **Below 900 px:** one pane at a time, with tabs: Projects (⌘B), Session, and Editor (⌘⇧B). The
-  third tab says Review or Pull requests while one of them is in the right pane. Opening a session
-  shows the Session tab, and opening a review shows the Review tab.
+  third tab says Tasks or Pull requests while one of them is in the right pane. Opening a session
+  or a review shows the Session tab, which holds the view's main area.
 - **Least widths:** the session column 320 px, the right pane 320 px, and the sidebar 180 px.
 - **Who gives way:** the session column keeps its least width. The right pane gives way first, down
   to its least width; then the sidebar. A pane that cannot keep its least width hides. The widths
@@ -130,8 +138,9 @@ Another Mac shows the Gatekeeper warning until you allow the app.
 
 The parts are atelier-ui's task board and task picker; the back end is in `docs/tracker.md`.
 
-- **The pane.** ⌘⇧L, `g t` (while nothing is being typed) or the project's ⋯ menu ("Tasks") puts the Tasks pane in
-  the right pane, as the pull requests do. It has a List | Board switch, the filter chips and "New task" (`c`). A
+- **The pane.** ⌘⇧L, `g t` (while nothing is being typed), the project's ⋯ menu ("Tasks") or the rail shows the
+  Tasks view, with the pane in the main area; ⌘⇧L again goes back to Sessions. A task opened from a session shows in
+  the right pane instead. It has a List | Board switch, the filter chips and "New task" (`c`). A
   press on a task shows it in full; "All tasks" (Esc) goes back. Under 560 px of pane width the board would clip,
   so the switch hides and the pane shows the list. Below 900 px of window width the third tab says "Tasks".
 - **Storage.** `Project::tracker()` opens `tracker.sqlite` in the project data folder: on this machine for a local

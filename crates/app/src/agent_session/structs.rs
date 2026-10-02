@@ -23,10 +23,19 @@ use crate::{
     review_state::{Record, ReviewState, record_path},
     status,
 };
-use super::types::{OVERDRAW, SAVE_AFTER, SessionEvent};
+use super::types::{ARRIVAL_KEPT, OVERDRAW, SAVE_AFTER, SessionEvent};
 use super::helpers::{is_activity, mode_from, mode_word, now, problem_words};
 
 impl EventEmitter<SessionEvent> for AgentSession {}
+
+/// Whether a skill picked from a composer's `/` list runs at once, as the settings say.
+pub(crate) struct RunPickedSkills(pub bool);
+
+impl gpui_kit::Global for RunPickedSkills {}
+
+pub(crate) fn runs_picked_skills(cx: &gpui_kit::App) -> bool {
+    cx.try_global::<RunPickedSkills>().is_some_and(|r| r.0)
+}
 
 pub struct AgentSession {
     /// The panel's id: stable from the start, before the agent names the session.
@@ -71,8 +80,12 @@ pub struct AgentSession {
     /// after the first, in the same turn.
     beginning: Option<Vec<Command>>,
     pub list: ListState,
+    /// The list's follow of the output and its glides.
+    pub glide: crate::glide::Glide,
     /// What each row of the list draws, and its fingerprint.
     pub shown: Vec<list_diff::Row>,
+    /// When each row that came in live arrived, for its entrance; a loaded conversation has none.
+    pub arrived: HashMap<list_diff::Arrival, std::time::Instant>,
     pub(super) rows: Vec<(u8, usize, usize)>,
     /// The turn being recorded, shared with the sink on the agent's thread.
     pub(super) tracker: Arc<Mutex<Option<TurnTracker>>>,
@@ -82,6 +95,9 @@ pub struct AgentSession {
     pub pr_chips: std::rc::Rc<Vec<atelier_ui::PrChipData>>,
     /// The session's review: its turns, decisions, marks and comments, kept in the data folder.
     pub reviews: ReviewState,
+    /// The files the whole session changed, each against its text before the session, above the composer.
+    changed: std::rc::Rc<Vec<atelier_ui::ChangedFile>>,
+    _changed: Task<()>,
     /// The card of the pull request the session opened, above the composer.
     pub pull_card: Option<Entity<crate::pull_card::PullCard>>,
     _pull_card: Option<Subscription>,
@@ -104,11 +120,30 @@ pub struct AgentSession {
     /// When each thinking block began, for its live "Thinking for 12s".
     pub thinking_since: HashMap<atelier_agents::session::BlockId, Instant>,
     _composer: Subscription,
+    _skills: Subscription,
     _pump: Task<()>,
     _start: Task<()>,
 }
 
 impl AgentSession {
+    /// The files the whole session changed, as the list above the composer shows them.
+    pub fn changed_files(&self) -> std::rc::Rc<Vec<atelier_ui::ChangedFile>> {
+        self.changed.clone()
+    }
+
+    /// Diffs the whole session off the UI thread, for [`Self::changed_files`].
+    fn diff_session(&mut self, cx: &mut Context<Self>) {
+        let turns = self.reviews.turns.clone();
+        let whole = cx.background_spawn(async move { atelier_review::present::changed_files(&turns.whole()) });
+        self._changed = cx.spawn(async move |this, cx| {
+            let files = whole.await;
+            _ = this.update(cx, |s, cx| {
+                s.changed = std::rc::Rc::new(files);
+                cx.notify();
+            });
+        });
+    }
+
     /// Gives the session its project's badge, which its panel's head shows. The shell sets it whenever it syncs.
     pub fn set_badge(&mut self, badge: atelier_ui::sidebar_model::Badge, cx: &mut Context<Self>) {
         if self.badge.as_ref() != Some(&badge) {
@@ -164,7 +199,12 @@ impl AgentSession {
         let composer = cx.new(|cx| {
             let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
             input.set_dictation(true, cx);
+            input.set_run_picked_skills(runs_picked_skills(cx));
             input
+        });
+        let _skills = cx.observe_global::<RunPickedSkills>(|this: &mut Self, cx| {
+            let run = runs_picked_skills(cx);
+            this.composer.update(cx, |c, _| c.set_run_picked_skills(run));
         });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
             PromptInputEvent::Submit(text) => this.send(text.to_string(), cx),
@@ -215,7 +255,9 @@ impl AgentSession {
             // The list lays out this much past the view each frame: enough that a fast scroll never
             // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
             list: ListState::new(0, ListAlignment::Bottom, px(OVERDRAW)),
+            glide: crate::glide::Glide::default(),
             shown: Vec::new(),
+            arrived: HashMap::new(),
             rows: Vec::new(),
             tracker,
             finished,
@@ -235,15 +277,18 @@ impl AgentSession {
             _renaming: None,
             thinking_since: HashMap::new(),
             _composer,
+            _skills,
+            changed: std::rc::Rc::default(),
+            _changed: Task::ready(()),
             _pump,
             _start: Task::ready(()),
         };
         // The conversation follows the agent's output while the reader is at its end, lets go when they scroll up, and takes
         // hold again when they come back (beui's message-scroller `followOutput`). The panel is told of each scroll, so its
         // "Latest" button and its rail keep up.
-        this.list.set_follow_mode(gpui_kit::FollowMode::Tail);
-        let scrolled = cx.entity().downgrade();
+        let (scrolled, glide) = (cx.entity().downgrade(), this.glide.clone());
         this.list.set_scroll_handler(move |_, _, cx| {
+            glide.scrolled();
             scrolled.update(cx, |_, cx| cx.notify()).ok();
         });
         this.open(resume.map(|(id, _)| id), true, cx);
@@ -321,6 +366,7 @@ impl AgentSession {
                 }
                 if let Some(record) = record {
                     s.reviews = ReviewState::from_record(record);
+                    s.diff_session(cx);
                     // The record knows when the agent last worked; the agent's list, which a resume
                     // touches, does not.
                     if let (Some(at), false) = (s.reviews.last_activity, s.activity_known) {
@@ -346,6 +392,10 @@ impl AgentSession {
                     }
                 }
                 s.refresh_rows();
+                if !history.is_empty() {
+                    // A loaded conversation is there at once; only what comes in live enters.
+                    s.arrived.clear();
+                }
                 cx.emit(SessionEvent::Changed);
                 cx.notify();
             });
@@ -423,6 +473,7 @@ impl AgentSession {
             self.reviews.finish_turn(turn, self.conversation.items().len());
         }
         if ended_turns {
+            self.diff_session(cx);
             self.save_review(cx);
             cx.emit(SessionEvent::TextSettled);
             self.draft_title(cx);
@@ -481,6 +532,11 @@ impl AgentSession {
         for (range, count) in list_diff::changes(&self.rows, &after) {
             self.list.splice(range, count);
         }
+        let now = std::time::Instant::now();
+        self.arrived.retain(|_, at| now.duration_since(*at) < ARRIVAL_KEPT);
+        for row in list_diff::arrivals(&self.shown, &shown) {
+            self.arrived.insert(row, now);
+        }
         self.rows = after;
         self.shown = shown;
     }
@@ -519,7 +575,7 @@ impl AgentSession {
         self.stderr = None;
         self.refresh_rows();
         // A message sent goes to the end and the follow takes hold again.
-        self.list.set_follow_mode(gpui_kit::FollowMode::Tail);
+        self.glide.follow();
         // The review comments go with the message, and show resolved once the agent's turn ends.
         let attachments = self.reviews.send_comments();
         if !attachments.is_empty() {

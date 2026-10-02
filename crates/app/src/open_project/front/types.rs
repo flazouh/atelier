@@ -3,7 +3,6 @@
 pub enum Front {
     #[default]
     Editor,
-    Review,
     Pulls,
     Tasks,
 }

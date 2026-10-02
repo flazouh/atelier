@@ -1,6 +1,6 @@
 //! What the conversation's rail holds, from the conversation: one entry for each message the reader sent, with the start
-//! of that message and the start of what came back, and the row of the list each one is at. Pure.
-use atelier_ui::message_rail::{DESCRIPTION_CHARS, LABEL_CHARS, RailItem, excerpt};
+//! of that message, and the row of the list each one is at. Pure.
+use atelier_ui::message_rail::{LABEL_CHARS, RailItem, excerpt};
 use atelier_agents::session::Item;
 
 use crate::list_diff::Row;
@@ -14,12 +14,7 @@ pub fn entries(items: &[Item], shown: &[Row]) -> Vec<(RailItem, usize)> {
         .filter_map(|(ix, item)| {
             let Item::User { text } = item else { return None };
             let row = row_of(ix)?;
-            // What came back: the first text the agent wrote before the next message of the reader's.
-            let answer = items[ix + 1..].iter().take_while(|i| !matches!(i, Item::User { .. })).find_map(|i| match i {
-                Item::Text { text, .. } => Some(excerpt(text, DESCRIPTION_CHARS)),
-                _ => None,
-            });
-            Some((RailItem { label: excerpt(text, LABEL_CHARS).into(), description: answer.filter(|a| !a.is_empty()).map(Into::into) }, row))
+            Some((RailItem { label: excerpt(text, LABEL_CHARS).into(), description: None }, row))
         })
         .collect()
 }

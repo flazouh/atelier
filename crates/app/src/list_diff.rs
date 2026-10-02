@@ -5,10 +5,10 @@
 mod helpers;
 mod types;
 
-pub use helpers::{activity_fingerprint, changes, changes_fingerprint, fingerprint, grouped};
+pub use helpers::{activity_fingerprint, arrivals, changes, changes_fingerprint, fingerprint, grouped};
 #[cfg(test)]
 pub use helpers::rows;
-pub use types::Row;
+pub use types::{Arrival, Row};
 
 #[cfg(test)]
 use atelier_agents::session::Item;
