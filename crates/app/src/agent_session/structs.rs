@@ -556,20 +556,15 @@ impl AgentSession {
     /// Tells the list which rows to measure again.
     pub(crate) fn refresh_rows(&mut self) {
         let items = self.conversation.items();
-        let mut shown = match self.density {
+        let shown = match self.density {
             ToolDensity::Grouped => list_diff::grouped(items, &|ix| crate::session_view::calls::shows(items, ix), &self.reviews.turn_marks),
             ToolDensity::Lines | ToolDensity::Detailed => list_diff::rows(items.len(), &self.reviews.turn_marks),
         };
-        // Until the agent says anything, a status line holds its place; otherwise a sent message shows nothing at all.
-        if list_diff::waits(items, self.conversation.working()) {
-            shown.push(list_diff::Row::Waiting);
-        }
         let after: Vec<_> = shown
             .iter()
             .map(|row| match *row {
                 list_diff::Row::Item(ix) => list_diff::fingerprint(&items[ix]),
                 list_diff::Row::Changes { turn } => list_diff::changes_fingerprint(turn),
-                list_diff::Row::Waiting => list_diff::waiting_fingerprint(),
                 list_diff::Row::Activity { from, to } => list_diff::activity_fingerprint(items, from, to, self.group_is_live(to), self.group_is_open(from, to)),
             })
             .collect();
