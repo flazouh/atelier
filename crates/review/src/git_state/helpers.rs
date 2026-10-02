@@ -37,7 +37,7 @@ pub(crate) fn head_files(project: &dyn Project, paths: &[&str]) -> HashMap<Strin
 
 /// `git cat-file --batch` for `HEAD:./path` of each path: one answer per path, in order. The answers
 /// read `<id> blob <size>` and the bytes, or `<name> missing`.
-pub(super) fn cat_file(project: &dyn Project, paths: &[&str]) -> Option<Vec<Option<Vec<u8>>>> {
+fn cat_file(project: &dyn Project, paths: &[&str]) -> Option<Vec<Option<Vec<u8>>>> {
     let mut process = project.spawn(&Command::new("git").args(["cat-file", "--batch"])).ok()?;
     for path in paths {
         writeln!(process.stdin, "HEAD:./{path}").ok()?;
@@ -111,7 +111,7 @@ pub(crate) fn parse_status(output: &str, prefix: &str) -> HashMap<String, Entry>
 
 /// The blob id of each file as it is in the working tree, paths relative to the project. A file git
 /// cannot read has no entry.
-pub(super) fn hash_files(project: &dyn Project, paths: &[&str]) -> HashMap<String, String> {
+fn hash_files(project: &dyn Project, paths: &[&str]) -> HashMap<String, String> {
     let mut blobs = HashMap::with_capacity(paths.len());
     for batch in paths.chunks(HASH_BATCH) {
         let mut args = vec!["hash-object", "--"];

@@ -5,10 +5,7 @@ use std::{
 
 use atelier_project::Project;
 
-use crate::{
-    file_review::{Change, FileReview},
-    git_state::{State},
-};
+use crate::{file_review::{Change, FileReview}, git_state::State};
 use super::types::Now;
 
 /// Whether the working tree holds something different at `path` than when the turn started.
@@ -34,7 +31,7 @@ pub(super) fn read(project: &dyn Project, path: &str) -> Option<Now> {
     }
 }
 
-pub(super) fn hash_bytes(bytes: &[u8]) -> u64 {
+fn hash_bytes(bytes: &[u8]) -> u64 {
     use std::hash::{DefaultHasher, Hash, Hasher};
     let mut hasher = DefaultHasher::new();
     bytes.hash(&mut hasher);

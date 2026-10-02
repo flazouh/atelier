@@ -17,8 +17,8 @@ use super::helpers::hunk_id;
 pub struct Merged {
     pub(super) text: String,
     pub(super) hunks: Vec<InlineHunk>,
-    pub(super) baseline_final_newline: bool,
-    pub(super) current_final_newline: bool,
+    baseline_final_newline: bool,
+    current_final_newline: bool,
 }
 
 /// Rows of a merged text, named in the lines of the version they belong to.
@@ -94,7 +94,7 @@ impl Merged {
     }
 
     /// The rows outside `skipped(hunk)` for every hunk, joined.
-    pub(super) fn version(&self, skipped: impl Fn(&InlineHunk) -> Range<usize>, final_newline: bool) -> String {
+    fn version(&self, skipped: impl Fn(&InlineHunk) -> Range<usize>, final_newline: bool) -> String {
         let skip: Vec<Range<usize>> = self.hunks.iter().map(skipped).collect();
         let mut next = 0;
         let kept = self.rows().enumerate().filter_map(|(row, text)| {

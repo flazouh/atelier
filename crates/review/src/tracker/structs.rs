@@ -1,6 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
-};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use atelier_agents::session::{Event, ToolId, ToolKind};
 use atelier_project::Project;
@@ -19,8 +17,8 @@ use super::helpers::{changed_since, pair_renames, read};
 pub struct TurnTracker {
     pub(super) root: String,
     pub(super) start: Option<State>,
-    pub(super) baselines: BTreeMap<String, Baseline>,
-    pub(super) kinds: HashMap<ToolId, ToolKind>,
+    baselines: BTreeMap<String, Baseline>,
+    kinds: HashMap<ToolId, ToolKind>,
 }
 
 impl TurnTracker {
@@ -57,7 +55,7 @@ impl TurnTracker {
         }
     }
 
-    pub(super) fn touch(&mut self, project: &dyn Project, kind: ToolKind, file: &str) {
+    fn touch(&mut self, project: &dyn Project, kind: ToolKind, file: &str) {
         if !matches!(kind, ToolKind::Edit | ToolKind::Write) {
             return;
         }
@@ -75,7 +73,7 @@ impl TurnTracker {
     }
 
     /// The path of a file the agent named, relative to the project; `None` outside it.
-    pub(super) fn relative(&self, file: &str) -> Option<String> {
+    fn relative(&self, file: &str) -> Option<String> {
         let rest = file.strip_prefix(self.root.as_str())?.strip_prefix('/')?;
         (!rest.is_empty() && !rest.split('/').any(|part| part == ".." || part == ".")).then(|| rest.to_string())
     }
@@ -106,7 +104,7 @@ impl TurnTracker {
         TurnReview::new(pair_renames(files))
     }
 
-    pub(super) fn review_of(&self, project: &dyn Project, path: &str, heads: &Heads) -> Option<FileReview> {
+    fn review_of(&self, project: &dyn Project, path: &str, heads: &Heads) -> Option<FileReview> {
         let now = read(project, path)?;
         let (baseline, exact) = match self.baselines.get(path) {
             Some(baseline) => (Some(baseline.clone()), true),
@@ -132,7 +130,7 @@ impl TurnTracker {
 
     /// The text before the turn of a file no tool named, from git. Exact when the file was clean when
     /// the turn started, since then it held the last commit's text. `None` when nothing is known.
-    pub(super) fn baseline_from_git(&self, path: &str, heads: &Heads) -> (Option<Baseline>, bool) {
+    fn baseline_from_git(&self, path: &str, heads: &Heads) -> (Option<Baseline>, bool) {
         let Some(start) = &self.start else { return (None, false) };
         let head = heads.get(path).and_then(|bytes| bytes.as_deref());
         let as_baseline = |bytes: &[u8]| match std::str::from_utf8(bytes) {

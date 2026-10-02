@@ -23,7 +23,7 @@ pub fn word_changes(old: &str, new: &str) -> (Vec<Range<usize>>, Vec<Range<usize
     (removed, added)
 }
 
-pub(super) fn push(out: &mut Vec<Range<usize>>, words: &[Range<usize>], span: Range<usize>) {
+fn push(out: &mut Vec<Range<usize>>, words: &[Range<usize>], span: Range<usize>) {
     if span.is_empty() {
         return;
     }
@@ -65,7 +65,7 @@ pub(super) fn words(text: &str) -> Vec<Range<usize>> {
 }
 
 /// How much of the two rows is the same: 1 for equal rows, 0 for rows with nothing in common.
-pub(super) fn similarity(old: &str, new: &str, removed: &[Range<usize>], added: &[Range<usize>]) -> f64 {
+fn similarity(old: &str, new: &str, removed: &[Range<usize>], added: &[Range<usize>]) -> f64 {
     let total = old.len() + new.len();
     if total == 0 {
         return 1.;

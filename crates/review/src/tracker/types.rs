@@ -1,6 +1,4 @@
-use std::{
-    collections::{HashMap},
-};
+use std::collections::HashMap;
 
 /// A file as it was when the agent first touched it.
 #[derive(Clone, Debug, PartialEq, Eq)]
