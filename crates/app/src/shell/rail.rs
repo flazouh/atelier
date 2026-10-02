@@ -103,8 +103,9 @@ impl Shell {
     /// The Git view's sidebar: the focused session's repository, branch and changed files.
     pub(super) fn git_sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
         let Some((project, session)) = self.focused(cx) else {
-            let name = self.active().map(|p| p.read(cx).name()).unwrap_or_default();
-            return GitPanel::new("git-panel", name).into_any_element();
+            let Some(project) = self.active() else { return GitPanel::new("git-panel", "").into_any_element() };
+            let p = project.read(cx);
+            return GitPanel::new("git-panel", p.name()).branch(p.git.branch().cloned()).into_any_element();
         };
         let p = project.read(cx);
         let s = session.read(cx);
