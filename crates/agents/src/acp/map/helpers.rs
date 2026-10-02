@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use super::super::wire::{self, ToolContent};
-use crate::session::{ChoiceKind, Todo, TodoStatus, ToolKind, ToolOutput, ToolStatus};
+use crate::session::{ChoiceKind, FileEdit, Todo, TodoStatus, ToolKind, ToolOutput, ToolStatus};
 use super::structs::Seen;
 
 /// A call announced as already ended starts as running; its `ToolFinished` follows at once.
@@ -61,6 +61,14 @@ pub(super) fn file_of(update: &wire::ToolCall) -> Option<String> {
 pub(super) fn diff_path(content: &[ToolContent]) -> Option<String> {
     content.iter().find_map(|c| match c {
         ToolContent::Diff(diff) => Some(diff.path.clone()),
+        _ => None,
+    })
+}
+
+/// The edit a call's content shows: its first diff.
+pub(super) fn edit_of(content: &[ToolContent]) -> Option<FileEdit> {
+    content.iter().find_map(|c| match c {
+        ToolContent::Diff(diff) => Some(diff.edit()),
         _ => None,
     })
 }

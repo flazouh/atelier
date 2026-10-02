@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::types::{ContentBlock, SessionUpdate, ToolContent};
+use crate::session::FileEdit;
 
 /// The answer to `initialize`.
 #[derive(Default, Deserialize)]
@@ -114,12 +115,20 @@ pub(in super::super) struct ToolCall {
 pub(in super::super) struct Diff {
     pub path: String,
     pub old_text: Option<String>,
+    #[serde(default)]
+    pub new_text: String,
 }
 
 impl Diff {
     /// Whether the diff makes a new file: ACP gives it no old text, and Cursor gives `-- /dev/null`.
     pub fn creates(&self) -> bool {
         self.old_text.as_deref().is_none_or(|old| old == "-- /dev/null")
+    }
+
+    /// The diff in the words every agent shares; a new file has no old text.
+    pub fn edit(&self) -> FileEdit {
+        let old = if self.creates() { String::new() } else { self.old_text.clone().unwrap_or_default() };
+        FileEdit { path: self.path.clone(), old, new: self.new_text.clone() }
     }
 }
 
