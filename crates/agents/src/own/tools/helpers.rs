@@ -4,7 +4,7 @@ use atelier_project::host_path;
 use serde_json::{Value, json};
 
 use super::super::message::ToolDef;
-use crate::session::ToolKind;
+use crate::session::{FileEdit, ToolKind};
 use super::structs::{ToolContext, ToolResult};
 use super::traits::Tool;
 
@@ -77,6 +77,11 @@ pub(crate) fn object(props: Value, required: &[&str]) -> Value {
 }
 
 /// The kind and the file of a call of `name`, for a history that shows calls without running a tool.
+/// The text a call of the tool `name` changes, when it is an edit or a write and its file is named.
+pub fn edit_of(name: &str, input: &Value) -> Option<FileEdit> {
+    all().iter().find(|t| t.name() == name)?.edit(input)
+}
+
 pub fn describe(name: &str, input: &Value) -> (ToolKind, Option<String>) {
     match all().iter().find(|t| t.name() == name) {
         Some(tool) => (tool.kind(), tool.file(input)),

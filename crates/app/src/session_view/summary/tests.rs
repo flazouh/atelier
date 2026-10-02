@@ -4,7 +4,7 @@ use serde_json::json;
 use super::*;
 
 fn call(name: &str, kind: ToolKind, input: serde_json::Value, file: Option<&str>, status: ToolStatus) -> Call {
-    Call { call: ToolCall { id: ToolId::new("t"), name: name.into(), kind, input, file: file.map(Into::into), parent: None, status }, output: None }
+    Call { call: ToolCall { id: ToolId::new("t"), name: name.into(), kind, input, file: file.map(Into::into), parent: None, status }, output: None, edit: None }
 }
 
 fn plain(path: &str) -> String {

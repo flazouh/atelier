@@ -167,7 +167,13 @@ impl StreamState {
                     ("signature_delta", Partial::Thinking { signature, .. }) => {
                         signature.get_or_insert_with(String::new).push_str(delta["signature"].as_str().unwrap_or(""));
                     }
-                    ("input_json_delta", Partial::Tool { json, .. }) => json.push_str(delta["partial_json"].as_str().unwrap_or("")),
+                    ("input_json_delta", Partial::Tool { id, json, .. }) => {
+                        let piece = delta["partial_json"].as_str().unwrap_or("");
+                        json.push_str(piece);
+                        if !piece.is_empty() {
+                            sink(Delta::ToolInput { id: id.clone(), piece: piece.to_string() });
+                        }
+                    }
                     _ => {}
                 }
             }

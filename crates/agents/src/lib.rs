@@ -11,6 +11,7 @@ pub mod commands;
 pub mod cursor;
 pub mod labs;
 pub mod own;
+mod partial_json;
 pub mod registry;
 pub mod session;
 pub mod subprocess;

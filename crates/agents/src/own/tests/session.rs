@@ -9,7 +9,7 @@ use super::{
     support::{KEY, Rig, rig, text_of, turn_ends},
 };
 use crate::session::{
-    Backend, ChoiceId, ChoiceKind, Command, Event, OpenRequest, PermissionMode, RequestId, ToolKind, ToolStatus, TurnOutcome,
+    Backend, ChoiceId, ChoiceKind, Command, Event, FileEdit, OpenRequest, PermissionMode, RequestId, ToolKind, ToolStatus, TurnOutcome,
 };
 
 fn tool_results(request: &Value) -> Vec<Value> {
@@ -183,6 +183,20 @@ fn write_steps() -> Vec<Step> {
         Step::Sse(uses(&[("w1", "write", json!({"path": "out/new.txt", "content": "made"}))])),
         Step::Sse(says("finished")),
     ]
+}
+
+/// A write's text is told while the model still writes the call, once its file is named, and again whole.
+#[test]
+fn a_write_tells_its_text_as_it_streams_and_whole() {
+    let streamed = server::reply(vec![server::tool_pieces(0, "w1", "write", &["{\"path\":\"a.t", "xt\",\"content\":\"hel", "lo\"}"])], "tool_use");
+    let rig = rig(vec![Step::Sse(streamed), Step::Sse(says("finished"))], PermissionMode::Bypass);
+    rig.send("write it");
+    let events = rig.turns(1);
+    let edits: Vec<&FileEdit> = events.iter().filter_map(|e| if let Event::ToolEdit { id, edit } = e { (id.as_str() == "w1").then_some(edit) } else { None }).collect();
+    let made = |new: &str| FileEdit { path: "a.txt".into(), old: String::new(), new: new.into() };
+    assert_eq!(edits.first(), Some(&&made("hel")), "the cut path waits; then the text as far as it came: {edits:#?}");
+    assert_eq!(edits.last(), Some(&&made("hello")), "and the whole text: {edits:#?}");
+    assert_eq!(std::fs::read_to_string(rig.dir.path().join("a.txt")).unwrap(), "hello");
 }
 
 #[test]

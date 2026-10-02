@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     sync::{Arc, Mutex, mpsc::{Receiver, RecvTimeoutError, Sender}},
     time::{Duration, Instant},
 };
@@ -16,7 +16,7 @@ use super::super::{
     tools::{self, Tool, ToolContext, ToolResult},
 };
 use crate::session::{
-    BlockId, Choice, ChoiceId, ChoiceKind, Command, EndReason, Event, EventSink, PermissionMode,
+    BlockId, Choice, ChoiceId, ChoiceKind, Command, EndReason, Event, EventSink, FileEdit, PermissionMode,
     PermissionRequest, RequestId, Session, SessionError, SessionId, Started, ToolCall, ToolId,
     ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage, message_text,
 };
@@ -279,6 +279,9 @@ impl Runner {
     fn run_one(&mut self, tool: &dyn Tool, id: &str, input: &Value, interrupted: &mut bool) -> ToolResult {
         let file = tool.file(input);
         self.emit(Event::ToolInput { id: ToolId::new(id), input: input.clone(), file: file.clone() });
+        if let Some(edit) = tool.edit(input) {
+            self.emit(Event::ToolEdit { id: ToolId::new(id), edit });
+        }
         if let Some(file) = file {
             self.emit(Event::ToolTarget { id: ToolId::new(id), file });
         }
@@ -347,11 +350,20 @@ struct Bridge {
     pub(super) open: Option<(BlockId, bool, Instant)>,
     text: String,
     finished: Vec<Block>,
+    /// The input of each call still streaming in, by its id.
+    inputs: HashMap<String, StreamingInput>,
+}
+
+/// A call's input as far as it has come, and the edit last told from it.
+struct StreamingInput {
+    name: String,
+    json: String,
+    shown: Option<FileEdit>,
 }
 
 impl Bridge {
     pub(super) fn new(sink: EventSink, next_block: u64) -> Self {
-        Self { sink, next_block, shown: false, open: None, text: String::new(), finished: Vec::new() }
+        Self { sink, next_block, shown: false, open: None, text: String::new(), finished: Vec::new(), inputs: HashMap::new() }
     }
 
     fn on(&mut self, delta: Delta) {
@@ -372,9 +384,25 @@ impl Bridge {
                 self.end();
                 self.shown = true;
                 let (kind, _) = tools::describe(&name, &Value::Null);
+                self.inputs.insert(id.clone(), StreamingInput { name: name.clone(), json: String::new(), shown: None });
                 (self.sink)(Event::ToolStarted(ToolCall { id: ToolId::new(id), name, kind, input: Value::Null, file: None, parent: None, status: ToolStatus::Pending }));
             }
-            Delta::ToolDone { .. } => {}
+            Delta::ToolInput { id, piece } => {
+                let Some(input) = self.inputs.get_mut(&id) else { return };
+                input.json.push_str(&piece);
+                // An edit's text is told as it comes, once its file is named whole.
+                let named = crate::partial_json::closed(&input.json).is_some_and(|so_far| tools::edit_of(&input.name, &so_far).is_some());
+                if named
+                    && let Some(edit) = crate::partial_json::fields(&input.json).and_then(|so_far| tools::edit_of(&input.name, &so_far))
+                    && input.shown.as_ref() != Some(&edit)
+                {
+                    input.shown = Some(edit.clone());
+                    (self.sink)(Event::ToolEdit { id: ToolId::new(id), edit });
+                }
+            }
+            Delta::ToolDone { id, .. } => {
+                self.inputs.remove(&id);
+            }
         }
     }
 

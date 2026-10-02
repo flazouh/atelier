@@ -223,6 +223,14 @@ pub fn tool_block(index: usize, id: &str, name: &str, input: &Value) -> Sse {
     ]
 }
 
+/// A tool call whose input streams in the pieces given, in that order.
+pub fn tool_pieces(index: usize, id: &str, name: &str, pieces: &[&str]) -> Sse {
+    let mut out = vec![ev("content_block_start", json!({"type": "content_block_start", "index": index, "content_block": {"type": "tool_use", "id": id, "name": name, "input": {}}}))];
+    out.extend(pieces.iter().map(|piece| ev("content_block_delta", json!({"type": "content_block_delta", "index": index, "delta": {"type": "input_json_delta", "partial_json": piece}}))));
+    out.push(ev("content_block_stop", json!({"type": "content_block_stop", "index": index})));
+    out
+}
+
 pub fn end(stop_reason: &str, output_tokens: u64) -> Sse {
     vec![
         ev("message_delta", json!({"type": "message_delta", "delta": {"stop_reason": stop_reason, "stop_sequence": null}, "usage": {"output_tokens": output_tokens}})),

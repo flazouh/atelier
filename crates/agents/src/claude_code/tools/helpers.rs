@@ -1,6 +1,8 @@
 use serde_json::Value;
 
-use crate::session::ToolKind;
+use crate::partial_json::string_end;
+
+use crate::session::{FileEdit, ToolKind};
 use super::types::{FILE_KEYS, TodoTool};
 
 pub(in super::super) fn kind(name: &str) -> ToolKind {
@@ -18,6 +20,18 @@ pub(in super::super) fn kind(name: &str) -> ToolKind {
 /// Whether a tool's input is text the reader can watch being written: an edit's old and new text, a file's content.
 pub(in super::super) fn streams_input(name: &str) -> bool {
     matches!(name, "Edit" | "Write")
+}
+
+/// The text an Edit or a Write changes, in the words every agent shares; a text not there yet is empty. `None` for
+/// another tool, and until the file is named. A MultiEdit has no one text and shows as its row.
+pub(in super::super) fn edit_of(name: &str, input: &Value) -> Option<FileEdit> {
+    let text = |key: &str| input.get(key).and_then(Value::as_str).unwrap_or("").to_string();
+    let path = input.get("file_path")?.as_str()?.to_string();
+    match name {
+        "Edit" => Some(FileEdit { path, old: text("old_string"), new: text("new_string") }),
+        "Write" => Some(FileEdit { path, old: String::new(), new: text("content") }),
+        _ => None,
+    }
 }
 
 /// The file a call names, from the argument the tool uses for it.
@@ -58,20 +72,6 @@ pub(in super::super) fn file_in_partial_input(json: &str) -> Option<String> {
     None
 }
 
-/// The index of the quote that closes the string opening at `start`, or `None` while it is still open.
-fn string_end(bytes: &[u8], start: usize) -> Option<usize> {
-    let mut i = start + 1;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\\' => i += 1,
-            b'"' => return Some(i),
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
-
 /// The tools that start a subagent.
 pub(in super::super) fn starts_subagent(name: &str) -> bool {
     matches!(name, "Agent" | "Task")
@@ -83,106 +83,5 @@ pub(in super::super) fn todo_tool(name: &str) -> Option<TodoTool> {
         "TaskCreate" => Some(TodoTool::Create),
         "TaskUpdate" => Some(TodoTool::Update),
         _ => None,
-    }
-}
-
-/// The text fields of a call's input, read from the start of its JSON while it still streams in: a value that has closed
-/// whole, the last one cut where the stream stopped. Only the outermost object's string values count; the others (a flag, a
-/// list) wait for the whole input. `None` until a field has begun.
-pub(in super::super) fn partial_input(json: &str) -> Option<Value> {
-    let bytes = json.as_bytes();
-    let skip = |mut i: usize| {
-        while i < bytes.len() && (bytes[i].is_ascii_whitespace() || bytes[i] == b',') {
-            i += 1;
-        }
-        i
-    };
-    let mut i = skip(0);
-    if bytes.get(i) != Some(&b'{') {
-        return None;
-    }
-    i += 1;
-    let mut fields = serde_json::Map::new();
-    loop {
-        i = skip(i);
-        if bytes.get(i) != Some(&b'"') {
-            break;
-        }
-        let Some(end) = string_end(bytes, i) else { break };
-        let Ok(key) = serde_json::from_str::<String>(&json[i..=end]) else { break };
-        i = end + 1;
-        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-            i += 1;
-        }
-        if bytes.get(i) != Some(&b':') {
-            break;
-        }
-        i += 1;
-        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
-            i += 1;
-        }
-        match bytes.get(i) {
-            None => break,
-            Some(b'"') => match string_end(bytes, i) {
-                Some(end) => {
-                    let Ok(text) = serde_json::from_str::<String>(&json[i..=end]) else { break };
-                    fields.insert(key, Value::String(text));
-                    i = end + 1;
-                }
-                None => {
-                    fields.insert(key, Value::String(cut_string(&json[i + 1..])));
-                    break;
-                }
-            },
-            Some(_) => match value_end(bytes, i) {
-                Some(end) => i = end,
-                None => break,
-            },
-        }
-    }
-    (!fields.is_empty()).then_some(Value::Object(fields))
-}
-
-/// The end of the value that is not a string and starts at `start`: the `,` or `}` that follows it, or `None` while it is open.
-fn value_end(bytes: &[u8], start: usize) -> Option<usize> {
-    let (mut depth, mut i) = (0usize, start);
-    while i < bytes.len() {
-        match bytes[i] {
-            b'"' => i = string_end(bytes, i)?,
-            b'{' | b'[' => depth += 1,
-            b'}' | b']' if depth == 0 => return Some(i),
-            b'}' | b']' => depth -= 1,
-            b',' if depth == 0 => return Some(i),
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
-
-/// The text of a JSON string whose closing quote has not come: `raw` with a cut escape left off, unescaped.
-fn cut_string(raw: &str) -> String {
-    let mut raw = raw;
-    // A backslash that ends the text starts an escape that has not arrived.
-    let slashes = raw.bytes().rev().take_while(|&b| b == b'\\').count();
-    if slashes % 2 == 1 {
-        raw = &raw[..raw.len() - 1];
-    }
-    // So does a `\u` with fewer than four digits after it.
-    if let Some(at) = raw.rfind("\\u")
-        && raw[..at].bytes().rev().take_while(|&b| b == b'\\').count() % 2 == 0
-        && raw[at + 2..].len() < 4
-    {
-        raw = &raw[..at];
-    }
-    // A high surrogate waits for its pair.
-    loop {
-        if let Ok(text) = serde_json::from_str::<String>(&format!("\"{raw}\"")) {
-            return text;
-        }
-        match raw.len().checked_sub(6) {
-            Some(at) if raw.is_char_boundary(at) && raw[at..].starts_with("\\u") => raw = &raw[..at],
-            _ => return String::new(),
-        }
     }
 }

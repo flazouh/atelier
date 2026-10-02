@@ -35,29 +35,3 @@ fn other_calls_have_no_preview() {
     assert_eq!(preview(&call("Read", json!({"file_path": "/home/alex/qa/m3/a"})), ROOT), None);
     assert_eq!(preview(&call("Edit", serde_json::Value::Null), ROOT), None);
 }
-
-/// While an edit streams in, what has come shows at once: old text alone reads as removed lines, and the new text
-/// joins as it arrives. A call whose file is not known has nothing to show yet.
-#[test]
-fn an_edit_that_streams_shows_what_has_come() {
-    let file = "/home/alex/qa/m3/NOTES.md";
-    let only_old = call("Edit", json!({"file_path": file, "old_string": "a\nb"}));
-    assert_eq!(streamed(&only_old, ROOT), Some(ToolPreview::edit("NOTES.md", "a\nb", "")));
-    let cut_new = call("Edit", json!({"file_path": file, "old_string": "a", "new_string": "a\nb"}));
-    assert_eq!(streamed(&cut_new, ROOT), Some(ToolPreview::edit("NOTES.md", "a", "a\nb")));
-    let write = call("Write", json!({"file_path": file, "content": "hi"}));
-    assert_eq!(streamed(&write, ROOT), Some(ToolPreview::written("NOTES.md", "hi")));
-    let no_text_yet = call("Write", json!({"file_path": file}));
-    assert_eq!(streamed(&no_text_yet, ROOT), Some(ToolPreview::written("NOTES.md", "")));
-    assert_eq!(streamed(&call("Edit", json!({"old_string": "a"})), ROOT), None, "no file yet");
-    assert_eq!(streamed(&call("Edit", serde_json::Value::Null), ROOT), None);
-}
-
-/// A whole MultiEdit shows as it does in an approval; a Bash call or a read is not an edit.
-#[test]
-fn only_edits_and_writes_stream() {
-    let multi = call("MultiEdit", json!({"file_path": "/w/a", "edits": [{"old_string": "x", "new_string": "y"}]}));
-    assert_eq!(streamed(&multi, "/w"), preview(&multi, "/w"));
-    assert_eq!(streamed(&call("Bash", json!({"command": "ls"})), ROOT), None);
-    assert_eq!(streamed(&call("Read", json!({"file_path": "/w/a"})), ROOT), None);
-}
