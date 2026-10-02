@@ -166,3 +166,29 @@ fn a_project_keeps_its_badge_colour_and_icon_and_an_old_file_has_none() {
     assert_eq!(round.project_colors["~/code/x"], 7);
     assert_eq!(round.project_icons["~/code/x"], "/data/project-icons/ab.svg");
 }
+
+/// The app saves from a thread for each change, so changes made together are all kept.
+#[test]
+fn saves_made_together_all_keep_their_change() {
+    for round in 0..20 {
+        let path = scratch("together");
+        let start = std::sync::Arc::new(std::sync::Barrier::new(16));
+        let threads: Vec<_> = (0..16)
+            .map(|i| {
+                let (path, start) = (path.clone(), start.clone());
+                std::thread::spawn(move || {
+                    start.wait();
+                    update(&path, |s| s.archived_sessions.push(format!("s{i}")))
+                })
+            })
+            .collect();
+        for thread in threads {
+            thread.join().unwrap().unwrap_or_else(|e| panic!("round {round}: {e}"));
+        }
+        let mut kept = load(&path).archived_sessions;
+        kept.sort();
+        let mut want: Vec<_> = (0..16).map(|i| format!("s{i}")).collect();
+        want.sort();
+        assert_eq!(kept, want, "round {round}");
+    }
+}

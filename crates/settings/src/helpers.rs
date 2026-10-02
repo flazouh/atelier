@@ -1,6 +1,7 @@
 use std::{
     io,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 use super::structs::Settings;
@@ -27,16 +28,20 @@ pub fn load(path: &Path) -> Settings {
     std::fs::read_to_string(path).ok().and_then(|text| serde_json::from_str(&text).ok()).unwrap_or_default()
 }
 
-/// Loads the settings at `path`, applies `change`, and writes them back whole. Call it off the UI
-/// thread.
+/// Held from the load to the write of an [`update`], so saves made together each keep their change.
+static SAVING: Mutex<()> = Mutex::new(());
+
+/// Loads the settings at `path`, applies `change`, and writes them back whole. Saves in this process take
+/// turns, and each writes a file of its own before it replaces the settings. Call it off the UI thread.
 pub fn update(path: &Path, change: impl FnOnce(&mut Settings)) -> io::Result<Settings> {
+    let _turn = SAVING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut settings = load(path);
     change(&mut settings);
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
     let text = serde_json::to_string_pretty(&settings).map_err(io::Error::other)?;
-    let temporary = path.with_extension("json.saving");
+    let temporary = path.with_extension(format!("json.saving.{}", std::process::id()));
     std::fs::write(&temporary, text)?;
     std::fs::rename(&temporary, path)?;
     Ok(settings)
