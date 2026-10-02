@@ -30,3 +30,8 @@ pub(super) fn save(cx: &mut gpui_kit::App, change: impl FnOnce(&mut atelier_sett
         .detach();
     }
 }
+
+/// The body text's size at `zoom`, as the font size slider tells it.
+pub fn font_size_words(zoom: f32) -> String {
+    format!("{} pt", (14. * zoom).round() as i32)
+}

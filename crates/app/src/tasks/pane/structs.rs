@@ -268,8 +268,6 @@ impl TasksPane {
                     .collect();
                 self.labels = labels.iter().map(|l| map::label_of(l)).collect();
                 self.load = Load::Ready;
-                let open = self.tasks.iter().filter(|t| !matches!(t.status, atelier_ui::task_model::TaskStatus::Done | atelier_ui::task_model::TaskStatus::Canceled)).count();
-                cx.emit(TasksEvent::Counted(open));
                 let (people, labels) = (self.people.clone(), self.labels.clone());
                 self.dialog.update(cx, |d, _| d.set_people(people, labels));
                 self.push_all(Source::None, cx);

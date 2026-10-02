@@ -152,14 +152,14 @@ pub fn agent_panel(
         .flex()
         .justify_center()
         .size_full()
-        .bg(theme.card)
+        .bg(theme.background)
         .child(
             div()
                 .flex()
                 .flex_col()
                 .w(px(560.))
                 .h_full()
-                .bg(theme.background)
+                .bg(theme.card)
                 .child(header)
                 .child(session)
                 .child(div().flex().flex_col().gap(px(8.)).p(px(12.)).child(pr).child(strip).child(prompt.clone())),

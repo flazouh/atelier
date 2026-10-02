@@ -16,9 +16,7 @@ pub(super) fn sample(other: &AgentLook) -> Vec<ProjectData> {
         name: "atelier".into(),
         location: Location::Local,
         connection: Connection::Connected,
-        branch: Some("main".into()),
         pulls_unavailable: None,
-        tasks_open: None,
         badge: Default::default(),
         sessions: vec![
             session("l1", "Add the sidebar and the agent panels", &claude, SessionStatus::Working, 0),
@@ -37,9 +35,7 @@ pub(super) fn sample(other: &AgentLook) -> Vec<ProjectData> {
         name: "api-server".into(),
         location: Location::Ssh { host: "hp-agent".into() },
         connection: Connection::Connected,
-        branch: Some("feature/tokens".into()),
         pulls_unavailable: None,
-        tasks_open: None,
         badge: Default::default(),
         sessions: vec![
             session("a1", "Which endpoints still return 500?", &claude, SessionStatus::NeedsYou(Need::Question), 1),
@@ -52,9 +48,7 @@ pub(super) fn sample(other: &AgentLook) -> Vec<ProjectData> {
         name: "infra".into(),
         location: Location::Ssh { host: "build-01".into() },
         connection: Connection::Reconnecting,
-        branch: None,
         pulls_unavailable: None,
-        tasks_open: None,
         badge: Default::default(),
         sessions: vec![],
     };
@@ -70,9 +64,7 @@ pub(super) fn big(projects: usize, sessions: usize) -> Vec<ProjectData> {
             name: format!("project-{p}").into(),
             location: if p % 3 == 0 { Location::Ssh { host: format!("host-{}", p % 5).into() } } else { Location::Local },
             connection: Connection::Connected,
-            branch: Some("main".into()),
             pulls_unavailable: None,
-        tasks_open: None,
         badge: Default::default(),
             sessions: (0..sessions)
                 .map(|s| {

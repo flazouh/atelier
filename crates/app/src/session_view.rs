@@ -15,6 +15,8 @@ mod types;
 
 pub use helpers::{rows, session_view_with};
 #[cfg(test)]
+pub use types::READING_WIDTH;
+#[cfg(test)]
 pub use helpers::session_view;
 
 #[cfg(test)]

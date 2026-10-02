@@ -1,5 +1,6 @@
 //! File icons as glyphs of one icon font, one for each file type, in one of nine colours. The glyphs are
-//! Anysphere's (`assets/FileGlyphs.ttf`, only the ones the table names). Folders keep atelier-ui's icons.
+//! Anysphere's (`assets/FileGlyphs.ttf`, only the ones the table names, plus a blank `m` and space: GPUI on macOS
+//! skips a font with no `m`). Folders keep atelier-ui's icons.
 //!
 //! A file's glyph comes from, in order: a `.plan.md` file, the agent rules files, the VS Code files in
 //! `.vscode`, the whole name, `.env` files, then the longest extension (`d.ts` before `ts`).

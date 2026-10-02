@@ -33,3 +33,30 @@ fn cached_rows_show_a_new_turn(cx: &mut TestAppContext) {
         before - 1
     );
 }
+
+/// A session alone in a wide window keeps its rows and its composer to a reading width, centred, with margin on
+/// each side; in a narrow panel they take the whole width.
+#[gpui_kit::test]
+fn a_wide_session_keeps_its_rows_and_composer_to_a_centred_reading_width(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![vec![text("one"), ended()]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("first".into(), cx)));
+    cx.run_until_parked();
+    let shown = session.clone();
+    let (_panel, cx) = cx.add_window_view(move |_, cx| SessionPanel::new(shown, cx));
+    let widest = crate::session_view::READING_WIDTH;
+    for (window, capped) in [(1600., true), (480., false)] {
+        cx.simulate_resize(size(px(window), px(800.)));
+        cx.run_until_parked();
+        for name in ["entering-0", "session-foot"] {
+            let bounds = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
+            let (left, width) = (f32::from(bounds.origin.x), f32::from(bounds.size.width));
+            let right = window - left - width;
+            if capped {
+                assert!(width <= widest + 0.5, "{name} at {window}: {width} wide");
+                assert!((left - right).abs() < 1., "{name} at {window}: centred, {left} and {right}");
+            } else {
+                assert!(width > window - 40., "{name} at {window}: takes the width, {width}");
+            }
+        }
+    }
+}

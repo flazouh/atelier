@@ -40,3 +40,9 @@ fn colours_follow_light_and_dark() {
     assert_ne!(Tone::Orange.color(&dark), Tone::Orange.color(&light));
     assert_eq!(Tone::Secondary.color(&dark), dark.foreground.opacity(0.66));
 }
+
+#[test]
+fn the_font_loads_on_macos_where_a_font_without_an_m_is_skipped() {
+    let face = ttf_parser::Face::parse(include_bytes!("../../assets/FileGlyphs.ttf"), 0).unwrap();
+    assert!(face.glyph_index('m').is_some(), "GPUI on macOS skips a font with no 'm', and every icon falls back to a '?' box");
+}

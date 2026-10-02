@@ -116,3 +116,14 @@ fn the_changed_files_sit_above_the_composer_and_review_opens_the_session(cx: &mu
     cx.run_until_parked();
     assert_eq!(heard.borrow().as_slice(), [(None, Some("a.txt".to_string()))]);
 }
+
+#[test]
+fn a_read_shows_no_file_content_and_only_its_error_when_it_fails() {
+    use atelier_agents::session::{ToolKind, ToolStatus};
+    use super::helpers::shows_output;
+    assert!(!shows_output(ToolKind::Read, ToolStatus::Done));
+    assert!(!shows_output(ToolKind::Read, ToolStatus::Running));
+    assert!(shows_output(ToolKind::Read, ToolStatus::Failed), "the error says why");
+    assert!(shows_output(ToolKind::Shell, ToolStatus::Done));
+    assert!(shows_output(ToolKind::Search, ToolStatus::Done));
+}

@@ -2,6 +2,7 @@ use atelier_ui::{
     ActiveTheme,
     ColorSelector,
     Kbd,
+    RangeSlider,
     Segment,
     Segmented,
     Swatch,
@@ -20,7 +21,7 @@ use atelier_ui::scale::px;
 
 use crate::tool_density::ToolDensity;
 use super::types::{Mode, PRIMARIES, Section, SettingsEvent};
-use super::helpers::{colour, rule_switch, save};
+use super::helpers::{colour, font_size_words, rule_switch, save};
 
 /// An agent the build can start, as the pane lists it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,6 +41,9 @@ pub struct SettingsPane {
     pub(super) section: Section,
     /// The sidebar's look, as this page edits it.
     pub(super) look: SidebarLayout,
+    /// The font size a drag on its slider is at. The zoom waits for the release: zooming as it moves rescales the
+    /// slider under the pointer.
+    pub(super) zoom_preview: Option<f32>,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -66,6 +70,7 @@ impl SettingsPane {
             rules,
             section: Section::Appearance,
             look: crate::sidebar_layout::from_settings(saved),
+            zoom_preview: None,
         }
     }
 
@@ -104,6 +109,18 @@ impl SettingsPane {
         cx.set_global(density);
         save(cx, move |s| s.tool_density = Some(density.key().into()));
         cx.notify();
+    }
+    pub(crate) fn preview_zoom(&mut self, zoom: f32, cx: &mut Context<Self>) {
+        self.zoom_preview = Some(zoom);
+        cx.notify();
+    }
+    pub(crate) fn choose_zoom(&mut self, zoom: f32, cx: &mut Context<Self>) {
+        self.zoom_preview = None;
+        cx.emit(SettingsEvent::Zoom(zoom));
+        cx.notify();
+    }
+    pub(super) fn shown_zoom(&self) -> f32 {
+        self.zoom_preview.unwrap_or_else(atelier_ui::scale::zoom)
     }
     fn choose_primary(&mut self, name: &SharedString, cx: &mut Context<Self>) {
         let bytes = PRIMARIES.iter().find(|(n, _, _)| *n == name.as_ref()).map(|(_, b, _)| *b);
@@ -191,6 +208,31 @@ impl Render for SettingsPane {
                 save(cx, move |s| s.theme = Some(name));
             })).into_any_element()))
             .child(row("Mode", modes.into_any_element()))
+            .child(row("Interface font size", {
+                let (this, ends) = (this.clone(), this.clone());
+                let zoom = self.shown_zoom();
+                div()
+                    .debug_selector(|| "font-size".into())
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .child(
+                        div().w(px(140.)).child(
+                            RangeSlider::new("font-size-slider", zoom)
+                                .compact(true)
+                                .range(atelier_ui::scale::MIN, atelier_ui::scale::MAX)
+                                .step(atelier_ui::scale::STEP)
+                                .on_change(move |zoom, _, cx| {
+                                    this.update(cx, |pane, cx| pane.preview_zoom(zoom, cx)).ok();
+                                })
+                                .on_end(move |zoom, _, cx| {
+                                    ends.update(cx, |pane, cx| pane.choose_zoom(zoom, cx)).ok();
+                                }),
+                        ),
+                    )
+                    .child(div().w(px(40.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(font_size_words(zoom)))
+                    .into_any_element()
+            }))
             .child(
                 div()
                     .pt(px(12.))

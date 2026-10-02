@@ -618,6 +618,7 @@ impl Shell {
                 let look = *look;
                 this.agents_sidebar.update(cx, |s, cx| s.set_layout(s.layout().with_look_of(&look), cx));
             }
+            crate::settings_pane::SettingsEvent::Zoom(zoom) => this.zoom_to(*zoom, cx),
         });
         pane.read(cx).focus_handle(cx).focus(window, cx);
         self.settings = Some((pane, events));
@@ -1305,16 +1306,7 @@ impl Shell {
         cx.notify();
     }
 
-    /// Opens the session that needs the reader most: one waiting for a yes or no, then a question, then one finished and unseen.
-    fn open_most_urgent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let sidebar = self.agents_sidebar.clone();
-        let Some((project, session)) = atelier_ui::most_urgent(self.agents_sidebar.read(cx).all_projects()) else { return };
-        self.sidebar_event(&sidebar, &SidebarEvent::Open { project, session }, window, cx);
-    }
-
     fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let counts = atelier_ui::counts_of(self.agents_sidebar.read(cx).all_projects());
-        let this = cx.entity().downgrade();
         div()
             .id("title-bar")
             .window_control_area(WindowControlArea::Drag)
@@ -1337,9 +1329,7 @@ impl Shell {
             .child(self.title_left(cx))
             .relative()
             .children(self.layout_button(cx))
-            .child(div().flex_1().flex().justify_center().child(atelier_ui::SessionsIsland::new("sessions-island", counts).on_press(
-                move |window, cx| drop(this.update(cx, |shell, cx| shell.open_most_urgent(window, cx))),
-            )))
+            .child(div().flex_1())
             .child(self.settings_button(cx))
     }
 
