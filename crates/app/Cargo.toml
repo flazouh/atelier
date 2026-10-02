@@ -23,6 +23,7 @@ atelier-remote.workspace = true
 atelier-review.workspace = true
 atelier-settings.workspace = true
 atelier-tracker.workspace = true
+atelier-voice.workspace = true
 futures-channel = "0.3"
 futures-util = "0.3"
 lsp-types = "0.97"

@@ -8,9 +8,7 @@ fn states_match_the_app_table() {
         (SparkState::Waiting, 16, 600, true),
         (SparkState::Shimmer, 15, 100, true),
         (SparkState::Orbiting, 18, 100, true),
-        (SparkState::Entrance, 6, 70, false),
         (SparkState::Exit, 6, 70, false),
-        (SparkState::Tickle, 7, 40, false),
     ];
     for (state, frames, ms, loops) in table {
         let strip = state.strip();
@@ -27,13 +25,12 @@ fn frame_zero_shows_at_the_start() {
 
 #[test]
 fn one_shots_hold_their_last_frame() {
-    assert_eq!(SparkState::Entrance.strip().frame_at(10_000), 5);
-    assert_eq!(SparkState::Tickle.strip().frame_at(10_000), 6);
+    assert_eq!(SparkState::Exit.strip().frame_at(10_000), 5);
 }
 
 #[test]
 fn each_strip_is_about_one_hundred_units_per_frame() {
-    // Entrance and exit are a unit or two off; every other strip is exactly 100 x frames*100.
+    // Exit is a unit or two off; every other strip is exactly 100 x frames*100.
     for state in SparkState::ALL {
         let strip = state.strip();
         let (w, h) = strip.native_size();
