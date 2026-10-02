@@ -12,11 +12,13 @@ use super::types::Presses;
 
 /// What the person chose for dictation, kept in the settings file between runs.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(super) struct Prefs {
+pub struct Prefs {
     /// The microphone, by `atelier_voice::Device::id`; none: the system's default.
-    pub(super) device: Option<String>,
+    pub device: Option<String>,
     /// The microphone button records only while it is held down.
-    pub(super) hold: bool,
+    pub hold: bool,
+    /// The key that dictates; none: no key.
+    pub key: Option<atelier_voice::hotkey::Key>,
 }
 
 /// The app's one engine, the presses it is serving, where the model's setup is, and the person's choices.

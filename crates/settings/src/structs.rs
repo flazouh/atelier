@@ -61,7 +61,7 @@ pub struct Settings {
     pub dictation_device: Option<String>,
     /// Dictation records only while the microphone button is held down, and stops when it is let go.
     pub dictation_hold: Option<bool>,
-    /// The key that dictates while held: `fn` (the default), `right-option` or `left-option`.
+    /// The key that dictates while held: `fn` (the default), `right-option`, `left-option`, or `off` for none.
     pub dictation_key: Option<String>,
     /// How much of the agent's tool calls a session shows: "grouped", "lines" or "detailed". Unset: grouped.
     pub tool_density: Option<String>,

@@ -36,7 +36,11 @@ pub(super) fn speech(cx: &mut App) -> (Rc<Engine>, Presses) {
     })
     .detach();
     let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
-    let prefs = Rc::new(RefCell::new(Prefs { device: saved.dictation_device, hold: saved.dictation_hold.unwrap_or(false) }));
+    let prefs = Rc::new(RefCell::new(Prefs {
+        device: saved.dictation_device,
+        hold: saved.dictation_hold.unwrap_or(false),
+        key: key_from(saved.dictation_key.as_deref()),
+    }));
     cx.set_global(Speech { engine: engine.clone(), presses: presses.clone(), phase, total_mb, prefs });
     (engine, presses)
 }
@@ -131,15 +135,15 @@ pub fn start_up(input: &mut PromptInput, cx: &mut Context<PromptInput>) {
 }
 
 /// Lets the dictation key reach `composer`, in `window`, for as long as it lives. The first composer starts listening for the
-/// key, which is Fn unless the settings file names another.
+/// key the person chose, whichever it is at the moment.
 pub fn hear_key(composer: &Entity<PromptInput>, window: &mut Window, cx: &mut App) -> gpui_kit::Subscription {
     if cx.try_global::<KeyRoute>().is_none() {
         let mut route = KeyRoute::default();
-        let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
-        let key: Key = saved.dictation_key.as_deref().and_then(|k| k.parse().ok()).unwrap_or_default();
+        speech(cx);
+        let prefs = cx.global::<Speech>().prefs.clone();
         let (tx, mut inputs) = unbounded::<(Input, std::time::Instant)>();
         let heard = tx.clone();
-        if atelier_voice::hotkey::listen(key, move |input| {
+        if atelier_voice::hotkey::listen(move || prefs.borrow().key, move |input| {
             heard.unbounded_send((input, std::time::Instant::now())).ok();
         }) {
             route.away = Some(tx);
@@ -203,25 +207,34 @@ fn press_target(cx: &mut App) -> Option<gpui_kit::WeakEntity<PromptInput>> {
 }
 
 /// What the person chose, as of now.
-pub(super) fn prefs(cx: &mut App) -> Prefs {
+pub fn prefs(cx: &mut App) -> Prefs {
     speech(cx);
     cx.global::<Speech>().prefs.borrow().clone()
 }
 
-/// Changes what the person chose and writes it to the settings file, off the UI thread.
-pub(super) fn choose(cx: &mut App, change: impl FnOnce(&mut Prefs)) {
+/// Changes what the person chose, puts it in force in every composer, and writes it to the settings file, off the UI thread.
+pub fn choose(cx: &mut App, change: impl FnOnce(&mut Prefs)) {
     speech(cx);
     let now = {
         let mut prefs = cx.global::<Speech>().prefs.borrow_mut();
         change(&mut prefs);
         prefs.clone()
     };
+    let composers: Vec<_> = cx.try_global::<KeyRoute>().map(|r| r.composers.iter().filter_map(|(c, _)| c.upgrade()).collect()).unwrap_or_default();
+    for composer in composers {
+        composer.update(cx, |c, cx| c.set_voice_hold(now.hold, cx));
+    }
+    // A test writes only the file it names, never this machine's settings.
+    if cfg!(test) && std::env::var_os("ATELIER_SETTINGS").is_none() {
+        return;
+    }
     let Some(path) = atelier_settings::path() else { return };
     cx.background_executor()
         .spawn(async move {
             if let Err(error) = atelier_settings::update(&path, |s| {
                 s.dictation_device = now.device;
                 s.dictation_hold = Some(now.hold).filter(|hold| *hold);
+                s.dictation_key = key_name(now.key);
             }) {
                 eprintln!("could not save the dictation settings: {error}");
             }
@@ -229,12 +242,30 @@ pub(super) fn choose(cx: &mut App, change: impl FnOnce(&mut Prefs)) {
         .detach();
 }
 
+/// The dictation key the settings file names: Fn when it names none, no key for `off`.
+pub(super) fn key_from(saved: Option<&str>) -> Option<Key> {
+    match saved {
+        Some("off") => None,
+        Some(name) => Some(name.parse().unwrap_or_default()),
+        None => Some(Key::default()),
+    }
+}
+
+/// How the settings file names the key: left out for the default.
+pub(super) fn key_name(key: Option<Key>) -> Option<String> {
+    match key {
+        None => Some("off".into()),
+        Some(Key::Fn) => None,
+        Some(key) => Some(key.name().into()),
+    }
+}
+
 /// The row that means "whichever microphone the system uses".
-pub(super) const DEFAULT_ID: &str = "default";
+pub const DEFAULT_ID: &str = "default";
 
 /// The menu's rows for the microphones found: the system's default first, named after the one it is now, then each microphone;
 /// and which row is chosen. A choice that is no longer plugged in falls back to the default row.
-pub(super) fn device_rows(found: &[Device], chosen: Option<&str>) -> (Vec<VoiceDevice>, String) {
+pub fn device_rows(found: &[Device], chosen: Option<&str>) -> (Vec<VoiceDevice>, String) {
     let default = match found.iter().find(|d| d.is_default) {
         Some(d) => format!("Default - {}", d.label),
         None => "Default".to_string(),

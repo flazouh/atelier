@@ -14,16 +14,33 @@ pub enum Key {
     LeftOption,
 }
 
+impl Key {
+    pub const ALL: [Key; 3] = [Key::Fn, Key::RightOption, Key::LeftOption];
+
+    /// As the settings file names it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Fn => "fn",
+            Self::RightOption => "right-option",
+            Self::LeftOption => "left-option",
+        }
+    }
+
+    /// As a person reads it.
+    pub fn words(self) -> &'static str {
+        match self {
+            Self::Fn => "Fn",
+            Self::RightOption => "Right Option",
+            Self::LeftOption => "Left Option",
+        }
+    }
+}
+
 impl FromStr for Key {
     type Err = ();
 
     fn from_str(name: &str) -> Result<Self, ()> {
-        match name {
-            "fn" => Ok(Self::Fn),
-            "right-option" => Ok(Self::RightOption),
-            "left-option" => Ok(Self::LeftOption),
-            _ => Err(()),
-        }
+        Self::ALL.into_iter().find(|k| k.name() == name).ok_or(())
     }
 }
 

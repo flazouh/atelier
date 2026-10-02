@@ -64,9 +64,10 @@ impl Tracker {
     }
 }
 
-/// Hears `key` in this app's windows and hands each change to `on`, for as long as the app runs. Only on macOS; elsewhere it
-/// does nothing and says so with `false`.
-pub fn listen(key: Key, on: impl Fn(Input) + 'static) -> bool {
+/// Hears the key `key` names, asked at every event so a new choice applies at once (`None`: no key), in this app's windows,
+/// and hands each change to `on`, for as long as the app runs. Only on macOS; elsewhere it does nothing and says so with
+/// `false`.
+pub fn listen(key: impl Fn() -> Option<Key> + 'static, on: impl Fn(Input) + 'static) -> bool {
     #[cfg(target_os = "macos")]
     return mac::listen(key, on);
     #[cfg(not(target_os = "macos"))]
@@ -103,11 +104,15 @@ mod mac {
         }
     }
 
-    pub(super) fn listen(key: Key, on: impl Fn(Input) + 'static) -> bool {
+    pub(super) fn listen(key: impl Fn() -> Option<Key> + 'static, on: impl Fn(Input) + 'static) -> bool {
         let down = Cell::new(false);
         let block = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
             let seen = unsafe { event.as_ref() };
             let kind = seen.r#type();
+            let Some(key) = key() else {
+                down.set(false);
+                return event.as_ptr();
+            };
             if kind == NSEventType::FlagsChanged {
                 let flags = seen.modifierFlags().0;
                 if let Some(now) = is_down(key, seen.keyCode(), flags)

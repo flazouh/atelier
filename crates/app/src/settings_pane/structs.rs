@@ -20,7 +20,8 @@ use gpui_kit::{
 use atelier_ui::scale::px;
 
 use crate::tool_density::ToolDensity;
-use super::types::{Mode, PRIMARIES, Section, SettingsEvent};
+use crate::agent_session::dictation;
+use super::types::{DICTATION_KEYS, Mode, PRIMARIES, Section, SettingsEvent};
 use super::helpers::{colour, font_size_words, rule_switch, save};
 
 /// An agent the build can start, as the pane lists it.
@@ -44,6 +45,8 @@ pub struct SettingsPane {
     /// The font size a drag on its slider is at. The zoom waits for the release: zooming as it moves rescales the
     /// slider under the pointer.
     pub(super) zoom_preview: Option<f32>,
+    /// The microphones found when the Dictation section was last shown, its rows as the composer's menu has them.
+    pub(super) mics: Vec<atelier_ui::VoiceDevice>,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -71,6 +74,7 @@ impl SettingsPane {
             section: Section::Appearance,
             look: crate::sidebar_layout::from_settings(saved),
             zoom_preview: None,
+            mics: Vec::new(),
         }
     }
 
@@ -83,6 +87,13 @@ impl SettingsPane {
 
     pub(crate) fn show(&mut self, section: Section, cx: &mut Context<Self>) {
         self.section = section;
+        if section == Section::Dictation {
+            self.mics = dictation::device_rows(&atelier_voice::devices(), None).0;
+        }
+        cx.notify();
+    }
+    pub(crate) fn choose_dictation(&mut self, change: impl FnOnce(&mut dictation::Prefs), cx: &mut Context<Self>) {
+        dictation::choose(cx, change);
         cx.notify();
     }
     /// Changes the sidebar's look: kept in the settings and applied at once.
@@ -332,11 +343,60 @@ impl Render for SettingsPane {
             ))
             .children(agent_rows)
             .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available.")));
+        let speech = dictation::prefs(cx);
+        let dictation_pane = {
+            let (key_pane, mic_pane, hold_pane) = (this.clone(), this.clone(), this.clone());
+            let keys = Segmented::new(
+                "dictation-key",
+                DICTATION_KEYS.into_iter().map(|k| Segment::new(k.map_or("Off", |k| k.words())).debug_name(k.map_or("dictation-key-off", |k| match k {
+                    atelier_voice::hotkey::Key::Fn => "dictation-key-fn",
+                    atelier_voice::hotkey::Key::RightOption => "dictation-key-right-option",
+                    atelier_voice::hotkey::Key::LeftOption => "dictation-key-left-option",
+                }))),
+                DICTATION_KEYS.iter().position(|k| *k == speech.key).unwrap_or(0),
+            )
+            .on_change(move |i, _, cx| {
+                key_pane.update(cx, |p, cx| p.choose_dictation(|d| d.key = DICTATION_KEYS[i], cx)).ok();
+            });
+            let chosen = speech.device.as_deref().unwrap_or(dictation::DEFAULT_ID);
+            let at = self.mics.iter().position(|m| m.id.as_ref() == chosen).unwrap_or(0);
+            let ids: Vec<SharedString> = self.mics.iter().map(|m| m.id.clone()).collect();
+            let mics = atelier_ui::Select::new("dictation-mic", self.mics.iter().map(|m| m.label.clone())).selected(Some(at)).on_change(move |i, _, cx| {
+                let id = ids.get(i).cloned();
+                mic_pane
+                    .update(cx, |p, cx| p.choose_dictation(|d| d.device = id.filter(|id| id != dictation::DEFAULT_ID).map(|id| id.to_string()), cx))
+                    .ok();
+            });
+            let key_gist = match speech.key {
+                Some(atelier_voice::hotkey::Key::Fn) if cfg!(target_os = "macos") => {
+                    "Hold it to talk; tap it to keep talking, and tap again to stop. In System Settings, Keyboard, set \"Press 🌐 key to\" to \"Do nothing\", or macOS takes the key for its own dictation."
+                }
+                Some(_) if cfg!(target_os = "macos") => "Hold it to talk; tap it to keep talking, and tap again to stop. A shortcut with the key still works.",
+                Some(_) => "Hold it to talk; tap it to keep talking, and tap again to stop. The key works on macOS for now.",
+                None => "The microphone button still dictates.",
+            };
+            div()
+                .flex()
+                .flex_col()
+                .child(row("Dictation key", keys.into_any_element()))
+                .child(div().debug_selector(|| "dictation-key-gist".into()).pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(key_gist))
+                .child(row("Microphone", div().debug_selector(|| "dictation-mic".into()).w(px(260.)).child(mics).into_any_element()))
+                .child(row(
+                    "Hold the microphone button to record",
+                    atelier_ui::Switch::new("dictation-hold", speech.hold)
+                        .debug_name("dictation-hold")
+                        .on_change(move |on, _, cx| {
+                            hold_pane.update(cx, |p, cx| p.choose_dictation(|d| d.hold = on, cx)).ok();
+                        })
+                        .into_any_element(),
+                ))
+        };
         let keys_list = div().flex().flex_col().children(key_rows);
         let body = match self.section {
             Section::Appearance => appearance.into_any_element(),
             Section::Sidebar => sidebar.into_any_element(),
             Section::Agents => agents.into_any_element(),
+            Section::Dictation => dictation_pane.into_any_element(),
             Section::Tasks => tasks.into_any_element(),
             Section::Keys => keys_list.into_any_element(),
         };
