@@ -12,7 +12,7 @@ use std::{
 use crate::{
     Error,
     access::{self, Access},
-    capture::{Recorder, level_from_rms},
+    capture::{self, Recorder, level_from_rms},
     files::{self, BASE, FILES},
     recognizer::Recognizer,
 };
@@ -100,6 +100,9 @@ struct Worker {
 
 impl Worker {
     fn run(mut self) {
+        // The first microphone opened in a process took 100 ms on an M4 Pro, and 60 once the audio system was awake; later
+        // ones take 45. Asking for the format opens nothing, so no light comes on and no permission is asked.
+        capture::prime();
         loop {
             match self.inbox.recv_timeout(LEVEL_EVERY) {
                 Ok(command) => self.handle(command),

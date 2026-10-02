@@ -84,6 +84,11 @@ impl Recorder {
         self.heard.lock().map_or(0., |mut h| h.take_rms())
     }
 
+    /// How many samples have come from the microphone so far, at its own rate: none until the audio really flows.
+    pub fn heard(&self) -> usize {
+        self.heard.lock().map_or(0, |h| h.samples.len())
+    }
+
     /// Stops listening and gives back everything heard, at 16 kHz mono.
     pub fn finish(self) -> Vec<f32> {
         let Self { stream, heard, rate } = self;
@@ -92,6 +97,18 @@ impl Recorder {
         to_16k(&samples, rate)
     }
 }
+
+/// Wakes the audio system and asks for the default microphone's format, without opening it, so the first press opens it
+/// faster.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub fn prime() {
+    if let Some(device) = cpal::default_host().default_input_device() {
+        device.default_input_config().ok();
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+pub fn prime() {}
 
 /// The microphones the system offers now, the default first.
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -139,6 +156,10 @@ impl Recorder {
 
     pub fn take_rms(&self) -> f32 {
         0.
+    }
+
+    pub fn heard(&self) -> usize {
+        0
     }
 
     pub fn finish(self) -> Vec<f32> {
