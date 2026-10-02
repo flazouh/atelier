@@ -1,18 +1,21 @@
-use atelier_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
+use atelier_agents::session::{Call, FileEdit, ToolCall, ToolId, ToolKind, ToolStatus};
 use atelier_ui::tool_preview::ToolPreview;
-use serde_json::json;
 
 use super::*;
 
 const ROOT: &str = "/w";
 
-fn call(name: &str, input: serde_json::Value, status: ToolStatus) -> Call {
-    let kind = if name == "Write" { ToolKind::Write } else if name == "Bash" { ToolKind::Shell } else { ToolKind::Edit };
-    Call { call: ToolCall { id: ToolId::new("t"), name: name.into(), kind, input, file: None, parent: None, status }, output: None, edit: None }
+fn call(name: &str, kind: ToolKind, edit: Option<FileEdit>, status: ToolStatus) -> Call {
+    let input = serde_json::Value::Null;
+    Call { call: ToolCall { id: ToolId::new("t"), name: name.into(), kind, input, file: None, parent: None, status }, output: None, edit }
+}
+
+fn change(old: &str, new: &str) -> Option<FileEdit> {
+    Some(FileEdit { path: "/w/a.rs".into(), old: old.into(), new: new.into() })
 }
 
 fn edit(status: ToolStatus) -> Call {
-    call("Edit", json!({"file_path": "/w/a.rs", "old_string": "a", "new_string": "b"}), status)
+    call("Edit", ToolKind::Edit, change("a", "b"), status)
 }
 
 #[test]
@@ -35,16 +38,24 @@ fn a_finished_edit_is_shut_unless_the_density_is_full_detail() {
     assert!(!view.streaming && view.open && !view.fold_when_done);
 }
 
+/// The view reads the shared edit and the kind, never the agent's names: Cursor's "Edit File", the own agent's
+/// "write" and Claude's "Write" all show the same way.
 #[test]
-fn a_write_that_has_its_file_shows_the_text_so_far() {
-    let write = call("Write", json!({"file_path": "/w/new.txt", "content": "hi"}), ToolStatus::Running);
-    assert_eq!(edit_view(&write, ROOT, ToolDensity::Lines, None).unwrap().preview, ToolPreview::written("new.txt", "hi"));
+fn any_agents_edit_or_write_shows_by_its_kind_whatever_its_name() {
+    for name in ["Edit", "Edit File", "edit"] {
+        let view = edit_view(&call(name, ToolKind::Edit, change("a", "b"), ToolStatus::Done), ROOT, ToolDensity::Lines, None).unwrap();
+        assert_eq!(view.preview, ToolPreview::edit("a.rs", "a", "b"), "{name}");
+    }
+    for name in ["Write", "write"] {
+        let view = edit_view(&call(name, ToolKind::Write, change("", "hi"), ToolStatus::Running), ROOT, ToolDensity::Lines, None).unwrap();
+        assert_eq!(view.preview, ToolPreview::written("a.rs", "hi"), "{name}");
+    }
 }
 
 #[test]
-fn a_call_that_is_no_edit_or_has_no_file_or_failed_or_was_refused_has_no_diff() {
-    assert_eq!(edit_view(&call("Bash", json!({"command": "ls"}), ToolStatus::Done), ROOT, ToolDensity::Lines, None), None);
-    assert_eq!(edit_view(&call("Edit", json!({}), ToolStatus::Running), ROOT, ToolDensity::Lines, None), None, "no file yet");
+fn a_call_with_no_edit_or_that_failed_or_was_refused_has_no_diff() {
+    assert_eq!(edit_view(&call("Bash", ToolKind::Shell, None, ToolStatus::Done), ROOT, ToolDensity::Lines, None), None);
+    assert_eq!(edit_view(&call("Edit", ToolKind::Edit, None, ToolStatus::Running), ROOT, ToolDensity::Lines, None), None, "no text told yet");
     assert_eq!(edit_view(&edit(ToolStatus::Failed), ROOT, ToolDensity::Lines, None), None, "the row says why");
     assert_eq!(edit_view(&edit(ToolStatus::Done), ROOT, ToolDensity::Lines, Some("Denied")), None);
     assert_eq!(edit_view(&edit(ToolStatus::Done), ROOT, ToolDensity::Lines, Some("Not answered")), None);

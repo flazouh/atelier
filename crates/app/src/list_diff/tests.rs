@@ -103,21 +103,21 @@ fn a_row_arrives_once_even_when_it_joins_a_group() {
 
 /// An edit's text streams into its call, so the row measures again as the text grows.
 #[test]
-fn a_tool_calls_fingerprint_follows_its_input_as_it_streams() {
-    use atelier_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
+fn a_tool_calls_fingerprint_follows_its_edit_as_it_streams() {
+    use atelier_agents::session::{Call, FileEdit, ToolCall, ToolId, ToolKind, ToolStatus};
     let edit = |new: &str| {
         Item::Tool(Call {
             call: ToolCall {
                 id: ToolId::new("t"),
                 name: "Edit".into(),
                 kind: ToolKind::Edit,
-                input: serde_json::json!({"file_path": "/w/a.rs", "old_string": "a", "new_string": new}),
+                input: serde_json::Value::Null,
                 file: None,
                 parent: None,
                 status: ToolStatus::Running,
             },
             output: None,
-            edit: None,
+            edit: Some(FileEdit { path: "/w/a.rs".into(), old: "a".into(), new: new.into() }),
         })
     };
     assert_ne!(fingerprint(&edit("b")), fingerprint(&edit("b\nc")));
