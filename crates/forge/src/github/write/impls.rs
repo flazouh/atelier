@@ -14,11 +14,11 @@ use super::types::{
 use super::helpers::{encode_ref, event_name, method_name, side_name};
 
 impl GitHub {
-    pub(super) fn mutate(&self, query: &str, input: Value) -> ForgeResult<Value> {
+    fn mutate(&self, query: &str, input: Value) -> ForgeResult<Value> {
         self.client.graphql(query, json!({"input": input}))?.whole()
     }
 
-    pub(super) fn target(&self, reference: &PullRef) -> ForgeResult<Target> {
+    fn target(&self, reference: &PullRef) -> ForgeResult<Target> {
         let data = self.client.graphql(queries::FOR_WRITE, Self::vars(reference))?.whole()?;
         let pull = &data["repository"]["pullRequest"];
         let text = |key: &str| pull[key].as_str().map(str::to_string);
@@ -166,7 +166,7 @@ impl GitHub {
     }
 
     /// The reader's pending review on this pull request, made when there is none.
-    pub(super) fn pending_review(&self, reference: &PullRef, body: Option<&str>) -> ForgeResult<String> {
+    fn pending_review(&self, reference: &PullRef, body: Option<&str>) -> ForgeResult<String> {
         let data = self.client.graphql(queries::PENDING_REVIEW, Self::vars(reference))?.whole()?;
         let pull = &data["repository"]["pullRequest"];
         if let Some(id) = pull["reviews"]["nodes"][0]["id"].as_str() {

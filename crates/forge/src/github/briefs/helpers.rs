@@ -52,7 +52,7 @@ pub(in super::super) fn open_for(client: &Client, repo: &RepoRef, head: &str) ->
     Ok(brief(repo, number, node))
 }
 
-pub(super) fn brief(repo: &RepoRef, number: u64, node: &Value) -> Option<PullBrief> {
+fn brief(repo: &RepoRef, number: u64, node: &Value) -> Option<PullBrief> {
     let text = |key: &str| node.get(key)?.as_str().map(str::to_string);
     let flag = |key: &str| node.get(key).and_then(Value::as_bool).unwrap_or(false);
     let state = match (text("state")?.as_str(), flag("merged"), flag("isDraft")) {

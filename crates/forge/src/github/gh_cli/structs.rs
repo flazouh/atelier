@@ -23,7 +23,7 @@ impl GhCli {
         self
     }
 
-    pub(super) fn command(&self, request: &Request) -> Command {
+    fn command(&self, request: &Request) -> Command {
         // `--include` puts the status line and the headers before the body, so a failure keeps its body
         // and a rate limit shows its reset.
         let mut args = vec!["api".to_string(), "--include".into(), "--method".into(), request.method.into()];

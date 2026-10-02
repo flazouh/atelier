@@ -58,7 +58,7 @@ pub(in super::super) fn repo_ref(name_with_owner: &str) -> ForgeResult<RepoRef> 
     Ok(RepoRef::new(HOST, owner, name))
 }
 
-pub(super) fn merge_method(name: &str) -> Option<MergeMethod> {
+fn merge_method(name: &str) -> Option<MergeMethod> {
     match name {
         "MERGE" => Some(MergeMethod::Merge),
         "SQUASH" => Some(MergeMethod::Squash),
@@ -67,7 +67,7 @@ pub(super) fn merge_method(name: &str) -> Option<MergeMethod> {
     }
 }
 
-pub(super) fn merge_settings(repo: &Repo) -> MergeSettings {
+fn merge_settings(repo: &Repo) -> MergeSettings {
     let allowed = [
         (repo.merge_commit_allowed, MergeMethod::Merge),
         (repo.squash_merge_allowed, MergeMethod::Squash),
@@ -86,7 +86,7 @@ pub(super) fn merge_settings(repo: &Repo) -> MergeSettings {
 }
 
 /// Whether the reader can push here: `WRITE` and above.
-pub(super) fn can_write(permission: Option<&str>) -> bool {
+fn can_write(permission: Option<&str>) -> bool {
     matches!(permission, Some("WRITE" | "MAINTAIN" | "ADMIN"))
 }
 
@@ -101,7 +101,7 @@ pub(in super::super) fn repository(repo: &Repo) -> ForgeResult<Repository> {
     })
 }
 
-pub(super) fn pull_state(node_state: &str, draft: bool, merged: bool) -> PullState {
+fn pull_state(node_state: &str, draft: bool, merged: bool) -> PullState {
     if merged || node_state == "MERGED" {
         PullState::Merged
     } else if node_state == "CLOSED" {
@@ -113,7 +113,7 @@ pub(super) fn pull_state(node_state: &str, draft: bool, merged: bool) -> PullSta
     }
 }
 
-pub(super) fn merge_state(text: Option<&str>) -> MergeState {
+fn merge_state(text: Option<&str>) -> MergeState {
     match text {
         Some("CLEAN" | "HAS_HOOKS") => MergeState::Clean,
         Some("UNSTABLE") => MergeState::Unstable,
@@ -125,7 +125,7 @@ pub(super) fn merge_state(text: Option<&str>) -> MergeState {
     }
 }
 
-pub(super) fn decision(text: Option<&str>) -> ReviewDecision {
+fn decision(text: Option<&str>) -> ReviewDecision {
     match text {
         Some("APPROVED") => ReviewDecision::Approved,
         Some("CHANGES_REQUESTED") => ReviewDecision::ChangesRequested,
@@ -134,7 +134,7 @@ pub(super) fn decision(text: Option<&str>) -> ReviewDecision {
     }
 }
 
-pub(super) fn verdict(state: &str) -> Option<Verdict> {
+fn verdict(state: &str) -> Option<Verdict> {
     match state {
         "APPROVED" => Some(Verdict::Approve),
         "CHANGES_REQUESTED" => Some(Verdict::RequestChanges),
@@ -144,7 +144,7 @@ pub(super) fn verdict(state: &str) -> Option<Verdict> {
 }
 
 /// How the counts of check runs and commit statuses split into passed, failed and running.
-pub(super) fn counts(contexts: &Contexts) -> CheckCounts {
+fn counts(contexts: &Contexts) -> CheckCounts {
     let mut counts = CheckCounts::default();
     let states = contexts.check_run_counts_by_state.iter().chain(&contexts.status_context_counts_by_state);
     for StateCount { state, count } in states {
@@ -157,15 +157,15 @@ pub(super) fn counts(contexts: &Contexts) -> CheckCounts {
     counts
 }
 
-pub(super) fn last_commit(commits: Option<&super::super::wire::Nodes<CommitNode>>) -> Option<&super::super::wire::CommitInfo> {
+fn last_commit(commits: Option<&super::super::wire::Nodes<CommitNode>>) -> Option<&super::super::wire::CommitInfo> {
     commits?.nodes.iter().flatten().last().map(|node| &node.commit)
 }
 
-pub(super) fn rollup_counts(commits: Option<&super::super::wire::Nodes<CommitNode>>) -> Option<CheckCounts> {
+fn rollup_counts(commits: Option<&super::super::wire::Nodes<CommitNode>>) -> Option<CheckCounts> {
     last_commit(commits)?.status_check_rollup.as_ref().map(|rollup| counts(&rollup.contexts))
 }
 
-pub(super) fn login(author: &Option<Login>) -> String {
+fn login(author: &Option<Login>) -> String {
     author.as_ref().map_or_else(|| "ghost".to_string(), |a| a.login.clone())
 }
 
@@ -279,7 +279,7 @@ pub(in super::super) fn thread(node: &ThreadNode) -> Thread {
     }
 }
 
-pub(super) fn status(text: &str) -> CheckStatus {
+fn status(text: &str) -> CheckStatus {
     match text.to_ascii_lowercase().as_str() {
         "completed" => CheckStatus::Done,
         "in_progress" => CheckStatus::Running,
@@ -287,7 +287,7 @@ pub(super) fn status(text: &str) -> CheckStatus {
     }
 }
 
-pub(super) fn conclusion(text: &str) -> Option<Conclusion> {
+fn conclusion(text: &str) -> Option<Conclusion> {
     Some(match text.to_ascii_lowercase().as_str() {
         "success" => Conclusion::Success,
         "failure" | "startup_failure" | "error" => Conclusion::Failure,

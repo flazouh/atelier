@@ -6,11 +6,11 @@ use super::types::Court;
 
 /// The two shelves that hold nothing but a wait: a machine's run can demote them, and a green one
 /// with no review required is the reader's to land.
-pub(super) fn nothing_but_the_run(shelf: Shelf) -> bool {
+fn nothing_but_the_run(shelf: Shelf) -> bool {
     matches!(shelf, Shelf::WaitingForReview | Shelf::ReadyToMerge)
 }
 
-pub(super) fn court_of_shelf(shelf: Shelf) -> Court {
+fn court_of_shelf(shelf: Shelf) -> Court {
     match shelf {
         Shelf::NeedsAction | Shelf::TeamReviewRequested | Shelf::ReadyToMerge | Shelf::YourDrafts => Court::NeedsYou,
         Shelf::WaitingForReview => Court::Waiting,

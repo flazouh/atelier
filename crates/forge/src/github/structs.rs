@@ -40,7 +40,7 @@ impl GitHub {
     }
 
     /// `repository.pullRequest`, or "not found" when the query answered with neither.
-    pub(super) fn read_pull(&self, reference: &PullRef) -> ForgeResult<(super::wire::Repo, super::wire::PullNode)> {
+    fn read_pull(&self, reference: &PullRef) -> ForgeResult<(super::wire::Repo, super::wire::PullNode)> {
         let data = self.client.graphql(super::queries::PULL, Self::vars(reference))?.whole()?;
         let root: Root<super::wire::Repo> = decode(data)?;
         let mut repo = root.repository.ok_or_else(|| not_found(&reference.repo.slug()))?;
@@ -49,7 +49,7 @@ impl GitHub {
     }
 
     /// Comments of a thread beyond the first page.
-    pub(super) fn rest_of_thread(&self, thread: &mut Thread, after: String) -> ForgeResult<()> {
+    fn rest_of_thread(&self, thread: &mut Thread, after: String) -> ForgeResult<()> {
         let more = self.client.pages(
             super::queries::THREAD_COMMENTS,
             json!({"thread": thread.id.0, "after": after}),

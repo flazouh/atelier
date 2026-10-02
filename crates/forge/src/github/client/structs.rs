@@ -33,7 +33,7 @@ impl Graph {
 
 pub(in super::super) struct Client {
     pub(super) transport: Box<dyn Transport>,
-    pub(super) pause: Box<dyn Fn(Duration) + Send + Sync>,
+    pause: Box<dyn Fn(Duration) + Send + Sync>,
     pub(super) now: Box<dyn Fn() -> u64 + Send + Sync>,
 }
 
@@ -140,7 +140,7 @@ impl Client {
         Err(ForgeError::Unexpected(format!("a list went on past {MOST_PAGES} pages")))
     }
 
-    pub(super) fn send(&self, request: &Request) -> ForgeResult<Reply> {
+    fn send(&self, request: &Request) -> ForgeResult<Reply> {
         self.transport.send(request).map_err(|error| match error {
             TransportError::ToolMissing => ForgeError::ToolMissing { tool: "gh".into() },
             TransportError::NotSignedIn => ForgeError::NotSignedIn,
@@ -149,7 +149,7 @@ impl Client {
         })
     }
 
-    pub(super) fn wait_or_give_up(&self, reply: &Reply) -> ForgeResult<()> {
+    fn wait_or_give_up(&self, reply: &Reply) -> ForgeResult<()> {
         match wait_of(reply, (self.now)()) {
             Some(seconds) if seconds <= LONGEST_WAIT => {
                 (self.pause)(Duration::from_secs(seconds));

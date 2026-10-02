@@ -47,7 +47,7 @@ pub(in super::super) fn involved(client: &Client, scope: Option<&RepoRef>) -> Fo
     Ok(all)
 }
 
-pub(super) fn search_one(client: &Client, shelf: Option<Shelf>, search: &str) -> ForgeResult<Vec<Involved>> {
+fn search_one(client: &Client, shelf: Option<Shelf>, search: &str) -> ForgeResult<Vec<Involved>> {
     client.pages(queries::INVOLVED, json!({"search": search}), |mut data| {
         let page: Page<SearchHit> = serde_json::from_value(data["search"].take())
             .map_err(|e| ForgeError::Unexpected(format!("a search has an unexpected shape: {e}")))?;
