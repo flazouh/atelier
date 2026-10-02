@@ -47,8 +47,8 @@ pub struct AgentSession {
     /// has no say.
     pub activity_known: bool,
     /// Asked the agent for a short title already, so it is asked once.
-    pub(super) titled: bool,
-    pub(super) _titling: Task<()>,
+    titled: bool,
+    _titling: Task<()>,
     /// The reader is looking at it: a turn that ends is seen.
     pub seen: bool,
     pub model: Option<String>,
@@ -64,12 +64,12 @@ pub struct AgentSession {
     /// Starting, or reading its history: the panel shows it.
     pub starting: bool,
     /// A message written while the agent was not running: it goes once the session resumes.
-    pub(super) waiting_send: Option<Command>,
+    waiting_send: Option<Command>,
     /// It resumes a past session, which keeps its agent.
     pub(super) resumed: bool,
     /// Messages sent while the turn's tracker begins: `Some` from the begin until it lands, and they go
     /// after the first, in the same turn.
-    pub(super) beginning: Option<Vec<Command>>,
+    beginning: Option<Vec<Command>>,
     pub list: ListState,
     /// What each row of the list draws, and its fingerprint.
     pub shown: Vec<list_diff::Row>,
@@ -84,9 +84,9 @@ pub struct AgentSession {
     pub reviews: ReviewState,
     /// The card of the pull request the session opened, above the composer.
     pub pull_card: Option<Entity<crate::pull_card::PullCard>>,
-    pub(super) _pull_card: Option<Subscription>,
+    _pull_card: Option<Subscription>,
     /// Writes the review to the data folder a moment after it last changed.
-    pub(super) _saving: Task<()>,
+    _saving: Task<()>,
     pub composer: Entity<PromptInput>,
     /// The project's badge, as the sidebar draws it.
     pub badge: Option<atelier_ui::sidebar_model::Badge>,
@@ -94,16 +94,16 @@ pub struct AgentSession {
     pub opened_groups: std::collections::HashSet<usize>,
     /// What the project adds to the `/` list, and the agent's own commands once it has said them.
     pub(super) project_commands: Vec<atelier_agents::commands::CommandInfo>,
-    pub(super) agent_commands: Vec<String>,
-    pub(super) _lists: Task<()>,
+    agent_commands: Vec<String>,
+    _lists: Task<()>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
-    pub(super) _renaming: Option<Subscription>,
+    _renaming: Option<Subscription>,
     /// When each thinking block began, for its live "Thinking for 12s".
     pub thinking_since: HashMap<atelier_agents::session::BlockId, Instant>,
-    pub(super) _composer: Subscription,
-    pub(super) _pump: Task<()>,
-    pub(super) _start: Task<()>,
+    _composer: Subscription,
+    _pump: Task<()>,
+    _start: Task<()>,
 }
 
 impl AgentSession {
@@ -242,7 +242,7 @@ impl AgentSession {
     }
 
     /// Reads the project's skills, command files and files off the UI thread, for the composer's lists.
-    pub(super) fn read_lists(&mut self, cx: &mut Context<Self>) {
+    fn read_lists(&mut self, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let reading = cx.background_spawn(async move { super::composer_lists::read(project.as_ref()) });
         self._lists = cx.spawn(async move |this, cx| {
@@ -256,7 +256,7 @@ impl AgentSession {
     }
 
     /// Gives the composer the `/` list: atelier's, the project's and the agent's own.
-    pub(super) fn offer_commands(&mut self, cx: &mut Context<Self>) {
+    fn offer_commands(&mut self, cx: &mut Context<Self>) {
         let items = super::composer_lists::commands(self.project_commands.clone(), &self.agent_commands)
             .into_iter()
             .map(|c| atelier_ui::command_item::CommandItem {
@@ -344,7 +344,7 @@ impl AgentSession {
 
     /// The sink the agent gets: each event passes the turn's tracker first, on the agent's thread, then
     /// goes to the queue. The turn's end finishes the tracker there, before its event reaches the UI.
-    pub(super) fn tracking_sink(&self) -> atelier_agents::session::EventSink {
+    fn tracking_sink(&self) -> atelier_agents::session::EventSink {
         let (queue, tracker, finished, project) = (self.queue.sink(), self.tracker.clone(), self.finished.clone(), self.project.clone());
         Arc::new(move |event: Event| {
             {
@@ -363,7 +363,7 @@ impl AgentSession {
     }
 
     /// Folds every event waiting: one frame's worth.
-    pub(super) fn drain(&mut self, cx: &mut Context<Self>) {
+    fn drain(&mut self, cx: &mut Context<Self>) {
         let events = self.queue.drain();
         if events.is_empty() {
             return;
@@ -539,7 +539,7 @@ impl AgentSession {
     /// Sends a message that starts a turn: the turn's tracker begins first, off the UI thread, so it
     /// knows the files as they were before the agent reads the message. A message sent while a turn
     /// runs joins that turn.
-    pub(super) fn start_turn(&mut self, command: Command, cx: &mut Context<Self>) {
+    fn start_turn(&mut self, command: Command, cx: &mut Context<Self>) {
         if let Some(waiting) = &mut self.beginning {
             return waiting.push(command);
         }
@@ -620,7 +620,7 @@ impl AgentSession {
         self.show_card(reference, cx);
     }
 
-    pub(super) fn show_card(&mut self, reference: atelier_forge::PullRef, cx: &mut Context<Self>) {
+    fn show_card(&mut self, reference: atelier_forge::PullRef, cx: &mut Context<Self>) {
         if self.pull_card.as_ref().is_some_and(|c| *c.read(cx).reference() == reference) {
             return;
         }
@@ -639,7 +639,7 @@ impl AgentSession {
 
     /// Asks the agent, once, for a short title from the first exchange, off the UI thread. A name the
     /// reader gave, before or while it drafts, stays.
-    pub(super) fn draft_title(&mut self, cx: &mut Context<Self>) {
+    fn draft_title(&mut self, cx: &mut Context<Self>) {
         if self.name.is_some() || self.titled {
             return;
         }

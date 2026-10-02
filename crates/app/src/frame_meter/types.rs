@@ -1,6 +1,4 @@
-use std::{
-    time::{Duration},
-};
+use std::time::Duration;
 
 /// Frames a report covers.
 pub(super) const FRAMES: usize = 300;

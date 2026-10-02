@@ -1,6 +1,6 @@
 use atelier_agents::session::Item;
 
-pub(super) fn plural(count: usize, one: &str, many: &str) -> String {
+fn plural(count: usize, one: &str, many: &str) -> String {
     format!("{count} {}", if count == 1 { one } else { many })
 }
 

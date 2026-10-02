@@ -1,10 +1,6 @@
 #[cfg(test)]
 use std::collections::HashMap;
-use std::{
-    collections::HashSet,
-    sync::Arc,
-    time::{Instant},
-};
+use std::{collections::HashSet, sync::Arc, time::Instant};
 
 use atelier_ui::{
     ActiveTheme,
@@ -62,7 +58,7 @@ use atelier_review::{Content, FileReview, Merged};
 
 use crate::{
     agent_session::{AgentSession, SessionEvent},
-    review_text::{row_of},
+    review_text::row_of,
     ship::{kept::{Kept, kept}, strip::{ShipStrip, StripEvent}},
 };
 use super::types::{DiskChange, PaneEvent, Scope, SessionFor, TREE_FROM, WRITE_AFTER};
@@ -79,7 +75,7 @@ pub struct PaneFile {
     /// The file before each decision, newest last: an undo in the editor brings one back.
     pub(super) undo: Vec<Merged>,
     /// The text each decision left, beside `undo`: Undo decision acts only while the file holds it.
-    pub(super) decided_text: Vec<String>,
+    decided_text: Vec<String>,
     /// The short id of the commit that took this file's decisions.
     pub committed: Option<String>,
 }
@@ -100,7 +96,7 @@ impl PaneFile {
 
     /// What the disk needs to hold what the reader decided, when it does not yet: the file's text, or no
     /// file at all for one the agent made and the reader rejected whole.
-    pub(super) fn to_disk(&self) -> Option<DiskChange> {
+    fn to_disk(&self) -> Option<DiskChange> {
         let merged = self.merged.as_ref()?;
         let text = merged.current();
         let rejected_whole = self.review.before.is_none() && merged.hunks().is_empty() && text.is_empty();
@@ -130,27 +126,27 @@ pub struct ReviewPane {
     /// The project's language servers, when the review has them: the open file's session on its
     /// merged text, which the server reads without the removed rows.
     pub(super) language: Option<SessionFor>,
-    pub(super) lsp: Option<Entity<EditorSession>>,
+    lsp: Option<Entity<EditorSession>>,
     /// Ships what the review kept: the commit, then the push and the pull request.
     pub ship: Entity<ShipStrip>,
     pub(super) focus: FocusHandle,
     pub review_mode: bool,
-    pub(super) resolving: Vec<atelier_ui::Resolve>,
+    resolving: Vec<atelier_ui::Resolve>,
     /// The comment being written: its file, the composer, and what the pane listens to on it.
     pub(super) composer: Option<(usize, Entity<LineComposer>, [Subscription; 2])>,
     pub(super) width: f32,
     /// The folder a press on the breadcrumb asked the tree to open, and how many times it has asked.
-    pub(super) reveal: (u64, SharedString),
-    pub(super) writing: Option<Task<()>>,
+    reveal: (u64, SharedString),
+    writing: Option<Task<()>>,
     /// The whole session's files, read off the UI thread; dropping it drops the read.
-    pub(super) loading: Task<()>,
+    loading: Task<()>,
     /// No files yet: the whole session is being read.
-    pub(super) reading: bool,
+    reading: bool,
     /// The file to open once the files are read.
-    pub(super) opening_at: Option<String>,
-    pub(super) _edits: Subscription,
+    opening_at: Option<String>,
+    _edits: Subscription,
     pub(super) _session: Subscription,
-    pub(super) _ship: Subscription,
+    _ship: Subscription,
 }
 
 impl ReviewPane {
@@ -250,7 +246,7 @@ impl ReviewPane {
     }
 
     /// An editor on `file`'s merged text, and the subscription that follows the reader's typing.
-    pub(super) fn editor_for(file: Option<&PaneFile>, window: &mut Window, cx: &mut Context<Self>) -> (Entity<EditorState>, Subscription) {
+    fn editor_for(file: Option<&PaneFile>, window: &mut Window, cx: &mut Context<Self>) -> (Entity<EditorState>, Subscription) {
         let (path, text) = file.map_or(("", String::new()), |f| (f.review.path.as_str(), f.merged.as_ref().map_or_else(String::new, |m| m.text().to_string())));
         let editor = atelier_ui::CodeEditor::state(path, text, window, cx);
         let edits = cx.subscribe(&editor, |this, state, event: &InputEvent, cx| {
@@ -275,7 +271,7 @@ impl ReviewPane {
     }
 
     /// The open file's server session, on its editor, when the review has servers and the file has text.
-    pub(super) fn start_lsp(&mut self, cx: &mut Context<Self>) {
+    fn start_lsp(&mut self, cx: &mut Context<Self>) {
         self.lsp = match (&self.language, self.files.get(self.current)) {
             (Some(language), Some(file)) if file.merged.is_some() => Some(language(&file.review.path, self.editor.clone(), RowMap::new(file.hunks()), cx)),
             _ => None,
@@ -308,7 +304,7 @@ impl ReviewPane {
     }
 
     /// A rebase gave commits new ids: each mark and the session's record name the new one.
-    pub(super) fn rewrote(&mut self, moved: &[(String, String)], cx: &mut Context<Self>) {
+    fn rewrote(&mut self, moved: &[(String, String)], cx: &mut Context<Self>) {
         let short = |sha: &str| sha.chars().take(7).collect::<String>();
         let map: Vec<(String, String)> = moved.iter().map(|(old, new)| (short(old), short(new))).collect();
         let renamed = |sha: &mut String| {
@@ -416,7 +412,7 @@ impl ReviewPane {
     }
 
     /// Tells the open file's server which shown rows the file does not have, after its hunks moved.
-    pub(super) fn sync_rows(&self, cx: &mut Context<Self>) {
+    fn sync_rows(&self, cx: &mut Context<Self>) {
         if let (Some(lsp), Some(file)) = (&self.lsp, self.files.get(self.current)) {
             let rows = RowMap::new(file.hunks());
             lsp.update(cx, |s, cx| s.set_rows(rows, cx));
@@ -425,7 +421,7 @@ impl ReviewPane {
 
     /// Puts the open file in a new editor. When the reader's keys were in the old one, they go to the
     /// new one, or the next key would reach nothing.
-    pub(super) fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn load_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let had_keys = self.editor.focus_handle(cx).is_focused(window);
         (self.editor, self._edits) = Self::editor_for(self.files.get(self.current), window, cx);
         self.start_lsp(cx);
@@ -464,7 +460,7 @@ impl ReviewPane {
     }
 
     /// Keeps file `at` as it stands with the session, so the review opens again as it was left.
-    pub(super) fn keep(&self, at: usize, cx: &mut Context<Self>) {
+    fn keep(&self, at: usize, cx: &mut Context<Self>) {
         let file = &self.files[at];
         let (key, kept) = ((self.scope, file.review.path.clone()), (file.merged.clone(), file.on_disk.clone()));
         self.session.update(cx, |s, cx| {
@@ -536,7 +532,7 @@ impl ReviewPane {
         .detach();
     }
 
-    pub(super) fn agent_wrote(&mut self, path: &str, text: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+    fn agent_wrote(&mut self, path: &str, text: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         let Some(at) = self.files.iter().position(|f| f.review.path == path) else { return };
         let file = &mut self.files[at];
         let Some(merged) = &file.merged else { return };
@@ -584,7 +580,7 @@ impl ReviewPane {
             .collect()
     }
 
-    pub(super) fn progress(&self, reviewed: &HashSet<SharedString>) -> ReviewProgress {
+    fn progress(&self, reviewed: &HashSet<SharedString>) -> ReviewProgress {
         let (added, removed) = self.files.iter().fold((0, 0), |(a, r), f| {
             let (fa, fr) = f.review.counts();
             (a + fa, r + fr)
@@ -603,7 +599,7 @@ impl ReviewPane {
         cx.notify();
     }
 
-    pub(super) fn step(&mut self, by: isize, window: &mut Window, cx: &mut Context<Self>) {
+    fn step(&mut self, by: isize, window: &mut Window, cx: &mut Context<Self>) {
         let order = FileTree::new(&self.changed).file_order();
         let current = self.files.get(self.current).map(|f| SharedString::from(f.review.path.clone()));
         if let Some(path) = step(&order, current.as_ref(), by) {
@@ -649,7 +645,7 @@ impl ReviewPane {
         timing(window, "review: a whole file decided".into(), started, started.elapsed());
     }
 
-    pub(super) fn decide_file_now(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
+    fn decide_file_now(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
         let at = self.current;
         self.resolving.clear();
         let decisions = self.files.get(at).map(|f| whole_file(f.hunks(), decision)).unwrap_or_default();
@@ -676,7 +672,7 @@ impl ReviewPane {
     /// Reads the files of `scope` from the session, and opens the one at the same path if it has it.
     /// A turn's files are at hand; the whole session is diffed off the UI thread, and the scope drawn
     /// now stays until its files land. A later switch drops a read still running.
-    pub(super) fn set_scope(&mut self, scope: Scope, window: &mut Window, cx: &mut Context<Self>) {
+    fn set_scope(&mut self, scope: Scope, window: &mut Window, cx: &mut Context<Self>) {
         let session = self.session.read(cx);
         let turns = session.reviews.turns.turns().len();
         match scope {
@@ -697,7 +693,7 @@ impl ReviewPane {
     }
 
     /// Shows `reviews`, the files of `scope`, with what the reader decided before, at the same file.
-    pub(super) fn show_scope(&mut self, scope: Scope, reviews: Vec<FileReview>, turns: usize, window: &mut Window, cx: &mut Context<Self>) {
+    fn show_scope(&mut self, scope: Scope, reviews: Vec<FileReview>, turns: usize, window: &mut Window, cx: &mut Context<Self>) {
         if self.writing.take().is_some() {
             self.write(&[self.current], cx);
         }
@@ -796,7 +792,7 @@ impl ReviewPane {
 
     /// The comments on the open file, as blocks under their rows: those waiting for the next message,
     /// those sent (resolved once the agent's turn after them ended), and the one being written.
-    pub(super) fn blocks(&self, cx: &mut Context<Self>) -> Vec<RowBlock> {
+    fn blocks(&self, cx: &mut Context<Self>) -> Vec<RowBlock> {
         let Some(file) = self.files.get(self.current) else { return Vec::new() };
         let Some(merged) = &file.merged else { return Vec::new() };
         let s = self.session.read(cx);

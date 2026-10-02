@@ -17,7 +17,7 @@ pub struct TaskRef {
 pub struct Slot {
     pub pane: Entity<TasksPane>,
     pub shown: bool,
-    pub(super) _events: Subscription,
+    _events: Subscription,
 }
 
 impl Slot {

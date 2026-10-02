@@ -1,6 +1,4 @@
-use std::{
-    time::{Duration},
-};
+use std::time::Duration;
 
 use atelier_ui::RowMap;
 use gpui_kit::{Entity, SharedString, component::input::EditorState};

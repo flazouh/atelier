@@ -18,7 +18,7 @@ pub struct Row {
 
 #[derive(Clone, Debug, Default)]
 pub struct ProjectTree {
-    pub(super) entries: Vec<Entry>,
+    entries: Vec<Entry>,
     /// Each folder's children, as indexes into `entries`, in the order they show. `""` is the root.
     pub(super) children: HashMap<String, Vec<usize>>,
 }
@@ -54,7 +54,7 @@ impl ProjectTree {
         rows
     }
 
-    pub(super) fn walk(&self, folder: &str, depth: usize, open: &HashSet<String>, rows: &mut Vec<Row>) {
+    fn walk(&self, folder: &str, depth: usize, open: &HashSet<String>, rows: &mut Vec<Row>) {
         for &i in self.children.get(folder).map(Vec::as_slice).unwrap_or_default() {
             let entry = &self.entries[i];
             let is_open = entry.dir && open.contains(&entry.path);

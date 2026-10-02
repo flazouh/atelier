@@ -30,7 +30,7 @@ pub struct SshForm {
     pub(super) hosts: Vec<String>,
     pub(super) host: Entity<InputState>,
     pub phase: Phase,
-    pub(super) _enter: gpui_kit::Subscription,
+    _enter: gpui_kit::Subscription,
 }
 
 impl EventEmitter<SshFormEvent> for SshForm {}

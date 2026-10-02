@@ -34,7 +34,7 @@ pub fn read(project: &dyn Project) -> Lists {
     Lists { project_commands, files }
 }
 
-pub(super) fn read_text(project: &dyn Project, path: &str) -> Option<String> {
+fn read_text(project: &dyn Project, path: &str) -> Option<String> {
     String::from_utf8(project.read(path).ok()?).ok()
 }
 

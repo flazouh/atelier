@@ -30,7 +30,7 @@ pub(super) fn label(project: &OpenProject) -> ProjectLabel {
     ProjectLabel { id: project_id(project), name: project.name().into(), location: row_location(&project.location) }
 }
 
-pub(super) fn row_location(location: &Location) -> RowLocation {
+fn row_location(location: &Location) -> RowLocation {
     match location {
         Location::Local { .. } => RowLocation::Local,
         Location::Ssh { host, .. } => RowLocation::Ssh { host: host.clone().into() },

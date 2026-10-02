@@ -46,26 +46,26 @@ use super::types::{BOARD_LEAST, Load, Mode, Source, TasksEvent};
 pub struct TasksPane {
     pub(super) tracker: Result<Arc<dyn Tracker>, SharedString>,
     /// Hears of changes made elsewhere while the pane lives.
-    pub(super) _watch: Option<gpui_kit::Task<()>>,
+    _watch: Option<gpui_kit::Task<()>>,
     pub(super) me: SharedString,
-    pub(super) agents: Vec<(SharedString, AgentLook)>,
-    pub(super) people: Vec<Assignee>,
+    agents: Vec<(SharedString, AgentLook)>,
+    people: Vec<Assignee>,
     pub(super) labels: Vec<Label>,
     pub(super) tasks: Vec<TaskData>,
     pub(super) load: Load,
     pub(super) mode: Mode,
     pub(super) open: Option<SharedString>,
     pub(super) creating: bool,
-    pub(super) said: Option<SharedString>,
+    said: Option<SharedString>,
     /// The task to put the cursor on when the tasks are read again: the one just made.
-    pub(super) select_after: Option<SharedString>,
+    select_after: Option<SharedString>,
     pub(super) width: f32,
     pub(super) list: Entity<TaskList>,
     pub(super) board: Entity<TaskBoard>,
-    pub(super) view: Entity<TaskView>,
+    view: Entity<TaskView>,
     pub(super) dialog: Entity<NewTask>,
     pub(super) focus: FocusHandle,
-    pub(super) _subscriptions: Vec<Subscription>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl EventEmitter<TasksEvent> for TasksPane {}
@@ -181,7 +181,7 @@ impl TasksPane {
 
     /// Reads the tasks again when a change is made elsewhere, for as long as the pane lives. The
     /// subscription is dropped with the pane, and that stops a remote poll.
-    pub(super) fn watch(tracker: Arc<dyn Tracker>, cx: &mut Context<Self>) -> gpui_kit::Task<()> {
+    fn watch(tracker: Arc<dyn Tracker>, cx: &mut Context<Self>) -> gpui_kit::Task<()> {
         use futures_util::StreamExt as _;
         let subscription = tracker.subscribe();
         let (told, mut heard) = futures_channel::mpsc::unbounded::<()>();
@@ -231,7 +231,7 @@ impl TasksPane {
         cx.notify();
     }
 
-    pub(super) fn looks(&self, cx: &gpui_kit::App) -> impl Fn(&str) -> AgentLook + use<> {
+    fn looks(&self, cx: &gpui_kit::App) -> impl Fn(&str) -> AgentLook + use<> {
         let agents = self.agents.clone();
         let neutral = AgentLook::neutral(cx.theme());
         move |name: &str| agents.iter().find(|(n, _)| n.as_ref() == name).map_or_else(|| neutral.clone(), |(_, look)| look.clone())
@@ -252,7 +252,7 @@ impl TasksPane {
         .detach();
     }
 
-    pub(super) fn loaded(&mut self, result: TrackerResult<(Vec<Task>, Vec<String>)>, cx: &mut Context<Self>) {
+    fn loaded(&mut self, result: TrackerResult<(Vec<Task>, Vec<String>)>, cx: &mut Context<Self>) {
         match result {
             Ok((tasks, labels)) => {
                 let looks = self.looks(cx);
@@ -288,7 +288,7 @@ impl TasksPane {
     }
 
     /// Gives every part the tasks again, except the one the change came from: it already has them.
-    pub(super) fn push_all(&mut self, source: Source, cx: &mut Context<Self>) {
+    fn push_all(&mut self, source: Source, cx: &mut Context<Self>) {
         let (tasks, people) = (self.tasks.clone(), self.people.clone());
         let now = crate::agent_session::now();
         if source != Source::List {
@@ -350,7 +350,7 @@ impl TasksPane {
         cx.notify();
     }
 
-    pub(super) fn close_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_dialog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.creating = false;
         self.focus_body(window, cx);
         cx.notify();
@@ -378,7 +378,7 @@ impl TasksPane {
         .detach();
     }
 
-    pub(super) fn say(&mut self, words: String, cx: &mut Context<Self>) {
+    fn say(&mut self, words: String, cx: &mut Context<Self>) {
         self.said = Some(words.into());
         cx.notify();
     }
@@ -392,7 +392,7 @@ impl TasksPane {
         cx.notify();
     }
 
-    pub(super) fn save(&mut self, patches: Vec<(TaskId, Patch)>, cx: &mut Context<Self>) {
+    fn save(&mut self, patches: Vec<(TaskId, Patch)>, cx: &mut Context<Self>) {
         let Ok(tracker) = self.tracker.clone() else { return };
         let by = self.me.to_string();
         let saving = cx.background_spawn(async move {
@@ -412,7 +412,7 @@ impl TasksPane {
         .detach();
     }
 
-    pub(super) fn describe(&mut self, id: &SharedString, text: &SharedString, cx: &mut Context<Self>) {
+    fn describe(&mut self, id: &SharedString, text: &SharedString, cx: &mut Context<Self>) {
         if let Some(task) = self.tasks.iter_mut().find(|t| t.id == *id) {
             task.description = text.clone();
         }
@@ -420,7 +420,7 @@ impl TasksPane {
         self.save(vec![(TaskId(id.to_string()), patch)], cx);
     }
 
-    pub(super) fn comment(&mut self, id: &SharedString, text: &SharedString, cx: &mut Context<Self>) {
+    fn comment(&mut self, id: &SharedString, text: &SharedString, cx: &mut Context<Self>) {
         let Ok(tracker) = self.tracker.clone() else { return };
         let (task_id, entry, by) = (TaskId(id.to_string()), Entry::Comment(text.to_string()), self.me.to_string());
         let writing = cx.background_spawn(async move { tracker.record(&task_id, &entry, &by) });

@@ -1,8 +1,6 @@
 use std::time::SystemTime;
 
-use atelier_agents::{
-    session::{Event, PermissionMode, SessionError},
-};
+use atelier_agents::session::{Event, PermissionMode, SessionError};
 
 /// Whether `event` is the agent at work, which stamps the session's row: its start on a resume is not.
 pub(super) fn is_activity(event: &Event) -> bool {

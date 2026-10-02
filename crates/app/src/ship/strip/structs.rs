@@ -66,7 +66,7 @@ pub struct Line {
 pub struct ShipStrip {
     pub(super) project: Arc<dyn Project>,
     pub(super) backend: Arc<dyn Backend>,
-    pub(super) model: Option<String>,
+    model: Option<String>,
     pub stage: Stage,
     pub(super) kept: Vec<Kept>,
     pub lines: Vec<Line>,
@@ -85,8 +85,8 @@ pub struct ShipStrip {
     /// The branch's pull request, once it has one: "Open #N" shows it.
     pub opened: Option<PullRef>,
     /// The key of the task the session works on: the draft names it in a `Refs` line.
-    pub(super) refs: Option<SharedString>,
-    pub(super) _pull: Option<gpui_kit::Subscription>,
+    refs: Option<SharedString>,
+    _pull: Option<gpui_kit::Subscription>,
     pub(super) work: Task<()>,
 }
 
@@ -242,7 +242,7 @@ impl ShipStrip {
         }
     }
 
-    pub(super) fn rebase_and_push(&mut self, set_aside: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn rebase_and_push(&mut self, set_aside: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.stage = Stage::Pushing(if set_aside { "Setting your edits aside, rebasing and pushing…" } else { "Pulling, rebasing and pushing…" }.into());
         let project = self.project.clone();
         let running = cx.background_spawn(async move {

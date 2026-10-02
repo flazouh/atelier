@@ -1,6 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use gpui_kit::Entity;
 use atelier_agents::session::{
@@ -21,7 +19,7 @@ pub struct Fake {
     pub work: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
 }
 
-pub(super) struct FakeSession {
+struct FakeSession {
     pub(super) backend: Arc<Fake>,
     pub(super) sink: EventSink,
 }

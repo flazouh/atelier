@@ -2,9 +2,7 @@ use std::{io::Read, path::PathBuf, sync::Arc};
 
 use atelier_ui::PrChipData;
 use atelier_lsp::Workers;
-use atelier_pr_view::{
-    services::{PrConfig, Services},
-};
+use atelier_pr_view::services::{PrConfig, Services};
 use atelier_project::{Command, Project};
 
 /// The reader's GitHub login, from `gh` on the project's host; `None` when gh is missing or signed out.

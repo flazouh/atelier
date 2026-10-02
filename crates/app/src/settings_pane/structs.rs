@@ -68,7 +68,7 @@ impl SettingsPane {
         }
     }
 
-    pub(super) fn choose_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
+    fn choose_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
         self.mode = mode;
         mode.apply(cx);
         save(cx, move |s| s.mode = Some(mode.key().into()));
@@ -88,13 +88,13 @@ impl SettingsPane {
         cx.notify();
     }
 
-    pub(super) fn set_rule(&mut self, rule: atelier_tracker::Rule, on: bool, cx: &mut Context<Self>) {
+    fn set_rule(&mut self, rule: atelier_tracker::Rule, on: bool, cx: &mut Context<Self>) {
         self.rules.set(rule, on);
         let off: Vec<String> = self.rules.disabled().into_iter().map(String::from).collect();
         save(cx, move |s| s.task_rules_off = off);
         cx.notify();
     }
-    pub(super) fn choose_primary(&mut self, name: &SharedString, cx: &mut Context<Self>) {
+    fn choose_primary(&mut self, name: &SharedString, cx: &mut Context<Self>) {
         let bytes = PRIMARIES.iter().find(|(n, _, _)| *n == name.as_ref()).map(|(_, b, _)| *b);
         self.primary = name.clone();
         set_pick(bytes.map(colour), cx);

@@ -34,7 +34,7 @@ pub(crate) fn remote_git(project: &dyn Project, args: &[&str]) -> Result<String,
 /// In tests, stops a call that would reach a remote other than a folder on this machine or a
 /// `.invalid` host, which never resolves. The address is the one git uses, after any insteadOf rule.
 #[cfg(test)]
-pub(super) fn local_only(project: &dyn Project) {
+fn local_only(project: &dyn Project) {
     let Ok(url) = plain(project, &["remote", "get-url", "--push", "origin"]) else { return };
     let url = url.trim();
     let local = url.starts_with('/') || url.starts_with("file://");
@@ -48,7 +48,7 @@ pub(super) fn plain(project: &dyn Project, args: &[&str]) -> Result<String, Stri
     run(project, Command::new("git").args(args.iter().copied()), None)
 }
 
-pub(super) fn has_origin(project: &dyn Project) -> bool {
+fn has_origin(project: &dyn Project) -> bool {
     plain(project, &["remote", "get-url", "origin"]).is_ok()
 }
 
@@ -131,31 +131,31 @@ pub(crate) fn pull_rebase_setting_aside_with(project: &dyn Project, branch: &str
 }
 
 /// The stash ref (`stash@{n}`) of the entry whose commit is `made`, wherever it sits in the list now.
-pub(super) fn entry_of(project: &dyn Project, made: &str) -> Option<String> {
+fn entry_of(project: &dyn Project, made: &str) -> Option<String> {
     let list = plain(project, &["stash", "list", "--format=%gd %H"]).ok()?;
     list.lines().find_map(|line| line.split_once(' ').filter(|(_, sha)| *sha == made).map(|(entry, _)| entry.to_string()))
 }
 
 /// Whether the working tree holds edits to tracked files that no commit has.
-pub(super) fn has_edits(project: &dyn Project) -> Result<bool, RebaseError> {
+fn has_edits(project: &dyn Project) -> Result<bool, RebaseError> {
     let edits = plain(project, &["status", "--porcelain", "--untracked-files=no"]).map_err(RebaseError::Git)?;
     Ok(!edits.trim().is_empty())
 }
 
 /// The files git left with a clash to settle.
-pub(super) fn unmerged(project: &dyn Project) -> Vec<String> {
+fn unmerged(project: &dyn Project) -> Vec<String> {
     let listed = plain(project, &["diff", "--name-only", "--diff-filter=U"]).unwrap_or_default();
     listed.lines().map(str::to_string).filter(|l| !l.is_empty()).collect()
 }
 
 /// The branch's own commits over `origin/<branch>`, oldest first; none when origin has no such branch.
-pub(super) fn own_commits(project: &dyn Project, branch: &str) -> Vec<String> {
+fn own_commits(project: &dyn Project, branch: &str) -> Vec<String> {
     let range = format!("origin/{branch}..HEAD");
     plain(project, &["rev-list", "--reverse", "--no-merges", &range]).unwrap_or_default().lines().map(str::to_string).collect()
 }
 
 /// Each commit's patch id, which a rebase keeps while the commit's id changes: (patch id, commit).
-pub(super) fn patch_ids(project: &dyn Project, commits: &[String]) -> Vec<(String, String)> {
+fn patch_ids(project: &dyn Project, commits: &[String]) -> Vec<(String, String)> {
     if commits.is_empty() {
         return Vec::new();
     }

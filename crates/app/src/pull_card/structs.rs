@@ -30,10 +30,10 @@ pub struct PullCard {
     pub said: Option<SharedString>,
     /// The action waiting for the reader's yes.
     pub confirm: Option<Action>,
-    pub(super) choice: Option<Choice>,
+    choice: Option<Choice>,
     pub busy: bool,
-    pub(super) writing: Task<()>,
-    pub(super) _watch: Subscription,
+    writing: Task<()>,
+    _watch: Subscription,
 }
 
 impl PullCard {
@@ -73,7 +73,7 @@ impl PullCard {
     }
 
     /// The reader's merge choice, else the repository's defaults.
-    pub(super) fn choice(&self, cx: &App) -> Option<Choice> {
+    fn choice(&self, cx: &App) -> Option<Choice> {
         self.choice.or_else(|| self.facts(cx).map(|f| Choice { method: f.default_method, auto: false, delete_branch: f.delete_branch }))
     }
 
@@ -230,7 +230,7 @@ impl Render for PullCard {
 
 impl PullCard {
     /// Whether the last words are a refusal, not a report of what was done.
-    pub(super) fn said_is_refusal(&self) -> bool {
+    fn said_is_refusal(&self) -> bool {
         self.said.as_deref().is_some_and(|w| !(w.starts_with("Merged") || w.starts_with("Deleted") || w.starts_with("Opened")))
     }
 }

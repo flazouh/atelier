@@ -15,10 +15,10 @@ use super::helpers::{LAST, each, each_line};
 
 #[derive(Default)]
 pub struct Meter {
-    pub(super) current: Duration,
+    current: Duration,
     /// This frame's layout (request_layout and prepaint), and every frame's.
     pub(super) layout: Duration,
-    pub(super) layouts: Vec<Duration>,
+    layouts: Vec<Duration>,
     pub(super) frames: Vec<Duration>,
     /// This frame's named parts ([`Part`]), in the order they were drawn.
     pub(super) parts: Vec<(&'static str, Duration)>,
@@ -34,7 +34,7 @@ impl Meter {
 }
 
 impl Meter {
-    pub(super) fn frame_done(&mut self) {
+    fn frame_done(&mut self) {
         LAST.with(|last| last.set(self.current));
         let parts = std::mem::take(&mut self.parts);
         if each() {

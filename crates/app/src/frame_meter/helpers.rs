@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    time::{Duration},
-};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use super::structs::Meter;
 use super::types::Mode;
@@ -34,7 +30,7 @@ pub(super) fn each() -> bool {
     *EACH.get_or_init(|| mode(std::env::var("ATELIER_FRAMES").ok().as_deref()) == Mode::Each)
 }
 
-/// Adds `spent` to this frame's part `name`, for time spent outside any [`Part`] (a view's own render).
+/// Adds `spent` to this frame's part `name`, for time spent outside any [`Part`](super::structs::Part) (a view's own render).
 pub fn add_part(meter: &Rc<RefCell<Meter>>, name: &'static str, spent: Duration) {
     meter.borrow_mut().add_part(name, spent);
 }

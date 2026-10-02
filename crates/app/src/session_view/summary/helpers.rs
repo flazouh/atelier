@@ -4,12 +4,12 @@ use serde_json::Value;
 use super::structs::Summary;
 use super::types::DETAIL_MAX;
 
-pub(super) fn text<'a>(input: &'a Value, keys: &[&str]) -> Option<&'a str> {
+fn text<'a>(input: &'a Value, keys: &[&str]) -> Option<&'a str> {
     keys.iter().find_map(|k| input.get(*k).and_then(Value::as_str)).map(str::trim).filter(|s| !s.is_empty())
 }
 
 /// The first line of `s`, cut to [`DETAIL_MAX`] characters.
-pub(super) fn first_line(s: &str) -> String {
+fn first_line(s: &str) -> String {
     let line = s.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
     if line.chars().count() <= DETAIL_MAX {
         return line.to_string();

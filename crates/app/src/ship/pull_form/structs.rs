@@ -49,7 +49,7 @@ impl EventEmitter<FormEvent> for PullForm {}
 pub struct PullForm {
     pub(super) project: Arc<dyn Project>,
     pub(super) backend: Arc<dyn Backend>,
-    pub(super) model: Option<String>,
+    model: Option<String>,
     pub(super) forge: Arc<dyn Forge>,
     pub stage: FormStage,
     pub head: String,
@@ -66,12 +66,12 @@ pub struct PullForm {
     pub refused: Option<SharedString>,
     pub title: Entity<InputState>,
     pub body: Entity<TextareaState>,
-    pub(super) base_focus: FocusHandle,
-    pub(super) draft_focus: FocusHandle,
-    pub(super) cancel_focus: FocusHandle,
-    pub(super) open_focus: FocusHandle,
-    pub(super) work: Task<()>,
-    pub(super) checks: Task<()>,
+    base_focus: FocusHandle,
+    draft_focus: FocusHandle,
+    cancel_focus: FocusHandle,
+    open_focus: FocusHandle,
+    work: Task<()>,
+    checks: Task<()>,
 }
 
 /// What the form reads before it opens.
@@ -81,7 +81,7 @@ pub(super) struct Read {
     pub(super) bases: Vec<String>,
     pub(super) ahead: usize,
     /// The open pull request the branch has, as the forge says.
-    pub(super) existing: Result<Option<atelier_forge::PullBrief>, String>,
+    existing: Result<Option<atelier_forge::PullBrief>, String>,
 }
 
 impl PullForm {
@@ -202,7 +202,7 @@ impl PullForm {
     }
 
     /// Asks the agent for a title and a body against the base picked; a draft fills only an empty field.
-    pub(super) fn redraft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn redraft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.drafting = true;
         let (project, backend, model, base) = (self.project.clone(), self.backend.clone(), self.model.clone(), self.bases[self.base].clone());
         let drafting = cx.background_spawn(async move {

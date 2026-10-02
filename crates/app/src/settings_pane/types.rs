@@ -1,7 +1,4 @@
-use atelier_ui::{
-    sidebar_layout::{SidebarLayout},
-    theme::{Appearance, follow_system, set_appearance},
-};
+use atelier_ui::{sidebar_layout::SidebarLayout, theme::{Appearance, follow_system, set_appearance}};
 
 /// Light, dark, or whatever the system is set to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

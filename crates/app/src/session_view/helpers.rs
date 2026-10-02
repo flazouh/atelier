@@ -43,7 +43,7 @@ use crate::{
 };
 use super::types::MenuAction;
 
-pub(super) fn row_status(status: ToolStatus) -> RowToolStatus {
+fn row_status(status: ToolStatus) -> RowToolStatus {
     match status {
         ToolStatus::Pending | ToolStatus::Running => RowToolStatus::Running,
         ToolStatus::Done => RowToolStatus::Done,
@@ -53,7 +53,7 @@ pub(super) fn row_status(status: ToolStatus) -> RowToolStatus {
 
 /// The row of `call`: what it is about (the command, the file, the pattern, with an icon for its kind), its paths
 /// relative to `root`, and the mark its answered approval left.
-pub(super) fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
+fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
     let about = super::summary::summary(call, |path| atelier_ui::tool_preview::relative_path(path, root).to_string());
     let icon = match about.kind {
         atelier_agents::session::ToolKind::Shell => IconName::Terminal,
@@ -96,7 +96,7 @@ pub(super) fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyEle
 
 /// The files turn `turn` changed, with its `+a −r`: Review opens the review at a file, and a file's
 /// name opens it in the editor.
-pub(super) fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElement {
+fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElement {
     let s = session.read(cx);
     let Some(files) = s.reviews.turns.turns().get(turn).map(|t| atelier_review::present::changed_files(t.files())) else {
         return div().into_any_element();
@@ -111,7 +111,7 @@ pub(super) fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App)
 }
 
 /// One item of the conversation, in its row's padding.
-pub(super) fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
+fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     match item_body(session, ix, cx) {
         Some(body) => div().px(px(16.)).pb(px(14.)).child(body).into_any_element(),
         None => div().into_any_element(),
@@ -121,7 +121,7 @@ pub(super) fn item_row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> A
 /// An activity group: the run of thinking, tool calls and subagents `from..to`. While the agent works and the
 /// group is the last row, its newest items show in a viewport that holds the end in view; once the turn is over
 /// it folds to one line of words that a press opens.
-pub(super) fn activity_row(session: &Entity<AgentSession>, from: usize, to: usize, cx: &App) -> AnyElement {
+fn activity_row(session: &Entity<AgentSession>, from: usize, to: usize, cx: &App) -> AnyElement {
     let s = session.read(cx);
     let theme = cx.theme().clone();
     let items = s.conversation.items();
@@ -167,7 +167,7 @@ pub(super) fn activity_row(session: &Entity<AgentSession>, from: usize, to: usiz
 }
 
 /// One item of the conversation, without its row's padding; `None` for an item that draws nothing.
-pub(super) fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyElement> {
+fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyElement> {
     let s = session.read(cx);
     let theme = cx.theme().clone();
     let items = s.conversation.items();
@@ -476,7 +476,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
 }
 
 /// The agents this build can start, as a picker a new session shows until its first message.
-pub(super) fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
+fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
     let agents = atelier_agents::registry::agents();
     if agents.len() < 2 {
         return None;
@@ -632,7 +632,7 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
 
 /// The panel's ⋯ menu: what a reader does with a session besides talking to it. Rename it, begin another in the same
 /// project, see the project's files, copy the id the agent knows it by (to resume it elsewhere), archive it.
-pub(super) fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Option<String>, window: &mut Window, cx: &mut App) -> impl IntoElement {
+fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Option<String>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     use atelier_ui::{
         menu::{self, Entry, Menu, MenuItem, MenuLook, Origin},
         popover::{Hang, Popover},

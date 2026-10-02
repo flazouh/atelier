@@ -1,6 +1,6 @@
 //! One project open in the window: its tree, its git branch, its tabs and their buffers, and the
 //! language servers for its files. Everything that touches the project runs on a background thread
-//! through [`Project`]; this entity only holds what came back, so switching projects is instant.
+//! through [`Project`](atelier_project::Project); this entity only holds what came back, so switching projects is instant.
 //!
 //! A file that changes on disk reloads when its tab is clean. When the tab holds unsaved edits, the
 //! tab keeps them and says the file changed, with Reload and Keep mine. A file deleted on disk says

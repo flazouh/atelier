@@ -53,7 +53,7 @@ pub struct Buffer {
     /// The file changed on disk while this tab held unsaved edits.
     pub changed_on_disk: bool,
     pub deleted: Deleted,
-    pub(super) _edits: Subscription,
+    _edits: Subscription,
 }
 
 impl EventEmitter<ProjectEvent> for OpenProject {}
@@ -61,7 +61,7 @@ impl EventEmitter<ProjectEvent> for OpenProject {}
 pub struct OpenProject {
     pub location: Location,
     pub(super) project: Arc<dyn Project>,
-    pub(super) workers: Arc<Workers>,
+    workers: Arc<Workers>,
     pub listing: Listing,
     /// How long the last listing took, for the status line and docs/performance.md.
     pub listed_in: Option<Duration>,
@@ -77,7 +77,7 @@ pub struct OpenProject {
     pub sessions: Vec<Entity<AgentSession>>,
     /// The agent's past sessions in this project, newest first, less the ones open.
     pub past: Vec<SessionSummary>,
-    pub(super) _session_events: Vec<Subscription>,
+    _session_events: Vec<Subscription>,
     /// The review of a session's changes, shown in place of the editor while it is open.
     pub review: Option<(Entity<ReviewPane>, Subscription)>,
     /// The project's pull requests, once asked for (`pulls.rs`).
@@ -85,41 +85,41 @@ pub struct OpenProject {
     /// The project's tasks, once asked for (`tasks.rs`).
     pub tasks: Option<crate::tasks::Slot>,
     /// What the reader asked the right pane for last.
-    pub(super) right_asked: super::front::Front,
+    right_asked: super::front::Front,
     /// A pull request to show once the pull request view has mounted.
-    pub(super) pending_pull: Option<atelier_forge::PullRef>,
+    pending_pull: Option<atelier_forge::PullRef>,
     /// The project's own repository on its forge, from the origin remote; `None` when it has none.
     pub(super) repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
-    pub(super) list_rows: Vec<atelier_ui::PrChipData>,
+    list_rows: Vec<atelier_ui::PrChipData>,
     pub(super) pr_chips: std::rc::Rc<Vec<atelier_ui::PrChipData>>,
     /// Chips looked up for numbers the list lacks, by number; `None` for one that is no pull request.
-    pub(super) looked_up: HashMap<u64, Option<atelier_ui::PrChipData>>,
+    looked_up: HashMap<u64, Option<atelier_ui::PrChipData>>,
     /// When each number was last asked about, so it is not asked again for a while.
     pub(super) asked: HashMap<u64, std::time::Instant>,
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
-    pub(super) chip_forge: Option<std::sync::Arc<dyn atelier_forge::Forge>>,
-    pub(super) opening_pulls: Task<()>,
+    chip_forge: Option<std::sync::Arc<dyn atelier_forge::Forge>>,
+    opening_pulls: Task<()>,
     /// The tasks hearing of sessions, one at a time and in order.
-    pub(super) task_signals: Task<()>,
+    task_signals: Task<()>,
     /// The merged pull requests the tasks were told of in this run.
-    pub(super) merged_told: HashSet<u64>,
+    merged_told: HashSet<u64>,
     /// The open tasks, as the Tasks pane last counted them.
-    pub(super) task_count: Option<usize>,
+    task_count: Option<usize>,
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
-    pub(super) reading_dirty: Task<()>,
+    reading_dirty: Task<()>,
     /// Files being read for a tab, so a second click does not read them twice.
-    pub(super) opening: HashSet<String>,
+    opening: HashSet<String>,
     /// Where the caret goes in a file still being read, after a jump to it.
-    pub(super) caret_at: HashMap<String, Position>,
+    caret_at: HashMap<String, Position>,
     pub(super) _watch: Option<Watch>,
     /// Hands the watch's batches to this entity, as long as it lives.
-    pub(super) watching: Task<()>,
+    watching: Task<()>,
     /// Hands the link's ups and downs to this entity.
-    pub(super) linking: Task<()>,
-    pub(super) listing_task: Task<()>,
+    linking: Task<()>,
+    listing_task: Task<()>,
 }
 
 impl OpenProject {
@@ -232,7 +232,7 @@ impl OpenProject {
     }
 
     /// A new session keyed `key` of `agent`, and the project listening to it.
-    pub(super) fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+    fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         let project = self.project.clone();
         let chips = self.pr_chips.clone();
         let session = cx.new(|cx| {
@@ -310,7 +310,7 @@ impl OpenProject {
         self.location.name()
     }
 
-    pub(super) fn relist(&mut self, cx: &mut Context<Self>) {
+    fn relist(&mut self, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let listed = cx.background_spawn(async move {
             let started = Instant::now();
@@ -336,7 +336,7 @@ impl OpenProject {
         self.read_git(cx);
     }
 
-    pub(super) fn read_git(&mut self, cx: &mut Context<Self>) {
+    fn read_git(&mut self, cx: &mut Context<Self>) {
         self.read_dirty(cx);
         let project = self.project.clone();
         let remote = cx.background_spawn(async move { project.git(&["remote", "get-url", "origin"]) });
@@ -367,7 +367,7 @@ impl OpenProject {
 
     /// Counts the files that differ from the last commit, off the UI thread. A burst of changes asks
     /// once: a new ask drops the one before it.
-    pub(super) fn read_dirty(&mut self, cx: &mut Context<Self>) {
+    fn read_dirty(&mut self, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let asked = cx.background_spawn(async move { project.git(&["status", "--porcelain", "-z", "--untracked-files=all"]) });
         self.reading_dirty = cx.spawn(async move |this, cx| {
@@ -442,7 +442,7 @@ impl OpenProject {
 
     /// The chips from the list and the repository. The list notifies on a hover or a tick, so the
     /// sessions hear only of chips that changed.
-    pub(super) fn refresh_chips(&mut self, cx: &mut Context<Self>) {
+    fn refresh_chips(&mut self, cx: &mut Context<Self>) {
         let slug = self.repo.as_ref().map(atelier_forge::RepoRef::slug);
         let chips = super::chips::merged(pulls::chips_of(self.list_rows.iter().cloned(), slug.as_deref()), &self.looked_up);
         if *self.pr_chips == chips {
@@ -518,7 +518,7 @@ impl OpenProject {
     }
 
     /// Opens the pull request a chip names, in the pull request pane.
-    pub(super) fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
         let Some(pulls) = &mut self.pulls else { return };
         let hub = pulls.hub.clone();
         let Some(reference) = hub.read(cx).list().read(cx).model().reference_of(chip) else { return };
@@ -560,7 +560,7 @@ impl OpenProject {
     }
 
     /// Tells the tasks a session is linked to what happened in it, and lets the rules move them.
-    pub(super) fn task_event(&mut self, session: &Entity<AgentSession>, event: crate::tasks::signal::TaskEvent, cx: &mut Context<Self>) {
+    fn task_event(&mut self, session: &Entity<AgentSession>, event: crate::tasks::signal::TaskEvent, cx: &mut Context<Self>) {
         if event == crate::tasks::signal::TaskEvent::Adopt {
             return self.adopt_task(session, cx);
         }
@@ -573,7 +573,7 @@ impl OpenProject {
     }
 
     /// A session opened again knows its task from the tracker's link, so its chip shows after a restart.
-    pub(super) fn adopt_task(&mut self, session: &Entity<AgentSession>, cx: &mut Context<Self>) {
+    fn adopt_task(&mut self, session: &Entity<AgentSession>, cx: &mut Context<Self>) {
         let Some(id) = session.read(cx).id.as_ref().map(|id| id.as_str().to_string()) else { return };
         let (open, project) = (self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()), self.project.clone());
         let finding = cx.background_spawn(async move {
@@ -600,7 +600,7 @@ impl OpenProject {
     }
 
     /// Lets the rules hear of `signal`, one after the other.
-    pub(super) fn send_signal(&mut self, signal: atelier_tracker::Signal, cx: &mut Context<Self>) {
+    fn send_signal(&mut self, signal: atelier_tracker::Signal, cx: &mut Context<Self>) {
         // The tracker of the pane if it is open. Else the project has one only if it kept a file: a session of
         // a project that never used tasks makes none.
         let (open, project) = (self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()), self.project.clone());
@@ -650,7 +650,7 @@ impl OpenProject {
         .detach();
     }
 
-    pub(super) fn begin_session_for(&mut self, task: atelier_tracker::Task, window: &mut Window, cx: &mut Context<Self>) {
+    fn begin_session_for(&mut self, task: atelier_tracker::Task, window: &mut Window, cx: &mut Context<Self>) {
         let session = self.open_session(None, None, window, cx);
         let text = crate::tasks::map::first_message(&task);
         let reference = crate::tasks::TaskRef { id: task.id.clone(), key: task.key.clone().into() };
@@ -703,7 +703,7 @@ impl OpenProject {
         self.toggle_pulls(window, cx);
     }
 
-    pub(super) fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
+    fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
         let hub = cx.new(|cx| PrHub::with_services(services, cx));
         let _events = cx.subscribe_in(&hub, window, |this, _, event: &PrEvent, window, cx| match event {
             // A file at the pull request's head opens in the editor, as it is in this project.
@@ -774,7 +774,7 @@ impl OpenProject {
         });
     }
 
-    pub(super) fn follow_link(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn follow_link(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let (tx, mut rx) = mpsc::unbounded::<Link>();
         self.project.on_link(Box::new(move |link| drop(tx.unbounded_send(link))));
         self.linking = cx.spawn_in(window, async move |this, cx| {
@@ -841,7 +841,7 @@ impl OpenProject {
 
     /// A dirty tab's file changed: it says so only when the file holds something other than what the
     /// tab last saved, so the watch reporting atelier's own write is no news.
-    pub(super) fn check_disk(&mut self, path: String, cx: &mut Context<Self>) {
+    fn check_disk(&mut self, path: String, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let read = {
             let path = path.clone();
@@ -927,7 +927,7 @@ impl OpenProject {
     }
 
     /// Puts the caret where a jump asked, once the file's tab has its buffer, and gives it focus.
-    pub(super) fn place_caret(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
+    fn place_caret(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(buffer) = self.buffers.get(path) else { return };
         let position = self.caret_at.remove(path);
         buffer.editor.update(cx, |state, cx| {
@@ -973,7 +973,7 @@ impl OpenProject {
     }
 
     /// The language server session for `path`'s editor, with jumps to other files opening them here.
-    pub(super) fn session_for(&self, path: &str, editor: Entity<EditorState>, cx: &mut Context<Self>) -> Entity<EditorSession> {
+    fn session_for(&self, path: &str, editor: Entity<EditorState>, cx: &mut Context<Self>) -> Entity<EditorSession> {
         (self.language_for(cx))(path, editor, atelier_ui::RowMap::default(), cx)
     }
 
@@ -992,7 +992,7 @@ impl OpenProject {
         })
     }
 
-    pub(super) fn add_buffer(&mut self, path: String, text: String, window: &mut Window, cx: &mut Context<Self>) {
+    fn add_buffer(&mut self, path: String, text: String, window: &mut Window, cx: &mut Context<Self>) {
         let editor = atelier_ui::CodeEditor::state(&path, text.clone(), window, cx);
         let session = self.session_for(&path, editor.clone(), cx);
         let key = path.clone();
@@ -1034,7 +1034,7 @@ impl OpenProject {
     }
 
     /// Writes `path`'s tab; with `then_close`, closes it once the write lands.
-    pub(super) fn save_path(&mut self, path: String, then_close: bool, cx: &mut Context<Self>) {
+    fn save_path(&mut self, path: String, then_close: bool, cx: &mut Context<Self>) {
         let Some(buffer) = self.buffers.get(&path) else { return };
         let text = buffer.editor.read(cx).value().to_string();
         let project = self.project.clone();

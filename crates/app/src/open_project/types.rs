@@ -1,12 +1,7 @@
 use gpui_kit::{Entity, SharedString};
-use atelier_agents::{
-    session::{SessionId},
-};
+use atelier_agents::session::SessionId;
 
-use crate::{
-    agent_session::{AgentSession},
-    tree::{ProjectTree},
-};
+use crate::{agent_session::AgentSession, tree::ProjectTree};
 
 /// What `git` says about the folder.
 #[derive(Clone, Debug, PartialEq, Eq)]

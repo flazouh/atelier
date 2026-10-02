@@ -173,8 +173,8 @@ pub(super) struct FileRecord {
     pub(super) kind: KindRecord,
     pub(super) before: Option<String>,
     pub(super) after: Option<String>,
-    pub(super) exact: bool,
-    pub(super) renamed_from: Option<String>,
+    exact: bool,
+    renamed_from: Option<String>,
 }
 
 impl FileRecord {
@@ -222,19 +222,19 @@ pub(super) struct DecidedRecord {
     pub(super) path: String,
     /// The baseline, with what the reader accepted, and the text now; `None` for a file with no text.
     pub(super) texts: Option<(String, String)>,
-    pub(super) on_disk: Option<String>,
+    on_disk: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct CommentRecord {
     pub(super) turn: usize,
     pub(super) path: String,
-    pub(super) removed: bool,
-    pub(super) first_line: u32,
-    pub(super) last_line: u32,
-    pub(super) quote: String,
+    removed: bool,
+    first_line: u32,
+    last_line: u32,
+    quote: String,
     pub(super) body: String,
-    pub(super) stale: bool,
+    stale: bool,
 }
 
 impl CommentRecord {

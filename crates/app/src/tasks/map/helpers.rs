@@ -72,7 +72,7 @@ pub fn assignee_to(assignee: &Assignee) -> tracker::Assignee {
     }
 }
 
-pub(super) fn pr_of(link: &tracker::PrLink) -> PrChipData {
+fn pr_of(link: &tracker::PrLink) -> PrChipData {
     PrChipData {
         number: link.number,
         repo: link.repo.clone().into(),
@@ -82,7 +82,7 @@ pub(super) fn pr_of(link: &tracker::PrLink) -> PrChipData {
     }
 }
 
-pub(super) fn activity_of(line: &tracker::Activity) -> Option<Activity> {
+fn activity_of(line: &tracker::Activity) -> Option<Activity> {
     let at = line.at.max(0) as u64;
     let by: SharedString = line.by.clone().into();
     Some(match &line.kind {

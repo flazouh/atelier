@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap},
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::{Duration, Instant}};
 
 use atelier_ui::ChangedFile;
 use gpui_kit::{Entity, FocusHandle, Window, component::input::EditorState};

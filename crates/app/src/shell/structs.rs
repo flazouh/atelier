@@ -55,11 +55,11 @@ pub struct Shell {
     pub(super) recent: Vec<Location>,
     /// The last thing a project or the shell said: a notice at the foot of the window for a few seconds, and the start
     /// screen's error line.
-    pub(super) said: Option<SharedString>,
+    said: Option<SharedString>,
     /// The window's width as of the last frame.
     pub(super) width: f32,
     /// Go to file, while it is open: the finder and the paths its rows stand for.
-    pub(super) finder: Option<(Entity<Finder>, Vec<String>, Subscription)>,
+    finder: Option<(Entity<Finder>, Vec<String>, Subscription)>,
     /// "Open over SSH…", while it is open.
     /// The Settings pane, while it is open.
     pub(super) settings: Option<(Entity<crate::settings_pane::SettingsPane>, Subscription)>,
@@ -74,46 +74,46 @@ pub struct Shell {
     /// Names the reader gave sessions, by the agent's id.
     pub(super) names: BTreeMap<String, String>,
     /// The colours and images the reader gave projects' badges.
-    pub(super) badges: agents_view::Badges,
+    badges: agents_view::Badges,
     /// "Choose an icon…", while it is open: the chooser, the project's place, and its events.
-    pub(super) icon: Option<(Entity<atelier_ui::icon_picker::IconPicker>, SharedString, Subscription)>,
+    icon: Option<(Entity<atelier_ui::icon_picker::IconPicker>, SharedString, Subscription)>,
     /// With `ATELIER_FRAMES=1`, times every frame.
-    pub(super) meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
+    meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
     /// The sidebar's and the right pane's widths as the reader dragged them; the window's width may
     /// show them narrower (`fit::widths`).
-    pub(super) sidebar_width: f32,
-    pub(super) right_width: f32,
+    sidebar_width: f32,
+    right_width: f32,
     /// Whether the sidebar shows in a window too narrow for it by default, after ⌘B.
-    pub(super) sidebar_in_medium: bool,
+    sidebar_in_medium: bool,
     /// The pane a narrow window shows.
     pub(super) narrow: Pane,
     /// The right pane's width before a review widened it, to give back when the review closes.
-    pub(super) before_review: Option<f32>,
+    before_review: Option<f32>,
     /// Sessions open at the last quit, waiting for their project to open.
-    pub(super) restoring: Vec<atelier_settings::OpenSession>,
+    restoring: Vec<atelier_settings::OpenSession>,
     /// Projects being opened: until they all arrive, a saved session may still find its project.
-    pub(super) opening: usize,
+    opening: usize,
     /// The session in front at the last quit, by the agent's id.
     pub(super) front: Option<String>,
     /// The open sessions and the one in front as the settings file has them, to write only a change.
-    pub(super) saved_open: (Vec<atelier_settings::OpenSession>, Option<String>),
-    pub(super) _subscriptions: Vec<Subscription>,
+    saved_open: (Vec<atelier_settings::OpenSession>, Option<String>),
+    _subscriptions: Vec<Subscription>,
     /// Each open session's panel view, by the session's entity.
-    pub(super) panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
+    panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
     /// Which view shows: Sessions or Files.
     pub(super) view: ShellView,
     /// In a narrow window, the Files view's tree or editor.
-    pub(super) files_narrow: FilesPane,
+    files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
-    pub(super) layout_menu: bool,
+    layout_menu: bool,
     /// The sessions the reader archived, by the agent's id.
     pub(super) archived: std::collections::BTreeSet<String>,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
-    pub(super) session_right: Option<f32>,
+    session_right: Option<f32>,
     /// The right pane's own view (`right_pane.rs`), cached.
-    pub(super) right_view: Entity<crate::right_pane::RightPane>,
+    right_view: Entity<crate::right_pane::RightPane>,
     /// Gives the cached sidebar the time each minute, so a session's age moves on.
-    pub(super) _ages: gpui_kit::Task<()>,
+    _ages: gpui_kit::Task<()>,
 }
 
 impl Shell {
@@ -177,7 +177,7 @@ impl Shell {
     }
 
     /// The sidebar's rows again with the time now, for their ages; nothing when no session row shows.
-    pub(super) fn tick_ages(&mut self, cx: &mut Context<Self>) {
+    fn tick_ages(&mut self, cx: &mut Context<Self>) {
         if !self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) {
             return;
         }
@@ -185,7 +185,7 @@ impl Shell {
     }
 
     /// The sidebar's projects from the sessions as they are now, narrowed by the filter and the box.
-    pub(super) fn push_sidebar(&mut self, cx: &mut Context<Self>) {
+    fn push_sidebar(&mut self, cx: &mut Context<Self>) {
         let all = agents_view::sidebar(&self.projects, &self.names, &self.badges, &self.archived, cx);
         // Each session carries its project's badge, for the head of its panel.
         let sessions: Vec<(Vec<Entity<AgentSession>>, atelier_ui::sidebar_model::Badge)> =
@@ -228,7 +228,7 @@ impl Shell {
 
     /// Keeps the open sessions and the one in front in the settings, off the UI thread, for the next
     /// launch. Nothing is written while sessions from the last quit still wait to open.
-    pub(super) fn save_open(&mut self, cx: &mut Context<Self>) {
+    fn save_open(&mut self, cx: &mut Context<Self>) {
         if !self.restoring.is_empty() {
             return;
         }
@@ -281,7 +281,7 @@ impl Shell {
 
     /// The sessions of project `at` that were open at the last quit, opened again; the one that was in
     /// front shows.
-    pub(super) fn reopen(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
+    fn reopen(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.projects.get(at).cloned() else { return };
         let location = project.read(cx).location.clone();
         let mine: Vec<atelier_settings::OpenSession> = super::restore::of(&self.restoring, &location).into_iter().cloned().collect();
@@ -315,30 +315,30 @@ impl Shell {
     /// Marks the row of the session in the active panel, in the sidebar.
     /// Tells the sidebar which session is the one in front. Only the single view has one: side by side, every panel
     /// is in front at once, so no row is marked.
-    pub(super) fn mark_open_session(&mut self, cx: &mut Context<Self>) {
+    fn mark_open_session(&mut self, cx: &mut Context<Self>) {
         let panels = self.panels.read(cx);
         let front = (panels.layout() == Layout::Single).then(|| panels.active().cloned()).flatten();
         self.agents_sidebar.update(cx, |s, cx| s.set_open(front, cx));
     }
-    pub(super) fn project_by_id(&self, id: &str, cx: &App) -> Option<usize> {
+    fn project_by_id(&self, id: &str, cx: &App) -> Option<usize> {
         self.projects.iter().position(|p| agents_view::project_id(p.read(cx)).as_ref() == id)
     }
 
     /// The open session keyed `key`, and the index of its project.
-    pub(super) fn session_by_key(&self, key: &str, cx: &App) -> Option<(usize, Entity<AgentSession>)> {
+    fn session_by_key(&self, key: &str, cx: &App) -> Option<(usize, Entity<AgentSession>)> {
         self.projects.iter().enumerate().find_map(|(i, p)| {
             p.read(cx).sessions.iter().find(|s| s.read(cx).key.as_ref() == key).map(|s| (i, s.clone()))
         })
     }
 
-    pub(super) fn new_session(&mut self, project: usize, window: &mut Window, cx: &mut Context<Self>) {
+    fn new_session(&mut self, project: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(p) = self.projects.get(project).cloned() else { return };
         let session = p.update(cx, |p, cx| p.open_session(None, None, window, cx));
         self.show_session(project, &session, window, cx);
     }
 
     /// Makes `session` the panel in front, and its project the one the tree and the editor show.
-    pub(super) fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
+    fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
         self.active = project;
         self.narrow = Pane::Session;
         self.sync(cx);
@@ -350,7 +350,7 @@ impl Shell {
     }
 
     /// The session keyed `key` is the one the reader looks at; no other is.
-    pub(super) fn seen(&mut self, key: &str, cx: &mut Context<Self>) {
+    fn seen(&mut self, key: &str, cx: &mut Context<Self>) {
         for p in &self.projects {
             for s in p.read(cx).sessions.clone() {
                 s.update(cx, |s, cx| s.set_seen(s.key.as_ref() == key, cx));
@@ -433,7 +433,7 @@ impl Shell {
     }
 
     /// Closes the session keyed `key`: its panel goes, its agent stops, and it is in the project's past list.
-    pub(super) fn close_session(&mut self, key: &str, cx: &mut Context<Self>) {
+    fn close_session(&mut self, key: &str, cx: &mut Context<Self>) {
         if let Some((at, _)) = self.session_by_key(key, cx) {
             self.projects[at].update(cx, |p, cx| p.close_session(key, cx));
             self.sync(cx);
@@ -441,7 +441,7 @@ impl Shell {
     }
 
     /// The id the agent knows the session on the sidebar's row `row` by: a past session's own, an open one's once it has started.
-    pub(super) fn agent_id_of(&self, row: &str, cx: &App) -> Option<String> {
+    fn agent_id_of(&self, row: &str, cx: &App) -> Option<String> {
         match agents_view::pick(row) {
             agents_view::Pick::Past(id) => Some(id.0),
             agents_view::Pick::Open(key) => self.session_by_key(&key, cx).and_then(|(_, s)| s.read(cx).id.as_ref().map(|i| i.as_str().to_string())),
@@ -486,7 +486,7 @@ impl Shell {
 
     /// Zooms the interface to `to` (kept between the least and the most), keeps it for the next launch, and draws every view
     /// again: the cached ones are told, since they only draw again when notified.
-    pub(super) fn zoom_to(&mut self, to: f32, cx: &mut Context<Self>) {
+    fn zoom_to(&mut self, to: f32, cx: &mut Context<Self>) {
         let kept = atelier_ui::scale::set_zoom(to);
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
@@ -508,7 +508,7 @@ impl Shell {
 
     /// Keeps what the sidebar's head chose that outlives the launch: how it lists (the filter starts as Active each
     /// time, so no session is hidden by a choice the reader forgot).
-    pub(super) fn keep_sidebar_layout(&mut self, layout: atelier_ui::sidebar_layout::SidebarLayout, cx: &mut Context<Self>) {
+    fn keep_sidebar_layout(&mut self, layout: atelier_ui::sidebar_layout::SidebarLayout, cx: &mut Context<Self>) {
         let key = layout.mode.key().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
@@ -520,7 +520,7 @@ impl Shell {
         }
     }
 
-    pub(super) fn panels_event(&mut self, _: &Entity<AgentPanels>, event: &PanelsEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn panels_event(&mut self, _: &Entity<AgentPanels>, event: &PanelsEvent, _: &mut Window, cx: &mut Context<Self>) {
         match event {
             PanelsEvent::Activated(key) => {
                 if let Some((at, _)) = self.session_by_key(key, cx) {
@@ -586,7 +586,7 @@ impl Shell {
 
     /// One project opening ended, opened or not. Once none is left opening, the sessions from the last
     /// quit that found no project stop waiting, and the open ones are kept from now on.
-    pub(super) fn opened_one(&mut self, cx: &mut Context<Self>) {
+    fn opened_one(&mut self, cx: &mut Context<Self>) {
         self.opening = self.opening.saturating_sub(1);
         if self.opening == 0 && !self.restoring.is_empty() {
             self.restoring.clear();
@@ -627,7 +627,7 @@ impl Shell {
         cx.notify();
     }
 
-    pub(super) fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
         let form = cx.new(|cx| SshForm::new(Vec::new(), window, cx));
         // ~/.ssh/config is read off the UI thread; the form fills its hosts in when it has them.
         let reading = cx.background_spawn(async { atelier_remote::ssh::known_hosts() });
@@ -690,7 +690,7 @@ impl Shell {
         .detach();
     }
 
-    pub(super) fn form_phase(&mut self, phase: Phase, cx: &mut Context<Self>) {
+    fn form_phase(&mut self, phase: Phase, cx: &mut Context<Self>) {
         if let Some((form, _)) = &self.ssh {
             form.update(cx, |f, cx| {
                 f.phase = phase;
@@ -707,7 +707,7 @@ impl Shell {
         }
     }
 
-    pub(super) fn open_tasks_key(&mut self, _: &OpenTasks, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_tasks_key(&mut self, _: &OpenTasks, window: &mut Window, cx: &mut Context<Self>) {
         self.show_tasks(window, cx);
     }
     /// Shows or hides the active project's tasks in the right pane.
@@ -720,12 +720,12 @@ impl Shell {
         self.focus_front(&project, window, cx);
         cx.notify();
     }
-    pub(super) fn pull_requests_key(&mut self, _: &PullRequests, window: &mut Window, cx: &mut Context<Self>) {
+    fn pull_requests_key(&mut self, _: &PullRequests, window: &mut Window, cx: &mut Context<Self>) {
         self.show_pulls(window, cx);
     }
 
     /// Shows or hides the active project's pull requests in the right pane, as wide as a review.
-    pub(super) fn show_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn show_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.active().cloned() else { return };
         self.view = ShellView::Sessions;
         project.update(cx, |p, cx| p.toggle_pulls(window, cx));
@@ -737,7 +737,7 @@ impl Shell {
 
     /// The keys go to what the right pane shows now: the review when it is in front, else the shell,
     /// so no key is left with a pane that is no longer drawn.
-    pub(super) fn focus_front(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) {
+    fn focus_front(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) {
         let p = project.read(cx);
         match (p.front(), p.review.as_ref()) {
             (crate::open_project::front::Front::Review, Some((pane, _))) => pane.focus_handle(cx).focus(window, cx),
@@ -751,7 +751,7 @@ impl Shell {
 
     /// Gives the right pane the width a review wants, taken from the agent panel while a session panel
     /// still fits in it.
-    pub(super) fn widen_for_review(&mut self, window: &mut Window, _: &mut Context<Self>) {
+    fn widen_for_review(&mut self, window: &mut Window, _: &mut Context<Self>) {
         let total = atelier_ui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
@@ -768,7 +768,7 @@ impl Shell {
 
     /// Whether the sidebar shows at `fit`: by the reader's choice in a wide window, after ⌘B in a
     /// medium one, and as its own tab in a narrow one.
-    pub(super) fn sidebar_shown(&self, fit: Fit) -> bool {
+    fn sidebar_shown(&self, fit: Fit) -> bool {
         match fit {
             Fit::Wide => self.sidebar,
             Fit::Medium => self.sidebar_in_medium,
@@ -777,7 +777,7 @@ impl Shell {
     }
 
     /// Opens `path` of `project` in the editor, and makes that project the one shown.
-    pub(super) fn open_in(&mut self, project: &Entity<OpenProject>, path: &str, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_in(&mut self, project: &Entity<OpenProject>, path: &str, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(i) = self.projects.iter().position(|p| p == project) {
             self.active = i;
         }
@@ -805,7 +805,7 @@ impl Shell {
     }
 
     /// Keeps the view for the next launch, off the UI thread.
-    pub(super) fn save_view(&self, cx: &mut Context<Self>) {
+    fn save_view(&self, cx: &mut Context<Self>) {
         let words = self.view.words().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
@@ -818,7 +818,7 @@ impl Shell {
     }
 
     /// A file was opened: the Files view shows it, in a narrow window with the editor in front.
-    pub(super) fn show_file(&mut self, cx: &mut Context<Self>) {
+    fn show_file(&mut self, cx: &mut Context<Self>) {
         self.files_narrow = FilesPane::Editor;
         if self.view != ShellView::Files {
             self.view = ShellView::Files;
@@ -920,7 +920,7 @@ impl Shell {
     }
 
     /// Puts `location` first in the recent list, here and in the settings file.
-    pub(super) fn remember(&mut self, location: Location, cx: &mut Context<Self>) {
+    fn remember(&mut self, location: Location, cx: &mut Context<Self>) {
         let mut settings = atelier_settings::Settings { recent: std::mem::take(&mut self.recent), ..Default::default() };
         settings.opened(location.clone());
         self.recent = settings.recent;
@@ -951,7 +951,7 @@ impl Shell {
         cx.notify();
     }
 
-    pub(super) fn open_folder(&mut self, _: &OpenFolder, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_folder(&mut self, _: &OpenFolder, window: &mut Window, cx: &mut Context<Self>) {
         let picked = cx.prompt_for_paths(PathPromptOptions { files: false, directories: true, multiple: false, prompt: Some("Open".into()) });
         cx.spawn_in(window, async move |this, cx| {
             let path = match picked.await {
@@ -969,13 +969,13 @@ impl Shell {
         .detach();
     }
 
-    pub(super) fn save(&mut self, _: &Save, window: &mut Window, cx: &mut Context<Self>) {
+    fn save(&mut self, _: &Save, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(p) = self.active().cloned() {
             p.update(cx, |p, cx| p.save_asking(window, cx));
         }
     }
 
-    pub(super) fn close_tab(&mut self, _: &CloseTab, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_tab(&mut self, _: &CloseTab, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(p) = self.active().cloned() {
             p.update(cx, |p, cx| {
                 if let Some(path) = p.tabs.active().map(str::to_string) {
@@ -1018,7 +1018,7 @@ impl Shell {
 
     /// A key from GitQuiet's table. ⌘B and ⌘⇧B arrive as actions instead, so they work from the
     /// editor too; here, Go to file and Go to tasks (`g t`), and only while nothing is being typed.
-    pub(super) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let press = Press::from_keystroke(&event.keystroke);
         if press.secondary || keys::typing(window) {
             return;
@@ -1036,7 +1036,7 @@ impl Shell {
         }
     }
 
-    pub(super) fn go_to_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn go_to_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(project) = self.active().cloned() else { return };
         let Listing::Ready(tree) = &project.read(cx).listing else { return };
         let paths = tree.file_paths();
@@ -1063,12 +1063,12 @@ impl Shell {
     }
 
     /// The app's own folder picker, over this machine's folders. It starts in the home folder.
-    pub(super) fn open_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.open_folder_picker_over(FolderSource::Local, window, cx);
     }
 
     /// The folder picker over `source`'s folders: this machine's, or a host's through its project.
-    pub(super) fn open_folder_picker_over(&mut self, source: FolderSource, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_folder_picker_over(&mut self, source: FolderSource, window: &mut Window, cx: &mut Context<Self>) {
         let recent: Vec<SharedString> = match &source {
             FolderSource::Local => Vec::new(),
             FolderSource::Remote { host, .. } => self
@@ -1161,7 +1161,7 @@ impl Shell {
     }
 
     /// Connects to `host` at its home folder, and offers its folders to choose from.
-    pub(super) fn browse_remote(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+    fn browse_remote(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
         let (tx, mut steps) = futures_channel::mpsc::unbounded::<String>();
         let connecting = {
             let host = host.clone();
@@ -1192,7 +1192,7 @@ impl Shell {
         .detach();
     }
 
-    pub(super) fn close_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_folder_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.folder.take().is_some() {
             self.focus.focus(window, cx);
         }
@@ -1200,7 +1200,7 @@ impl Shell {
     }
 
     /// "Choose an icon…": lists the image files of the project and lets the reader pick one for its badge.
-    pub(super) fn choose_icon(&mut self, place: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+    fn choose_icon(&mut self, place: SharedString, window: &mut Window, cx: &mut Context<Self>) {
         let Some(at) = self.project_by_id(&place, cx) else { return };
         let project = self.projects[at].clone();
         let Listing::Ready(tree) = &project.read(cx).listing else {
@@ -1224,7 +1224,7 @@ impl Shell {
         cx.notify();
     }
 
-    pub(super) fn close_icon_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_icon_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.icon.take().is_some() {
             self.focus.focus(window, cx);
         }
@@ -1233,7 +1233,7 @@ impl Shell {
 
     /// Keeps the chosen image for the project's badge: its bytes are copied into the data folder, since the file may be
     /// on another host, and the copy's path is saved. `None` puts the letter back.
-    pub(super) fn save_icon(&mut self, place: SharedString, file: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+    fn save_icon(&mut self, place: SharedString, file: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         self.close_icon_picker(window, cx);
         let Some(settings) = settings_path() else { return };
         let key = place.to_string();
@@ -1281,7 +1281,7 @@ impl Shell {
     }
 
     /// Closes "Open over SSH…", and gives focus back here.
-    pub(super) fn close_ssh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_ssh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.ssh.take().is_some() {
             self.focus.focus(window, cx);
         }
@@ -1289,14 +1289,14 @@ impl Shell {
     }
 
     /// Closes Go to file. A pick hands focus to the file's editor; a dismissal gives it back here.
-    pub(super) fn close_finder(&mut self, refocus: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_finder(&mut self, refocus: bool, window: &mut Window, cx: &mut Context<Self>) {
         if self.finder.take().is_some() && refocus {
             self.focus.focus(window, cx);
         }
         cx.notify();
     }
 
-    pub(super) fn toggle_sidebar(&mut self, _: &ToggleSidebar, window: &mut Window, cx: &mut Context<Self>) {
+    fn toggle_sidebar(&mut self, _: &ToggleSidebar, window: &mut Window, cx: &mut Context<Self>) {
         match Fit::of(atelier_ui::scale::design(window.viewport_size().width)) {
             Fit::Wide => self.sidebar = !self.sidebar,
             Fit::Medium => self.sidebar_in_medium = !self.sidebar_in_medium,
@@ -1304,7 +1304,7 @@ impl Shell {
         }
         cx.notify();
     }
-    pub(super) fn toggle_right(&mut self, _: &ToggleRight, window: &mut Window, cx: &mut Context<Self>) {
+    fn toggle_right(&mut self, _: &ToggleRight, window: &mut Window, cx: &mut Context<Self>) {
         match Fit::of(atelier_ui::scale::design(window.viewport_size().width)) {
             Fit::Narrow => self.narrow = if self.narrow == Pane::Right { Pane::Session } else { Pane::Right },
             Fit::Medium | Fit::Wide => self.right = !self.right,
@@ -1313,13 +1313,13 @@ impl Shell {
     }
 
     /// Opens the session that needs the reader most: one waiting for a yes or no, then a question, then one finished and unseen.
-    pub(super) fn open_most_urgent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_most_urgent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let sidebar = self.agents_sidebar.clone();
         let Some((project, session)) = atelier_ui::most_urgent(self.agents_sidebar.read(cx).all_projects()) else { return };
         self.sidebar_event(&sidebar, &SidebarEvent::Open { project, session }, window, cx);
     }
 
-    pub(super) fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let counts = atelier_ui::counts_of(self.agents_sidebar.read(cx).all_projects());
         let this = cx.entity().downgrade();
         div()
@@ -1352,7 +1352,7 @@ impl Shell {
 
     /// What the title bar holds at its left: Back while Settings is open, "Sessions" back from the Files view, else the
     /// app's name.
-    pub(super) fn title_left(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn title_left(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity();
         if self.settings.is_some() {
             return Button::new("settings-back")
@@ -1371,7 +1371,7 @@ impl Shell {
     }
 
     /// The Settings button at the top right, lit while the page is open.
-    pub(super) fn settings_button(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn settings_button(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity();
         Button::new("settings-entry")
             .debug_name("settings-entry")
@@ -1384,7 +1384,7 @@ impl Shell {
             .into_any_element()
     }
 
-    pub(super) fn close_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.settings.take().is_some() {
             window.focus(&self.focus, cx);
             cx.notify();
@@ -1393,7 +1393,7 @@ impl Shell {
 
     /// In the Files view, the way back: "Sessions" with its key. Nothing in the Sessions view: Files is entered
     /// from a project's menu, so there is no switch to draw.
-    pub(super) fn back_to_sessions(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn back_to_sessions(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.view != ShellView::Files {
             return None;
         }
@@ -1411,7 +1411,7 @@ impl Shell {
 
     /// The ⋯ at the top right of the session area, and its layout menu: side by side or single, grouped by
     /// project or not, each with its key. `None` while no session is open.
-    pub(super) fn layout_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn layout_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         use atelier_ui::{
             agent_panels::chord,
             menu::{self, Choice, Entry, Menu, MenuItem, MenuLook, Origin},
@@ -1488,17 +1488,17 @@ impl Shell {
         self.close_layout_menu(cx);
     }
 
-    pub(super) fn choose_grouping(&mut self, grouped: bool, cx: &mut Context<Self>) {
+    fn choose_grouping(&mut self, grouped: bool, cx: &mut Context<Self>) {
         self.panels.update(cx, |p, cx| p.set_grouped(grouped, cx));
         self.close_layout_menu(cx);
     }
 
-    pub(super) fn close_layout_menu(&mut self, cx: &mut Context<Self>) {
+    fn close_layout_menu(&mut self, cx: &mut Context<Self>) {
         self.layout_menu = false;
         cx.notify();
     }
 
-    pub(super) fn start_screen(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn start_screen(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let recent = self.recent.iter().enumerate().map(|(i, location)| {
@@ -1596,7 +1596,7 @@ impl Shell {
     }
 
     /// The Files view's tree: the front project's files, under their heading.
-    pub(super) fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         div()
             .debug_selector(|| "files-tree".into())
@@ -1617,7 +1617,7 @@ impl Shell {
     }
 
     /// The Files view's editor, on its card; it says "No file open" until a file is.
-    pub(super) fn files_editor(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    fn files_editor(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         div()
             .size_full()
@@ -1628,7 +1628,7 @@ impl Shell {
     }
 
     /// The Files view in a wide window: the tree, then the editor.
-    pub(super) fn files_panes(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    fn files_panes(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         self.session_right = None;
         div()
             .debug_selector(|| "files-view".into())
@@ -1641,7 +1641,7 @@ impl Shell {
     }
 
     /// The Files view in a narrow window: the tree or the editor, with a tab for each.
-    pub(super) fn narrow_files(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    fn narrow_files(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity();
         let panes = [FilesPane::Tree, FilesPane::Editor];
         let tabs = div().flex().flex_none().items_center().px(px(8.)).h(px(44.)).child(
@@ -1673,7 +1673,7 @@ impl Shell {
     }
 
     /// The open sessions' panels, or, with none open, a way to start one.
-    pub(super) fn agent_panel(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn agent_panel(&self, cx: &mut Context<Self>) -> AnyElement {
         let open = self.projects.iter().any(|p| !p.read(cx).sessions.is_empty());
         if open {
             // The strip scrolls its columns sideways; they must not draw under the sidebar.
@@ -1766,7 +1766,7 @@ impl Shell {
 
     /// One pane at a time, with a tab for each: the sidebar, the sessions, and the editor or what
     /// stands in its place.
-    pub(super) fn narrow_panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn narrow_panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         // The right pane has a tab only while it holds something: the review, the pull requests or the tasks.
         // The editor is the Files view's.
         let right = {
@@ -1830,7 +1830,7 @@ impl Shell {
 
     /// The right pane: the review, the pull requests, or the editor.
     /// The right pane for `project`, drawn from its last frame until the project changes.
-    pub(super) fn right_pane(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    fn right_pane(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         self.right_view.update(cx, |pane, cx| pane.show(project, cx));
         crate::view_cache::draw(&self.right_view)
     }
@@ -1856,7 +1856,7 @@ impl Render for Shell {
 }
 
 impl Shell {
-    pub(super) fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn root(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         // Rems follow the zoom too, so what is written in them scales with the rest.
         window.set_rem_size(gpui_kit::px(16. * atelier_ui::scale::zoom()));

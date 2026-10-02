@@ -18,7 +18,7 @@ pub struct FakeForge {
 }
 
 impl FakeForge {
-    pub(super) fn answer<T>(&self, ok: T) -> ForgeResult<T> {
+    fn answer<T>(&self, ok: T) -> ForgeResult<T> {
         match self.fails.lock().unwrap().clone() {
             Some(error) => Err(error),
             None => Ok(ok),

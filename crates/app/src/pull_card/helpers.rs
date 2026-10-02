@@ -1,6 +1,4 @@
-use atelier_ui::{
-    merge::{MergeMethod as UiMethod},
-};
+use atelier_ui::merge::MergeMethod as UiMethod;
 
 pub(super) fn verb(method: UiMethod) -> &'static str {
     match method {
