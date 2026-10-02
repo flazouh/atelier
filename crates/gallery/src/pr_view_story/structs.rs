@@ -21,11 +21,11 @@ use crate::sidebar_story::run::Run;
 use super::types::Keep;
 
 pub struct PrViewStory {
-    pub(super) hub: Entity<PrHub>,
-    pub(super) _keep: Keep,
-    pub(super) _events: Subscription,
+    hub: Entity<PrHub>,
+    _keep: Keep,
+    _events: Subscription,
     /// A measuring run (`GALLERY_SCROLL=1`): the rail scrolls and the walk goes through the files.
-    pub(super) run: Option<Run>,
+    run: Option<Run>,
 }
 
 impl PrViewStory {

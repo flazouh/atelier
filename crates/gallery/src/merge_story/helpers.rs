@@ -1,6 +1,4 @@
-use atelier_ui::{
-    merge::{MergeFacts, MergeMethod, PullState, Queue, ReviewNeed, Rights, UpdateWay},
-    };
+use atelier_ui::merge::{MergeFacts, MergeMethod, PullState, Queue, ReviewNeed, Rights, UpdateWay};
 
 /// Each state the button shows, with its name in the story.
 pub fn states() -> Vec<(&'static str, MergeFacts)> {

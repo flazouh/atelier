@@ -46,7 +46,7 @@ impl RequestContext {
 }
 ";
 
-pub(super) const RESPONSE: &str = "/// What the relay has told the client so far.
+const RESPONSE: &str = "/// What the relay has told the client so far.
 #[derive(Default)]
 pub struct Flags {
     pub aborted: bool,
@@ -70,7 +70,7 @@ impl Response {
 }
 ";
 
-pub(super) const STREAM: &str = "/// A body the upstream sends in chunks.
+const STREAM: &str = "/// A body the upstream sends in chunks.
 #[derive(Default)]
 pub struct ByteStream {
     pub sink: Option<Vec<u8>>,

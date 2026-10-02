@@ -73,29 +73,29 @@ impl FileState {
 }
 
 /// A thread on one row of one file.
-pub(super) struct Thread {
+struct Thread {
     pub(super) file: usize,
-    pub(super) row: usize,
-    pub(super) comments: Vec<Comment>,
+    row: usize,
+    comments: Vec<Comment>,
 }
 
 pub struct ReviewStory {
     /// The scope the bar's switch shows: 0 this turn, 1 the whole session.
-    pub(super) scope: usize,
+    scope: usize,
     pub(super) editor: Entity<EditorState>,
     /// The pane's own focus: Escape in the editor moves here, so the letters work.
-    pub(super) focus: FocusHandle,
+    focus: FocusHandle,
     /// Files the reader marked seen with `x`, whatever their hunks.
-    pub(super) marked: HashSet<SharedString>,
+    marked: HashSet<SharedString>,
     /// `r`: the review on the whole window.
-    pub(super) review_mode: bool,
+    review_mode: bool,
     pub(super) files: Vec<FileState>,
-    pub(super) current: usize,
-    pub(super) resolving: Vec<atelier_ui::Resolve>,
-    pub(super) history: DecisionHistory,
-    pub(super) threads: Vec<Thread>,
-    pub(super) composer: Option<(usize, Entity<LineComposer>, Subscription)>,
-    pub(super) _edits: Subscription,
+    current: usize,
+    resolving: Vec<atelier_ui::Resolve>,
+    history: DecisionHistory,
+    threads: Vec<Thread>,
+    composer: Option<(usize, Entity<LineComposer>, Subscription)>,
+    _edits: Subscription,
 }
 
 impl ReviewStory {
@@ -143,7 +143,7 @@ impl ReviewStory {
         story
     }
 
-    pub(super) fn open_composer(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_composer(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         let composer = cx.new(|cx| LineComposer::new(row, window, cx));
         let sub = cx.subscribe(&composer, |this, _, event: &LineComposerEvent, cx| {
             if let LineComposerEvent::Submit { row, text } = event {
@@ -166,7 +166,7 @@ impl ReviewStory {
         self.files.iter().filter(|f| f.hunks.is_empty() || self.marked.contains(&f.path)).map(|f| f.path.clone()).collect()
     }
 
-    pub(super) fn toggle_mark(&mut self, cx: &mut Context<Self>) {
+    fn toggle_mark(&mut self, cx: &mut Context<Self>) {
         let path = self.files[self.current].path.clone();
         if !self.marked.remove(&path) {
             self.marked.insert(path);
@@ -174,7 +174,7 @@ impl ReviewStory {
         cx.notify();
     }
 
-    pub(super) fn progress(&self) -> ReviewProgress {
+    fn progress(&self) -> ReviewProgress {
         ReviewProgress {
             files: self.files.len(),
             reviewed: self.reviewed().len(),
@@ -197,7 +197,7 @@ impl ReviewStory {
         cx.notify();
     }
 
-    pub(super) fn step(&mut self, by: isize, window: &mut Window, cx: &mut Context<Self>) {
+    fn step(&mut self, by: isize, window: &mut Window, cx: &mut Context<Self>) {
         let order = FileTree::new(&self.changed()).file_order();
         if let Some(path) = step(&order, Some(&self.files[self.current].path), by) {
             self.open(&path, window, cx);
@@ -205,7 +205,7 @@ impl ReviewStory {
     }
 
     /// Decides every hunk of the open file at once, then moves to the next file.
-    pub(super) fn decide_file(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
+    fn decide_file(&mut self, decision: Decision, window: &mut Window, cx: &mut Context<Self>) {
         let hunks = std::mem::take(&mut self.files[self.current].hunks);
         if !hunks.is_empty() {
             let before = (self.files[self.current].text.clone(), hunks.clone());
@@ -218,7 +218,7 @@ impl ReviewStory {
         cx.notify();
     }
 
-    pub(super) fn put_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn put_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.files = FIXTURES.iter().map(FileState::open).collect();
         self.marked.clear();
         self.resolving.clear();
@@ -227,7 +227,7 @@ impl ReviewStory {
         cx.notify();
     }
 
-    pub(super) fn handlers(&self, cx: &mut Context<Self>) -> ReviewHandlers {
+    fn handlers(&self, cx: &mut Context<Self>) -> ReviewHandlers {
         let this = cx.entity().downgrade();
         let with = move |f: fn(&mut Self, &mut Window, &mut Context<Self>)| {
             let this = this.clone();
@@ -253,7 +253,7 @@ impl ReviewStory {
     }
 
     /// The threads and the composer on the open file, as blocks under their rows.
-    pub(super) fn blocks(&self, cx: &mut Context<Self>) -> Vec<RowBlock> {
+    fn blocks(&self, cx: &mut Context<Self>) -> Vec<RowBlock> {
         let mut blocks: Vec<RowBlock> = Vec::new();
         for (i, thread) in self.threads.iter().enumerate().filter(|(_, t)| t.file == self.current) {
             let comments = thread.comments.clone();

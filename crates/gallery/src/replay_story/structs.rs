@@ -20,16 +20,16 @@ use super::helpers::tool_row;
 pub struct ReplayStory {
     pub(super) lines: Vec<&'static str>,
     /// What the recorded user answered.
-    pub(super) decision: ChoiceKind,
+    decision: ChoiceKind,
     /// When the question on screen appeared.
-    pub(super) asking_since: Option<Instant>,
-    pub(super) next: usize,
-    pub(super) per_frame: usize,
+    asking_since: Option<Instant>,
+    next: usize,
+    per_frame: usize,
     pub(super) mapper: Mapper,
     pub(super) queue: EventQueue,
     pub(super) conversation: Conversation,
-    pub(super) page: ScrollHandle,
-    pub(super) started: Instant,
+    page: ScrollHandle,
+    started: Instant,
 }
 
 impl ReplayStory {
@@ -55,7 +55,7 @@ impl ReplayStory {
     }
 
     /// Plays the next lines and folds what the queue holds: one frame's work.
-    pub(super) fn advance(&mut self) {
+    fn advance(&mut self) {
         let asking = self.conversation.items().iter().rev().find_map(|item| match item {
             Item::Permission { request, answer: Answer::Asking } => Some(request.id.clone()),
             _ => None,
@@ -79,7 +79,7 @@ impl ReplayStory {
         }
     }
 
-    pub(super) fn answer(&mut self, request: &PermissionRequest, kind: ChoiceKind, cx: &mut Context<Self>) {
+    fn answer(&mut self, request: &PermissionRequest, kind: ChoiceKind, cx: &mut Context<Self>) {
         self.conversation.answered(&request.id, kind);
         cx.notify();
     }

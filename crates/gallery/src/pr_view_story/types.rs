@@ -1,6 +1,4 @@
-use atelier_pr_view::{
-    fixture::{big::Big, relay::Relay},
-    };
+use atelier_pr_view::fixture::{big::Big, relay::Relay};
 
 /// The repository the story reads, kept on disk while the story shows it.
 #[allow(dead_code)]

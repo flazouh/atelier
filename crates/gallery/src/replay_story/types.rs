@@ -1,8 +1,6 @@
 use std::time::Duration;
 
-use atelier_agents::{
-    session::{ChoiceKind},
-};
+use atelier_agents::session::ChoiceKind;
 
 /// How long a question shows before the story answers it, as the recorded run was answered.
 pub(super) const ASK_HOLD: Duration = Duration::from_millis(700);

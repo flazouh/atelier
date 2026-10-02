@@ -13,12 +13,12 @@ use super::helpers::{panel, projects};
 
 pub struct PanelsStory {
     pub(super) panels: Entity<AgentPanels>,
-    pub(super) data: Vec<PanelData>,
-    pub(super) next: usize,
+    data: Vec<PanelData>,
+    next: usize,
     pub(super) look: AgentLook,
-    pub(super) run: Option<Run>,
-    pub(super) switching: bool,
-    pub(super) _events: Subscription,
+    run: Option<Run>,
+    switching: bool,
+    _events: Subscription,
 }
 
 impl PanelsStory {
@@ -54,7 +54,7 @@ impl PanelsStory {
         }
     }
 
-    pub(super) fn open_another(&mut self, cx: &mut Context<Self>) {
+    fn open_another(&mut self, cx: &mut Context<Self>) {
         let next = panel(self.next, &self.look, cx);
         self.data.push(next);
         self.next += 1;

@@ -24,15 +24,15 @@ use super::helpers::states;
 pub struct MergeStory {
     pub(super) states: Vec<(&'static str, MergeFacts)>,
     /// The reader's last method in each repository.
-    pub(super) remembered: HashMap<SharedString, MergeMethod>,
+    remembered: HashMap<SharedString, MergeMethod>,
     /// The toggles each button holds; the method comes from `remembered`.
-    pub(super) choices: Vec<Choice>,
+    choices: Vec<Choice>,
     /// The last press, as the story heard it.
     pub(super) last: Option<SharedString>,
     pub(super) ready: Entity<MergeBox>,
-    pub(super) blocked: Entity<MergeBox>,
-    pub(super) merged: Entity<MergeBox>,
-    pub(super) _boxes: [Subscription; 3],
+    blocked: Entity<MergeBox>,
+    merged: Entity<MergeBox>,
+    _boxes: [Subscription; 3],
 }
 
 impl MergeStory {
@@ -61,7 +61,7 @@ impl MergeStory {
         Self { states, remembered: HashMap::new(), choices, last: None, ready, blocked, merged, _boxes }
     }
 
-    pub(super) fn heard(&mut self, merge_box: &Entity<MergeBox>, event: &MergeBoxEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn heard(&mut self, merge_box: &Entity<MergeBox>, event: &MergeBoxEvent, _: &mut Window, cx: &mut Context<Self>) {
         match event {
             MergeBoxEvent::Act { action, choice, title, .. } => {
                 self.report(format!("{} \"{title}\"", action.word()), cx);
@@ -82,13 +82,13 @@ impl MergeStory {
         cx.notify();
     }
 
-    pub(super) fn remember(&mut self, method: MergeMethod, cx: &mut Context<Self>) {
+    fn remember(&mut self, method: MergeMethod, cx: &mut Context<Self>) {
         self.remembered.insert(REPO.into(), method);
         cx.notify();
     }
 
     /// The choice for button `i`: its own toggles, with the remembered method when the repository allows it.
-    pub(super) fn choice(&self, i: usize) -> Choice {
+    fn choice(&self, i: usize) -> Choice {
         let facts = &self.states[i].1;
         let method = first_choice(facts, self.remembered.get(REPO).copied()).method;
         Choice { method, ..self.choices[i] }

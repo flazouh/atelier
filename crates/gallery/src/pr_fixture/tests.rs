@@ -1,4 +1,5 @@
 use super::*;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn each_changed_file_shows_its_removed_rows_above_its_added_ones() {
@@ -28,4 +29,11 @@ fn go_to_file_lists_what_gitignore_leaves() {
     assert!(files.contains(&"tests/abort.rs".to_string()));
     assert!(!files.iter().any(|f| f.starts_with("target/")), "the build output is ignored: {files:?}");
     assert!(!files.iter().any(|f| f.starts_with('.')), "hidden files are left out: {files:?}");
+}
+
+/// Go to file lists paths the way the changed files write them, with `/` between the parts.
+#[test]
+fn a_listed_path_has_a_slash_between_its_parts() {
+    assert_eq!(slashed(&PathBuf::from_iter(["src", "config.rs"])), "src/config.rs");
+    assert_eq!(slashed(Path::new("Cargo.toml")), "Cargo.toml");
 }

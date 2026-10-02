@@ -97,7 +97,7 @@ pub fn editor_story(gallery: &Gallery, cx: &mut Context<Gallery>) -> gpui_kit::A
 }
 
 /// The uses of a symbol, one row each: where it is, then its line. A click moves the caret there.
-pub(super) fn references_list(
+fn references_list(
     references: &[atelier_lsp::Target],
     session: &Entity<EditorSession>,
     cx: &mut Context<Gallery>,

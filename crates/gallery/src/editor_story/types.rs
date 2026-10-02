@@ -34,4 +34,4 @@ pub(super) const FIXTURES: &[Fixture] = &[
 ];
 
 /// The Rust tab's file: the one the editor was first built on.
-pub(super) const SAMPLE_RUST: &str = include_str!("../editor_story/sample_lib.rs.txt");
+const SAMPLE_RUST: &str = include_str!("../editor_story/sample_lib.rs.txt");

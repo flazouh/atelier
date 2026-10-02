@@ -85,7 +85,7 @@ pub fn running_card(id: &'static str, tick: usize) -> SubagentCard {
         .calls(sample_calls())
 }
 
-pub(super) fn sample_calls() -> Vec<ToolCall> {
+fn sample_calls() -> Vec<ToolCall> {
     vec![
         ToolCall::new("sc-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done),
         ToolCall::new("sc-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done),
@@ -94,7 +94,7 @@ pub(super) fn sample_calls() -> Vec<ToolCall> {
 }
 
 /// Play live, or Pause while it plays.
-pub(super) fn live_button(playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
+fn live_button(playing: bool, cx: &mut Context<Gallery>) -> impl IntoElement {
     Button::new("live")
         .label(if playing { "Pause" } else { "Play live" })
         .variant(ButtonVariant::Secondary)
@@ -186,7 +186,7 @@ pub fn anthropic() -> atelier_ui::BrandMark {
 }
 
 /// A badge for `label`, with the mark when there is one and a monogram when there is not.
-pub(super) fn badge(id: &'static str, label: &'static str, mark: Option<atelier_ui::BrandMark>) -> ModelBadge {
+fn badge(id: &'static str, label: &'static str, mark: Option<atelier_ui::BrandMark>) -> ModelBadge {
     match mark {
         Some(mark) => ModelBadge::new(label).mark(id, mark),
         None => ModelBadge::new(label).monogram(id),

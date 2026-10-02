@@ -1,4 +1,4 @@
-pub(super) fn rust_line(i: usize) -> [String; 6] {
+fn rust_line(i: usize) -> [String; 6] {
     [
         format!("/// Adds {i}, and says so."),
         format!("pub fn add_{i}(value: u64) -> Result<u64, String> {{"),

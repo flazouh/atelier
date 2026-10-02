@@ -10,7 +10,7 @@ pub use helpers::list_files;
 pub use structs::Fixture;
 
 #[cfg(test)]
-use helpers::shown;
+use helpers::{shown, slashed};
 #[cfg(test)]
 use types::{ABORT_TEST, CHANGES, REQUEST};
 

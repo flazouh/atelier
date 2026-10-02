@@ -39,12 +39,12 @@ pub struct TasksStory {
     pub(super) tab: Tab,
     pub(super) list: Entity<TaskList>,
     pub(super) board: Entity<TaskBoard>,
-    pub(super) view: Entity<TaskView>,
+    view: Entity<TaskView>,
     pub(super) dialog: Entity<NewTask>,
     pub(super) people: Vec<atelier_ui::task_model::Assignee>,
-    pub(super) open: SharedString,
+    open: SharedString,
     pub(super) run: Option<Run>,
-    pub(super) _subscriptions: Vec<Subscription>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl TasksStory {
@@ -113,12 +113,12 @@ impl TasksStory {
         story
     }
 
-    pub(super) fn show(&mut self, id: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+    fn show(&mut self, id: SharedString, window: &mut Window, cx: &mut Context<Self>) {
         self.open = id;
         self.go(Tab::Task, window, cx);
     }
 
-    pub(super) fn go(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
+    fn go(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
         self.tab = tab;
         match tab {
             Tab::List => window.focus(&self.list.focus_handle(cx), cx),
@@ -135,13 +135,13 @@ impl TasksStory {
         cx.notify();
     }
 
-    pub(super) fn changed(&mut self, ids: &[SharedString], change: &Change, source: Source, cx: &mut Context<Self>) {
+    fn changed(&mut self, ids: &[SharedString], change: &Change, source: Source, cx: &mut Context<Self>) {
         task_edit::apply(&mut self.tasks, ids, change, ME, BASE);
         self.push_all(source, cx);
     }
 
     /// Gives every view the tasks again, except the one the change came from: it already has them.
-    pub(super) fn push_all(&mut self, source: Source, cx: &mut Context<Self>) {
+    fn push_all(&mut self, source: Source, cx: &mut Context<Self>) {
         let (tasks, people) = (self.tasks.clone(), self.people.clone());
         if source != Source::List {
             self.list.update(cx, |l, cx| l.set_tasks(tasks.clone(), people.clone(), BASE, cx));

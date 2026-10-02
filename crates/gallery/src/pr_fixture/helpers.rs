@@ -1,6 +1,4 @@
-use std::{
-    path::{Path},
-};
+use std::path::Path;
 
 use atelier_ui::{InlineHunk, RowMap};
 
@@ -25,6 +23,11 @@ pub(super) fn shown(change: &Change) -> Shown {
     Shown { path: change.path, text: rows.join("\n"), hunks, rows: rows_map }
 }
 
+/// A relative path with `/` between its parts on every platform, as the changed files' paths are written.
+pub(super) fn slashed(path: &Path) -> String {
+    path.components().map(|part| part.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/")
+}
+
 /// Every file in the repository at `root`, relative and sorted, as Go to file offers them: what
 /// `.gitignore` leaves, hidden files left out. It reads the disk, so call it off the UI thread.
 pub fn list_files(root: &Path) -> Vec<String> {
@@ -33,7 +36,7 @@ pub fn list_files(root: &Path) -> Vec<String> {
         .build()
         .flatten()
         .filter(|entry| entry.file_type().is_some_and(|t| t.is_file()))
-        .filter_map(|entry| entry.path().strip_prefix(root).ok().map(|p| p.to_string_lossy().into_owned()))
+        .filter_map(|entry| entry.path().strip_prefix(root).ok().map(slashed))
         .collect();
     out.sort();
     out

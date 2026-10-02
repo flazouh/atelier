@@ -1,6 +1,4 @@
-use std::{
-    time::{Duration},
-};
+use std::time::Duration;
 
 use gpui_kit::LayoutId;
 

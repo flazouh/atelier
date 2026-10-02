@@ -1,10 +1,8 @@
 use atelier_ui::{ToolCall as ToolRow, ToolStatus as RowToolStatus};
 use gpui_kit::SharedString;
-use atelier_agents::{
-    session::{Call, ToolStatus},
-};
+use atelier_agents::session::{Call, ToolStatus};
 
-pub(super) fn row_status(status: ToolStatus) -> RowToolStatus {
+fn row_status(status: ToolStatus) -> RowToolStatus {
     match status {
         ToolStatus::Pending | ToolStatus::Running => RowToolStatus::Running,
         ToolStatus::Done => RowToolStatus::Done,

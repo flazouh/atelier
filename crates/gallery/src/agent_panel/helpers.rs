@@ -49,7 +49,7 @@ use super::super::{DIFF, Gallery, PromptInput, REPLY, TEST_OUTPUT, thinking_for}
 use crate::agent_parts::{PR_TEXT, changed_files, pr_3344, resolve_pr, running_card, strip_rows};
 use super::types::SESSION_LEN;
 
-pub(super) fn sample_plan() -> Vec<Todo> {
+fn sample_plan() -> Vec<Todo> {
     vec![
         Todo::new("find", "Find where hunk numbers start", TodoStatus::Done),
         Todo::new("fix", "Fix the off-by-one in hunk_starts", TodoStatus::Done),
@@ -60,7 +60,7 @@ pub(super) fn sample_plan() -> Vec<Todo> {
 
 /// The session's first `shown` chat items, as the panel lists them. The two reads stack tight in their
 /// own list, so each still enters on its own.
-pub(super) fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> EntranceList {
+fn session_list(started: Instant, replay: usize, shown: usize, tick: usize) -> EntranceList {
     let tools = [
         ("s-read", ToolCall::new("s-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done)),
         ("s-grep", ToolCall::new("s-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done)),

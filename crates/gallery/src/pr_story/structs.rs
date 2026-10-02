@@ -26,52 +26,52 @@ use super::helpers::{checks, commits, conversation, fit};
 pub(super) struct Place {
     /// Relative to the repository.
     pub(super) path: String,
-    pub(super) brought_in: bool,
+    brought_in: bool,
 }
 
 /// Where a row of a lookup leads: a file and a place in it, in that file's own rows, or in the shown
 /// rows when it is the file on screen.
 #[derive(Clone, Debug)]
-pub(super) struct Lead {
+struct Lead {
     pub(super) path: PathBuf,
-    pub(super) position: Position,
-    pub(super) shown_rows: bool,
+    position: Position,
+    shown_rows: bool,
 }
 
 /// A lookup open over the diff, and where each of its rows leads.
-pub(super) struct Lookup {
-    pub(super) command: Command,
+struct Lookup {
+    command: Command,
     pub(super) finder: Entity<Finder>,
-    pub(super) leads: Vec<Lead>,
-    pub(super) asking: Task<()>,
-    pub(super) _events: Subscription,
+    leads: Vec<Lead>,
+    asking: Task<()>,
+    _events: Subscription,
 }
 
 pub struct PrStory {
-    pub(super) fixture: Fixture,
-    pub(super) editor: Entity<EditorState>,
+    fixture: Fixture,
+    editor: Entity<EditorState>,
     pub(super) place: Place,
     /// Where Escape and Previous go back to, newest last, with the caret there.
     pub(super) back: Vec<(Place, Position)>,
-    pub(super) session: Option<Entity<EditorSession>>,
-    pub(super) lookup: Option<Lookup>,
+    session: Option<Entity<EditorSession>>,
+    lookup: Option<Lookup>,
     /// The repository's files, listed once on a background thread; `None` until then.
     pub(super) files: Option<Rc<Vec<String>>>,
-    pub(super) _listing: Task<()>,
+    _listing: Task<()>,
     pub(super) seen: HashSet<SharedString>,
     pub(super) focus: FocusHandle,
-    pub(super) details: bool,
+    details: bool,
     /// The tree as ⌘⇧B last left it; `None` lets the width decide.
     pub(super) tree: Option<bool>,
     /// The pane's width in the last frame.
     pub(super) width: f32,
-    pub(super) review_mode: bool,
+    review_mode: bool,
     pub(super) unsent: usize,
-    pub(super) composer: Entity<CommentComposer>,
+    composer: Entity<CommentComposer>,
     pub(super) verdict: Entity<VerdictBox>,
     pub(super) merge: Entity<atelier_ui::MergeBox>,
-    pub(super) _subscriptions: Vec<Subscription>,
-    pub(super) _session: Option<Subscription>,
+    _subscriptions: Vec<Subscription>,
+    _session: Option<Subscription>,
 }
 
 impl PrStory {
@@ -166,12 +166,12 @@ impl PrStory {
         }
     }
 
-    pub(super) fn path_on_disk(&self) -> PathBuf {
+    fn path_on_disk(&self) -> PathBuf {
         self.fixture.root.join(&self.place.path)
     }
 
     /// Puts `place` in the card, the caret at `position` in shown rows, and a language server on it.
-    pub(super) fn show(&mut self, place: Place, position: Option<Position>, window: &mut Window, cx: &mut Context<Self>) {
+    fn show(&mut self, place: Place, position: Option<Position>, window: &mut Window, cx: &mut Context<Self>) {
         let changed = self.fixture.changed_at(&place.path).filter(|_| !place.brought_in);
         let (text, rows) = match changed {
             Some(i) => (self.fixture.changed[i].text.clone(), self.fixture.changed[i].rows.clone()),
@@ -230,7 +230,7 @@ impl PrStory {
     }
 
     /// Follows a jump out of the file on screen: to another changed file, or Brought In.
-    pub(super) fn jump(&mut self, jump: Jump, window: &mut Window, cx: &mut Context<Self>) {
+    fn jump(&mut self, jump: Jump, window: &mut Window, cx: &mut Context<Self>) {
         let Some(relative) = self.fixture.relative(&canonical(&jump.path)) else {
             // The toolchain's own sources, say: named, not opened.
             let name = jump.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -252,7 +252,7 @@ impl PrStory {
         self.show(place, Some(position), window, cx);
     }
 
-    pub(super) fn go_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn go_back(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some((place, caret)) = self.back.pop() {
             self.show(place, Some(caret), window, cx);
         }
@@ -272,7 +272,7 @@ impl PrStory {
 
     /// Opens the lookup for `command` and asks for its rows. Uses asks about the name under the
     /// pointer when the pointer is over the text, else the one at the caret.
-    pub(super) fn open_lookup(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_lookup(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         let pointer = self.editor.read(cx).offset_at_pointer(window);
         self.open_finder(command, window, cx);
         self.ask(command, pointer, cx);
@@ -280,7 +280,7 @@ impl PrStory {
     }
 
     /// Opens the lookup for `command`, empty.
-    pub(super) fn open_finder(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_finder(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         let (title, placeholder, filter) = match command {
             Command::Uses => ("Uses", "Filter the uses", Filter::Here),
             Command::FileNames => ("Names in this file", "Filter the names", Filter::Here),
@@ -303,7 +303,7 @@ impl PrStory {
     }
 
     /// Fills the open lookup for `command`: from the server, or from the repository's files.
-    pub(super) fn ask(&mut self, command: Command, pointer: Option<usize>, cx: &mut Context<Self>) {
+    fn ask(&mut self, command: Command, pointer: Option<usize>, cx: &mut Context<Self>) {
         let Some(session) = self.session.clone() else { return self.note("The language server is not ready", cx) };
         match command {
             Command::Uses => match session.read(cx).uses(pointer, cx) {
@@ -320,7 +320,7 @@ impl PrStory {
     }
 
     /// Go to file's rows: the repository's files, once the background listing has them.
-    pub(super) fn fill_files(&mut self, cx: &mut Context<Self>) {
+    fn fill_files(&mut self, cx: &mut Context<Self>) {
         let Some(files) = self.files.clone() else { return self.note("Loading files", cx) };
         let leads = files
             .iter()
@@ -331,17 +331,17 @@ impl PrStory {
     }
 
     /// "changed" for a file the pull request changed, nothing for the rest.
-    pub(super) fn file_note(&self, relative: &str) -> &'static str {
+    fn file_note(&self, relative: &str) -> &'static str {
         if self.fixture.changed_at(relative).is_some() { "changed" } else { "" }
     }
 
-    pub(super) fn note(&mut self, note: &'static str, cx: &mut Context<Self>) {
+    fn note(&mut self, note: &'static str, cx: &mut Context<Self>) {
         if let Some(lookup) = &self.lookup {
             lookup.finder.update(cx, |f, cx| f.set_note(note, cx));
         }
     }
 
-    pub(super) fn set_rows(&mut self, items: Vec<FinderItem>, leads: Vec<Lead>, cx: &mut Context<Self>) {
+    fn set_rows(&mut self, items: Vec<FinderItem>, leads: Vec<Lead>, cx: &mut Context<Self>) {
         if let Some(lookup) = &mut self.lookup {
             lookup.leads = leads;
             lookup.finder.update(cx, |f, cx| f.set_items(items, cx));
@@ -349,7 +349,7 @@ impl PrStory {
     }
 
     /// Waits for a server's answer off the UI thread; the lookup says `asking` meanwhile.
-    pub(super) fn wait<T: 'static>(
+    fn wait<T: 'static>(
         &mut self,
         task: Task<Result<T, LspError>>,
         asking: &'static str,
@@ -378,19 +378,19 @@ impl PrStory {
     }
 
     /// A place's line for a row: the file's own line, counted from 1.
-    pub(super) fn line_of(&self, lead: &Lead) -> usize {
+    fn line_of(&self, lead: &Lead) -> usize {
         let line = lead.position.line as usize;
         let line = if lead.shown_rows { self.rows().to_head(line).unwrap_or(line) } else { line };
         line + 1
     }
 
-    pub(super) fn lead(&self, path: Option<PathBuf>, position: Position) -> Option<Lead> {
+    fn lead(&self, path: Option<PathBuf>, position: Position) -> Option<Lead> {
         let path = path?;
         let shown_rows = path == self.path_on_disk();
         Some(Lead { path, position, shown_rows })
     }
 
-    pub(super) fn fill_uses(&mut self, uses: Vec<atelier_lsp::Target>, cx: &mut Context<Self>) {
+    fn fill_uses(&mut self, uses: Vec<atelier_lsp::Target>, cx: &mut Context<Self>) {
         let mut items = Vec::new();
         let mut leads = Vec::new();
         for target in uses {
@@ -405,7 +405,7 @@ impl PrStory {
         self.set_rows(items, leads, cx);
     }
 
-    pub(super) fn fill_names(&mut self, names: Vec<atelier_lsp::Symbol>, with_file: bool, cx: &mut Context<Self>) {
+    fn fill_names(&mut self, names: Vec<atelier_lsp::Symbol>, with_file: bool, cx: &mut Context<Self>) {
         let mut items = Vec::new();
         let mut leads = Vec::new();
         for symbol in names {
@@ -428,7 +428,7 @@ impl PrStory {
         self.set_rows(items, leads, cx);
     }
 
-    pub(super) fn ask_names(&mut self, query: SharedString, cx: &mut Context<Self>) {
+    fn ask_names(&mut self, query: SharedString, cx: &mut Context<Self>) {
         if query.trim().is_empty() {
             self.set_rows(Vec::new(), Vec::new(), cx);
             return self.note("Type part of a name", cx);
@@ -437,7 +437,7 @@ impl PrStory {
         self.wait(task, "Asking for the names", |story, names, cx| story.fill_names(names, true, cx), cx);
     }
 
-    pub(super) fn pick(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
+    fn pick(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(lead) = self.lookup.as_ref().and_then(|l| l.leads.get(at).cloned()) else { return };
         self.close_lookup(window, cx);
         if lead.path == self.path_on_disk() {
@@ -452,13 +452,13 @@ impl PrStory {
         }
     }
 
-    pub(super) fn close_lookup(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn close_lookup(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.lookup = None;
         self.focus.focus(window, cx);
         cx.notify();
     }
 
-    pub(super) fn handlers(&self, cx: &mut Context<Self>) -> ReviewHandlers {
+    fn handlers(&self, cx: &mut Context<Self>) -> ReviewHandlers {
         let this = cx.entity().downgrade();
         let with = move |f: fn(&mut Self, &mut Window, &mut Context<Self>)| {
             let this = this.clone();

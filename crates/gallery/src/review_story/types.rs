@@ -2,7 +2,7 @@ use atelier_ui::InlineHunk;
 
 use super::structs::Fixture;
 
-pub(super) const FILE_DIFF: &str = "pub fn hunk_starts(header: &str) -> Option<usize> {
+const FILE_DIFF: &str = "pub fn hunk_starts(header: &str) -> Option<usize> {
     let plus = header.split('+').nth(1)?;
     let start = plus.split(',').next()?;
     start.parse().ok()
@@ -16,7 +16,7 @@ pub fn line_numbers(lines: &[DiffLine]) -> Vec<usize> {
 }
 ";
 
-pub(super) const FILE_DIFF_TESTS: &str = "use super::super::*;
+const FILE_DIFF_TESTS: &str = "use super::*;
 
 #[test]
 fn a_hunk_at_line_one_starts_at_one() {
@@ -30,7 +30,7 @@ fn numbers_count_from_the_hunk_start() {
 }
 ";
 
-pub(super) const THEME: &str = "pub fn diff_color(&self, added: bool) -> Hsla {
+const THEME: &str = "pub fn diff_color(&self, added: bool) -> Hsla {
     if added { self.success } else { self.danger }
 }
 
@@ -40,7 +40,7 @@ pub fn diff_line(&self, added: bool) -> Hsla {
 }
 ";
 
-pub(super) const MAIN: &str = "fn diffs() -> impl IntoElement {
+const MAIN: &str = "fn diffs() -> impl IntoElement {
     let lines = DiffLine::parse(DIFF);
     let (added, removed) = diff_stats(&lines);
     narrow(FileDiff::new(\"diff\", \"file_diff.rs\", lines))

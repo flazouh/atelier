@@ -15,14 +15,14 @@ use super::helpers::{big, sample, session};
 
 pub struct SidebarStory {
     pub(super) sidebar: Entity<Sidebar>,
-    pub(super) data: Vec<ProjectData>,
+    data: Vec<ProjectData>,
     pub(super) other: AgentLook,
-    pub(super) events: Vec<SharedString>,
+    events: Vec<SharedString>,
     pub(super) live: bool,
-    pub(super) started: Instant,
+    started: Instant,
     pub(super) step: u64,
     pub(super) run: Option<Run>,
-    pub(super) _events: Subscription,
+    _events: Subscription,
 }
 
 impl SidebarStory {
@@ -58,7 +58,7 @@ impl SidebarStory {
     }
 
     /// One live step: the next session takes the next status and becomes the most recent.
-    pub(super) fn advance(&mut self, cx: &mut Context<Self>) {
+    fn advance(&mut self, cx: &mut Context<Self>) {
         self.step += 1;
         let n = self.step as usize;
         let total: usize = self.data.iter().map(|p| p.sessions.len()).sum();

@@ -25,7 +25,7 @@ pub fn people(claude: &AgentLook, other: &AgentLook) -> Vec<Assignee> {
     ]
 }
 
-pub(super) fn pr(number: u64, state: PrState, title: &str) -> PrChipData {
+fn pr(number: u64, state: PrState, title: &str) -> PrChipData {
     PrChipData {
         number,
         repo: "flazouh/atelier".into(),
@@ -97,7 +97,7 @@ pub fn tasks(count: usize, claude: &AgentLook, other: &AgentLook) -> Vec<TaskDat
 }
 
 /// The first task is the one the "Task" tab opens on, so it has a bit of everything.
-pub(super) fn feature(task: &mut TaskData, claude: &AgentLook) {
+fn feature(task: &mut TaskData, claude: &AgentLook) {
     task.title = "Add the task list and the task board".into();
     task.status = TaskStatus::InProgress;
     task.priority = Priority::High;

@@ -12,7 +12,7 @@ pub(super) fn projects() -> [ProjectLabel; 2] {
     ]
 }
 
-pub(super) fn status_of(n: usize) -> SessionStatus {
+fn status_of(n: usize) -> SessionStatus {
     match n % 6 {
         0 => SessionStatus::Working,
         1 => SessionStatus::NeedsYou(Need::Approval),
@@ -24,7 +24,7 @@ pub(super) fn status_of(n: usize) -> SessionStatus {
 }
 
 /// What a panel holds in the story: its title, its status in words, and some lines to scroll past.
-pub(super) fn body(title: SharedString, status: SessionStatus) -> impl Fn(&mut Window, &mut gpui_kit::App) -> AnyElement {
+fn body(title: SharedString, status: SessionStatus) -> impl Fn(&mut Window, &mut gpui_kit::App) -> AnyElement {
     move |_, cx| {
         let theme = cx.theme().clone();
         div()

@@ -5,8 +5,8 @@ use std::{
 
 use atelier_ui::{InlineHunk, RowMap};
 
-use super::types::{CHANGES, UNCHANGED};
 use super::helpers::shown;
+use super::types::{CHANGES, UNCHANGED};
 
 /// One changed file: its text at the head, and each hunk as the head row its added rows start at,
 /// the rows it removed there, and how many rows it added.

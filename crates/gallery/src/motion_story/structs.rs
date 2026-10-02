@@ -13,28 +13,28 @@ use super::helpers::{accents, initial_uploads, section, teams};
 
 pub struct MotionStory {
     pub(super) part: Option<String>,
-    pub(super) segs: [usize; 3],
-    pub(super) swap: usize,
-    pub(super) switches: [bool; 2],
-    pub(super) tabs: [usize; 3],
-    pub(super) email: Entity<gpui_kit::component::input::InputState>,
+    segs: [usize; 3],
+    swap: usize,
+    switches: [bool; 2],
+    tabs: [usize; 3],
+    email: Entity<gpui_kit::component::input::InputState>,
     pub(super) teams: Entity<MultiSelect>,
-    pub(super) toasts: Entity<ToastStack>,
-    pub(super) notes: Entity<NotificationStack>,
-    pub(super) uploads: Entity<FileUpload>,
-    pub(super) bloom: Entity<BloomMenu>,
-    pub(super) upload_variant: atelier_ui::UploadVariant,
-    pub(super) upload_ticks: Vec<gpui_kit::Task<()>>,
-    pub(super) position: ToastPosition,
-    pub(super) accent: SharedString,
+    toasts: Entity<ToastStack>,
+    notes: Entity<NotificationStack>,
+    uploads: Entity<FileUpload>,
+    bloom: Entity<BloomMenu>,
+    upload_variant: atelier_ui::UploadVariant,
+    upload_ticks: Vec<gpui_kit::Task<()>>,
+    position: ToastPosition,
+    accent: SharedString,
     /// Owned by the "every state" rows below.
-    pub(super) second: SharedString,
-    pub(super) third: SharedString,
-    pub(super) terms: bool,
-    pub(super) updates: bool,
-    pub(super) all: bool,
-    pub(super) level: f32,
-    pub(super) fine: f32,
+    second: SharedString,
+    third: SharedString,
+    terms: bool,
+    updates: bool,
+    all: bool,
+    level: f32,
+    fine: f32,
 }
 
 impl MotionStory {
@@ -77,7 +77,7 @@ impl MotionStory {
     }
 
     /// Moves one file's progress on, as the web preview's timer does: 7 to 19 a step, every 520 ms, until it is done.
-    pub(super) fn tick_upload(&mut self, id: String, cx: &mut Context<Self>) {
+    fn tick_upload(&mut self, id: String, cx: &mut Context<Self>) {
         let uploads = self.uploads.downgrade();
         let mut seed = atelier_ui::motion::now_millis() as u64 ^ (id.len() as u64) << 7;
         self.upload_ticks.push(cx.spawn(async move |_, cx| {

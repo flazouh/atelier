@@ -6,7 +6,7 @@
 //! diff on its card with a thread in place). GitQuiet's keys work while no box has focus: `s` and `w`
 //! move between files, `x` marks one seen, `r` is review mode, ⌘B folds the rail and ⌘⇧B the tree.
 //!
-//! It fits any pane from an 1100px window up ([`fit`]): the rail and the right pane share the width,
+//! It fits any pane from an 1100px window up (`fit`): the rail and the right pane share the width,
 //! the tree folds away first when the diff would get too narrow, then the rail narrows. ⌘⇧B brings the
 //! tree back, and the choice holds until the next ⌘⇧B.
 //!
