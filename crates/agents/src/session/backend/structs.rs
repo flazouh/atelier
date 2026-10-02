@@ -1,7 +1,4 @@
-use super::super::{
-    command::{PermissionMode},
-    event::{SessionId},
-};
+use super::super::{command::PermissionMode, event::SessionId};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelChoice {

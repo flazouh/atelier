@@ -80,11 +80,11 @@ pub(super) struct Runner {
 }
 
 impl Runner {
-    pub(super) fn emit(&self, event: Event) {
+    fn emit(&self, event: Event) {
         (self.sink)(event);
     }
 
-    pub(super) fn warn(&self, text: impl Into<String>) {
+    fn warn(&self, text: impl Into<String>) {
         self.emit(Event::Warning(text.into()));
     }
 
@@ -92,7 +92,7 @@ impl Runner {
         *self.shared.mode.lock().unwrap_or_else(|p| p.into_inner())
     }
 
-    pub(super) fn model_id(&self) -> String {
+    fn model_id(&self) -> String {
         self.shared.model.lock().unwrap_or_else(|p| p.into_inner()).clone()
     }
 
@@ -126,7 +126,7 @@ impl Runner {
         self.emit(Event::Ended(EndReason::Closed));
     }
 
-    pub(super) fn persist(&mut self) {
+    fn persist(&mut self) {
         if self.meta.title.is_empty() {
             self.meta.title = self.messages.iter().find(|m| m.role == super::super::message::Role::User).map(|m| store::title_of(&m.text())).unwrap_or_default();
         }
@@ -205,7 +205,7 @@ impl Runner {
 
     /// One model call, retried while the failure is one a moment may cure and nothing was shown yet.
     #[allow(clippy::type_complexity)]
-    pub(super) fn call_model(&mut self, system: &str, defs: &[ToolDef]) -> Result<(super::super::message::Reply, Vec<Block>), (ModelError, Vec<Block>)> {
+    fn call_model(&mut self, system: &str, defs: &[ToolDef]) -> Result<(super::super::message::Reply, Vec<Block>), (ModelError, Vec<Block>)> {
         let model_id = self.model_id();
         let mut attempt = 0;
         loop {
@@ -238,7 +238,7 @@ impl Runner {
         }
     }
 
-    pub(super) fn run_tools(&mut self, calls: &[&Block], malformed: &[String], tools: &'static [Box<dyn Tool>]) -> (Vec<Block>, bool) {
+    fn run_tools(&mut self, calls: &[&Block], malformed: &[String], tools: &'static [Box<dyn Tool>]) -> (Vec<Block>, bool) {
         let mut results = Vec::new();
         let mut interrupted = false;
         for call in calls {
@@ -263,7 +263,7 @@ impl Runner {
         (results, interrupted)
     }
 
-    pub(super) fn finish(&self, id: &str, result: ToolResult, results: &mut Vec<Block>) {
+    fn finish(&self, id: &str, result: ToolResult, results: &mut Vec<Block>) {
         let truncated = result.text.len() > ToolOutput::MAX_TEXT;
         self.emit(Event::ToolFinished {
             id: ToolId::new(id),
@@ -272,11 +272,11 @@ impl Runner {
         results.push(Block::ToolResult { id: id.to_string(), content: result.text, is_error: result.is_error });
     }
 
-    pub(super) fn call_of(&self, tool: &dyn Tool, id: &str, input: &Value, status: ToolStatus) -> ToolCall {
+    fn call_of(&self, tool: &dyn Tool, id: &str, input: &Value, status: ToolStatus) -> ToolCall {
         ToolCall { id: ToolId::new(id), name: tool.name().into(), kind: tool.kind(), input: input.clone(), file: tool.file(input), parent: None, status }
     }
 
-    pub(super) fn run_one(&mut self, tool: &dyn Tool, id: &str, input: &Value, interrupted: &mut bool) -> ToolResult {
+    fn run_one(&mut self, tool: &dyn Tool, id: &str, input: &Value, interrupted: &mut bool) -> ToolResult {
         let file = tool.file(input);
         self.emit(Event::ToolInput { id: ToolId::new(id), input: input.clone(), file: file.clone() });
         if let Some(file) = file {
@@ -300,7 +300,7 @@ impl Runner {
         tool.run(&ctx, input)
     }
 
-    pub(super) fn ask(&mut self, tool: &dyn Tool, id: &str, input: &Value) -> Answer {
+    fn ask(&mut self, tool: &dyn Tool, id: &str, input: &Value) -> Answer {
         let request = RequestId::new(format!("permission-{id}"));
         let choice = |id: &str, label: &str, kind| Choice { id: ChoiceId::new(id), label: label.into(), kind };
         self.emit(Event::Permission(PermissionRequest {
@@ -339,14 +339,14 @@ impl Runner {
 }
 
 /// Turns the model's deltas into events, and keeps what streamed so an interrupt can keep it.
-pub(super) struct Bridge {
+struct Bridge {
     pub(super) sink: EventSink,
     pub(super) next_block: u64,
     /// Any event has gone out. A retry after that would show the reply twice.
-    pub(super) shown: bool,
+    shown: bool,
     pub(super) open: Option<(BlockId, bool, Instant)>,
-    pub(super) text: String,
-    pub(super) finished: Vec<Block>,
+    text: String,
+    finished: Vec<Block>,
 }
 
 impl Bridge {
@@ -354,7 +354,7 @@ impl Bridge {
         Self { sink, next_block, shown: false, open: None, text: String::new(), finished: Vec::new() }
     }
 
-    pub(super) fn on(&mut self, delta: Delta) {
+    fn on(&mut self, delta: Delta) {
         match delta {
             Delta::Text(piece) => {
                 let id = self.block(false);
@@ -378,7 +378,7 @@ impl Bridge {
         }
     }
 
-    pub(super) fn block(&mut self, thinking: bool) -> BlockId {
+    fn block(&mut self, thinking: bool) -> BlockId {
         if let Some((id, is_thinking, _)) = self.open
             && is_thinking == thinking
         {
@@ -402,7 +402,7 @@ impl Bridge {
     }
 
     /// The text that streamed, for an interrupted reply.
-    pub(super) fn partial(&mut self) -> Vec<Block> {
+    fn partial(&mut self) -> Vec<Block> {
         self.end();
         std::mem::take(&mut self.finished)
     }

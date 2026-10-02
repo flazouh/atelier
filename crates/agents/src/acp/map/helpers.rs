@@ -88,7 +88,7 @@ pub(super) fn content_text(content: &[ToolContent]) -> String {
 /// The text of a raw output, which ACP leaves to the agent: a string, or an object whose `content`,
 /// `output`, `stdout` or `text` holds it (Cursor's read and shell results), with a `stderr` after. A
 /// command that printed nothing gives empty text. Any other shape shows as its JSON.
-pub(super) fn raw_text(raw: &Value) -> String {
+fn raw_text(raw: &Value) -> String {
     let field = |key: &str| raw.get(key).and_then(Value::as_str);
     match raw {
         Value::String(text) => text.clone(),

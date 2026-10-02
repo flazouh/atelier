@@ -17,8 +17,8 @@ use super::helpers::{deliver, lock, write_lines};
 pub(in super::super) struct AcpSession {
     pub(super) lines: Lines,
     pub(super) protocol: Arc<Mutex<Protocol>>,
-    pub(super) control: Arc<Mutex<Box<dyn Control>>>,
-    pub(super) closing: Arc<AtomicBool>,
+    control: Arc<Mutex<Box<dyn Control>>>,
+    closing: Arc<AtomicBool>,
     pub(super) sink: EventSink,
 }
 

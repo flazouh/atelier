@@ -16,14 +16,14 @@ pub struct Call {
 #[derive(Debug, Default)]
 pub struct Conversation {
     pub(super) items: Vec<Item>,
-    pub(super) todos: Vec<Todo>,
+    todos: Vec<Todo>,
     pub(super) usage: Usage,
-    pub(super) working: bool,
-    pub(super) started: Option<Started>,
+    working: bool,
+    started: Option<Started>,
     pub(super) ended: Option<EndReason>,
-    pub(super) last_turn: Option<TurnEnd>,
+    last_turn: Option<TurnEnd>,
     pub(super) calls: HashMap<ToolId, Slot>,
-    pub(super) subagents: HashMap<ToolId, usize>,
+    subagents: HashMap<ToolId, usize>,
 }
 
 impl Conversation {
@@ -189,7 +189,7 @@ impl Conversation {
         }
     }
 
-    pub(super) fn tool_started(&mut self, call: &ToolCall) {
+    fn tool_started(&mut self, call: &ToolCall) {
         let inside = call.parent.as_ref().and_then(|parent| self.subagents.get(parent).copied());
         let entry = Call { call: call.clone(), output: None };
         match inside {
@@ -205,7 +205,7 @@ impl Conversation {
         }
     }
 
-    pub(super) fn call_mut(&mut self, id: &ToolId) -> Option<&mut Call> {
+    fn call_mut(&mut self, id: &ToolId) -> Option<&mut Call> {
         match *self.calls.get(id)? {
             Slot::Top(at) => match self.items.get_mut(at)? {
                 Item::Tool(call) => Some(call),
@@ -218,7 +218,7 @@ impl Conversation {
         }
     }
 
-    pub(super) fn subagent_mut(&mut self, id: &ToolId) -> Option<&mut Item> {
+    fn subagent_mut(&mut self, id: &ToolId) -> Option<&mut Item> {
         let at = *self.subagents.get(id)?;
         self.items.get_mut(at)
     }

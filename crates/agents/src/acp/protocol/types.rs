@@ -1,10 +1,6 @@
-use std::{
-    time::{Duration},
-};
+use std::time::Duration;
 
-use crate::{
-    session::{Event, OpenRequest, SessionId, SessionSummary},
-};
+use crate::session::{Event, OpenRequest, SessionId, SessionSummary};
 
 /// The JSON-RPC error code ACP gives when the agent needs a sign-in first.
 pub(super) const AUTH_REQUIRED: i64 = -32000;

@@ -1,8 +1,4 @@
-use std::{
-    io::{Read, Write},
-    net::{TcpStream},
-    time::{Duration},
-};
+use std::{io::{Read, Write}, net::TcpStream, time::Duration};
 
 use rustls::{ClientConnection, StreamOwned};
 

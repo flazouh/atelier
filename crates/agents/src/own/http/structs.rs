@@ -47,7 +47,7 @@ pub(super) struct Conn {
 
 impl Conn {
     /// Reads more into the buffer. `false` at the end of the stream.
-    pub(super) fn fill(&mut self) -> io::Result<bool> {
+    fn fill(&mut self) -> io::Result<bool> {
         if self.pos > 0 && self.pos == self.buf.len() {
             self.buf.clear();
             self.pos = 0;
@@ -75,7 +75,7 @@ impl Conn {
         }
     }
 
-    pub(super) fn available(&self) -> &[u8] {
+    fn available(&self) -> &[u8] {
         &self.buf[self.pos..]
     }
 
@@ -185,7 +185,7 @@ impl Read for Body {
 
 impl Body {
     /// Copies up to `limit` bytes from the buffer into `out`, reading more first when it is empty.
-    pub(super) fn pull(&mut self, out: &mut [u8], limit: usize) -> io::Result<usize> {
+    fn pull(&mut self, out: &mut [u8], limit: usize) -> io::Result<usize> {
         if self.conn.available().is_empty() && !self.conn.fill()? {
             return Ok(0);
         }

@@ -15,7 +15,7 @@ pub fn atelier_commands() -> Vec<CommandInfo> {
 }
 
 /// The front matter's `key: value`, from a `---` block at the top.
-pub(super) fn front_matter<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+fn front_matter<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     let rest = text.strip_prefix("---")?;
     let end = rest.find("\n---")?;
     rest[..end].lines().find_map(|line| {

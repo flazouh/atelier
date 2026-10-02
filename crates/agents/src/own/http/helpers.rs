@@ -1,9 +1,4 @@
-use std::{
-    io::{self, Write},
-    net::{TcpStream, ToSocketAddrs},
-    sync::{Arc, OnceLock},
-    time::{Instant},
-};
+use std::{io::{self, Write}, net::{TcpStream, ToSocketAddrs}, sync::{Arc, OnceLock}, time::Instant};
 
 use rustls::{ClientConfig, ClientConnection, StreamOwned, pki_types::ServerName};
 
@@ -12,7 +7,7 @@ use super::structs::{Body, Conn, HttpOptions, HttpRequest, HttpResponse, Url};
 use super::types::{HttpError, Mode, WAKE};
 use super::traits::Wire;
 
-pub(super) fn parse_url(url: &str) -> Result<Url, HttpError> {
+fn parse_url(url: &str) -> Result<Url, HttpError> {
     let bad = || HttpError::Connect(format!("not a usable URL: {}", url.split('?').next().unwrap_or("")));
     let (tls, rest) = if let Some(rest) = url.strip_prefix("https://") {
         (true, rest)
@@ -36,7 +31,7 @@ pub(super) fn parse_url(url: &str) -> Result<Url, HttpError> {
     Ok(Url { tls, host: host.trim_matches(['[', ']']).to_string(), port, target })
 }
 
-pub(super) fn tls_config() -> Result<Arc<ClientConfig>, HttpError> {
+fn tls_config() -> Result<Arc<ClientConfig>, HttpError> {
     static CONFIG: OnceLock<Result<Arc<ClientConfig>, String>> = OnceLock::new();
     CONFIG
         .get_or_init(|| {
@@ -58,7 +53,7 @@ pub(super) fn tls_config() -> Result<Arc<ClientConfig>, HttpError> {
         .map_err(HttpError::Connect)
 }
 
-pub(super) fn connect(url: &Url, options: &HttpOptions) -> Result<Box<dyn Wire>, HttpError> {
+fn connect(url: &Url, options: &HttpOptions) -> Result<Box<dyn Wire>, HttpError> {
     let fail = |why: String| HttpError::Connect(why);
     let addrs = (url.host.as_str(), url.port).to_socket_addrs().map_err(|e| fail(format!("cannot find {}: {e}", url.host)))?;
     let mut last = None;

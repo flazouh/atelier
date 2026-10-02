@@ -1,6 +1,4 @@
-use std::{
-    time::{Duration},
-};
+use std::time::Duration;
 
 /// How long a list or a history may take before atelier gives up on the agent.
 pub(super) const PATIENCE: Duration = Duration::from_secs(60);

@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use atelier_project::Project;
 
-use super::super::{
-    command::{Command},
-    event::{Event, SessionId},
-};
+use super::super::{command::Command, event::{Event, SessionId}};
 use super::structs::{Capabilities, OpenRequest, SessionSummary};
 use super::types::{EventSink, SessionError};
 

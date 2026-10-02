@@ -1,6 +1,4 @@
-use std::{
-    time::{Duration},
-};
+use std::time::Duration;
 
 /// How often a wait looks at the cancel flag.
 pub(super) const WAKE: Duration = Duration::from_millis(100);

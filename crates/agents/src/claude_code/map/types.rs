@@ -1,10 +1,6 @@
-use std::{
-    time::{Instant},
-};
+use std::time::Instant;
 
-use crate::{
-    session::{BlockId, ToolId},
-};
+use crate::session::{BlockId, ToolId};
 
 pub(in super::super) const ALLOW: &str = "allow";
 

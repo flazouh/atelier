@@ -2,9 +2,7 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
-use super::super::{
-    message::{Block, ModelError, ModelRequest, Role},
-    };
+use super::super::message::{Block, ModelError, ModelRequest, Role};
 
 pub fn request_body(request: &ModelRequest<'_>) -> Value {
     let mut messages = vec![json!({"role": "system", "content": request.system})];

@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 use super::structs::Outgoing;
 use super::types::PROTOCOL_VERSION;
 
-pub(super) fn out(method: &'static str, params: Value) -> Outgoing {
+fn out(method: &'static str, params: Value) -> Outgoing {
     Outgoing { method, params }
 }
 

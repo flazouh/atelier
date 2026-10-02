@@ -4,9 +4,7 @@ use std::{
 };
 
 use super::super::protocol::Step;
-use crate::{
-    session::{EventSink, SessionError},
-};
+use crate::session::{EventSink, SessionError};
 use super::types::Lines;
 
 /// Writes a step's lines, then hands its events to the sink. The caller holds the protocol's lock, so the

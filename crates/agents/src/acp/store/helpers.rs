@@ -31,7 +31,7 @@ pub(in super::super) fn history(agent: Arc<AcpAgent>, project: &dyn Project, ses
 }
 
 /// Starts the agent, runs the protocol for `goal` until it has found what it asked, and stops the agent.
-pub(super) fn ask(agent: Arc<AcpAgent>, project: &dyn Project, goal: Goal) -> Result<Found, SessionError> {
+fn ask(agent: Arc<AcpAgent>, project: &dyn Project, goal: Goal) -> Result<Found, SessionError> {
     let Process { mut stdin, stdout, mut control } = subprocess::start(project, &agent.command())?;
     let (mut protocol, first) = Protocol::new(agent, project.root().display().to_string(), goal);
     let (lines, read) = mpsc::channel();

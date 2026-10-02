@@ -11,11 +11,11 @@ use super::types::{ERROR_BODY, OPENROUTER_BASE, Open};
 use super::helpers::{request_body, status_error};
 
 pub struct OpenAiCompatible {
-    pub(super) key: Option<Secret>,
+    key: Option<Secret>,
     /// Up to and including the version, such as `https://api.openai.com/v1`.
-    pub(super) base: String,
-    pub(super) extra_headers: Vec<(String, String)>,
-    pub(super) http: HttpOptions,
+    base: String,
+    extra_headers: Vec<(String, String)>,
+    http: HttpOptions,
 }
 
 impl OpenAiCompatible {
@@ -88,25 +88,25 @@ impl Model for OpenAiCompatible {
 pub(super) struct ToolFragment {
     pub(super) id: String,
     pub(super) name: String,
-    pub(super) args: String,
-    pub(super) announced: bool,
+    args: String,
+    announced: bool,
 }
 
 /// The reply as it builds, from `data:` lines.
 #[derive(Default)]
 pub struct ChatState {
     pub(super) text: String,
-    pub(super) thinking: String,
-    pub(super) open: Option<Open>,
+    thinking: String,
+    open: Option<Open>,
     pub(super) tools: BTreeMap<usize, ToolFragment>,
-    pub(super) stop: Option<StopReason>,
-    pub(super) usage: TokenUsage,
+    stop: Option<StopReason>,
+    usage: TokenUsage,
     pub done: bool,
-    pub(super) saw_chunk: bool,
+    saw_chunk: bool,
 }
 
 impl ChatState {
-    pub(super) fn switch(&mut self, to: Open, sink: &mut dyn FnMut(Delta)) {
+    fn switch(&mut self, to: Open, sink: &mut dyn FnMut(Delta)) {
         let now = self.open.unwrap_or(Open::None);
         if now != to && now != Open::None {
             sink(Delta::BlockEnd);

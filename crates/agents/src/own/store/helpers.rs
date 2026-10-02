@@ -27,7 +27,7 @@ pub fn title_of(text: &str) -> String {
     if line.chars().count() > TITLE_CHARS { format!("{}…", line.chars().take(TITLE_CHARS).collect::<String>()) } else { line.to_string() }
 }
 
-pub(super) fn path(id: &str, ext: &str) -> String {
+fn path(id: &str, ext: &str) -> String {
     format!("{DIR}/{id}.{ext}")
 }
 

@@ -53,7 +53,7 @@ pub(in super::super) fn parse_listing(text: &str) -> Vec<SessionSummary> {
 }
 
 /// What the user typed, from one transcript line, when it is a user message.
-pub(super) fn user_text(line: &str) -> Option<String> {
+fn user_text(line: &str) -> Option<String> {
     let value: Value = serde_json::from_str(line).ok()?;
     if value.get("type")?.as_str()? != "user" || value.get("isMeta").and_then(Value::as_bool) == Some(true) {
         return None;
@@ -69,7 +69,7 @@ pub(super) fn user_text(line: &str) -> Option<String> {
     (!text.is_empty() && !text.starts_with('<')).then(|| text.to_string())
 }
 
-pub(super) fn cut(text: &str) -> String {
+fn cut(text: &str) -> String {
     let one_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
     if one_line.chars().count() <= TITLE_CHARS {
         return one_line;

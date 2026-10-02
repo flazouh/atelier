@@ -1,12 +1,8 @@
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use super::super::{
-    wire::{self},
-};
-use crate::{
-    session::{Event, SessionId, SessionSummary, TurnOutcome, Usage},
-};
+use super::super::wire;
+use crate::session::{Event, SessionId, SessionSummary, TurnOutcome, Usage};
 use super::structs::Step;
 use super::types::{LISTED, TITLE_MAX};
 

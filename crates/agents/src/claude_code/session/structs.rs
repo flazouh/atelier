@@ -15,11 +15,11 @@ use super::helpers::{lock, write_lines};
 
 pub(in super::super) struct ClaudeSession {
     pub(super) lines: Option<mpsc::Sender<String>>,
-    pub(super) mapper: Arc<Mutex<Mapper>>,
-    pub(super) control: Arc<Mutex<Box<dyn Control>>>,
-    pub(super) closing: Arc<AtomicBool>,
-    pub(super) sink: EventSink,
-    pub(super) next_request: AtomicU64,
+    mapper: Arc<Mutex<Mapper>>,
+    control: Arc<Mutex<Box<dyn Control>>>,
+    closing: Arc<AtomicBool>,
+    sink: EventSink,
+    next_request: AtomicU64,
 }
 
 impl ClaudeSession {
@@ -55,11 +55,11 @@ impl ClaudeSession {
         Self { lines: Some(lines), mapper, control, closing, sink, next_request: AtomicU64::new(1) }
     }
 
-    pub(super) fn request_id(&self) -> String {
+    fn request_id(&self) -> String {
         format!("atelier-{}", self.next_request.fetch_add(1, Ordering::Relaxed))
     }
 
-    pub(super) fn write(&self, line: String) -> Result<(), SessionError> {
+    fn write(&self, line: String) -> Result<(), SessionError> {
         self.lines.as_ref().ok_or(SessionError::Closed)?.send(line).map_err(|_| SessionError::Closed)
     }
 }

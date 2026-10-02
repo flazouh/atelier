@@ -25,7 +25,7 @@ pub fn estimate(messages: &[Message]) -> usize {
     bytes / 4
 }
 
-pub(super) fn shorten(text: &str) -> String {
+fn shorten(text: &str) -> String {
     let mut end = HEAD.min(text.len());
     while !text.is_char_boundary(end) {
         end -= 1;
@@ -33,7 +33,7 @@ pub(super) fn shorten(text: &str) -> String {
     format!("{MARK}: {} bytes. It began:]\n{}", text.len(), &text[..end])
 }
 
-pub(super) fn shorten_strings(value: &mut Value) -> usize {
+fn shorten_strings(value: &mut Value) -> usize {
     match value {
         Value::String(s) if s.len() > BIG && !s.starts_with(MARK) => {
             let saved = s.len();

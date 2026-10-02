@@ -18,33 +18,33 @@ use super::types::{ALLOW, ALLOW_ALWAYS, DENY, Open};
 use super::helpers::{flatten, is_agent_task, task_number, todo_status, tool_output};
 
 /// A question `claude` asked and atelier has not answered.
-pub(super) struct Asked {
+struct Asked {
     pub(super) input: Value,
-    pub(super) suggestions: Option<Value>,
+    suggestions: Option<Value>,
 }
 
 #[derive(Default)]
 pub struct Mapper {
-    pub(super) next_block: u64,
+    next_block: u64,
     /// Messages that streamed: their finished copy repeats what the deltas already said.
-    pub(super) streamed: HashSet<String>,
-    pub(super) open: HashMap<u32, Open>,
+    streamed: HashSet<String>,
+    open: HashMap<u32, Open>,
     /// Calls announced and not finished.
-    pub(super) running: HashSet<ToolId>,
+    running: HashSet<ToolId>,
     /// Calls whose result atelier swallows: todo edits and subagent starts.
-    pub(super) hidden: HashSet<ToolId>,
-    pub(super) subagents: HashSet<ToolId>,
+    hidden: HashSet<ToolId>,
+    subagents: HashSet<ToolId>,
     /// Shell commands that run on after their call returned (`run_in_background`), until `claude` says
     /// they ended. Each is a shell call that stays running, not a subagent.
-    pub(super) background: HashSet<ToolId>,
+    background: HashSet<ToolId>,
     /// The last turn ended aborted.
-    pub(super) aborted: bool,
-    pub(super) todos: Vec<Todo>,
+    aborted: bool,
+    todos: Vec<Todo>,
     /// `TaskCreate` calls waiting for the id the result gives the task.
-    pub(super) creating: HashMap<ToolId, String>,
-    pub(super) asked: HashMap<RequestId, Asked>,
-    pub(super) turn_open: bool,
-    pub(super) ended: bool,
+    creating: HashMap<ToolId, String>,
+    asked: HashMap<RequestId, Asked>,
+    turn_open: bool,
+    ended: bool,
 }
 
 impl Mapper {
@@ -70,7 +70,7 @@ impl Mapper {
         }
     }
 
-    pub(super) fn parsed(&mut self, line: Line, now: Instant) -> Vec<Event> {
+    fn parsed(&mut self, line: Line, now: Instant) -> Vec<Event> {
         match line {
             Line::System(system) => self.system(system),
             Line::StreamEvent(stream) => self.stream(stream, now),
@@ -146,7 +146,7 @@ impl Mapper {
         if std::mem::replace(&mut self.ended, true) { Vec::new() } else { vec![Event::Ended(EndReason::Closed)] }
     }
 
-    pub(super) fn system(&mut self, system: System) -> Vec<Event> {
+    fn system(&mut self, system: System) -> Vec<Event> {
         match system.subtype.as_str() {
             "init" => match system.session_id {
                 Some(id) => vec![Event::Started(Started {
@@ -259,7 +259,7 @@ impl Mapper {
 
     /// A finished assistant message: what streamed is already told, what did not stream is told now,
     /// and every tool call gets its whole input.
-    pub(super) fn assistant(&mut self, message: Message) -> Vec<Event> {
+    fn assistant(&mut self, message: Message) -> Vec<Event> {
         if message.sidechain {
             return Vec::new();
         }
@@ -287,7 +287,7 @@ impl Mapper {
         events
     }
 
-    pub(super) fn user(&mut self, message: Message) -> Vec<Event> {
+    fn user(&mut self, message: Message) -> Vec<Event> {
         if message.sidechain || message.meta {
             return Vec::new();
         }
@@ -312,14 +312,14 @@ impl Mapper {
 
     /// A user message that did not come from atelier: history. `claude` also writes a line for an
     /// interrupt and for a subagent's prompt; neither is something the user said.
-    pub(super) fn user_text(&mut self, text: String, from_subagent: bool) -> Vec<Event> {
+    fn user_text(&mut self, text: String, from_subagent: bool) -> Vec<Event> {
         if from_subagent || text.starts_with("[Request interrupted") || text.trim().is_empty() {
             return Vec::new();
         }
         vec![Event::UserMessage { text }]
     }
 
-    pub(super) fn finished(&mut self, finish: Finish) -> Vec<Event> {
+    fn finished(&mut self, finish: Finish) -> Vec<Event> {
         let interrupted = matches!(finish.terminal_reason.as_deref(), Some("aborted_tools" | "aborted_streaming"));
         let outcome = if interrupted {
             TurnOutcome::Interrupted
@@ -346,7 +346,7 @@ impl Mapper {
         events
     }
 
-    pub(super) fn control_request(&mut self, request: ControlRequest) -> Vec<Event> {
+    fn control_request(&mut self, request: ControlRequest) -> Vec<Event> {
         let ControlBody::CanUseTool(ask) = request.request else { return Vec::new() };
         let CanUseTool { tool_name, input, tool_use_id, description, permission_suggestions } = *ask;
         let id = RequestId::new(request.request_id);
@@ -369,12 +369,12 @@ impl Mapper {
         vec![Event::Permission(PermissionRequest { id, call, reason: description.filter(|d| !d.is_empty()), choices })]
     }
 
-    pub(super) fn new_block(&mut self) -> BlockId {
+    fn new_block(&mut self) -> BlockId {
         self.next_block += 1;
         BlockId(self.next_block)
     }
 
-    pub(super) fn announce(&mut self, id: ToolId, name: String, input: Value, parent: Option<ToolId>) -> Vec<Event> {
+    fn announce(&mut self, id: ToolId, name: String, input: Value, parent: Option<ToolId>) -> Vec<Event> {
         self.running.insert(id.clone());
         vec![Event::ToolStarted(ToolCall {
             id,
@@ -388,7 +388,7 @@ impl Mapper {
     }
 
     /// A tool call with its whole input, from a finished message.
-    pub(super) fn tool_use(&mut self, id: ToolId, name: String, input: Value, parent: Option<ToolId>) -> Vec<Event> {
+    fn tool_use(&mut self, id: ToolId, name: String, input: Value, parent: Option<ToolId>) -> Vec<Event> {
         if tools::starts_subagent(&name) {
             self.hidden.insert(id.clone());
             if !self.subagents.insert(id.clone()) {
@@ -408,7 +408,7 @@ impl Mapper {
         self.announce(id, name, input, parent)
     }
 
-    pub(super) fn edit_todos(&mut self, id: ToolId, tool: TodoTool, input: &Value) -> Vec<Event> {
+    fn edit_todos(&mut self, id: ToolId, tool: TodoTool, input: &Value) -> Vec<Event> {
         let text = |value: &Value, key: &str| value.get(key).and_then(Value::as_str).map(str::to_string);
         match tool {
             TodoTool::Write => {
@@ -445,7 +445,7 @@ impl Mapper {
         }
     }
 
-    pub(super) fn tool_result(&mut self, id: ToolId, content: &Value, is_error: bool, detail: Option<Value>) -> Vec<Event> {
+    fn tool_result(&mut self, id: ToolId, content: &Value, is_error: bool, detail: Option<Value>) -> Vec<Event> {
         if let Some(subject) = self.creating.remove(&id) {
             self.hidden.remove(&id);
             let task = detail.as_ref().and_then(|d| d.get("task")?.get("id")?.as_str().map(str::to_string));
@@ -471,7 +471,7 @@ impl Mapper {
 
     /// Ends the calls still running with an error. A background command outlives the turn that started it,
     /// so `keep_background` leaves it running; a process that ended takes it down too.
-    pub(super) fn fail_open_tools(&mut self, why: &str, keep_background: bool) -> Vec<Event> {
+    fn fail_open_tools(&mut self, why: &str, keep_background: bool) -> Vec<Event> {
         let mut open: Vec<_> = self.running.iter().filter(|id| !(keep_background && self.background.contains(*id))).cloned().collect();
         for id in &open {
             self.running.remove(id);

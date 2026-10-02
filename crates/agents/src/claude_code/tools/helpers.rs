@@ -54,7 +54,7 @@ pub(in super::super) fn file_in_partial_input(json: &str) -> Option<String> {
 }
 
 /// The index of the quote that closes the string opening at `start`, or `None` while it is still open.
-pub(super) fn string_end(bytes: &[u8], start: usize) -> Option<usize> {
+fn string_end(bytes: &[u8], start: usize) -> Option<usize> {
     let mut i = start + 1;
     while i < bytes.len() {
         match bytes[i] {

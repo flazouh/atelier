@@ -3,16 +3,16 @@ use std::time::Duration;
 use serde_json::{Value, json};
 
 use super::super::{
-    http::{HttpError},
+    http::HttpError,
     message::{Block, Message, ModelError, ModelRequest, Role, Thinking},
-    };
+};
 
 /// True for a model that needs a token budget for thinking (Haiku 4.5) instead of adaptive thinking.
 pub(crate) fn wants_budget(model: &str) -> bool {
     model.starts_with("claude-haiku-4-5") || model.starts_with("claude-sonnet-4-5") || model.starts_with("claude-opus-4-5")
 }
 
-pub(super) fn cached(mut value: Value) -> Value {
+fn cached(mut value: Value) -> Value {
     value["cache_control"] = json!({"type": "ephemeral"});
     value
 }

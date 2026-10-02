@@ -1,8 +1,6 @@
 use std::{fmt, sync::Arc};
 
-use super::super::{
-    event::{Event},
-};
+use super::super::event::Event;
 
 /// Where a session sends its events. It runs on the session's own thread, so it must be quick: queue
 /// the event and wake the UI (see [`super::EventQueue`]).

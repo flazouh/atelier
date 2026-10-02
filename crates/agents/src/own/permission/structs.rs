@@ -3,7 +3,7 @@ use std::collections::HashSet;
 /// Tools the reader allowed for good ("Always allow"), by name.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Rules {
-    pub(super) always: HashSet<String>,
+    always: HashSet<String>,
 }
 
 impl Rules {

@@ -1,6 +1,4 @@
-use std::{
-    time::{Instant},
-};
+use std::time::Instant;
 
 use crate::session::BlockId;
 

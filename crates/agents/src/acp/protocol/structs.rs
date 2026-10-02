@@ -1,8 +1,4 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-    time::{Instant},
-};
+use std::{collections::{HashMap, VecDeque}, sync::Arc, time::Instant};
 
 use serde_json::Value;
 
@@ -30,38 +26,38 @@ pub(in super::super) struct Step {
 
 pub(in super::super) struct Protocol {
     pub(super) agent: Arc<AcpAgent>,
-    pub(super) cwd: String,
+    cwd: String,
     pub(super) goal: Goal,
-    pub(super) phase: Phase,
-    pub(super) next_id: u64,
+    phase: Phase,
+    next_id: u64,
     pub(super) waiting: HashMap<u64, Asked>,
     /// When each waiting mode or model request was written, by id: an agent that never answers one does not
     /// hold the user's messages for good.
-    pub(super) settings_at: HashMap<u64, Instant>,
+    settings_at: HashMap<u64, Instant>,
     /// The time of the last line or command, which a request written now is stamped with.
-    pub(super) now: Instant,
+    now: Instant,
     /// The sign-in methods the agent offered, and whether atelier has used one.
-    pub(super) auth_methods: Vec<String>,
-    pub(super) authenticated: bool,
-    pub(super) can_load: bool,
-    pub(super) can_list: bool,
+    auth_methods: Vec<String>,
+    authenticated: bool,
+    can_load: bool,
+    can_list: bool,
     pub(super) session: Option<SessionId>,
     /// The agent's mode and model in force (the model by atelier's name for it), the config option that
     /// sets the model when it has one, and the model ids the agent listed.
     pub(super) mode: Option<String>,
     pub(super) model: Option<String>,
-    pub(super) model_option: Option<String>,
-    pub(super) models: Vec<String>,
-    pub(super) commands: Vec<String>,
+    model_option: Option<String>,
+    models: Vec<String>,
+    commands: Vec<String>,
     /// The model and mode to set once the session is ready.
-    pub(super) want_model: Option<String>,
-    pub(super) want_mode: Option<String>,
+    want_model: Option<String>,
+    want_mode: Option<String>,
     /// Messages to prompt, in order: sent before the session was ready, or while a turn ran.
-    pub(super) queued: VecDeque<String>,
-    pub(super) in_turn: bool,
+    queued: VecDeque<String>,
+    in_turn: bool,
     /// The agent's permission requests atelier has not answered, with their JSON-RPC ids.
     pub(super) asked: HashMap<RequestId, Value>,
-    pub(super) mapper: Mapper,
+    mapper: Mapper,
     pub(super) history: Vec<Event>,
     pub(super) found: Option<Result<Found, SessionError>>,
 }
@@ -186,7 +182,7 @@ impl Protocol {
         if std::mem::replace(&mut self.phase, Phase::Over) == Phase::Over { Vec::new() } else { vec![Event::Ended(EndReason::Closed)] }
     }
 
-    pub(super) fn response(&mut self, id: &Value, outcome: Result<Value, RpcError>, now: Instant) -> Step {
+    fn response(&mut self, id: &Value, outcome: Result<Value, RpcError>, now: Instant) -> Step {
         // An id atelier wrote as a number may come back as text.
         let number = id.as_u64().or_else(|| id.as_str()?.parse().ok());
         let Some(asked) = number.and_then(|id| {
@@ -235,12 +231,12 @@ impl Protocol {
         step
     }
 
-    pub(super) fn can_sign_in(&self, error: &RpcError) -> bool {
+    fn can_sign_in(&self, error: &RpcError) -> bool {
         error.code == AUTH_REQUIRED && !self.authenticated && !self.auth_methods.is_empty()
     }
 
     /// Asks for the session the goal needs, once the agent is initialized (and signed in, if it asked).
-    pub(super) fn open(&mut self, step: &mut Step, now: Instant) {
+    fn open(&mut self, step: &mut Step, now: Instant) {
         let outgoing = match self.goal.clone() {
             Goal::Open(OpenRequest { resume: None, .. }) => client::new_session(&self.cwd),
             Goal::Open(OpenRequest { resume: Some(session), .. }) | Goal::History(session) if self.can_load => {
@@ -256,7 +252,7 @@ impl Protocol {
         step.lines.push(self.request(Asked::Open, outgoing));
     }
 
-    pub(super) fn opened(&mut self, step: &mut Step, opened: wire::Opened, now: Instant) {
+    fn opened(&mut self, step: &mut Step, opened: wire::Opened, now: Instant) {
         let session = match (&self.goal, opened.session_id) {
             (_, Some(id)) => SessionId::new(id),
             (Goal::Open(OpenRequest { resume: Some(id), .. }) | Goal::History(id), None) => id.clone(),
@@ -289,7 +285,7 @@ impl Protocol {
         self.prompt_next(step);
     }
 
-    pub(super) fn update(&mut self, params: Value, now: Instant) -> Step {
+    fn update(&mut self, params: Value, now: Instant) -> Step {
         let update = match parse::<wire::Notification>(params) {
             Ok(notification) => notification.update,
             Err(error) => return warning(format!("an update from the agent did not parse: {error}")),
@@ -318,7 +314,7 @@ impl Protocol {
         step
     }
 
-    pub(super) fn request_from_agent(&mut self, id: Value, method: &str, params: Value, now: Instant) -> Step {
+    fn request_from_agent(&mut self, id: Value, method: &str, params: Value, now: Instant) -> Step {
         let mut step = Step::default();
         if method != "session/request_permission" {
             step.lines.push(rpc::error(&id, rpc::METHOD_NOT_FOUND, &format!("atelier does not serve {method}")));
@@ -343,7 +339,7 @@ impl Protocol {
         step
     }
 
-    pub(super) fn interrupt(&mut self, step: &mut Step) {
+    fn interrupt(&mut self, step: &mut Step) {
         if !self.in_turn {
             // Nothing runs: the messages that wait for the session are dropped, and their turn ends.
             if !std::mem::take(&mut self.queued).is_empty() {
@@ -365,7 +361,7 @@ impl Protocol {
 
     /// Prompts the next message, unless a turn runs or a model or mode atelier asked for is not answered yet:
     /// a turn runs on the settings the user chose.
-    pub(super) fn prompt_next(&mut self, step: &mut Step) {
+    fn prompt_next(&mut self, step: &mut Step) {
         if self.in_turn || self.settings_open() {
             return;
         }
@@ -376,7 +372,7 @@ impl Protocol {
     }
 
     /// Whether a mode or model request is waiting for its answer and is not older than [`SETTINGS_WAIT`].
-    pub(super) fn settings_open(&self) -> bool {
+    fn settings_open(&self) -> bool {
         self.settings_at.values().any(|at| self.now.saturating_duration_since(*at) < SETTINGS_WAIT)
     }
 
@@ -389,7 +385,7 @@ impl Protocol {
     }
 
     /// Ends a connection that cannot go on.
-    pub(super) fn fail(&mut self, step: &mut Step, why: String, now: Instant) {
+    fn fail(&mut self, step: &mut Step, why: String, now: Instant) {
         if !matches!(self.goal, Goal::Open(_)) {
             return self.finish(step, Err(SessionError::Start(why)));
         }
@@ -400,7 +396,7 @@ impl Protocol {
     }
 
     /// The events that close what a gone agent left open: its calls, its questions, its turn.
-    pub(super) fn cut_short(&mut self, why: &str, now: Instant) -> Vec<Event> {
+    fn cut_short(&mut self, why: &str, now: Instant) -> Vec<Event> {
         let mut events = self.mapper.gone(why, now);
         let mut asked: Vec<_> = self.asked.drain().map(|(request, _)| request).collect();
         asked.sort();
@@ -427,7 +423,7 @@ impl Protocol {
         }
     }
 
-    pub(super) fn started(&self) -> Event {
+    fn started(&self) -> Event {
         Event::Started(Started {
             session: self.session.clone().unwrap_or_else(|| SessionId::new("")),
             model: self.model.clone(),
@@ -436,13 +432,13 @@ impl Protocol {
         })
     }
 
-    pub(super) fn ready_session(&self) -> Option<SessionId> {
+    fn ready_session(&self) -> Option<SessionId> {
         (self.phase == Phase::Ready).then(|| self.session.clone()).flatten()
     }
 
     /// Sets `model`, by atelier's name or the agent's whole id. The request remembers atelier's name, which
     /// `Started` then says.
-    pub(super) fn set_model(&mut self, session: &SessionId, model: String) -> String {
+    fn set_model(&mut self, session: &SessionId, model: String) -> String {
         let id = self.models.iter().find(|id| **id == model || model_name(id) == model).cloned().unwrap_or_else(|| model.clone());
         let outgoing = match &self.model_option {
             Some(option) => client::set_config_option(session.as_str(), option, &id),

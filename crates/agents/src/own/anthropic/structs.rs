@@ -11,8 +11,8 @@ use super::types::{DEFAULT_BASE, ERROR_BODY, Partial, VERSION};
 use super::helpers::{error_of, from_http, request_body, status_error};
 
 pub struct Anthropic {
-    pub(super) key: Secret,
-    pub(super) base: String,
+    key: Secret,
+    base: String,
     pub(super) http: HttpOptions,
 }
 
@@ -32,7 +32,7 @@ impl Anthropic {
         self
     }
 
-    pub(super) fn headers(&self) -> Vec<(String, String)> {
+    fn headers(&self) -> Vec<(String, String)> {
         vec![
             ("x-api-key".into(), self.key.expose().to_string()),
             ("anthropic-version".into(), VERSION.into()),
@@ -104,13 +104,13 @@ impl Model for Anthropic {
 /// The reply as it builds. Feed it each event; it says what to show and, at the end, gives the reply.
 #[derive(Default)]
 pub struct StreamState {
-    pub(super) open: BTreeMap<usize, Partial>,
+    open: BTreeMap<usize, Partial>,
     pub(super) blocks: Vec<Block>,
-    pub(super) usage: TokenUsage,
-    pub(super) stop: Option<StopReason>,
+    usage: TokenUsage,
+    stop: Option<StopReason>,
     pub(super) malformed: Vec<String>,
     pub done: bool,
-    pub(super) started: bool,
+    started: bool,
 }
 
 impl StreamState {

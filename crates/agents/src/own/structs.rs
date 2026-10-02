@@ -68,7 +68,7 @@ impl Default for OwnOptions {
 }
 
 /// A model with no key. Every call says so, in words a person can act on.
-pub(super) struct MissingKey(pub(super) String);
+struct MissingKey(pub(super) String);
 
 impl Model for MissingKey {
     fn stream(&self, _: &ModelRequest<'_>, _: &mut dyn FnMut(Delta), _: &Cancel) -> Result<Reply, ModelError> {
@@ -80,7 +80,7 @@ pub struct OwnAgent {
     pub(super) model: Arc<dyn Model>,
     pub(super) options: Arc<OwnOptions>,
     /// Why the agent cannot start, when it cannot.
-    pub(super) unavailable: Option<String>,
+    unavailable: Option<String>,
 }
 
 impl OwnAgent {

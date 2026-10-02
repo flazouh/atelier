@@ -1,6 +1,4 @@
-use std::{
-    sync::{atomic::{AtomicU64}, },
-    };
+use std::sync::atomic::AtomicU64;
 
 use crate::session::{ChoiceId, RequestId};
 

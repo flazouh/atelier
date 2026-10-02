@@ -14,17 +14,17 @@ use super::types::{DEFAULT_TIMEOUT, KEEP, MAX_TIMEOUT};
 
 /// What the command wrote, kept up to [`KEEP`] bytes, with its group id taken off the front.
 #[derive(Default)]
-pub(super) struct Output {
-    pub(super) bytes: Vec<u8>,
-    pub(super) total: usize,
+struct Output {
+    bytes: Vec<u8>,
+    total: usize,
     /// The first line, until it is whole.
     pub(super) head: Vec<u8>,
-    pub(super) seen_head: bool,
-    pub(super) group: Option<String>,
+    seen_head: bool,
+    group: Option<String>,
 }
 
 impl Output {
-    pub(super) fn take(&mut self, mut chunk: &[u8]) {
+    fn take(&mut self, mut chunk: &[u8]) {
         if !self.seen_head {
             self.head.extend_from_slice(chunk);
             let Some(end) = self.head.iter().position(|b| *b == b'\n') else { return };
@@ -46,7 +46,7 @@ impl Output {
         self.push(chunk);
     }
 
-    pub(super) fn push(&mut self, chunk: &[u8]) {
+    fn push(&mut self, chunk: &[u8]) {
         let room = KEEP.saturating_sub(self.bytes.len());
         self.bytes.extend_from_slice(&chunk[..chunk.len().min(room)]);
         self.total += chunk.len();

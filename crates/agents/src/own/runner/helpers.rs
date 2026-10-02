@@ -1,24 +1,19 @@
 use std::{
     collections::VecDeque,
     path::Path,
-    sync::{Arc, Mutex, atomic::{Ordering}, mpsc::{channel}},
+    sync::{Arc, Mutex, atomic::Ordering, mpsc::channel},
     thread,
     time::{Duration, Instant},
 };
 
 use atelier_project::Project;
 
-use super::super::{
-    OwnOptions,
-    message::{Cancel, Model},
-    permission::{Rules},
-    store::{self, Meta},
-    };
+use super::super::{OwnOptions, message::{Cancel, Model}, permission::Rules, store::{self, Meta}};
 use crate::session::{EventSink, PermissionMode, Session, SessionError};
 use super::structs::{Handle, Runner, Shared};
 use super::types::COUNTER;
 
-pub(super) fn new_id() -> String {
+fn new_id() -> String {
     let millis = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis());
     format!("own-{millis:x}-{:x}", COUNTER.fetch_add(1, Ordering::SeqCst))
 }

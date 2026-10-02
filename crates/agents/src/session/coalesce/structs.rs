@@ -5,7 +5,7 @@ use super::helpers::join_or_push;
 
 pub(super) struct Shared {
     pub(super) pending: Mutex<Vec<Event>>,
-    pub(super) wake: Box<dyn Fn() + Send + Sync>,
+    wake: Box<dyn Fn() + Send + Sync>,
 }
 
 /// Events waiting for the UI.

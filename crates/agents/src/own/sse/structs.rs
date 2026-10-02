@@ -9,9 +9,9 @@ pub struct SseEvent {
 #[derive(Default)]
 pub struct Parser {
     pub(super) line: Vec<u8>,
-    pub(super) name: Option<String>,
+    name: Option<String>,
     pub(super) data: String,
-    pub(super) has_data: bool,
+    has_data: bool,
 }
 
 impl Parser {
@@ -38,7 +38,7 @@ impl Parser {
         self.dispatch(out);
     }
 
-    pub(super) fn take_line(&mut self, out: &mut dyn FnMut(SseEvent)) {
+    fn take_line(&mut self, out: &mut dyn FnMut(SseEvent)) {
         let mut line = std::mem::take(&mut self.line);
         if line.last() == Some(&b'\r') {
             line.pop();
@@ -71,7 +71,7 @@ impl Parser {
         self.line = line;
     }
 
-    pub(super) fn dispatch(&mut self, out: &mut dyn FnMut(SseEvent)) {
+    fn dispatch(&mut self, out: &mut dyn FnMut(SseEvent)) {
         if self.has_data {
             out(SseEvent { name: self.name.take(), data: std::mem::take(&mut self.data) });
         } else {

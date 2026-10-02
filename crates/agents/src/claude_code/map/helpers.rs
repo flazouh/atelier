@@ -1,8 +1,6 @@
 use serde_json::Value;
 
-use crate::{
-    session::{TodoStatus, ToolOutput},
-};
+use crate::session::{TodoStatus, ToolOutput};
 
 /// Whether a `task_started` names a subagent. A task with no type is an older `claude`'s subagent.
 pub(super) fn is_agent_task(task_type: Option<&str>) -> bool {

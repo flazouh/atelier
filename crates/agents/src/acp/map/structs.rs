@@ -24,16 +24,16 @@ pub(super) struct Seen {
 
 #[derive(Default)]
 pub(in super::super) struct Mapper {
-    pub(super) next_block: u64,
+    next_block: u64,
     pub(super) open: Option<Open>,
     /// A user message a history replays, with the id its chunks share. Chunks join only under one id: a
     /// chunk with none is a message of its own, as Cursor sends each one whole.
     pub(super) user: Option<(Option<String>, String)>,
     pub(super) calls: HashMap<ToolId, Seen>,
     /// The calls in the order they started, so the ones a turn leaves open end in that order.
-    pub(super) order: Vec<ToolId>,
+    order: Vec<ToolId>,
     /// The last text block of the turn: its closing text.
-    pub(super) last_text: String,
+    last_text: String,
 }
 
 impl Mapper {
@@ -145,7 +145,7 @@ impl Mapper {
 
     /// A thought opens a thinking block, even an empty one: it says the agent thinks now. Its time runs
     /// until something else comes.
-    pub(super) fn thought(&mut self, delta: &str, now: Instant) -> Vec<Event> {
+    fn thought(&mut self, delta: &str, now: Instant) -> Vec<Event> {
         let mut events = self.flush_user();
         match self.open {
             Some(Open::Thinking(block, _)) => {
@@ -163,7 +163,7 @@ impl Mapper {
         events
     }
 
-    pub(super) fn tool_call(&mut self, update: wire::ToolCall, now: Instant) -> Vec<Event> {
+    fn tool_call(&mut self, update: wire::ToolCall, now: Instant) -> Vec<Event> {
         let id = ToolId::new(update.tool_call_id.clone());
         if self.calls.contains_key(&id) {
             return self.tool_update(update, now);
@@ -188,7 +188,7 @@ impl Mapper {
         events
     }
 
-    pub(super) fn tool_update(&mut self, update: wire::ToolCall, now: Instant) -> Vec<Event> {
+    fn tool_update(&mut self, update: wire::ToolCall, now: Instant) -> Vec<Event> {
         let id = ToolId::new(update.tool_call_id.clone());
         if !self.calls.contains_key(&id) {
             return self.tool_call(update, now);
@@ -216,7 +216,7 @@ impl Mapper {
     }
 
     /// Folds what an update says into the call it names. Content replaces what came before, as ACP says.
-    pub(super) fn merge(&mut self, id: &ToolId, update: &wire::ToolCall) {
+    fn merge(&mut self, id: &ToolId, update: &wire::ToolCall) {
         let Some(seen) = self.calls.get_mut(id) else { return };
         if let Some(content) = &update.content {
             seen.content = content.clone();
@@ -241,7 +241,7 @@ impl Mapper {
     }
 
     /// `ToolFinished` for a call whose status says it has ended.
-    pub(super) fn finish_if_ended(&self, id: &ToolId) -> Option<Event> {
+    fn finish_if_ended(&self, id: &ToolId) -> Option<Event> {
         let seen = self.calls.get(id)?;
         let failed = match seen.call.status {
             ToolStatus::Done => false,
@@ -251,7 +251,7 @@ impl Mapper {
         Some(Event::ToolFinished { id: id.clone(), output: output(seen, failed) })
     }
 
-    pub(super) fn end_open_calls(&mut self, why: &str, failed: bool) -> Vec<Event> {
+    fn end_open_calls(&mut self, why: &str, failed: bool) -> Vec<Event> {
         let mut events = Vec::new();
         for id in &self.order {
             let Some(seen) = self.calls.get_mut(id) else { continue };
@@ -265,20 +265,20 @@ impl Mapper {
     }
 
     /// Ends what streams and the user text a history is joining, before anything that is not part of them.
-    pub(super) fn settle(&mut self, now: Instant) -> Vec<Event> {
+    fn settle(&mut self, now: Instant) -> Vec<Event> {
         let mut events = self.flush_user();
         events.extend(self.close_block(now));
         events
     }
 
-    pub(super) fn flush_user(&mut self) -> Vec<Event> {
+    fn flush_user(&mut self) -> Vec<Event> {
         match self.user.take() {
             Some((_, text)) if !text.is_empty() => vec![Event::UserMessage { text }],
             _ => Vec::new(),
         }
     }
 
-    pub(super) fn close_block(&mut self, now: Instant) -> Vec<Event> {
+    fn close_block(&mut self, now: Instant) -> Vec<Event> {
         match self.open.take() {
             Some(Open::Thinking(block, since)) => {
                 vec![Event::ThinkingDone { block, took: now.checked_duration_since(since).unwrap_or(Duration::ZERO) }]
