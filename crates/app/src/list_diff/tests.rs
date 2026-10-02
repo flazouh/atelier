@@ -91,3 +91,11 @@ fn a_groups_fingerprint_follows_its_items_and_its_state() {
     assert_ne!(base, activity_fingerprint(&grown, 0, 3, false, false), "a third item");
     assert_eq!(base, activity_fingerprint(&items, 0, 2, false, false), "same state, same print");
 }
+
+#[test]
+fn a_row_arrives_once_even_when_it_joins_a_group() {
+    let before = [Row::Item(0), Row::Item(1)];
+    let after = [Row::Item(0), Row::Activity { from: 1, to: 3 }, Row::Changes { turn: 0 }, Row::Item(3)];
+    assert_eq!(arrivals(&before, &after), vec![Arrival::Card(0), Arrival::Item(3)]);
+    assert!(arrivals(&after, &after).is_empty(), "a group that grows is the same row");
+}

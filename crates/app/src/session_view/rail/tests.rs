@@ -9,15 +9,15 @@ fn wrote(text: &str) -> Item {
     Item::Text { block: BlockId(1), text: text.into() }
 }
 
-/// One entry for each message the reader sent, with the answer's start, at the row that shows it.
+/// One entry for each message the reader sent, at the row that shows it; the card holds that message only, not the answer.
 #[test]
-fn each_message_of_the_reader_is_an_entry_with_the_start_of_its_answer() {
+fn each_message_of_the_reader_is_an_entry_of_its_own_words() {
     let items = [said("fix the bug"), wrote("I found it in the parser."), said("and the tests"), Item::Notice("x".into())];
     let shown: Vec<Row> = (0..items.len()).map(Row::Item).collect();
     let got = entries(&items, &shown);
     assert_eq!(got.len(), 2);
-    assert_eq!((got[0].0.label.as_ref(), got[0].0.description.as_deref(), got[0].1), ("fix the bug", Some("I found it in the parser."), 0));
-    assert_eq!((got[1].0.label.as_ref(), got[1].0.description.as_deref(), got[1].1), ("and the tests", None, 2), "no answer yet: no description");
+    assert_eq!((got[0].0.label.as_ref(), got[0].0.description.as_deref(), got[0].1), ("fix the bug", None, 0));
+    assert_eq!((got[1].0.label.as_ref(), got[1].0.description.as_deref(), got[1].1), ("and the tests", None, 2));
 }
 
 /// A group of rows can stand where items were: an entry's row is where its message is, not its item's number.

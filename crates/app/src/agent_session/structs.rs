@@ -23,7 +23,7 @@ use crate::{
     review_state::{Record, ReviewState, record_path},
     status,
 };
-use super::types::{OVERDRAW, SAVE_AFTER, SessionEvent};
+use super::types::{ARRIVAL_KEPT, OVERDRAW, SAVE_AFTER, SessionEvent};
 use super::helpers::{is_activity, mode_from, mode_word, now, problem_words};
 
 impl EventEmitter<SessionEvent> for AgentSession {}
@@ -80,8 +80,12 @@ pub struct AgentSession {
     /// after the first, in the same turn.
     beginning: Option<Vec<Command>>,
     pub list: ListState,
+    /// The list's follow of the output and its glides.
+    pub glide: crate::glide::Glide,
     /// What each row of the list draws, and its fingerprint.
     pub shown: Vec<list_diff::Row>,
+    /// When each row that came in live arrived, for its entrance; a loaded conversation has none.
+    pub arrived: HashMap<list_diff::Arrival, std::time::Instant>,
     pub(super) rows: Vec<(u8, usize, usize)>,
     /// The turn being recorded, shared with the sink on the agent's thread.
     pub(super) tracker: Arc<Mutex<Option<TurnTracker>>>,
@@ -251,7 +255,9 @@ impl AgentSession {
             // The list lays out this much past the view each frame: enough that a fast scroll never
             // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
             list: ListState::new(0, ListAlignment::Bottom, px(OVERDRAW)),
+            glide: crate::glide::Glide::default(),
             shown: Vec::new(),
+            arrived: HashMap::new(),
             rows: Vec::new(),
             tracker,
             finished,
@@ -280,9 +286,9 @@ impl AgentSession {
         // The conversation follows the agent's output while the reader is at its end, lets go when they scroll up, and takes
         // hold again when they come back (beui's message-scroller `followOutput`). The panel is told of each scroll, so its
         // "Latest" button and its rail keep up.
-        this.list.set_follow_mode(gpui_kit::FollowMode::Tail);
-        let scrolled = cx.entity().downgrade();
+        let (scrolled, glide) = (cx.entity().downgrade(), this.glide.clone());
         this.list.set_scroll_handler(move |_, _, cx| {
+            glide.scrolled();
             scrolled.update(cx, |_, cx| cx.notify()).ok();
         });
         this.open(resume.map(|(id, _)| id), true, cx);
@@ -386,6 +392,10 @@ impl AgentSession {
                     }
                 }
                 s.refresh_rows();
+                if !history.is_empty() {
+                    // A loaded conversation is there at once; only what comes in live enters.
+                    s.arrived.clear();
+                }
                 cx.emit(SessionEvent::Changed);
                 cx.notify();
             });
@@ -522,6 +532,11 @@ impl AgentSession {
         for (range, count) in list_diff::changes(&self.rows, &after) {
             self.list.splice(range, count);
         }
+        let now = std::time::Instant::now();
+        self.arrived.retain(|_, at| now.duration_since(*at) < ARRIVAL_KEPT);
+        for row in list_diff::arrivals(&self.shown, &shown) {
+            self.arrived.insert(row, now);
+        }
         self.rows = after;
         self.shown = shown;
     }
@@ -560,7 +575,7 @@ impl AgentSession {
         self.stderr = None;
         self.refresh_rows();
         // A message sent goes to the end and the follow takes hold again.
-        self.list.set_follow_mode(gpui_kit::FollowMode::Tail);
+        self.glide.follow();
         // The review comments go with the message, and show resolved once the agent's turn ends.
         let attachments = self.reviews.send_comments();
         if !attachments.is_empty() {

@@ -21,6 +21,7 @@ mod fake_agent;
 #[cfg(test)]
 mod fake_forge;
 mod frame_meter;
+mod glide;
 mod key_table;
 mod list_diff;
 mod look_rules;

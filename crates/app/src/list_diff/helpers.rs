@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use atelier_agents::session::{Answer, Item, SubagentStatus, ToolStatus};
 
-use super::types::Row;
+use super::types::{Arrival, Row};
 
 /// What a row draws, in a few numbers: equal fingerprints draw the same row.
 pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
@@ -102,6 +102,12 @@ pub fn activity_fingerprint(items: &[Item], from: usize, to: usize, live: bool, 
 /// A turn's card draws the same files once the turn is kept: its turn is its fingerprint.
 pub fn changes_fingerprint(turn: usize) -> (u8, usize, usize) {
     (7, turn, 0)
+}
+
+/// The rows of `after` that `before` did not have.
+pub fn arrivals(before: &[Row], after: &[Row]) -> Vec<Arrival> {
+    let had: std::collections::HashSet<Arrival> = before.iter().map(|&r| Arrival::of(r)).collect();
+    after.iter().map(|&r| Arrival::of(r)).filter(|a| !had.contains(a)).collect()
 }
 
 /// The replacements that turn a list of `before` rows into `after`: `(old range, new count)`, in order

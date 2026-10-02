@@ -4,6 +4,9 @@ pub(super) const SAVE_AFTER: std::time::Duration = std::time::Duration::from_mil
 /// How far past the view the list lays out rows.
 pub(super) const OVERDRAW: f32 = 160.;
 
+/// How long a row's arrival is kept: well past its entrance.
+pub(super) const ARRIVAL_KEPT: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// What the session tells the shell.
 pub enum SessionEvent {
     /// Its title, status or id changed: the sidebar and the tabs draw it again.

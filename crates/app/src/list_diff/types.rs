@@ -7,3 +7,20 @@ pub enum Row {
     /// group.
     Activity { from: usize, to: usize },
 }
+
+/// What a row is for its entrance: the item it starts at, or a turn's card. An item that joins others in a group, or
+/// a group that grows, is the same row; it entered once.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Arrival {
+    Item(usize),
+    Card(usize),
+}
+
+impl Arrival {
+    pub fn of(row: Row) -> Self {
+        match row {
+            Row::Item(ix) | Row::Activity { from: ix, .. } => Self::Item(ix),
+            Row::Changes { turn } => Self::Card(turn),
+        }
+    }
+}
