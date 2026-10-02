@@ -8,7 +8,7 @@ fn wav(path: &str) -> Vec<f32> {
 
 /// Runs the real model on a spoken clip. It needs the model's files and a clip, so it runs only when
 /// `ATELIER_VOICE_MODEL` (the folder) and `ATELIER_VOICE_CLIP` (a 16 kHz mono WAV of "Hello, this is a quick dictation test of
-/// the on device model.") are set.
+/// the on-device model.") are set.
 #[test]
 fn the_real_model_hears_a_spoken_sentence() {
     let (Some(dir), Some(clip)) = (std::env::var_os("ATELIER_VOICE_MODEL"), std::env::var("ATELIER_VOICE_CLIP").ok()) else {
@@ -17,7 +17,7 @@ fn the_real_model_hears_a_spoken_sentence() {
     };
     let mut recognizer = Recognizer::load(std::path::Path::new(&dir)).expect("the model loads");
     let words = recognizer.transcribe(&wav(&clip)).expect("it transcribes");
-    assert_eq!(words, "Hello, this is a quick dictation test of the on device model.");
+    assert_eq!(words, "Hello, this is a quick dictation test of the on-device model.");
 }
 
 #[test]

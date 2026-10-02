@@ -1,21 +1,21 @@
 use super::structs::ModelFile;
 
 /// Where the files are fetched from, pinned to a commit.
-pub const BASE: &str = "https://huggingface.co/tiyuvta/Phonon-2-ONNX/resolve/12c9688bbc4fc52d23c1a66ca873fd3ac6ed4408";
+pub const BASE: &str = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v2-onnx/resolve/0bbb45a3365852604aef28b538a8f066f4ccaa85";
 
 pub const FILES: [ModelFile; 4] = [
     ModelFile {
-        remote: "encoder-model.exact4x2.onnx",
-        local: "encoder-model.onnx",
-        size: 662_190_977,
-        sha256: "abfdefaa1c74d6d3ca367a7ed358732a6140fb26a312b650ee57e46f1a9849ec",
+        remote: "encoder-model.int8.onnx",
+        local: "encoder-model.int8.onnx",
+        size: 652_184_014,
+        sha256: "3e0581fda6ab843888b51e56d7ee78b6d5bc3237ec113af1f732d1d5286aa155",
     },
     ModelFile {
-        remote: "decoder_joint-model.exact4x2.onnx",
-        local: "decoder_joint-model.onnx",
-        size: 72_518_934,
-        sha256: "420125e0e13596692320c35ef648eee9bf4583718c7896c8732ebf6f50b9ca0d",
+        remote: "decoder_joint-model.int8.onnx",
+        local: "decoder_joint-model.int8.onnx",
+        size: 8_998_286,
+        sha256: "a449f49acd68979d418651dd2dcb737cc0f1bf0225e009e29ee326354edbf7d3",
     },
-    ModelFile { remote: "vocab.txt", local: "vocab.txt", size: 93_939, sha256: "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d" },
-    ModelFile { remote: "config.json", local: "config.json", size: 121, sha256: "db59e29a3c1fde6a081bf04965e72bba26cd65be1aee65b064360df8aef468e5" },
+    ModelFile { remote: "vocab.txt", local: "vocab.txt", size: 9_384, sha256: "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d" },
+    ModelFile { remote: "config.json", local: "config.json", size: 97, sha256: "666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466" },
 ];

@@ -78,6 +78,10 @@ impl Worker {
         if self.recognizer.is_none() {
             self.recognizer = Some(Recognizer::load(dir)?);
             self.loaded.store(true, Ordering::Relaxed);
+            // The model that came before is of no use once this one has loaded; it was 735 MB.
+            if let Some(old) = files::legacy_dir() {
+                std::fs::remove_dir_all(old).ok();
+            }
         }
         Ok(())
     }

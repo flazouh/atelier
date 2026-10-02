@@ -1,12 +1,12 @@
-//! The model's files: Phonon-2 by Fermion Research (CC-BY-4.0 weights), exported to ONNX by tiyuvta, pinned to one commit and
-//! to the hash of every file, so what runs is what was reviewed. The encoder is the `exact4x2` one: the same tokens as the
-//! fp32 model, a 662 MB file that needs 1.1 GB of memory instead of 2.2.
+//! The model's files: NVIDIA's Parakeet TDT 0.6B v2 (English, CC-BY-4.0 weights), exported to ONNX by istupakov with int8
+//! weights, pinned to one commit and to the hash of every file, so what runs is what was reviewed. About 660 MB on disk.
+//! Chosen over Phonon-2 and Whisper by the eval in `asr-eval`: the lowest error of the fast models, about 100 ms after stop.
 
 mod helpers;
 mod structs;
 mod types;
 
-pub use helpers::{dir, install, installed, total_bytes};
+pub use helpers::{dir, install, installed, legacy_dir, total_bytes};
 pub use structs::ModelFile;
 pub use types::{BASE, FILES};
 

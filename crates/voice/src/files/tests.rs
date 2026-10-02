@@ -78,12 +78,18 @@ fn an_unreachable_server_is_a_network_error() {
 fn only_a_complete_set_counts_as_installed() {
     let dir = tempfile::tempdir().unwrap();
     assert!(!installed(dir.path(), &FILES));
-    fs::write(dir.path().join("vocab.txt"), vec![0u8; 93_939]).unwrap();
+    fs::write(dir.path().join("vocab.txt"), vec![0u8; 9_384]).unwrap();
     assert!(!installed(dir.path(), &FILES));
 }
 
 #[test]
 fn the_pinned_files_add_up_to_the_download_the_words_promise() {
     let mb = total_bytes(&FILES) as f32 / 1e6;
-    assert!((730. ..740.).contains(&mb), "{mb}");
+    assert!((660. ..663.).contains(&mb), "{mb}");
+}
+
+#[test]
+fn the_old_model_has_its_own_folder_so_it_can_be_cleared() {
+    assert_ne!(dir(), legacy_dir());
+    assert!(legacy_dir().unwrap().ends_with("phonon-2"));
 }

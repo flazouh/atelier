@@ -15,8 +15,13 @@ pub fn total_bytes(files: &[ModelFile]) -> u64 {
     files.iter().map(|f| f.size).sum()
 }
 
-/// `<data>/atelier/speech/phonon-2`, where the model lives on this machine.
+/// `<data>/atelier/speech/parakeet-tdt-v2`, where the model lives on this machine.
 pub fn dir() -> Option<PathBuf> {
+    Some(dirs::data_dir()?.join("atelier").join("speech").join("parakeet-tdt-v2"))
+}
+
+/// The folder an earlier model used, `<data>/atelier/speech/phonon-2`. It holds about 735 MB nobody uses any more.
+pub fn legacy_dir() -> Option<PathBuf> {
     Some(dirs::data_dir()?.join("atelier").join("speech").join("phonon-2"))
 }
 
