@@ -17,7 +17,9 @@ pub use helpers::{rows, session_view_with};
 pub use helpers::session_view;
 
 #[cfg(test)]
-use helpers::shows_stop;
+use helpers::{gap_between, is_lookup, shows_stop};
+#[cfg(test)]
+use types::Block;
 
 #[cfg(test)]
 mod tests;

@@ -15,8 +15,10 @@ atelier-lsp.workspace = true
 atelier-pr-view.workspace = true
 atelier-project.workspace = true
 atelier-settings.workspace = true
+atelier-voice.workspace = true
 ignore = "0.4.33"
 lsp-types = "0.97"
+
 
 [dev-dependencies]
 gpui-kit = { workspace = true, features = ["test-support"] }

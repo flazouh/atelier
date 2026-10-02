@@ -18,5 +18,6 @@ pub fn give_back() {
     }
 }
 
-#[cfg(test)]
+// The only test reads /proc and glibc's heap, so it exists where there is one.
+#[cfg(all(test, target_os = "linux", target_env = "gnu"))]
 mod tests;

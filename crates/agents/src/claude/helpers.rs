@@ -16,6 +16,12 @@ pub fn mark() -> Mark {
     }
 }
 
+/// The strips the loading mark picks among at random, one per run: every spark that loops while Claude works.
+/// Orbiting is left out, since it means subagents run, and so is waiting, which moves too slowly to read as loading.
+pub fn loading_strips() -> Vec<atelier_ui::Strip> {
+    [SparkState::Thinking, SparkState::Writing, SparkState::Shimmer].map(SparkState::strip).to_vec()
+}
+
 /// Claude's words. The thinking labels are the desktop app's `Wne`, which are also beui's neutral ones;
 /// only waiting names Claude.
 pub fn labels() -> PhaseLabels {

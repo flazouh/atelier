@@ -6,7 +6,7 @@ mod types;
 
 pub use spark::SparkState;
 
-pub use helpers::{labels, look, mark, spark};
+pub use helpers::{labels, loading_strips, look, mark, spark};
 pub use types::{CLAY, GLIMMER_CLAY, MESSAGE_CLAY};
 
 #[cfg(test)]

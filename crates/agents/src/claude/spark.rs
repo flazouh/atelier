@@ -4,7 +4,7 @@
 //! Claude desktop app 2.9939.2, `/Applications/Claude.app/Contents/Resources/ion-dist/assets/v1/
 //! cf2613ee5-Btwr9m9F.js` (read on 2026-09-26), where each state is `{svg, width: 100, height: 100,
 //! frameCount, speed}`. Each SVG stacks its frames top to bottom, so its `viewBox` is 100 wide and
-//! `100 * frames` tall; entrance and exit are exported at 100x601 and 101x601, which atelier-ui's
+//! `100 * frames` tall; exit is exported at 101x601, which atelier-ui's
 //! [`atelier_ui::Sprite`] allows for. The app (component `ob` in `shared-frame-BgE9BXIr.js`) slides the strip
 //! up with `steps(frames, jump-none)`, as [`atelier_ui::Sprite`] does.
 
@@ -47,9 +47,7 @@ strips! {
     Waiting => "waiting", 16, 600, true,
     Shimmer => "shimmer", 15, 100, true,
     Orbiting => "orbiting", 18, 100, true,
-    Entrance => "entrance", 6, 70, false,
     Exit => "exit", 6, 70, false,
-    Tickle => "tickle", 7, 40, false,
 }
 
 #[cfg(test)]

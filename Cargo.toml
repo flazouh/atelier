@@ -23,6 +23,7 @@ atelier-remote = { path = "crates/remote" }
 atelier-review = { path = "crates/review" }
 atelier-settings = { path = "crates/settings" }
 atelier-tracker = { path = "crates/tracker" }
+atelier-voice = { path = "crates/voice" }
 
 [patch.crates-io]
 # gpui-base 0.6.6 with the editor fixes in vendor/gpui-base/PATCHES.md.
