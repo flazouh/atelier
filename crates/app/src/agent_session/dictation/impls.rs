@@ -21,7 +21,7 @@ impl AgentSession {
             }
         }
         let (engine, presses) = speech(cx);
-        let press = engine.start(prefs(cx).device);
+        let press = engine.start(prefs(cx).device, self.key.to_string());
         presses.borrow_mut().insert(press, (cx.weak_entity(), window.window_handle()));
         self.dictation.live = Some(press);
     }

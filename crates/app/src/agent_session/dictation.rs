@@ -14,6 +14,6 @@ mod impls;
 mod structs;
 mod types;
 
-pub use helpers::{DEFAULT_ID, choose, device_rows, hear_key, key_away, prefs, start_up, warm};
+pub use helpers::{DEFAULT_ID, choose, device_rows, hear_key, key_away, prefs, start_up, take_recovered, warm};
 pub use structs::Prefs;
 pub use structs::Dictation;

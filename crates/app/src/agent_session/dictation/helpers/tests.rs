@@ -44,3 +44,10 @@ fn the_settings_file_names_the_key_and_leaves_the_default_out() {
     }
     assert_eq!(key_name(Some(Key::Fn)), None);
 }
+
+#[test]
+fn recovered_words_go_back_to_their_session_or_else_the_first() {
+    assert_eq!(recovered_home(&["a", "b"], "b"), Some(1));
+    assert_eq!(recovered_home(&["a", "b"], "gone"), Some(0));
+    assert_eq!(recovered_home(&[], "b"), None);
+}

@@ -14,6 +14,7 @@ pub mod engine;
 pub mod error;
 pub mod files;
 pub mod hotkey;
+pub mod kept;
 pub mod recognizer;
 mod types;
 

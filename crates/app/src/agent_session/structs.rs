@@ -247,6 +247,7 @@ impl AgentSession {
         });
         super::dictation::warm(cx);
         let _key = super::dictation::hear_key(&composer, window, cx);
+        super::dictation::take_recovered(key.clone(), cx.weak_entity(), window.window_handle(), cx);
         let _away = cx.observe_window_activation(window, |_, window, cx| {
             if !window.is_window_active() {
                 super::dictation::key_away(cx);

@@ -12,7 +12,7 @@ use gpui_kit::{App, AsyncApp, Context};
 use atelier_voice::hotkey::{Action, Input, Key, Tracker};
 use gpui_kit::{AnyWindowHandle, Entity, Focusable, Window};
 
-use super::structs::{KeyRoute, Prefs, Speech};
+use super::structs::{KeyRoute, Prefs, Recovery, Speech};
 use super::types::{Owner, Presses};
 
 /// The engine, started on first use.
@@ -21,17 +21,23 @@ pub(super) fn speech(cx: &mut App) -> (Rc<Engine>, Presses) {
         return (speech.engine.clone(), speech.presses.clone());
     }
     let (tx, mut events) = unbounded::<Event>();
-    let engine = Rc::new(Engine::spawn(move |event| {
-        tx.unbounded_send(event).ok();
-    }));
+    // A test keeps no recording on this machine's disk, and takes up none.
+    let kept = if cfg!(test) { None } else { atelier_voice::kept::dir() };
+    let engine = Rc::new(Engine::spawn_keeping(
+        move |event| {
+            tx.unbounded_send(event).ok();
+        },
+        kept,
+    ));
     let presses = Presses::default();
     let installed = files::dir().is_some_and(|dir| files::installed(&dir, &files::FILES));
     let phase = Rc::new(Cell::new((!engine.ready()).then_some(if installed { SetupPhase::Prepare } else { SetupPhase::Download(0.) })));
     let total_mb = Rc::new(Cell::new(files::total_bytes(&files::FILES) as f32 / 1e6));
-    let (serving, at, size) = (presses.clone(), phase.clone(), total_mb.clone());
+    let recovery = Rc::new(RefCell::new(Recovery::default()));
+    let (serving, at, size, back) = (presses.clone(), phase.clone(), total_mb.clone(), recovery.clone());
     App::spawn(cx, async move |cx| {
         while let Some(event) = events.next().await {
-            dispatch(event, &serving, &at, &size, cx);
+            dispatch(event, &serving, &back, &at, &size, cx);
         }
     })
     .detach();
@@ -41,12 +47,16 @@ pub(super) fn speech(cx: &mut App) -> (Rc<Engine>, Presses) {
         hold: saved.dictation_hold.unwrap_or(false),
         key: key_from(saved.dictation_key.as_deref()),
     }));
-    cx.set_global(Speech { engine: engine.clone(), presses: presses.clone(), phase, total_mb, prefs });
+    cx.set_global(Speech { engine: engine.clone(), presses: presses.clone(), phase, total_mb, prefs, recovery });
     (engine, presses)
 }
 
 /// Hands one event to the session it is about: a press's to its owner, the setup's to every session whose words wait for it.
-fn dispatch(event: Event, presses: &Presses, phase: &Cell<Option<SetupPhase>>, total_mb: &Cell<f32>, cx: &mut AsyncApp) {
+fn dispatch(event: Event, presses: &Presses, recovery: &Rc<RefCell<Recovery>>, phase: &Cell<Option<SetupPhase>>, total_mb: &Cell<f32>, cx: &mut AsyncApp) {
+    if let Event::Recovered(press, tag) = event {
+        recovery.borrow_mut().orphans.insert(press, tag);
+        return;
+    }
     if let Some(step) = setup_step(&event, total_mb) {
         phase.set(step.filter(|p| *p != SetupPhase::Ready));
         let owners: Vec<Owner> = presses.borrow().values().cloned().collect();
@@ -61,7 +71,19 @@ fn dispatch(event: Event, presses: &Presses, phase: &Cell<Option<SetupPhase>>, t
         return;
     }
     let Some(press) = press_of(&event) else { return };
-    let Some((session, window)) = presses.borrow().get(&press).cloned() else { return };
+    let owner = presses.borrow().get(&press).cloned();
+    let Some((session, window)) = owner else {
+        // A press from an earlier run: its words go to a session once they are out, and anything else about it is dropped.
+        if ends(&event) {
+            let tag = recovery.borrow_mut().orphans.remove(&press);
+            if let (Some(tag), Event::Transcript(_, words)) = (tag, event) {
+                recovery.borrow_mut().unclaimed.push((tag, words));
+                let recovery = recovery.clone();
+                cx.update(|cx| deliver(&recovery, cx));
+            }
+        }
+        return;
+    };
     if ends(&event) {
         presses.borrow_mut().remove(&press);
     }
@@ -70,6 +92,42 @@ fn dispatch(event: Event, presses: &Presses, phase: &Cell<Option<SetupPhase>>, t
             session.update(cx, |s, cx| s.dictation_event(event, window, cx)).ok();
         })
         .ok();
+}
+
+/// Puts words kept from an earlier run into a session: the one they were spoken in if it is open again, or else the first
+/// open. They wait in its box, unsent. With no session open, they wait for one.
+fn deliver(recovery: &Rc<RefCell<Recovery>>, cx: &mut App) {
+    let (sessions, words) = {
+        let mut r = recovery.borrow_mut();
+        r.sessions.retain(|(_, s, _)| s.upgrade().is_some());
+        if r.sessions.is_empty() {
+            return;
+        }
+        (r.sessions.clone(), std::mem::take(&mut r.unclaimed))
+    };
+    for (tag, words) in words {
+        let keys: Vec<&str> = sessions.iter().map(|(k, _, _)| k.as_ref()).collect();
+        let Some(at) = recovered_home(&keys, &tag) else { continue };
+        let (_, session, window) = &sessions[at];
+        window
+            .update(cx, |_, window, cx| {
+                session.update(cx, |s, cx| s.composer.update(cx, |c, cx| c.insert_transcript(words.trim(), window, cx))).ok();
+            })
+            .ok();
+    }
+}
+
+/// Which of the open sessions, by key, takes words spoken in the session `tag`: that one, or else the first.
+pub(super) fn recovered_home(keys: &[&str], tag: &str) -> Option<usize> {
+    keys.iter().position(|k| *k == tag).or((!keys.is_empty()).then_some(0))
+}
+
+/// Lets words kept from an earlier run reach the session `key` while it is open, and hands it any that are waiting.
+pub fn take_recovered(key: gpui_kit::SharedString, session: gpui_kit::WeakEntity<super::super::AgentSession>, window: AnyWindowHandle, cx: &mut App) {
+    speech(cx);
+    let recovery = cx.global::<Speech>().recovery.clone();
+    recovery.borrow_mut().sessions.push((key, session, window));
+    cx.defer(move |cx| deliver(&recovery, cx));
 }
 
 /// For an event about the model's setup, the step it shows (`None` inside: the setup failed); for any other, `None`. Keeps the

@@ -1,5 +1,6 @@
 use std::{
     collections::VecDeque,
+    path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -14,6 +15,7 @@ use crate::{
     access::{self, Access},
     capture::{self, Recorder, level_from_rms},
     files::{self, BASE, FILES},
+    kept,
     recognizer::Recognizer,
 };
 use super::helpers::verdict;
@@ -22,14 +24,22 @@ use super::types::{Command, Event, LEVEL_EVERY, MAX_PRESS, PROGRESS_EVERY, Press
 pub struct Engine {
     commands: mpsc::Sender<Command>,
     loaded: Arc<AtomicBool>,
-    next: AtomicU64,
+    next: Arc<AtomicU64>,
 }
 
 impl Engine {
-    /// Starts the worker. `emit` is called on the worker's thread, so it should hand the event on and return.
+    /// Starts the worker, which keeps waiting recordings in [`kept::dir`]. `emit` is called on the worker's thread, so it
+    /// should hand the event on and return.
     pub fn spawn(emit: impl Fn(Event) + Send + 'static) -> Self {
+        Self::spawn_keeping(emit, kept::dir())
+    }
+
+    /// Starts the worker, keeping waiting recordings in `kept` (none: in memory only). The first thing it does is take up
+    /// the recordings an earlier run left there.
+    pub fn spawn_keeping(emit: impl Fn(Event) + Send + 'static, kept: Option<PathBuf>) -> Self {
         let (commands, inbox) = mpsc::channel();
         let loaded = Arc::new(AtomicBool::new(false));
+        let next = Arc::new(AtomicU64::new(1));
         let worker = Worker {
             inbox,
             outbox: commands.clone(),
@@ -39,9 +49,11 @@ impl Engine {
             setting_up: false,
             live: None,
             waiting: VecDeque::new(),
+            kept,
+            next: next.clone(),
         };
         thread::Builder::new().name("atelier-dictation".into()).spawn(move || worker.run()).ok();
-        Self { commands, loaded, next: AtomicU64::new(1) }
+        Self { commands, loaded, next }
     }
 
     /// Whether the model is in memory, so a recording turns into words as soon as it ends.
@@ -60,10 +72,11 @@ impl Engine {
     }
 
     /// The microphone was pressed: it opens at once, whether or not the model is here yet. `device` is the id of the microphone
-    /// to listen on (see [`crate::devices`]); `None` for the system's default.
-    pub fn start(&self, device: Option<String>) -> Press {
+    /// to listen on (see [`crate::devices`]); `None` for the system's default. `tag` says whose the press is, so words kept
+    /// across a quit can find their way back ([`Event::Recovered`]).
+    pub fn start(&self, device: Option<String>, tag: impl Into<String>) -> Press {
         let press = self.next.fetch_add(1, Ordering::Relaxed);
-        self.commands.send(Command::Start(press, device)).ok();
+        self.commands.send(Command::Start(press, device, tag.into())).ok();
         press
     }
 
@@ -81,8 +94,25 @@ impl Engine {
 /// The press that is recording.
 struct Live {
     press: Press,
+    tag: String,
     recorder: Recorder,
     since: Instant,
+}
+
+/// A recording that waits for the model, and its file on disk if it has one.
+struct Waiting {
+    press: Press,
+    samples: Vec<f32>,
+    file: Option<PathBuf>,
+}
+
+impl Waiting {
+    /// Its words are out, or it was cancelled: the file goes.
+    fn forget(&self) {
+        if let Some(file) = &self.file {
+            std::fs::remove_file(file).ok();
+        }
+    }
 }
 
 struct Worker {
@@ -95,7 +125,10 @@ struct Worker {
     setting_up: bool,
     live: Option<Live>,
     /// Recordings that ended before the model was ready, oldest first.
-    waiting: VecDeque<(Press, Vec<f32>)>,
+    waiting: VecDeque<Waiting>,
+    /// Where waiting recordings are kept on disk; none: in memory only.
+    kept: Option<PathBuf>,
+    next: Arc<AtomicU64>,
 }
 
 impl Worker {
@@ -103,6 +136,7 @@ impl Worker {
         // The first microphone opened in a process took 100 ms on an M4 Pro, and 60 once the audio system was awake; later
         // ones take 45. Asking for the format opens nothing, so no light comes on and no permission is asked.
         capture::prime();
+        self.recover();
         loop {
             match self.inbox.recv_timeout(LEVEL_EVERY) {
                 Ok(command) => self.handle(command),
@@ -125,13 +159,15 @@ impl Worker {
         match command {
             Command::Warm => self.set_up(false),
             Command::Fetch => self.set_up(true),
-            Command::Start(press, device) => self.start(press, device.as_deref()),
+            Command::Start(press, device, tag) => self.start(press, device.as_deref(), tag),
             Command::Stop(press) => self.stop(press),
             Command::Cancel(press) => {
                 if self.live.as_ref().is_some_and(|l| l.press == press) {
                     self.live = None;
                 }
-                self.waiting.retain(|(p, _)| *p != press);
+                if let Some(at) = self.waiting.iter().position(|w| w.press == press) {
+                    self.waiting.remove(at).inspect(Waiting::forget);
+                }
                 (self.emit)(Event::Cancelled(press));
             }
             Command::Progress(event) => (self.emit)(event),
@@ -146,8 +182,10 @@ impl Worker {
                             std::fs::remove_dir_all(old).ok();
                         }
                         (self.emit)(Event::Ready);
-                        while let Some((press, samples)) = self.waiting.pop_front() {
-                            self.transcribe(press, &samples);
+                        // A file goes only once its words are out, so a quit in between keeps it.
+                        while let Some(waiting) = self.waiting.pop_front() {
+                            self.transcribe(waiting.press, &waiting.samples);
+                            waiting.forget();
                         }
                     }
                     Err(why) => (self.emit)(Event::SetupFailed(why.to_string())),
@@ -157,7 +195,7 @@ impl Worker {
     }
 
     /// Opens the microphone at once; the model comes alongside, so the person can talk while it does.
-    fn start(&mut self, press: Press, device: Option<&str>) {
+    fn start(&mut self, press: Press, device: Option<&str>, tag: String) {
         if self.live.is_some() {
             return (self.emit)(Event::Cancelled(press));
         }
@@ -173,7 +211,7 @@ impl Worker {
         }
         match Recorder::start(device) {
             Ok(recorder) => {
-                self.live = Some(Live { press, recorder, since: Instant::now() });
+                self.live = Some(Live { press, tag, recorder, since: Instant::now() });
                 (self.emit)(Event::Listening(press));
                 self.set_up(true);
             }
@@ -187,10 +225,30 @@ impl Worker {
         if self.recognizer.is_some() {
             return self.transcribe(press, &samples);
         }
-        self.waiting.push_back((press, samples));
+        let file = self.kept.as_deref().and_then(|dir| kept::save(dir, &live.tag, &samples).inspect_err(|why| eprintln!("could not keep a recording: {why}")).ok());
+        self.waiting.push_back(Waiting { press, samples, file });
         (self.emit)(Event::Waiting(press));
         // A setup that failed is tried again: the words are waiting for it.
         self.set_up(true);
+    }
+
+    /// Takes up the recordings an earlier run left waiting, oldest first, and sets the model up for them.
+    fn recover(&mut self) {
+        let Some(dir) = self.kept.clone() else { return };
+        let mut any = false;
+        for file in kept::list(&dir) {
+            let Ok((tag, samples)) = kept::load(&file) else {
+                std::fs::remove_file(&file).ok();
+                continue;
+            };
+            let press = self.next.fetch_add(1, Ordering::Relaxed);
+            (self.emit)(Event::Recovered(press, tag));
+            self.waiting.push_back(Waiting { press, samples, file: Some(file) });
+            any = true;
+        }
+        if any {
+            self.set_up(true);
+        }
     }
 
     fn transcribe(&mut self, press: Press, samples: &[f32]) {
