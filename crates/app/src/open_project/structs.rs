@@ -561,6 +561,16 @@ impl OpenProject {
         cx.notify();
     }
 
+    /// Loads the tasks for the Tasks view, where they are not in the right pane.
+    pub fn mount_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.tasks.is_none() {
+            let mut slot = crate::tasks::Slot::new(self.project.clone(), window, cx);
+            slot.shown = false;
+            self.tasks = Some(slot);
+            cx.notify();
+        }
+    }
+
     /// Tells the tasks a session is linked to what happened in it, and lets the rules move them.
     fn task_event(&mut self, session: &Entity<AgentSession>, event: crate::tasks::signal::TaskEvent, cx: &mut Context<Self>) {
         if event == crate::tasks::signal::TaskEvent::Adopt {

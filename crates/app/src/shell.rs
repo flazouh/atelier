@@ -7,6 +7,7 @@
 
 mod fit;
 mod helpers;
+mod rail;
 mod restore;
 mod structs;
 mod types;

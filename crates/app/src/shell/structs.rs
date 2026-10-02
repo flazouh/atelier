@@ -84,7 +84,7 @@ pub struct Shell {
     sidebar_width: f32,
     pub(super) right_width: f32,
     /// Whether the sidebar shows in a window too narrow for it by default, after ⌘B.
-    sidebar_in_medium: bool,
+    pub(super) sidebar_in_medium: bool,
     /// The pane a narrow window shows.
     pub(super) narrow: Pane,
     /// Sessions open at the last quit, waiting for their project to open.
@@ -322,7 +322,7 @@ impl Shell {
     }
 
     /// The open session keyed `key`, and the index of its project.
-    fn session_by_key(&self, key: &str, cx: &App) -> Option<(usize, Entity<AgentSession>)> {
+    pub(super) fn session_by_key(&self, key: &str, cx: &App) -> Option<(usize, Entity<AgentSession>)> {
         self.projects.iter().enumerate().find_map(|(i, p)| {
             p.read(cx).sessions.iter().find(|s| s.read(cx).key.as_ref() == key).map(|s| (i, s.clone()))
         })
@@ -707,14 +707,17 @@ impl Shell {
     fn open_tasks_key(&mut self, _: &OpenTasks, window: &mut Window, cx: &mut Context<Self>) {
         self.show_tasks(window, cx);
     }
-    /// Shows or hides the active project's tasks in the right pane.
+    /// Shows the Tasks view, with the active project's board; from the Tasks view, goes back to Sessions.
     pub(super) fn show_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.view == ShellView::Tasks {
+            return self.show_view(ShellView::Sessions, window, cx);
+        }
         let Some(project) = self.active().cloned() else { return };
-        self.view = ShellView::Sessions;
-        project.update(cx, |p, cx| p.toggle_tasks(window, cx));
-        self.right = true;
-        self.widen_right(window, cx);
-        self.focus_front(&project, window, cx);
+        self.show_view(ShellView::Tasks, window, cx);
+        project.update(cx, |p, cx| p.mount_tasks(window, cx));
+        if let Some(tasks) = &project.read(cx).tasks {
+            tasks.pane.focus_handle(cx).focus(window, cx);
+        }
         cx.notify();
     }
     fn pull_requests_key(&mut self, _: &PullRequests, window: &mut Window, cx: &mut Context<Self>) {
@@ -764,7 +767,7 @@ impl Shell {
 
     /// Whether the sidebar shows at `fit`: by the reader's choice in a wide window, after ⌘B in a
     /// medium one, and as its own tab in a narrow one.
-    fn sidebar_shown(&self, fit: Fit) -> bool {
+    pub(super) fn sidebar_shown(&self, fit: Fit) -> bool {
         match fit {
             Fit::Wide => self.sidebar,
             Fit::Medium => self.sidebar_in_medium,
@@ -801,7 +804,7 @@ impl Shell {
     }
 
     /// Keeps the view for the next launch, off the UI thread.
-    fn save_view(&self, cx: &mut Context<Self>) {
+    pub(super) fn save_view(&self, cx: &mut Context<Self>) {
         let words = self.view.words().to_string();
         if let Some(path) = settings_path() {
             cx.background_spawn(async move {
@@ -834,14 +837,8 @@ impl Shell {
             ProjectEvent::Said(line) => this.say(line.to_string(), cx),
             ProjectEvent::Open(path) => this.open_in(project, path, window, cx),
             ProjectEvent::Review { session, turn, path } => {
-                if let Some(i) = this.projects.iter().position(|p| p == project) {
-                    this.active = i;
-                }
                 let scope = turn.map_or(Scope::Whole, Scope::Turn);
-                this.view = ShellView::Sessions;
-                project.update(cx, |p, cx| p.open_review(session.clone(), scope, path.as_deref(), window, cx));
-                this.narrow = Pane::Session;
-                cx.notify();
+                this.review(project, session.clone(), scope, path.as_deref(), window, cx);
             }
             ProjectEvent::ShowSession(session) => {
                 if let Some(at) = this.projects.iter().position(|p| p == project) {
@@ -863,6 +860,9 @@ impl Shell {
             ProjectEvent::ReviewClosed => {
                 // The review's texts and hunks are freed now: give their pages back.
                 crate::memory::give_back();
+                if this.view == ShellView::Git {
+                    this.show_view(ShellView::Sessions, window, cx);
+                }
                 cx.notify();
             }
             ProjectEvent::CloseSession(key) => this.close_session(key.as_ref(), cx),
@@ -1286,7 +1286,11 @@ impl Shell {
     }
 
     fn toggle_sidebar(&mut self, _: &ToggleSidebar, window: &mut Window, cx: &mut Context<Self>) {
-        match Fit::of(atelier_ui::scale::design(window.viewport_size().width)) {
+        self.flip_sidebar(Fit::of(atelier_ui::scale::design(window.viewport_size().width)), cx);
+    }
+
+    pub(super) fn flip_sidebar(&mut self, fit: Fit, cx: &mut Context<Self>) {
+        match fit {
             Fit::Wide => self.sidebar = !self.sidebar,
             Fit::Medium => self.sidebar_in_medium = !self.sidebar_in_medium,
             Fit::Narrow => self.narrow = if self.narrow == Pane::Projects { Pane::Session } else { Pane::Projects },
@@ -1575,8 +1579,12 @@ impl Shell {
     }
 
     /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
-    pub(super) fn sidebar(&self, _cx: &mut Context<Self>) -> impl IntoElement {
-        // The projects and their sessions; the files are the Files view's.
+    pub(super) fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        // The projects and their sessions, or in the Git view the focused session's changes; the files
+        // are the Files view's.
+        if self.view == ShellView::Git {
+            return div().size_full().child(self.git_sidebar(cx));
+        }
         div()
             .flex()
             .flex_col()
@@ -1624,6 +1632,7 @@ impl Shell {
             .flex()
             .size_full()
             .min_h_0()
+            .child(self.view_rail(true, cx))
             .child(div().flex_none().w(px(self.sidebar_width)).h_full().child(self.files_tree(project, cx)))
             .child(div().flex_1().min_w_0().h_full().child(self.files_editor(project, cx)))
             .into_any_element()
@@ -1698,21 +1707,22 @@ impl Shell {
             self.session_right = None;
             return match self.view {
                 ShellView::Files => self.narrow_files(project, cx),
-                ShellView::Sessions => self.narrow_panes(project, window, cx),
+                _ => self.narrow_panes(project, window, cx),
             };
         }
         if self.view == ShellView::Files {
             return self.files_panes(project, cx);
         }
-        // In the Sessions view the right pane holds the review, the pull requests or the tasks; the editor
-        // is the Files view's.
-        let asked = project.read(cx).front() != crate::open_project::front::Front::Editor;
+        // In the Sessions view the right pane holds the pull requests or the tasks; the editor is the
+        // Files view's.
+        let asked = self.view == ShellView::Sessions && project.read(cx).front() != crate::open_project::front::Front::Editor;
         let wants = super::fit::Wants {
             sidebar: self.sidebar_shown(fit).then_some(self.sidebar_width),
             right: (self.right && asked).then_some(self.right_width),
         };
-        let widths = super::fit::widths(total, wants);
-        self.session_right = Some(widths.sidebar.unwrap_or(0.) + widths.agent);
+        let rail = atelier_ui::view_rail::WIDTH;
+        let widths = super::fit::widths(total - rail, wants);
+        self.session_right = Some(rail + widths.sidebar.unwrap_or(0.) + widths.agent);
         // The strip lays its columns out from this width in this frame; the strip keeps 8 px each side.
         self.panels.update(cx, |p, cx| p.fit_to(widths.agent - 16., cx));
         let wash = cx.theme().muted_hover();
@@ -1740,15 +1750,16 @@ impl Shell {
             .size_full()
             .min_h_0()
             .on_drag_move::<Edge>(cx.listener(|this, event: &gpui_kit::DragMoveEvent<Edge>, _, cx| {
-                let x = f32::from(event.event.position.x - event.bounds.origin.x);
+                let x = f32::from(event.event.position.x - event.bounds.origin.x) - atelier_ui::view_rail::WIDTH;
                 match event.drag(cx) {
                     Edge::Sidebar => this.sidebar_width = x.clamp(super::fit::SIDEBAR_LEAST, super::fit::SIDEBAR_MOST),
                     Edge::Right => this.right_width = (f32::from(event.bounds.size.width) - x).clamp(super::fit::RIGHT_LEAST, super::fit::RIGHT_MOST),
                 }
                 cx.notify();
             }))
+            .child(self.view_rail(widths.sidebar.is_some(), cx))
             .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("sidebar", self.sidebar(cx).into_any_element())).child(handle(Edge::Sidebar))))
-            .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, cx))))
+            .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, window, cx))))
             .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
     }
@@ -1800,7 +1811,7 @@ impl Shell {
             Pane::Session => {
                 let total = atelier_ui::scale::design(window.viewport_size().width);
                 self.panels.update(cx, |p, cx| p.fit_to(total - 16., cx));
-                self.center(project, cx)
+                self.center(project, window, cx)
             }
             Pane::Right => self.right_pane(project, cx),
         };
@@ -1815,11 +1826,12 @@ impl Shell {
             .into_any_element()
     }
 
-    /// The review when `project` has one open, in place of the session bar and the panels; else they.
-    fn center(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        match project.read(cx).review.as_ref().map(|(pane, _)| pane.clone()) {
-            Some(pane) => div().debug_selector(|| "review-in-place".into()).size_full().pt(px(8.)).pr(px(8.)).pb(px(4.)).child(pane).into_any_element(),
-            None => self.agent_panel(cx),
+    /// The view's main area: the board, the panels, or the review.
+    fn center(&self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        match self.view {
+            ShellView::Tasks => self.tasks_main(project, window, cx),
+            ShellView::Git => self.git_main(project, cx),
+            _ => self.agent_panel(cx),
         }
     }
 

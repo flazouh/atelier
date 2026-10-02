@@ -117,9 +117,7 @@ fn the_tasks_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
     shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
     settle(&shell, cx);
     let chord = if cfg!(target_os = "macos") { "cmd-shift-l" } else { "ctrl-shift-l" };
-    let front = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| {
-        shell.read_with(cx, |s, cx| s.active().map(|p| p.read(cx).front()))
-    };
+    let front = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, _| s.view);
     type Place = fn(&mut Shell, &mut Window, &mut Context<Shell>);
     let places: [(&str, Place); 4] = [
         ("nothing", |_, window, cx| window.blur(cx)),
@@ -127,7 +125,7 @@ fn the_tasks_chord_reaches_its_action_from_each_pane(cx: &mut TestAppContext) {
         ("the sidebar", |s, window, cx| s.agents_sidebar.read(cx).focus_handle(cx).focus(window, cx)),
         ("a session's composer", |s, window, cx| s.new_session_key(&NewSession, window, cx)),
     ];
-    let tasks = Some(crate::open_project::front::Front::Tasks);
+    let tasks = ShellView::Tasks;
     let mut lost = Vec::new();
     for (name, place) in places {
         shell.update_in(cx, place);
@@ -742,10 +740,10 @@ fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
     assert!(rising.top() > row.top(), "it starts below its place: {rising:?} in {row:?}");
 }
 
-/// A review takes the place of the session bar and the panels, not of the sidebar or the right pane; when it
-/// closes, the panels come back.
+/// A review opens in the Git view: in place of the panels, with the session's changes in the sidebar, and
+/// the right pane as it was; when it closes, Sessions comes back.
 #[gpui_kit::test]
-fn a_review_takes_the_place_of_the_panels_and_the_sidebar_stays(cx: &mut TestAppContext) {
+fn a_review_opens_in_the_git_view_and_closing_it_goes_back(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     let right_before = shell.read_with(cx, |s, _| (s.right, s.right_width));
     assert!(cx.debug_bounds("panel-close").is_some() && cx.debug_bounds("review-in-place").is_none());
@@ -754,10 +752,47 @@ fn a_review_takes_the_place_of_the_panels_and_the_sidebar_stays(cx: &mut TestApp
     settle(&shell, cx);
     assert!(cx.debug_bounds("review-in-place").is_some(), "the review is where the panels were");
     assert!(cx.debug_bounds("panel-close").is_none(), "the panels make way");
-    assert!(cx.debug_bounds("sidebar-tasks").is_some(), "the sidebar stays");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
+    assert!(cx.debug_bounds("git-panel").is_some(), "the sidebar shows the session's changes");
     assert_eq!(shell.read_with(cx, |s, _| (s.right, s.right_width)), right_before, "the right pane neither opens nor widens");
     let pane = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).review.as_ref().map(|(p, _)| p.clone()).unwrap());
     pane.update(cx, |_, cx| cx.emit(crate::review_pane::PaneEvent::Close));
     settle(&shell, cx);
     assert!(cx.debug_bounds("review-in-place").is_none() && cx.debug_bounds("panel-close").is_some(), "closed: the panels are back");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Sessions);
+}
+
+/// The rail goes Tasks, Sessions, Git. A press on another view shows it; a press on the view in front
+/// hides the sidebar, and the next press shows it again.
+#[gpui_kit::test]
+fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let press = |name: &'static str, cx: &mut gpui_kit::VisualTestContext| {
+        let at = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
+        cx.simulate_click(at.center(), gpui_kit::Modifiers::default());
+        settle(&shell, cx);
+    };
+    let rail = cx.debug_bounds("view-rail").expect("the rail is drawn");
+    let sidebar = cx.debug_bounds("sidebar-tasks").expect("the sidebar is drawn");
+    assert!(rail.right() <= sidebar.left(), "the rail is left of the sidebar: {rail:?} {sidebar:?}");
+    let tasks = cx.debug_bounds("rail-tasks").unwrap();
+    let git = cx.debug_bounds("rail-git").unwrap();
+    assert!(tasks.top() < cx.debug_bounds("rail-sessions").unwrap().top() && cx.debug_bounds("rail-sessions").unwrap().top() < git.top());
+
+    press("rail-tasks", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks);
+    assert!(cx.debug_bounds("tasks-view").is_some() && cx.debug_bounds("panel-close").is_none(), "the board is in the main area");
+    press("rail-tasks", cx);
+    assert!(!shell.read_with(cx, |s, _| s.sidebar), "a second press hides the sidebar");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks, "and the view stays");
+    press("rail-tasks", cx);
+    assert!(shell.read_with(cx, |s, _| s.sidebar), "a third shows it again");
+
+    press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
+    assert!(cx.debug_bounds("git-panel").is_some() && cx.debug_bounds("git-empty").is_some(), "no change yet: nothing to review");
+    press("rail-git", cx);
+    press("rail-sessions", cx);
+    assert!(shell.read_with(cx, |s, _| s.sidebar), "another view comes with the sidebar");
+    assert!(cx.debug_bounds("panel-close").is_some(), "the panels are back");
 }
