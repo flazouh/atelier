@@ -16,7 +16,7 @@ pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
         Item::User { text } => (0, text.len(), 0),
         Item::Text { text, .. } => (1, text.len(), 0),
         Item::Thinking { text, took, .. } => (2, text.len(), usize::from(took.is_some())),
-        Item::Tool(call) => (3, tool(call.call.status), call.output.as_ref().map_or(0, |o| o.text.len() + 1)),
+        Item::Tool(call) => (3, tool(call.call.status) + 4 * input_size(&call.call.input), call.output.as_ref().map_or(0, |o| o.text.len() + 1)),
         Item::Subagent { status, activity, calls, summary, .. } => {
             let status = match status {
                 SubagentStatus::Running => 0,
@@ -33,6 +33,12 @@ pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
         }, 0),
         Item::Notice(text) => (6, text.len(), 0),
     }
+}
+
+/// The length of the text in a call's input, as far as its top-level values go: an edit's text streams in, and its row
+/// is as tall as that text.
+fn input_size(input: &serde_json::Value) -> usize {
+    input.as_object().map_or(0, |fields| fields.values().filter_map(serde_json::Value::as_str).map(str::len).sum())
 }
 
 /// The rows for `items` conversation items, with each turn's changed files after the item it ended at:

@@ -18,6 +18,7 @@ use gpui_kit::{
 };
 use atelier_ui::scale::px;
 
+use crate::tool_density::ToolDensity;
 use super::types::{Mode, PRIMARIES, Section, SettingsEvent};
 use super::helpers::{colour, rule_switch, save};
 
@@ -97,6 +98,11 @@ impl SettingsPane {
     fn set_run_picked_skills(&mut self, on: bool, cx: &mut Context<Self>) {
         cx.set_global(crate::agent_session::RunPickedSkills(on));
         save(cx, move |s| s.run_picked_skills = Some(on));
+        cx.notify();
+    }
+    fn choose_tool_density(&mut self, density: ToolDensity, cx: &mut Context<Self>) {
+        cx.set_global(density);
+        save(cx, move |s| s.tool_density = Some(density.key().into()));
         cx.notify();
     }
     fn choose_primary(&mut self, name: &SharedString, cx: &mut Context<Self>) {
@@ -257,9 +263,22 @@ impl Render for SettingsPane {
             )
         }));
         let skills_pane = this.clone();
+        let density_pane = this.clone();
+        let density = {
+            let segments = ToolDensity::ALL.into_iter().map(|d| Segment::new(d.word()).debug_name(match d {
+                ToolDensity::Grouped => "tool-density-grouped",
+                ToolDensity::Lines => "tool-density-lines",
+                ToolDensity::Detailed => "tool-density-detailed",
+            }));
+            let current = ToolDensity::ALL.iter().position(|d| *d == crate::tool_density::tool_density(cx)).unwrap_or(0);
+            Segmented::new("tool-density", segments, current).on_change(move |i, _, cx| {
+                density_pane.update(cx, |p, cx| p.choose_tool_density(ToolDensity::ALL[i], cx)).ok();
+            })
+        };
         let agents = div()
             .flex()
             .flex_col()
+            .child(row("Tool calls", density.into_any_element()))
             .child(row(
                 "Run a skill when you pick it",
                 atelier_ui::Switch::new("skills-run-when-picked", crate::agent_session::runs_picked_skills(cx))

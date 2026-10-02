@@ -46,6 +46,7 @@ mod tabs;
 #[cfg(test)]
 mod test_dirs;
 mod timings;
+mod tool_density;
 mod tasks;
 mod tree;
 mod tree_view;
@@ -65,6 +66,7 @@ fn main() {
         atelier_ui::init(cx);
         file_glyphs::install(cx);
         cx.set_global(agent_session::RunPickedSkills(saved.run_picked_skills.unwrap_or(false)));
+        cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
         // or the system's, which keeps the pick.

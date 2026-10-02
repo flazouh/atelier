@@ -3,6 +3,8 @@ use std::{rc::Rc, time::Instant};
 use atelier_ui::{
     AgentText,
     AgentTextStatus,
+    FileDiff,
+    FileDiffStatus,
     MessageBubble,
     MessageBubbleAlign,
     MessageBubbleVariant,
@@ -76,7 +78,7 @@ pub(super) fn gap_between(above: Block, below: Option<Block>, default: f32) -> f
 
 /// The row of `call`: what it is about (the command, the file, the pattern, with an icon for its kind), its paths
 /// relative to `root`, and the mark its answered approval left.
-fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>) -> ToolRow {
+fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: Option<&'static str>, detailed: bool) -> ToolRow {
     let about = super::summary::summary(call, |path| atelier_ui::tool_preview::relative_path(path, root).to_string());
     let icon = match about.kind {
         atelier_agents::session::ToolKind::Shell => IconName::Terminal,
@@ -87,6 +89,10 @@ fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: O
         atelier_agents::session::ToolKind::Other => IconName::Build,
     };
     let mut row = ToolRow::new(id, SharedString::from(about.title)).icon(icon).status(row_status(call.call.status));
+    // Full detail keeps a call open on its output, also once it has finished.
+    if detailed {
+        row = row.default_open(true).collapse_on_complete(false);
+    }
     if is_lookup(about.kind) {
         row = row.flat();
     }
@@ -108,6 +114,15 @@ fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: O
         row = row.output(format!("{}{note}", output.text));
     }
     row
+}
+
+/// The diff of an edit, as the agent writes it: open while it streams, then shut to its line or kept open as the density says.
+fn edit_diff(id: impl Into<gpui_kit::ElementId>, view: super::edit::EditView) -> FileDiff {
+    let path = view.preview.path().cloned().unwrap_or_default();
+    FileDiff::new(id, path, view.preview.rows())
+        .status(if view.streaming { FileDiffStatus::Streaming } else { FileDiffStatus::Complete })
+        .default_open(view.open)
+        .collapse_on_complete(view.fold_when_done)
 }
 
 /// One row of the list: a conversation item, or a turn's changed files.
@@ -257,12 +272,19 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
             let loading = if look.mark.working == atelier_agents::claude::mark().working { atelier_agents::claude::loading_strips() } else { Vec::new() };
             Thinking::new(id("think"), look, phase).loading(loading).subagents(running).into_any_element()
         }
-        Item::Tool(call) => tool_row(id("tool"), call, &root, super::calls::mark_kept(items, &call.call.id, &s.reviews.approvals)).into_any_element(),
+        Item::Tool(call) => {
+            let mark = super::calls::mark_kept(items, &call.call.id, &s.reviews.approvals);
+            let density = crate::tool_density::tool_density(cx);
+            match super::edit::edit_view(call, &root, density, mark) {
+                Some(view) => edit_diff(id("tool"), view).into_any_element(),
+                None => tool_row(id("tool"), call, &root, mark, density == crate::tool_density::ToolDensity::Detailed).into_any_element(),
+            }
+        }
         Item::Subagent { subagent, status, activity, calls, summary } => {
             let name = subagent.kind.clone().unwrap_or_else(|| "Subagent".into());
             let mut card = SubagentCard::new(id("sub"), look, name, subagent.task.clone())
                 .tool_calls(calls.len() as u64)
-                .calls(calls.iter().enumerate().map(|(n, c)| tool_row(id(&format!("sub-call-{n}")), c, &root, None)).collect());
+                .calls(calls.iter().enumerate().map(|(n, c)| tool_row(id(&format!("sub-call-{n}")), c, &root, None, false)).collect());
             if let Some(model) = &subagent.model {
                 card = card.model(model.clone());
                 if let Some(mark) = atelier_agents::registry::model_mark(model) {
