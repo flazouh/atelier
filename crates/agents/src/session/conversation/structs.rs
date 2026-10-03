@@ -197,7 +197,9 @@ impl Conversation {
             Event::Limit(limit) => self.limit = (limit.state != LimitState::Clear).then_some(*limit),
             Event::TurnEnded(end) => {
                 self.working = false;
-                if let TurnOutcome::Failed(why) = &end.outcome {
+                // A reached usage limit has its own box, with the reset time; the notice would say the same again.
+                let limit_told = self.limit.is_some_and(|limit| limit.state == LimitState::Reached);
+                if let (TurnOutcome::Failed(why), false) = (&end.outcome, limit_told) {
                     self.items.push(Item::Notice(crate::subprocess::strip_ansi(why)));
                 }
                 self.last_turn = Some(end.clone());

@@ -11,10 +11,10 @@ use super::super::{
     wire::{Block, CanUseTool, Content, ControlBody, ControlRequest, Delta, Finish, Line, Message, Stream, StreamEvent, System},
 };
 use crate::{
-    session::{BlockId, Choice, ContextFill, Limit, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage},
+    session::{BlockId, Choice, ContextFill, Limit, ChoiceId, ChoiceKind, EndReason, Event, LimitState, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage},
     subprocess,
 };
-use super::types::{ALLOW, ALLOW_ALWAYS, DENY, Open};
+use super::types::{ALLOW, ALLOW_ALWAYS, DENY, Open, SYNTHETIC_MODEL};
 use super::helpers::{context_tokens, context_window, flatten, known_window, limit, is_agent_task, task_number, todo_status, tool_output};
 
 /// A question `claude` asked and atelier has not answered.
@@ -49,6 +49,9 @@ pub struct Mapper {
     ended: bool,
     context: ContextFill,
     limit: Option<Limit>,
+    /// What `claude` wrote itself as a reply (its model is `<synthetic>`: "You've hit your weekly limit"),
+    /// held until the turn's result says whether a reached usage limit tells it already.
+    held: Vec<String>,
     /// The model of the latest main-thread reply, whose window the context fills.
     model: Option<String>,
 }
@@ -95,7 +98,11 @@ impl Mapper {
             Line::System(system) => self.system(system),
             Line::StreamEvent(stream) => self.stream(stream, now),
             Line::Assistant(message) => self.assistant(message),
-            Line::User(message) => self.user(message),
+            Line::User(message) => {
+                let mut events = if message.sidechain || message.written_by_claude() { Vec::new() } else { self.flush_held() };
+                events.extend(self.user(message));
+                events
+            }
             Line::Finished(finish) => self.finished(finish),
             Line::ControlRequest(request) => self.control_request(request),
             Line::ControlCancelRequest { request_id } => {
@@ -130,7 +137,8 @@ impl Mapper {
         }
         let tail = subprocess::stderr_tail(stderr);
         let why = subprocess::exit_why(code, &tail);
-        let mut events = self.fail_open_tools(&why, false);
+        let mut events = self.flush_held();
+        events.extend(self.fail_open_tools(&why, false));
         events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
         let mut open: Vec<_> = self.subagents.drain().collect();
         open.sort();
@@ -154,10 +162,10 @@ impl Mapper {
         };
         let mut open: Vec<_> = self.running.drain().collect();
         open.sort();
-        let mut events: Vec<Event> = open
+        let mut events = self.flush_held();
+        events.extend(open
             .into_iter()
-            .map(|id| Event::ToolFinished { id, output: ToolOutput { text: note.into(), is_error: !ok, truncated: false, full_at: None } })
-            .collect();
+            .map(|id| Event::ToolFinished { id, output: ToolOutput { text: note.into(), is_error: !ok, truncated: false, full_at: None } }));
         let mut subagents: Vec<_> = self.subagents.drain().collect();
         subagents.sort();
         events.extend(subagents.into_iter().map(|id| Event::SubagentEnded { id, ok, summary: Some(note.into()) }));
@@ -296,7 +304,17 @@ impl Mapper {
         }
         let parent = message.parent_tool_use_id.map(ToolId::new);
         let streamed = message.message.id.as_ref().is_some_and(|id| self.streamed.contains(id));
-        let mut events = Vec::new();
+        let synthetic = parent.is_none() && message.message.model.as_deref() == Some(SYNTHETIC_MODEL);
+        if synthetic {
+            if let Content::Blocks(blocks) = message.message.content {
+                self.held.extend(blocks.into_iter().filter_map(|block| match block {
+                    Block::Text { text } if !text.is_empty() => Some(text),
+                    _ => None,
+                }));
+            }
+            return Vec::new();
+        }
+        let mut events = self.flush_held();
         if parent.is_none() {
             if let Some(model) = message.message.model {
                 self.model = Some(model);
@@ -359,7 +377,25 @@ impl Mapper {
         vec![Event::UserMessage { text }]
     }
 
+    /// The held replies `claude` wrote itself, as text, in order.
+    fn flush_held(&mut self) -> Vec<Event> {
+        std::mem::take(&mut self.held).into_iter().map(|text| Event::Text { block: self.new_block(), delta: text }).collect()
+    }
+
     fn finished(&mut self, finish: Finish) -> Vec<Event> {
+        // A reached limit is told by the event already, with its reset time; its words here would be a repeat.
+        let told = self.limit.is_some_and(|limit| limit.state == LimitState::Reached);
+        let mut events = if told {
+            self.held.clear();
+            Vec::new()
+        } else {
+            self.flush_held()
+        };
+        events.extend(self.finished_turn(finish));
+        events
+    }
+
+    fn finished_turn(&mut self, finish: Finish) -> Vec<Event> {
         let interrupted = matches!(finish.terminal_reason.as_deref(), Some("aborted_tools" | "aborted_streaming"));
         let outcome = if interrupted {
             TurnOutcome::Interrupted

@@ -15,3 +15,6 @@ pub(super) enum Open {
     /// whether its file has been told; `shown` is the last edit told, for a tool whose text streams.
     Tool { id: ToolId, name: String, json: String, targeted: bool, shown: Option<crate::session::FileEdit> },
 }
+
+/// The model `claude` names on a reply it wrote itself, such as "You've hit your weekly limit".
+pub(super) const SYNTHETIC_MODEL: &str = "<synthetic>";

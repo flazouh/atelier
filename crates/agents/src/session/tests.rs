@@ -290,6 +290,16 @@ mod conversation {
     }
 
     #[test]
+    fn a_turn_that_failed_on_a_reached_limit_adds_no_notice() {
+        let limit = Event::Limit(Limit { state: LimitState::Reached, resets_at: Some(10), window: Some(LimitWindow::Weekly) });
+        let failed = Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("You've hit your weekly limit".into()), summary: None });
+        let conversation = fold(vec![Event::UserMessage { text: "hi".into() }, limit, failed.clone()]);
+        assert_eq!(conversation.items(), [Item::User { text: "hi".into() }], "the box over the composer tells it");
+        let other = fold(vec![Event::UserMessage { text: "hi".into() }, failed]);
+        assert_eq!(other.items().len(), 2, "any other failure still says so");
+    }
+
+    #[test]
     fn the_context_is_the_latest_reading_not_a_sum() {
         let reading = |used, window| Event::Context(ContextFill { used, window });
         let conversation = fold(vec![reading(90_000, None), reading(4_000, Some(200_000))]);
