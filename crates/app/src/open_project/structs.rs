@@ -94,7 +94,7 @@ pub struct OpenProject {
     pub(super) repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
-    list_rows: Vec<atelier_ui::PrChipData>,
+    pub(crate) list_rows: Vec<atelier_ui::PrChipData>,
     pub(super) pr_chips: std::rc::Rc<Vec<atelier_ui::PrChipData>>,
     /// Chips looked up for numbers the list lacks, by number; `None` for one that is no pull request.
     looked_up: HashMap<u64, Option<atelier_ui::PrChipData>>,
@@ -103,6 +103,7 @@ pub struct OpenProject {
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
     chip_forge: Option<std::sync::Arc<dyn atelier_forge::Forge>>,
     opening_pulls: Task<()>,
+    pulls_loading: bool,
     /// The tasks hearing of sessions, one at a time and in order.
     task_signals: Task<()>,
     /// The merged pull requests the tasks were told of in this run.
@@ -162,6 +163,7 @@ impl OpenProject {
             asked: HashMap::new(),
             chip_forge: None,
             opening_pulls: Task::ready(()),
+            pulls_loading: false,
             task_signals: Task::ready(()),
             merged_told: HashSet::new(),
             dirty: None,
@@ -441,20 +443,46 @@ impl OpenProject {
         let Some(repo) = self.repo.clone() else {
             return cx.emit(ProjectEvent::Said(NO_FORGE_REMOTE.into()));
         };
+        self.read_pulls(repo, true, window, cx);
+    }
+
+    /// Reads the project's pull requests once, for the Code view's list: nothing comes to the front of the
+    /// Sessions view.
+    pub fn load_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.pulls.is_some() || self.pulls_loading {
+            return;
+        }
+        let Some(repo) = self.repo.clone() else { return };
+        self.read_pulls(repo, false, window, cx);
+    }
+
+    /// Whether the pull requests are being read now.
+    pub fn pulls_loading(&self) -> bool {
+        self.pulls_loading
+    }
+
+    /// Opens the pull request services off the UI thread, then the hub; `front` puts it in front of the right pane.
+    fn read_pulls(&mut self, repo: atelier_forge::RepoRef, front: bool, window: &mut Window, cx: &mut Context<Self>) {
         let (project, workers) = (self.project.clone(), self.workers.clone());
         let Some(local) = atelier_settings::path().and_then(|p| p.parent().map(std::path::Path::to_path_buf)) else {
             return cx.emit(ProjectEvent::Said("Pull requests need a data folder on this machine".into()));
         };
-        cx.emit(ProjectEvent::Said("Reading pull requests…".into()));
+        if front {
+            cx.emit(ProjectEvent::Said("Reading pull requests…".into()));
+        }
+        self.pulls_loading = true;
         let opening = cx.background_spawn(async move {
             let me = pulls::login(project.as_ref()).unwrap_or_default();
             pulls::open_services(project, me, local, workers, repo)
         });
         self.opening_pulls = cx.spawn_in(window, async move |this, cx| {
             let services = opening.await;
-            _ = this.update_in(cx, |p, window, cx| match services {
-                Ok(services) => p.mount_pulls(services, window, cx),
-                Err(error) => cx.emit(ProjectEvent::Said(format!("Pull requests: {error}").into())),
+            _ = this.update_in(cx, |p, window, cx| {
+                p.pulls_loading = false;
+                match services {
+                    Ok(services) => p.mount_pulls(services, front, window, cx),
+                    Err(error) => cx.emit(ProjectEvent::Said(format!("Pull requests: {error}").into())),
+                }
             });
         });
     }
@@ -744,7 +772,7 @@ impl OpenProject {
         self.toggle_pulls(window, cx);
     }
 
-    fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
+    fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, front: bool, window: &mut Window, cx: &mut Context<Self>) {
         let hub = cx.new(|cx| PrHub::with_services(services, cx));
         let _events = cx.subscribe_in(&hub, window, |this, _, event: &PrEvent, window, cx| match event {
             // A file at the pull request's head opens in the editor, as it is in this project.
@@ -772,10 +800,12 @@ impl OpenProject {
         if let Some(reference) = self.pending_pull.take() {
             hub.update(cx, |hub, cx| hub.open(reference, window, cx));
         }
-        self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens, _chips] });
-        // Mounted, they are in front: the shell moves the keys to them.
-        cx.emit(ProjectEvent::PullsShown);
-        cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
+        self.pulls = Some(Pulls { hub, shown: front, _events: [_events, _opens, _chips] });
+        // Mounted in front, they take the keys: the shell moves them there.
+        if front {
+            cx.emit(ProjectEvent::PullsShown);
+            cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
+        }
         cx.notify();
     }
 

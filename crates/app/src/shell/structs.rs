@@ -76,7 +76,7 @@ pub struct Shell {
     /// Names the reader gave sessions, by the agent's id.
     pub(super) names: BTreeMap<String, String>,
     /// The colours and images the reader gave projects' badges.
-    badges: agents_view::Badges,
+    pub(super) badges: agents_view::Badges,
     /// "Choose an icon…", while it is open: the chooser, the project's place, and its events.
     icon: Option<(Entity<atelier_ui::icon_picker::IconPicker>, SharedString, Subscription)>,
     /// With `ATELIER_FRAMES=1`, times every frame.
@@ -102,6 +102,12 @@ pub struct Shell {
     panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
     /// Which view shows: Sessions or Files.
     pub(super) view: ShellView,
+    /// The view of the Code lens the rail goes back to.
+    pub(super) code_view: ShellView,
+    /// In Sessions, the project the list and the panels are narrowed to; all of them with `None`.
+    pub(super) session_filter: Option<SharedString>,
+    /// The project switcher's menu is open.
+    pub(super) switcher_open: bool,
     /// In a narrow window, the Files view's tree or editor.
     files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
@@ -162,6 +168,9 @@ impl Shell {
             view: ShellView::from_words(saved.view.as_deref()),
             files_narrow: FilesPane::default(),
             layout_menu: false,
+            code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
+            session_filter: None,
+            switcher_open: false,
             archived: saved.archived_sessions.iter().cloned().collect(),
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
@@ -196,6 +205,10 @@ impl Shell {
             }
         }
         let now = agent_session::now();
+        let all = match &self.session_filter {
+            Some(place) => all.into_iter().filter(|p| p.id == *place).collect(),
+            None => all,
+        };
         let handoff: Vec<_> = self.projects.iter().map(|p| (agents_view::project_id(p.read(cx)), p.read(cx).handoff_branches())).collect();
         self.agents_sidebar.update(cx, |s, cx| {
             for (project, targets) in handoff {
@@ -226,6 +239,10 @@ impl Shell {
         let views = &self.panel_views;
         let (panels, project_order) = agents_view::panels(&self.projects, &|s| views[&s.entity_id()].clone().into(), cx);
         let panels = agents_view::newest_first(panels, |p| &p.id, &mut self.order);
+        let panels = match &self.session_filter {
+            Some(place) => panels.into_iter().filter(|p| p.project.id == *place).collect(),
+            None => panels,
+        };
         self.push_sidebar(cx);
         self.panels.update(cx, |p, cx| p.set_panels(panels, project_order, cx));
         self.mark_open_session(cx);
@@ -849,6 +866,9 @@ impl Shell {
     /// Shows `view`. The way into Files is a project's menu; ⌘1 (⌃ elsewhere) goes back to Sessions. The focus comes to the shell: what had it (a
     /// composer, the editor) is not drawn in the other view, and a key from it would reach nothing.
     pub fn show_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
+        if view.in_code() {
+            self.code_view = view;
+        }
         if self.view != view {
             self.view = view;
             self.save_view(cx);
@@ -1413,10 +1433,7 @@ impl Shell {
                 .on_click(move |_, window, cx| this.update(cx, |this, cx| this.close_settings(window, cx)))
                 .into_any_element();
         }
-        match self.active().and_then(|_| self.back_to_sessions(cx)) {
-            Some(back) => back,
-            None => self.sidebar_toggle(cx),
-        }
+        div().flex().items_center().gap(px(4.)).child(self.sidebar_toggle(cx)).children(self.project_switcher(cx)).into_any_element()
     }
 
     /// The sidebar's toggle at the left of the title bar, lit while the sidebar shows.
@@ -1456,24 +1473,6 @@ impl Shell {
             window.focus(&self.focus, cx);
             cx.notify();
         }
-    }
-
-    /// In the Files view, the way back: "Sessions" with its key. Nothing in the Sessions view: Files is entered
-    /// from a project's menu, so there is no switch to draw.
-    fn back_to_sessions(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.view != ShellView::Files {
-            return None;
-        }
-        let this = cx.entity();
-        Some(
-            Button::new("back-to-sessions")
-                .debug_name("back-to-sessions")
-                .label("Sessions")
-                .cap(keys::cap("⌘1"))
-                .variant(ButtonVariant::Ghost)
-                .on_click(move |_, window, cx| this.update(cx, |this, cx| this.show_view(ShellView::Sessions, window, cx)))
-                .into_any_element(),
-        )
     }
 
     /// The ⋯ at the top right of the session area, and its layout menu: side by side or single, grouped by
@@ -1656,8 +1655,10 @@ impl Shell {
     pub(super) fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         // The projects and their sessions, or in the Git view the focused session's changes; the files
         // are the Files view's.
-        if self.view == ShellView::Git {
-            return div().size_full().child(self.git_sidebar(cx));
+        if self.view.in_code()
+            && let Some(project) = self.active().cloned()
+        {
+            return div().size_full().child(self.code_sidebar(&project, cx));
         }
         div()
             .flex()
@@ -1667,7 +1668,7 @@ impl Shell {
     }
 
     /// The Files view's tree: the front project's files, under their heading.
-    fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         div()
             .debug_selector(|| "files-tree".into())
@@ -1689,27 +1690,7 @@ impl Shell {
 
     /// The Files view's editor, on its card; it says "No file open" until a file is.
     fn files_editor(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        div()
-            .size_full()
-            .pr(px(8.))
-            .pb(px(4.))
-            .child(div().size_full().pt(px(8.)).rounded(radius::lg()).bg(theme.card).child(crate::editor_pane::editor_pane(project, cx)))
-            .into_any_element()
-    }
-
-    /// The Files view in a wide window: the tree, then the editor.
-    fn files_panes(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        self.session_right = None;
-        div()
-            .debug_selector(|| "files-view".into())
-            .flex()
-            .size_full()
-            .min_h_0()
-            .child(self.view_rail(true, cx))
-            .child(div().flex_none().w(px(self.sidebar_width)).h_full().child(self.files_tree(project, cx)))
-            .child(div().flex_1().min_w_0().h_full().child(self.files_editor(project, cx)))
-            .into_any_element()
+        self.code_card(div().size_full().pt(px(8.)).child(crate::editor_pane::editor_pane(project, cx)).into_any_element(), cx)
     }
 
     /// The Files view in a narrow window: the tree or the editor, with a tab for each.
@@ -1784,9 +1765,6 @@ impl Shell {
                 _ => self.narrow_panes(project, window, cx),
             };
         }
-        if self.view == ShellView::Files {
-            return self.files_panes(project, cx);
-        }
         // In the Sessions view the right pane holds the pull requests or the tasks; the editor is the
         // Files view's.
         let asked = self.view == ShellView::Sessions && project.read(cx).front() != crate::open_project::front::Front::Editor;
@@ -1824,7 +1802,7 @@ impl Shell {
         };
         div()
             .id("shell-panes")
-            .debug_selector(|| "sessions-view".into())
+            .debug_selector(if self.view == ShellView::Files { || "files-view".into() } else { || "sessions-view".into() })
             .flex()
             .size_full()
             .min_h_0()
@@ -1913,6 +1891,8 @@ impl Shell {
         match self.view {
             ShellView::Tasks => self.tasks_main(project, window, cx),
             ShellView::Git => self.git_main(project, cx),
+            ShellView::Files => self.files_editor(project, cx),
+            ShellView::Pulls => self.pulls_main(project, cx),
             _ => self.agent_panel(cx),
         }
     }

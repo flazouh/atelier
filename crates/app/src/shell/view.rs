@@ -1,7 +1,7 @@
-//! The views of a window, one on screen at a time, in the order of a change's life: Tasks (the
-//! board), Sessions (the session list, the agent panels, and the pull requests or the tasks when one
-//! is asked for), Git (the focused session's changed files and their review), and Files (the file
-//! tree and the editor).
+//! The views of a window, one on screen at a time. The rail holds three lenses: Sessions (every project's
+//! sessions and their panels), Issues (one project's tasks) and Code (one project's pull requests, files and
+//! changes). Code is three views: Pulls, Files (the tree and the editor) and Git (the focused session's
+//! changed files and their review).
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ShellView {
@@ -10,6 +10,7 @@ pub enum ShellView {
     Sessions,
     Git,
     Files,
+    Pulls,
 }
 
 impl ShellView {
@@ -20,6 +21,7 @@ impl ShellView {
             Self::Sessions => "sessions",
             Self::Git => "git",
             Self::Files => "files",
+            Self::Pulls => "pulls",
         }
     }
 
@@ -29,12 +31,26 @@ impl ShellView {
             Some("tasks") => Self::Tasks,
             Some("git") => Self::Git,
             Some("files") => Self::Files,
+            Some("pulls") => Self::Pulls,
             _ => Self::Sessions,
         }
     }
 
-    /// The views the left rail switches between, in its order.
-    pub const ON_RAIL: [Self; 3] = [Self::Tasks, Self::Sessions, Self::Git];
+    /// The lenses the left rail switches between, in its order: Sessions, Issues, Code. Code is named by Git.
+    pub const ON_RAIL: [Self; 3] = [Self::Sessions, Self::Tasks, Self::Git];
+
+    /// The views of the Code lens, in the order its sidebar lists them.
+    pub const IN_CODE: [Self; 3] = [Self::Pulls, Self::Files, Self::Git];
+
+    /// The lens on the rail this view is part of.
+    pub fn lens(self) -> Self {
+        if self.in_code() { Self::Git } else { self }
+    }
+
+    /// Whether this is a view of the Code lens, which is about one project.
+    pub fn in_code(self) -> bool {
+        Self::IN_CODE.contains(&self)
+    }
 }
 
 /// In a narrow window, the Files view shows one of these at a time.

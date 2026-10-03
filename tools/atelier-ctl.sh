@@ -20,6 +20,8 @@ if cmd == "find" or cmd == "click":
         request["name"] = rest[0]
     elif len(rest) == 2:
         request["x"], request["y"] = float(rest[0]), float(rest[1])
+if cmd == "view":
+    request["name"] = rest[0]
 if cmd == "send":
     request["text"] = " ".join(rest)
 

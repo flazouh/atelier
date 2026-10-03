@@ -429,7 +429,7 @@ fn the_project_menu_opens_files_and_a_key_or_button_goes_back(cx: &mut TestAppCo
     assert!(cx.debug_bounds("files-view").is_none(), "⌘2 does nothing: the project menu is the way in");
     open_files_from_the_menu(&shell, cx);
     assert!(cx.debug_bounds("files-view").is_some() && cx.debug_bounds("files-tree").is_some(), "the menu's Files shows the Files view");
-    assert!(cx.debug_bounds("back-to-sessions").is_some(), "with a way back");
+    assert!(cx.debug_bounds("code-sidebar").is_some() && cx.debug_bounds("rail-sessions").is_some(), "in the Code lens, with the rail the way back");
     assert!(cx.debug_bounds("sessions-view").is_none(), "and only it");
     assert!(cx.debug_bounds("editor-tab-0").is_none(), "no editor before a file is open");
     cx.simulate_keystrokes(sessions);
@@ -873,7 +873,7 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
     assert!(rail.right() <= sidebar.left(), "the rail is left of the sidebar: {rail:?} {sidebar:?}");
     let tasks = cx.debug_bounds("rail-tasks").unwrap();
     let git = cx.debug_bounds("rail-git").unwrap();
-    assert!(tasks.top() < cx.debug_bounds("rail-sessions").unwrap().top() && cx.debug_bounds("rail-sessions").unwrap().top() < git.top());
+    assert!(cx.debug_bounds("rail-sessions").unwrap().top() < tasks.top() && tasks.top() < git.top(), "Sessions, Issues, Code");
 
     press("rail-tasks", cx);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks);
@@ -885,8 +885,13 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
     assert!(shell.read_with(cx, |s, _| s.sidebar), "a third shows it again");
 
     press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Files, "the Code lens opens on its files first");
+    press("code-nav-git", cx);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
     assert!(cx.debug_bounds("git-panel").is_some() && cx.debug_bounds("git-empty").is_some(), "no change yet: nothing to review");
+    press("rail-sessions", cx);
+    press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git, "the lens comes back on the view it was left on");
     press("rail-git", cx);
     press("rail-sessions", cx);
     assert!(shell.read_with(cx, |s, _| s.sidebar), "another view comes with the sidebar");
@@ -934,4 +939,44 @@ fn the_project_menu_opens_the_worktrees_in_the_git_view(cx: &mut TestAppContext)
     assert!(rows[1].notes.iter().any(|n| n.words == "1 uncommitted"), "{:?}", rows[1].notes);
     let main_row = std::fs::canonicalize(&main).unwrap().to_string_lossy().into_owned();
     assert!(cx.debug_bounds(format!("worktree-{main_row}").leak()).is_some());
+}
+
+#[test]
+fn a_project_that_needs_the_reader_outweighs_one_at_work() {
+    use atelier_ui::session_status::{Need, SessionStatus};
+    use super::helpers::{ProjectMark, project_mark};
+    assert_eq!(project_mark(&[]), ProjectMark::Quiet);
+    assert_eq!(project_mark(&[SessionStatus::Idle, SessionStatus::Working]), ProjectMark::Working);
+    assert_eq!(project_mark(&[SessionStatus::Working, SessionStatus::NeedsYou(Need::Question)]), ProjectMark::NeedsYou);
+}
+
+/// The switcher in the title bar: in Sessions it narrows the list and the panels to one project or shows all of
+/// them; in the Code lens it is the project the view is about.
+#[gpui_kit::test]
+fn the_project_switcher_narrows_sessions_and_names_the_project_of_code(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    assert!(cx.debug_bounds("project-switcher").is_some(), "the switcher is in the title bar");
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), None, "Sessions shows every project at first");
+    let press = |name: &'static str, cx: &mut gpui_kit::VisualTestContext| {
+        let at = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
+        cx.simulate_click(at.center(), gpui_kit::Modifiers::default());
+        settle(&shell, cx);
+    };
+    press("project-switcher", cx);
+    assert!(cx.debug_bounds("switcher-all").is_some(), "Sessions offers all projects");
+    let name = shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).name());
+    let row_name: &'static str = Box::leak(format!("switcher-{name}").into_boxed_str());
+    let row = cx.debug_bounds(row_name).expect("each project has a row");
+    cx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), Some(0), "the list is narrowed to it");
+    assert!(cx.debug_bounds("panel-close").is_some(), "its panels stay");
+    press("project-switcher", cx);
+    press("switcher-all", cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), None, "and back to all of them");
+
+    press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), Some(0), "Code is about one project");
+    press("project-switcher", cx);
+    assert!(cx.debug_bounds("switcher-all").is_none(), "with no All projects");
 }

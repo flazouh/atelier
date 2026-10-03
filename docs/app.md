@@ -53,16 +53,24 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 
 - The window draws its own title bar area. On macOS the traffic lights sit inset in the page, as in
   Zed and Cursor. On Linux the layout is the same, without them.
-- Far left: the view rail, in the order a change lives: Tasks, Sessions and Git
-  (`crates/app/src/shell/rail.rs`). A press on another view shows it with the sidebar; a press on the
-  view in front hides the sidebar, and the next press shows it again. The view in front has a wash, or
-  an edge bar while its sidebar is hidden.
-  - **Tasks:** the sidebar, and the task board in the main area.
+- Top left: the sidebar's toggle (⌘B), then the project switcher: each open project's badge, with a dot
+  while one of its sessions works (accent) or needs the reader (warning), and how many need them. Sessions
+  are every project's, so in Sessions the switcher narrows the list and the panels to one project or shows
+  "All projects"; in Issues and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
+- Far left: the view rail, three lenses: Sessions, Issues and Code (`crates/app/src/shell/rail.rs`).
+  Sessions carries a count of the sessions that need the reader, in every project. A press on another lens
+  shows it with the sidebar; a press on the lens in front hides the sidebar, and the next press shows it
+  again. The lens in front has a wash, or an edge bar while its sidebar is hidden.
   - **Sessions:** the sidebar with the projects open in this window and each project's sessions, the
-    agent panels, and the right pane.
-  - **Git:** the focused session's repository, branch and changed files in the sidebar, and the
-    review in the main area. A press on a file opens the review at it; a review opened anywhere opens
-    here, and closing it goes back to Sessions.
+    agent panels, and the right pane. A new session opens at the left of the strip.
+  - **Issues:** the sidebar, and the task board in the main area.
+  - **Code:** a sidebar that lists its three views, then what the one in front lists:
+    - **Pull requests:** the project's pull requests, read on the first look, and the one open.
+    - **Files:** the tree in the sidebar and the editor in the main area.
+    - **Changes:** the focused session's repository, branch, changed files and worktrees, and the review
+      in the main area. A press on a file opens the review at it; a review opened anywhere opens here.
+    The lens comes back on the view it was left on; it opens on Files the first time.
+- The sidebar and the main areas are cards 2 px apart, like the agent panels.
 - Right: the pull requests, or a task opened from a session.
 - A pane's edge is a handle that shows only as a wash on hover; a drag sizes the pane beside it.
 - Foot: the status line: the project, its branch, and the language server's state.
