@@ -1,5 +1,5 @@
-//! What the lenses add to the window: the project switcher in the title bar, the Code lens's sidebar and its
-//! pull requests. Sessions are every project's; Issues and Code are about the project the switcher names.
+//! What the lenses add to the window: the project switcher in the title bar, the Issues and Code lenses'
+//! sidebars, and the pull requests. Sessions are every project's; Issues and Code are about the project the switcher names.
 
 use atelier_ui::button::{Button, ButtonVariant};
 use atelier_ui::menu::{self, Choice, Entry, Menu, MenuItem, MenuLook, Origin};
@@ -9,6 +9,8 @@ use atelier_ui::scale::px;
 use atelier_ui::session_status::SessionStatus;
 use atelier_ui::sidebar_model::Badge;
 use atelier_ui::theme::{ActiveTheme, radius};
+use atelier_ui::task_marks::{TaskStatusMark, label_tone_color};
+use atelier_ui::task_model::TaskStatus;
 use atelier_ui::typography::TextSize;
 use atelier_ui::{Icon, IconName};
 use gpui_kit::prelude::*;
@@ -19,6 +21,41 @@ use super::structs::Shell;
 use super::view::ShellView;
 use crate::agents_view;
 use crate::open_project::OpenProject;
+use crate::tasks::pane::Scope;
+
+/// A row of a lens's sidebar: a mark, the words, and a count at the end. `id` names it for the control socket.
+fn nav_row(id: String, on: bool, mark: AnyElement, label: SharedString, count: Option<usize>, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
+    let theme = cx.theme();
+    let name = id.clone();
+    div()
+        .id(SharedString::from(id))
+        .debug_selector(move || name.clone())
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .h(px(28.))
+        .px(px(8.))
+        .rounded(radius::md())
+        .cursor_pointer()
+        .text_size(TextSize::Sm.font_size())
+        .when(on, |d| d.bg(theme.card_strong))
+        .when(!on, |d| d.hover(|s| s.bg(theme.card_strong.opacity(0.6))))
+        .child(div().flex_none().flex().items_center().justify_center().size(px(15.)).text_color(theme.muted_foreground).child(mark))
+        .child(div().flex_1().min_w_0().truncate().child(label))
+        .children(count.map(|n| div().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(n.to_string())))
+}
+
+/// A heading over a group of rows in a lens's sidebar.
+fn nav_heading(words: &'static str, cx: &App) -> AnyElement {
+    div()
+        .px(px(8.))
+        .pt(px(10.))
+        .pb(px(4.))
+        .text_size(TextSize::Xs.font_size())
+        .text_color(cx.theme().muted_foreground)
+        .child(words)
+        .into_any_element()
+}
 
 /// The badge of a project with its mark at the corner: a session that needs the reader, or one at work.
 fn marked_badge(badge: &Badge, mark: ProjectMark, cx: &App) -> AnyElement {
@@ -70,7 +107,6 @@ impl Shell {
         if self.projects.is_empty() || self.settings.is_some() {
             return None;
         }
-        let theme = cx.theme().clone();
         let badges = self.project_badges(cx);
         let current = self.switched(cx);
         let sessions = self.view == ShellView::Sessions;
@@ -81,12 +117,7 @@ impl Shell {
                 .gap(px(7.))
                 .child(marked_badge(&badges[at], Self::mark_of(&self.projects[at], cx), cx))
                 .child(self.projects[at].read(cx).name()),
-            None => div()
-                .flex()
-                .items_center()
-                .gap(px(7.))
-                .child(div().flex_none().size(px(16.)).rounded(radius::md()).bg(theme.muted_foreground.opacity(0.35)))
-                .child("All projects"),
+            None => div().child("All projects"),
         };
         let this = cx.entity().downgrade();
         let menu = self.switcher_open.then(|| {
@@ -180,24 +211,8 @@ impl Shell {
         let pulls = p.pulls.as_ref().map(|_| p.list_rows.len());
         let changes = self.focused(cx).map(|(_, s)| s.read(cx).changed_files().len()).filter(|n| *n > 0);
         let row = |view: ShellView, icon: IconName, label: &'static str, count: Option<usize>, cx: &mut Context<Self>| {
-            let on = self.view == view;
             let this = cx.entity().downgrade();
-            div()
-                .id(SharedString::from(format!("code-nav-{}", view.words())))
-                .debug_selector(move || format!("code-nav-{}", view.words()))
-                .flex()
-                .items_center()
-                .gap(px(8.))
-                .h(px(28.))
-                .px(px(8.))
-                .rounded(radius::md())
-                .cursor_pointer()
-                .text_size(TextSize::Sm.font_size())
-                .when(on, |d| d.bg(theme.card_strong))
-                .when(!on, |d| d.hover(|s| s.bg(theme.card_strong.opacity(0.6))))
-                .child(Icon::new(icon).size(px(15.)).color(theme.muted_foreground))
-                .child(div().flex_1().child(label))
-                .children(count.map(|n| div().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(n.to_string())))
+            nav_row(format!("code-nav-{}", view.words()), self.view == view, Icon::new(icon).into_any_element(), label.into(), count, cx)
                 .on_click(move |_, window, cx| drop(this.update(cx, |s, cx| s.show_code(view, window, cx))))
         };
         let nav = div()
@@ -220,6 +235,59 @@ impl Shell {
             .size_full()
             .child(nav)
             .children(below.map(|below| div().flex_1().min_h_0().border_t_1().border_color(theme.background).child(below)))
+            .into_any_element()
+    }
+
+    /// The Issues lens's sidebar: the views over the project's issues, its labels, and the agents that hold
+    /// issues. Each sets the scope of the project's Tasks pane.
+    pub(super) fn issues_sidebar(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+        let Some(pane) = project.read(cx).tasks.as_ref().map(|slot| slot.pane.clone()) else {
+            return div().into_any_element();
+        };
+        let theme = cx.theme().clone();
+        let p = pane.read(cx);
+        let scope = p.scope().clone();
+        let row = |id: String, at: Scope, mark: AnyElement, label: SharedString, cx: &App| {
+            let pane = pane.downgrade();
+            let count = Some(p.count(&at)).filter(|n| *n > 0);
+            nav_row(id, scope == at, mark, label, count, cx)
+                .on_click(move |_, window, cx| drop(pane.update(cx, |p, cx| p.set_scope(at.clone(), window, cx))))
+                .into_any_element()
+        };
+        let views = Scope::VIEWS.map(|at| {
+            let (id, label, mark) = match at {
+                Scope::Mine => ("mine", "My issues", Icon::new(IconName::VerifiedUser).into_any_element()),
+                Scope::Active => ("active", "Active", TaskStatusMark::new(TaskStatus::InProgress).size(px(14.)).into_any_element()),
+                Scope::Backlog => ("backlog", "Backlog", TaskStatusMark::new(TaskStatus::Backlog).size(px(14.)).into_any_element()),
+                _ => ("all", "All issues", Icon::new(IconName::FormatListBulleted).into_any_element()),
+            };
+            row(format!("issues-{id}"), at, mark, label.into(), cx)
+        });
+        let labels: Vec<AnyElement> = p
+            .labels()
+            .iter()
+            .map(|l| {
+                let dot = div().size(px(8.)).rounded_full().bg(label_tone_color(l, &theme)).into_any_element();
+                row(format!("issues-label-{}", l.name), Scope::Label(l.name.clone()), dot, l.name.clone(), cx)
+            })
+            .collect();
+        let agents: Vec<AnyElement> = p
+            .agents_at_work()
+            .into_iter()
+            .map(|(name, _)| row(format!("issues-agent-{name}"), Scope::Agent(name.clone()), Icon::new(IconName::Bot).into_any_element(), name, cx))
+            .collect();
+        div()
+            .debug_selector(|| "issues-sidebar".into())
+            .id("issues-sidebar")
+            .flex()
+            .flex_col()
+            .size_full()
+            .overflow_y_scroll()
+            .gap(px(1.))
+            .p(px(6.))
+            .children(views)
+            .when(!labels.is_empty(), |d| d.child(nav_heading("Labels", cx)).children(labels))
+            .when(!agents.is_empty(), |d| d.child(nav_heading("Agents", cx)).children(agents))
             .into_any_element()
     }
 
