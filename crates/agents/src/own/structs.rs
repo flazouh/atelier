@@ -143,6 +143,7 @@ impl Backend for OwnAgent {
             subagents: false,
             todos: false,
             providers: false,
+            forks: false,
         }
     }
 

@@ -39,6 +39,9 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
     .collect::<Vec<_>>();
     if let Some(session) = &request.resume {
         args.extend(["--resume".into(), session.as_str().into()]);
+        if request.fork {
+            args.push(FORK_FLAG.into());
+        }
     }
     if let Some(model) = &request.model {
         args.extend(["--model".into(), model.clone()]);
@@ -47,18 +50,18 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
     if let Some(mode) = request.mode.filter(|mode| *mode != PermissionMode::Ask) {
         args.extend(["--permission-mode".into(), mode_name(mode).into()]);
     }
-    match &request.provider {
-        Some(Provider::OpenRouter { key }) => on_openrouter(program, key, args),
-        Some(Provider::Account(name)) if name != DEFAULT_ACCOUNT => on_account(program, name, args),
-        Some(Provider::Account(_)) => Command::new(program).args(args),
-        None => match &request.resume {
-            Some(session) => on_the_account_holding(program, session, args),
-            None => Command::new(program).args(args),
-        },
+    match (&request.provider, &request.resume) {
+        (Some(Provider::OpenRouter { key }), _) => on_openrouter(program, key, args),
+        (Some(Provider::Account(name)), Some(session)) => on_account_with(program, name, session, args),
+        (Some(Provider::Account(name)), None) if name != DEFAULT_ACCOUNT => on_account(program, name, args),
+        (Some(Provider::Account(_)), None) => Command::new(program).args(args),
+        (None, Some(session)) => on_the_account_holding(program, session, args),
+        (None, None) => Command::new(program).args(args),
     }
 }
 
 const SHELL: &str = "sh";
+const FORK_FLAG: &str = "--fork-session";
 /// Carries the account's name into the script, so the script never holds it.
 const ACCOUNT_ENV: &str = "ATELIER_CLAUDE_ACCOUNT";
 /// Carries the id of the session to resume into the script, so the script never holds it.
@@ -92,20 +95,41 @@ const FIND_ACCOUNT: &str = r#"if ! ls "$HOME"/.claude/projects/*/"$ATELIER_CLAUD
 fi
 "#;
 
+/// Gives the account `claude` runs on the session from whichever account holds it, so `--resume` finds it there: a
+/// hard link where the folders share a disk, a copy where they do not. One the account holds already stays.
+const BRING_SESSION: &str = r#"home="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+if ! ls "$home"/projects/*/"$ATELIER_CLAUDE_SESSION".jsonl >/dev/null 2>&1; then
+  for saved in "$HOME"/.claude/projects/*/"$ATELIER_CLAUDE_SESSION".jsonl "$HOME"/.claude-*/projects/*/"$ATELIER_CLAUDE_SESSION".jsonl; do
+    if [ -f "$saved" ]; then
+      project="${saved%/*}"
+      folder="$home/projects/${project##*/}"
+      mkdir -p "$folder" && { ln "$saved" "$folder/" 2>/dev/null || cp "$saved" "$folder/"; }
+      break
+    fi
+  done
+fi
+"#;
+
 const RUN_CLAUDE: &str = r#"exec "$0" "$@""#;
 
 fn on_account(program: &str, name: &str, args: Vec<String>) -> Command {
-    through_shell(program, &[CHECK_CLAUDE, USE_ACCOUNT, RUN_CLAUDE], args, (ACCOUNT_ENV, name))
+    through_shell(program, &[CHECK_CLAUDE, USE_ACCOUNT, RUN_CLAUDE], args, &[(ACCOUNT_ENV, name)])
 }
 
 fn on_the_account_holding(program: &str, session: &SessionId, args: Vec<String>) -> Command {
-    through_shell(program, &[CHECK_CLAUDE, FIND_ACCOUNT, RUN_CLAUDE], args, (SESSION_ENV, session.as_str()))
+    through_shell(program, &[CHECK_CLAUDE, FIND_ACCOUNT, RUN_CLAUDE], args, &[(SESSION_ENV, session.as_str())])
 }
 
-/// `program` with `args`, started by a shell running `script`, with `input` in its environment.
-fn through_shell(program: &str, script: &[&str], args: Vec<String>, (name, value): (&str, &str)) -> Command {
+/// On the account `name`, with the session brought there from whichever account holds it.
+fn on_account_with(program: &str, name: &str, session: &SessionId, args: Vec<String>) -> Command {
+    let script: &[&str] = if name == DEFAULT_ACCOUNT { &[CHECK_CLAUDE, BRING_SESSION, RUN_CLAUDE] } else { &[CHECK_CLAUDE, USE_ACCOUNT, BRING_SESSION, RUN_CLAUDE] };
+    through_shell(program, script, args, &[(ACCOUNT_ENV, name), (SESSION_ENV, session.as_str())])
+}
+
+/// `program` with `args`, started by a shell running `script`, with `inputs` in its environment.
+fn through_shell(program: &str, script: &[&str], args: Vec<String>, inputs: &[(&str, &str)]) -> Command {
     let mut command = Command::new(SHELL).args(["-c", script.concat().as_str(), program]).args(args);
-    command.env.push((name.into(), value.into()));
+    command.env.extend(inputs.iter().map(|(name, value)| (name.to_string(), value.to_string())));
     command
 }
 

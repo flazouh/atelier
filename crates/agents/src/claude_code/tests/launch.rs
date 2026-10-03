@@ -21,6 +21,7 @@ const HOSTILE_ACCOUNT: &str = "a b'$(touch pwned)\"`touch pwned`";
 const HOSTILE_LEFTOVER: &str = "pwned";
 
 const SAVED_SESSION: &str = "5e55-1011";
+const FORK_FLAG: &str = "--fork-session";
 
 const OPENROUTER_KEY: &str = "sk-or-v1-secret";
 const OPENROUTER_URL: &str = "https://openrouter.ai/api";
@@ -124,6 +125,50 @@ fn a_resume_of_a_session_on_the_usual_account_leaves_claude_as_it_is() {
     let started = host.run(&command(CLAUDE, &resuming(SAVED_SESSION)));
 
     assert_eq!(started, Ok(Started { account_folder: String::new(), first_arg: FIRST_FLAG.into() }));
+}
+
+#[test]
+fn a_fork_resumes_into_a_new_session_and_leaves_the_old_one() {
+    let forking = OpenRequest { fork: true, ..resuming(SAVED_SESSION) };
+
+    assert!(args(&forking).contains(&FORK_FLAG.to_string()));
+    assert!(!args(&resuming(SAVED_SESSION)).contains(&FORK_FLAG.to_string()));
+    assert!(!args(&OpenRequest { fork: true, ..OpenRequest::default() }).contains(&FORK_FLAG.to_string()), "nothing to fork");
+}
+
+#[test]
+fn a_resume_on_another_account_brings_the_session_there_first() {
+    let host = FakeHost::new();
+    host.save_session(Some(WORK_ACCOUNT), SAVED_SESSION);
+    host.sign_in(TEAM_ACCOUNT);
+
+    let started = host.run(&command(CLAUDE, &OpenRequest { provider: Some(account(TEAM_ACCOUNT)), ..resuming(SAVED_SESSION) }));
+
+    assert_eq!(started, Ok(Started { account_folder: host.account_folder(TEAM_ACCOUNT), first_arg: FIRST_FLAG.into() }));
+    assert!(host.holds_session(Some(TEAM_ACCOUNT), SAVED_SESSION));
+    assert!(host.holds_session(Some(WORK_ACCOUNT), SAVED_SESSION), "the old account keeps it");
+}
+
+#[test]
+fn a_resume_on_the_usual_account_brings_the_session_into_its_folder() {
+    let host = FakeHost::new();
+    host.save_session(Some(WORK_ACCOUNT), SAVED_SESSION);
+
+    let started = host.run(&command(CLAUDE, &OpenRequest { provider: Some(account(DEFAULT_ACCOUNT)), ..resuming(SAVED_SESSION) }));
+
+    assert_eq!(started, Ok(Started { account_folder: String::new(), first_arg: FIRST_FLAG.into() }));
+    assert!(host.holds_session(None, SAVED_SESSION));
+}
+
+#[test]
+fn a_session_id_is_never_read_as_shell() {
+    let host = FakeHost::new();
+    host.sign_in(TEAM_ACCOUNT);
+
+    let started = host.run(&command(CLAUDE, &OpenRequest { provider: Some(account(TEAM_ACCOUNT)), ..resuming(HOSTILE_ACCOUNT) }));
+
+    assert!(started.is_ok(), "{started:?}");
+    assert!(!host.has(HOSTILE_LEFTOVER));
 }
 
 #[test]

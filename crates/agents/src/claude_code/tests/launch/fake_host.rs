@@ -59,6 +59,15 @@ impl FakeHost {
         fs::write(format!("{project}/{id}.jsonl"), "").expect("the session is saved");
     }
 
+    /// Whether `account`, or `~/.claude` when `None`, holds the session `id`.
+    pub fn holds_session(&self, account: Option<&str>, id: &str) -> bool {
+        let config = match account {
+            Some(account) => self.account_folder(account),
+            None => format!("{}/{USUAL_FOLDER}", self.home.path().display()),
+        };
+        Path::new(&format!("{config}/projects/{SOME_PROJECT}/{id}.jsonl")).exists()
+    }
+
     pub fn has(&self, file: &str) -> bool {
         self.home.path().join(file).exists()
     }
