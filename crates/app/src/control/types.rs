@@ -14,6 +14,8 @@ pub enum Request {
     Click { name: Option<String>, x: Option<f32>, y: Option<f32> },
     /// Brings a view to the front by the name the settings keep it by: sessions, tasks, pulls, files or git.
     View { name: String },
+    /// Opens the folder at `path`, on `host` over SSH when one is named, as the add menu does.
+    Open { path: String, host: Option<String> },
 }
 
 /// The longest text a row's description keeps.

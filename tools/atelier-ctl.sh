@@ -6,9 +6,10 @@
 #   tools/atelier-ctl.sh new_session [agent]     e.g. Cursor, "Claude Code"
 #   tools/atelier-ctl.sh send "a message"
 #   tools/atelier-ctl.sh limit                  pretend the front session hit its weekly limit
+#   tools/atelier-ctl.sh open PATH [HOST]       open a folder, over SSH on HOST when named
 # Each prints the app's JSON answer, one line.
 set -euo pipefail
-[ $# -ge 1 ] || { sed -n 2,9p "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n 2,10p "$0"; exit 2; }
 exec python3 - "$@" <<'PY'
 import glob, json, os, socket, sys
 cmd, rest = sys.argv[1], sys.argv[2:]
@@ -22,6 +23,10 @@ if cmd == "find" or cmd == "click":
         request["x"], request["y"] = float(rest[0]), float(rest[1])
 if cmd == "view":
     request["name"] = rest[0]
+if cmd == "open":
+    request["path"] = rest[0]
+    if len(rest) > 1:
+        request["host"] = rest[1]
 if cmd == "send":
     request["text"] = " ".join(rest)
 

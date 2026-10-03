@@ -15,6 +15,7 @@ fn a_line_names_its_command() {
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"find","name":"a"}"#).unwrap(), Request::Find { name: "a".into() });
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"click","name":"a"}"#).unwrap(), Request::Click { name: Some("a".into()), x: None, y: None });
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"click","x":1,"y":2.5}"#).unwrap(), Request::Click { name: None, x: Some(1.), y: Some(2.5) });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"open","path":"~/p","host":"h"}"#).unwrap(), Request::Open { path: "~/p".into(), host: Some("h".into()) });
     assert!(serde_json::from_str::<Request>(r#"{"cmd":"explode"}"#).is_err());
     assert!(serde_json::from_str::<Request>(r#"{"cmd":"send"}"#).is_err(), "a message needs its text");
 }

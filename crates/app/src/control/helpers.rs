@@ -141,6 +141,13 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
             shell.go_to(view, window, cx);
             json!({ "ok": true, "view": view.words() })
         }
+        Request::Open { path, host } => {
+            match host {
+                Some(host) => shell.open_remote(host, path, window, cx),
+                None => shell.open_local(path.into(), window, cx),
+            }
+            json!({ "ok": true })
+        }
         Request::Send { text } => match shell.front_session(cx) {
             Some(session) => {
                 session.update(cx, |s, cx| s.send(text, cx));
