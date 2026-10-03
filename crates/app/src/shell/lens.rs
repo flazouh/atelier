@@ -191,7 +191,7 @@ impl Shell {
                 let waiting = p.sessions.iter().filter(|s| s.read(cx).status.needs_you()).count();
                 let item = MenuItem::new(p.name())
                     .debug_name(format!("switcher-{}", p.name()))
-                    .lead(move |cx| marked_badge(&badge, mark, cx))
+                    .lead_element(move |cx| marked_badge(&badge, mark, cx))
                     .choice(Choice::Radio(current == Some(at)))
                     .on_select(move |window, cx| drop(pick.update(cx, |s, cx| s.switch_project(Some(at), window, cx))));
                 let count = match (waiting, p.sessions.len()) {
