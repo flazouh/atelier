@@ -1,12 +1,81 @@
+use std::{fs, path::Path, process};
+
 use serde_json::json;
+use tempfile::TempDir;
 
 use crate::{
-    claude_code::store::{parse_listing, slug},
+    claude_code::store::{list_script, parse_listing, read_script, slug},
     session::SessionId,
 };
 
+const PROJECT_SLUG: &str = "-home-alex-code-atelier";
+const OTHER_PROJECT_SLUG: &str = "-home-alex-code-other";
+const USUAL_FOLDER: &str = ".claude";
+const WORK_FOLDER: &str = ".claude-work";
+const WORK_ACCOUNT: &str = "work";
+const USUAL_SESSION: &str = "aaaa-1111";
+const WORK_SESSION: &str = "bbbb-2222";
+
 fn user(text: &str) -> String {
     json!({"type": "user", "message": {"role": "user", "content": text}}).to_string()
+}
+
+/// A home folder with Claude Code's session files in it.
+struct Home(TempDir);
+
+impl Home {
+    fn new() -> Self {
+        Self(tempfile::tempdir().expect("a temporary home"))
+    }
+
+    /// Saves a session that starts with `first_words` in `config_folder`, for the project `slug`.
+    fn save(&self, config_folder: &str, slug: &str, id: &str, first_words: &str) {
+        let folder = self.0.path().join(config_folder).join("projects").join(slug);
+        fs::create_dir_all(&folder).expect("the project folder is made");
+        fs::write(folder.join(format!("{id}.jsonl")), user(first_words) + "\n").expect("the session is saved");
+    }
+
+    /// Runs `script` with this home, and returns what it printed.
+    fn run(&self, script: &str) -> String {
+        let output = process::Command::new("sh").args(["-c", script]).env("HOME", self.0.path()).output().expect("sh runs");
+        String::from_utf8_lossy(&output.stdout).into()
+    }
+
+    fn path(&self) -> &Path {
+        self.0.path()
+    }
+}
+
+#[test]
+fn the_list_holds_the_sessions_of_every_account_each_named_by_its_account() {
+    let home = Home::new();
+    home.save(USUAL_FOLDER, PROJECT_SLUG, USUAL_SESSION, "on the usual account");
+    home.save(WORK_FOLDER, PROJECT_SLUG, WORK_SESSION, "on the work account");
+
+    let mut sessions = parse_listing(&home.run(&list_script(PROJECT_SLUG)));
+    sessions.sort_by(|a, b| a.id.as_str().cmp(b.id.as_str()));
+
+    assert_eq!(sessions.len(), 2);
+    assert_eq!((sessions[0].id.as_str(), sessions[0].account.as_deref()), (USUAL_SESSION, None));
+    assert_eq!((sessions[1].id.as_str(), sessions[1].account.as_deref()), (WORK_SESSION, Some(WORK_ACCOUNT)));
+}
+
+#[test]
+fn the_list_leaves_out_other_projects() {
+    let home = Home::new();
+    home.save(WORK_FOLDER, OTHER_PROJECT_SLUG, WORK_SESSION, "another project");
+
+    assert!(parse_listing(&home.run(&list_script(PROJECT_SLUG))).is_empty());
+}
+
+#[test]
+fn a_session_is_read_from_whichever_account_holds_it() {
+    let home = Home::new();
+    home.save(WORK_FOLDER, PROJECT_SLUG, WORK_SESSION, "on the work account");
+
+    let transcript = home.run(&read_script(PROJECT_SLUG, &SessionId::new(WORK_SESSION)));
+
+    assert!(transcript.contains("on the work account"), "read from {}", home.path().display());
 }
 
 #[test]

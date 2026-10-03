@@ -15,20 +15,47 @@ pub(in super::super) fn slug(root: &str) -> String {
     root.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect()
 }
 
-pub(super) fn folder(project: &dyn Project) -> String {
-    format!("$HOME/.claude/projects/{}", slug(&project.root().to_string_lossy()))
+/// The session files of the project `slug` in every account: `~/.claude`'s, then each `~/.claude-<name>`'s.
+fn session_files(slug: &str, file: &str) -> String {
+    format!(r#""$HOME/.claude/projects/{slug}"/{file} "$HOME"/.claude-*/projects/"{slug}"/{file}"#)
 }
 
-pub(in super::super) fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
-    let script = format!(
-        r#"ls -t "{dir}"/*.jsonl 2>/dev/null | head -n {LIST_LIMIT} | while IFS= read -r f; do
+/// Prints the newest sessions of the project `slug`, each as a `MARK path mtime` line and the head of its file.
+pub(in super::super) fn list_script(slug: &str) -> String {
+    format!(
+        r#"ls -t {files} 2>/dev/null | head -n {LIST_LIMIT} | while IFS= read -r f; do
   printf '{MARK}%s %s\n' "$f" "$(stat -c %Y "$f" 2>/dev/null || stat -f %m "$f")"
   head -n {TITLE_LINES} "$f" | cut -c1-4000
 done"#,
-        dir = folder(project),
-    );
+        files = session_files(slug, "*.jsonl"),
+    )
+}
+
+/// Prints the transcript of `session`, from whichever account holds it.
+pub(in super::super) fn read_script(slug: &str, session: &SessionId) -> String {
+    format!(
+        r#"for f in {files}; do
+  if [ -f "$f" ]; then exec cat "$f"; fi
+done
+exit 1"#,
+        files = session_files(slug, &format!("{}.jsonl", session.as_str())),
+    )
+}
+
+pub(in super::super) fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
+    let script = list_script(&slug(&project.root().to_string_lossy()));
     let command = Command::new("sh").args(["-c", script.as_str()]);
     Ok(parse_listing(&subprocess::output(project, &command)?))
+}
+
+/// The account a session file was saved under: `None` for `~/.claude`, `work` for `~/.claude-work`.
+fn account_of(path: &str) -> Option<String> {
+    let mut folders = path.rsplit('/').skip(1);
+    let (_project, projects, config) = (folders.next()?, folders.next()?, folders.next()?);
+    if projects != "projects" {
+        return None;
+    }
+    config.strip_prefix(".claude-").map(str::to_string)
 }
 
 /// Reads the listing script's output: a `@@ path mtime` line, then the head of that file.
@@ -39,7 +66,7 @@ pub(in super::super) fn parse_listing(text: &str) -> Vec<SessionSummary> {
         if let Some(header) = line.strip_prefix(MARK) {
             let (path, updated) = header.rsplit_once(' ').unwrap_or((header, ""));
             let id = path.rsplit('/').next().unwrap_or(path).trim_end_matches(".jsonl");
-            sessions.push(SessionSummary { id: SessionId::new(id), title: String::new(), updated: updated.parse().ok() });
+            sessions.push(SessionSummary { id: SessionId::new(id), title: String::new(), updated: updated.parse().ok(), account: account_of(path) });
             titled = false;
         } else if !titled
             && let Some((session, text)) = sessions.last_mut().zip(user_text(line))
@@ -83,7 +110,7 @@ pub(in super::super) fn read_history(project: &dyn Project, session: &SessionId)
     if !session.as_str().chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
         return Err(SessionError::Read("the session id has characters a file name cannot".into()));
     }
-    let script = format!("cat \"{}/{}.jsonl\"", folder(project), session.as_str());
+    let script = read_script(&slug(&project.root().to_string_lossy()), session);
     let command = Command::new("sh").args(["-c", script.as_str()]);
     Ok(history(&subprocess::output(project, &command)?))
 }

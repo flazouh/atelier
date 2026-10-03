@@ -525,7 +525,7 @@ fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) 
 fn an_archived_session_leaves_the_list_until_the_filter_asks(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
-    project.update(cx, |p, _| p.past = vec![atelier_agents::session::SessionSummary { id: atelier_agents::session::SessionId::new("old-1"), title: "an old idea".into(), updated: Some(5) }]);
+    project.update(cx, |p, _| p.past = vec![atelier_agents::session::SessionSummary { id: atelier_agents::session::SessionId::new("old-1"), title: "an old idea".into(), updated: Some(5), account: None }]);
     shell.update(cx, |s, cx| s.sync(cx));
     let titles = |cx: &mut gpui_kit::VisualTestContext| {
         shell.read_with(cx, |s, cx| s.agents_sidebar.read(cx).projects().iter().flat_map(|p| p.sessions.iter().map(|x| x.title.to_string())).collect::<Vec<_>>())

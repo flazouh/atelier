@@ -50,6 +50,7 @@ pub(super) fn summaries(listed: wire::Listed) -> Vec<SessionSummary> {
             id: SessionId::new(s.session_id),
             title: s.title.map(|t| t.trim().chars().take(TITLE_MAX).collect()).filter(|t: &String| !t.is_empty()).unwrap_or_else(|| "Untitled session".into()),
             updated: s.updated_at.as_deref().and_then(super::super::time::epoch_seconds),
+            account: None,
         })
         .collect();
     rows.sort_by_key(|row| std::cmp::Reverse(row.updated));

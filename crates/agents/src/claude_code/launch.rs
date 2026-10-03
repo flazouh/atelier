@@ -2,7 +2,7 @@
 use atelier_project::Command;
 
 use super::control::mode_name;
-use crate::session::{ApiKey, OpenRequest, PermissionMode, Provider};
+use crate::session::{ApiKey, OpenRequest, PermissionMode, Provider, SessionId};
 
 /// The command line for one piece of text: `claude --print` with the prompt on stdin, the answer as
 /// plain text on stdout, in Plan mode (it changes nothing) and with no session saved, so it never shows
@@ -48,10 +48,13 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
         args.extend(["--permission-mode".into(), mode_name(mode).into()]);
     }
     match &request.provider {
-        None => Command::new(program).args(args),
-        Some(Provider::Account(name)) if name == DEFAULT_ACCOUNT => Command::new(program).args(args),
-        Some(Provider::Account(name)) => on_account(program, name, args),
         Some(Provider::OpenRouter { key }) => on_openrouter(program, key, args),
+        Some(Provider::Account(name)) if name != DEFAULT_ACCOUNT => on_account(program, name, args),
+        Some(Provider::Account(_)) => Command::new(program).args(args),
+        None => match &request.resume {
+            Some(session) => on_the_account_holding(program, session, args),
+            None => Command::new(program).args(args),
+        },
     }
 }
 
@@ -59,26 +62,53 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
 const DEFAULT_ACCOUNT: &str = "default";
 
 const SHELL: &str = "sh";
-/// Carries the account's name into [`ACCOUNT_SCRIPT`], so the script never holds it.
+/// Carries the account's name into the script, so the script never holds it.
 const ACCOUNT_ENV: &str = "ATELIER_CLAUDE_ACCOUNT";
+/// Carries the id of the session to resume into the script, so the script never holds it.
+const SESSION_ENV: &str = "ATELIER_CLAUDE_SESSION";
 
-/// Runs `claude` with `CLAUDE_CONFIG_DIR` at `~/.claude-<name>` on the host, whose home only a shell there knows.
-/// A missing `claude` is told in the words of [`crate::session::SessionError::Missing`].
-const ACCOUNT_SCRIPT: &str = r#"if ! command -v "$0" >/dev/null 2>&1; then
+/// Stops with the words of [`crate::session::SessionError::Missing`] when the host has no `claude`.
+const CHECK_CLAUDE: &str = r#"if ! command -v "$0" >/dev/null 2>&1; then
   printf '%s is not installed on this host\n' "$0" >&2
   exit 127
 fi
-CLAUDE_CONFIG_DIR="$HOME/.claude-$ATELIER_CLAUDE_ACCOUNT"
+"#;
+
+/// Points `claude` at `~/.claude-<name>` on the host, whose home only a shell there knows, or stops with how to sign in.
+const USE_ACCOUNT: &str = r#"CLAUDE_CONFIG_DIR="$HOME/.claude-$ATELIER_CLAUDE_ACCOUNT"
 if [ ! -d "$CLAUDE_CONFIG_DIR" ]; then
   printf 'The Claude account "%s" is not signed in. Sign in with: CLAUDE_CONFIG_DIR="%s" claude auth login\n' "$ATELIER_CLAUDE_ACCOUNT" "$CLAUDE_CONFIG_DIR" >&2
   exit 1
 fi
 export CLAUDE_CONFIG_DIR
-exec "$0" "$@""#;
+"#;
+
+/// Points `claude` at the other account whose folder holds the session, when `~/.claude` does not.
+const FIND_ACCOUNT: &str = r#"if ! ls "$HOME"/.claude/projects/*/"$ATELIER_CLAUDE_SESSION".jsonl >/dev/null 2>&1; then
+  for saved in "$HOME"/.claude-*/projects/*/"$ATELIER_CLAUDE_SESSION".jsonl; do
+    if [ -f "$saved" ]; then
+      CLAUDE_CONFIG_DIR="${saved%/projects/*}"
+      export CLAUDE_CONFIG_DIR
+      break
+    fi
+  done
+fi
+"#;
+
+const RUN_CLAUDE: &str = r#"exec "$0" "$@""#;
 
 fn on_account(program: &str, name: &str, args: Vec<String>) -> Command {
-    let mut command = Command::new(SHELL).args(["-c", ACCOUNT_SCRIPT, program]).args(args);
-    command.env.push((ACCOUNT_ENV.into(), name.into()));
+    through_shell(program, &[CHECK_CLAUDE, USE_ACCOUNT, RUN_CLAUDE], args, (ACCOUNT_ENV, name))
+}
+
+fn on_the_account_holding(program: &str, session: &SessionId, args: Vec<String>) -> Command {
+    through_shell(program, &[CHECK_CLAUDE, FIND_ACCOUNT, RUN_CLAUDE], args, (SESSION_ENV, session.as_str()))
+}
+
+/// `program` with `args`, started by a shell running `script`, with `input` in its environment.
+fn through_shell(program: &str, script: &[&str], args: Vec<String>, (name, value): (&str, &str)) -> Command {
+    let mut command = Command::new(SHELL).args(["-c", script.concat().as_str(), program]).args(args);
+    command.env.push((name.into(), value.into()));
     command
 }
 

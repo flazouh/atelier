@@ -8,4 +8,4 @@ mod types;
 pub use helpers::history;
 pub(super) use helpers::{list, read_history};
 #[cfg(test)]
-pub(super) use helpers::{parse_listing, slug};
+pub(super) use helpers::{list_script, parse_listing, read_script, slug};
