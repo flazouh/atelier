@@ -43,15 +43,3 @@ pub enum SessionEvent {
     /// The reader ran `/tasks`: the project's tasks come to the right pane.
     ShowTasks,
 }
-
-/// Where the sign-in of a session's agent stands.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum SignIn {
-    Idle,
-    /// The browser is open and the reader signs in there.
-    Waiting,
-    /// The last try did not finish, with why.
-    Failed(gpui_kit::SharedString),
-    /// The project is on another host, where a browser here cannot sign the agent in.
-    Elsewhere,
-}

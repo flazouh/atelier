@@ -16,6 +16,7 @@ mod process;
 mod protocol;
 mod replay;
 mod rpc;
+mod sign_in;
 mod time;
 
 /// An agent with two modes and two models, as a test names it.

@@ -65,6 +65,36 @@ fn an_agent_that_needs_a_sign_in_is_authenticated_once_and_asked_again() {
 }
 
 #[test]
+fn a_terminal_method_is_never_authenticated_the_agent_one_is() {
+    let mut run = Run::open();
+    run.agent(respond(0, json!({
+        "protocolVersion": 1,
+        "authMethods": [
+            { "id": "terminal-login", "name": "Log in from the terminal", "type": "terminal", "args": ["--login"] },
+            { "id": "agent-login", "name": "Agent login", "type": "agent" },
+        ],
+    })));
+    run.agent(fail(1, -32000, "Authentication required"));
+    assert_eq!(run.last()["method"], "authenticate");
+    assert_eq!(run.last()["params"], json!({ "methodId": "agent-login" }), "a terminal method is for the client's own terminal, not for `authenticate`");
+}
+
+#[test]
+fn an_agent_that_offers_only_a_terminal_method_is_signed_out_and_not_authenticated() {
+    let mut run = Run::open();
+    run.command(Command::send("hello"));
+    run.agent(respond(0, json!({
+        "protocolVersion": 1,
+        "authMethods": [{ "id": "terminal-login", "name": "Log in from the terminal", "type": "terminal" }],
+    })));
+    run.agent(fail(1, -32000, "Authentication required"));
+    assert!(run.sent("authenticate").is_empty(), "the protocol forbids it");
+    let events = run.events();
+    assert_eq!(events[0], Event::SignedOut, "the reader signs in with the agent's own login, and the notice says so");
+    assert!(run.done);
+}
+
+#[test]
 fn an_agent_still_signed_out_after_the_sign_in_ends_the_session_with_its_own_words() {
     let mut run = Run::open();
     run.command(Command::send("hello"));

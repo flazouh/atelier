@@ -15,7 +15,7 @@ fn handoff(id: &'static str) -> Button {
 }
 
 fn notice(id: &'static str, agent: CodingAgent, account: Option<&'static str>, state: SignInState, handoff_too: bool) -> impl IntoElement {
-    let notice = SignInNotice::new(id, agent.name(), Lead::of(agent.mark())).account(account).state(state).on_sign_in(|_, _| {});
+    let notice = SignInNotice::new(id, agent.name(), Lead::of(agent.mark())).account(account).state(state).on_sign_in(|_, _| {}).on_cancel(|_, _| {});
     div().w(px(560.)).child(if handoff_too { notice.action(handoff(id)).into_any_element() } else { notice.into_any_element() })
 }
 
@@ -32,7 +32,7 @@ pub fn sign_in_story(_cx: &App) -> impl IntoElement {
                 .child(notice("s-cursor", CodingAgent::Cursor, None, SignInState::Ready, false)),
         ))
         .child(section(
-            "The browser is open: the button waits",
+            "The browser is open: the button waits, and Cancel leaves the wait",
             notice("s-waiting", CodingAgent::ClaudeCode, None, SignInState::Waiting, true),
         ))
         .child(section(

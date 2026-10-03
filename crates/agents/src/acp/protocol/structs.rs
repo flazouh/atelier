@@ -195,7 +195,7 @@ impl Protocol {
         match (asked, outcome) {
             (Asked::Initialize, Ok(result)) => {
                 let initialized: wire::Initialized = parse(result).unwrap_or_default();
-                self.auth_methods = initialized.auth_methods.into_iter().map(|m| m.id).collect();
+                self.auth_methods = initialized.auth_methods.into_iter().filter(|m| m.agent_runs_it()).map(|m| m.id).collect();
                 self.can_load = initialized.agent_capabilities.load_session;
                 self.can_list = initialized.agent_capabilities.session_capabilities.list.is_some();
                 self.open(&mut step, now);

@@ -32,6 +32,17 @@ pub(in super::super) struct SessionCapabilities {
 #[derive(Deserialize)]
 pub(in super::super) struct AuthMethod {
     pub id: String,
+    /// `agent` (the default when absent) for a method the agent runs when asked to `authenticate`; `terminal` for one the
+    /// client runs itself, which `authenticate` must never name.
+    #[serde(default, rename = "type")]
+    pub kind: Option<String>,
+}
+
+impl AuthMethod {
+    /// Whether `authenticate` can name it.
+    pub fn agent_runs_it(&self) -> bool {
+        self.kind.as_deref().is_none_or(|kind| kind == "agent")
+    }
 }
 
 /// The answer to `session/new` and `session/load`. `load` gives no id: it is the one asked for.

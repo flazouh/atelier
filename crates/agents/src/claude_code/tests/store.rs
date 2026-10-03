@@ -4,7 +4,7 @@ use serde_json::json;
 use tempfile::TempDir;
 
 use crate::{
-    claude_code::store::{list_script, parse_listing, read_script, slug},
+    claude_code::store::{holder_account, holder_script, list_script, parse_listing, read_script, slug},
     session::SessionId,
 };
 
@@ -125,4 +125,17 @@ fn a_session_with_no_user_message_is_left_out_and_a_long_title_is_cut() {
 fn garbage_lines_and_an_empty_listing_give_no_sessions() {
     assert!(parse_listing("").is_empty());
     assert!(parse_listing("garbage\n{\n").is_empty());
+}
+
+#[test]
+fn the_account_holding_a_session_is_told_by_the_folder_it_is_in() {
+    let home = Home::new();
+    home.save(USUAL_FOLDER, PROJECT_SLUG, USUAL_SESSION, "on the usual account");
+    home.save(WORK_FOLDER, PROJECT_SLUG, WORK_SESSION, "on the work account");
+
+    let holder = |id: &str| holder_account(&home.run(&holder_script(PROJECT_SLUG, &SessionId::new(id))));
+
+    assert_eq!(holder(WORK_SESSION).as_deref(), Some(WORK_ACCOUNT));
+    assert_eq!(holder(USUAL_SESSION), None, "the usual account has no name");
+    assert_eq!(holder("cccc-3333"), None, "a session no account holds is left to the usual one");
 }

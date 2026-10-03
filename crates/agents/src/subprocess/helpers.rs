@@ -1,9 +1,10 @@
 use std::io::{self, BufRead, BufReader, Read};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use atelier_project::{Command, Process, Project};
 
 use crate::session::SessionError;
-use super::types::STDERR_LINES;
+use super::types::{CANCELLED, STDERR_LINES};
 
 /// Starts `command` in the project. A program the host does not have is [`SessionError::Missing`].
 pub fn start(project: &dyn Project, command: &Command) -> Result<Process, SessionError> {
@@ -62,15 +63,28 @@ pub fn output(project: &dyn Project, command: &Command) -> Result<String, Sessio
     Ok(text)
 }
 
+/// How often a running command is checked for a cancel.
+const CANCEL_CHECK: std::time::Duration = std::time::Duration::from_millis(100);
+
 /// Runs `command` to the end, for a command that does its work by running (a sign-in): done when it exits with code 0,
-/// else the reason, in words for the reader: the program is missing, or how it ended and the last thing it wrote to stderr.
-pub fn run(project: &dyn Project, command: &Command) -> Result<(), String> {
+/// else the reason, in words for the reader: the program is missing, or how it ended and the last thing it wrote to
+/// stderr. Setting `cancelled` kills it, and the reason is `cancelled`.
+pub fn run(project: &dyn Project, command: &Command, cancelled: &AtomicBool) -> Result<(), String> {
     let Process { stdin, stdout, mut control } = start(project, command).map_err(|error| match error {
         SessionError::Start(why) => why,
         other => other.to_string(),
     })?;
     drop(stdin);
-    lines(stdout).for_each(drop);
+    // Not joined: a child of the command can keep the pipe open past the command's end.
+    std::thread::spawn(move || lines(stdout).for_each(drop));
+    while control.running() {
+        if cancelled.load(Ordering::SeqCst) {
+            let _ = control.kill();
+            let _ = control.wait();
+            return Err(CANCELLED.into());
+        }
+        std::thread::sleep(CANCEL_CHECK);
+    }
     let code = control.wait().map_err(|error| error.to_string())?;
     match code {
         Some(0) => Ok(()),
