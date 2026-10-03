@@ -16,7 +16,13 @@ pub enum Way {
 }
 
 impl Way {
-    pub const ALL: [Way; 5] = [Way::Today, Way::Fade, Way::Settle, Way::Paced, Way::WetInk];
+    pub const EVERY: [Way; 5] = [Way::Today, Way::Fade, Way::Settle, Way::Paced, Way::WetInk];
+
+    /// The ways shown: all, or the letters in `WORDS_ONLY` (`AB`).
+    pub fn shown() -> Vec<Way> {
+        let only = std::env::var("WORDS_ONLY").unwrap_or_default().to_uppercase();
+        Self::EVERY.into_iter().filter(|w| only.is_empty() || only.contains(w.name().chars().next().unwrap_or(' '))).collect()
+    }
 
     pub fn name(self) -> &'static str {
         match self {

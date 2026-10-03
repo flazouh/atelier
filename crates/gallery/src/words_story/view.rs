@@ -36,7 +36,7 @@ impl WordsStory {
                 }
             }
         });
-        Self { tracks: Way::ALL.iter().map(|w| Track::new(*w, now)).collect(), began: now, last: now, fed: 0, speed, _ticker: ticker }
+        Self { tracks: Way::shown().into_iter().map(|w| Track::new(w, now)).collect(), began: now, last: now, fed: 0, speed, _ticker: ticker }
     }
 
     fn tick(&mut self, cx: &mut Context<Self>) {
@@ -46,7 +46,7 @@ impl WordsStory {
         let hold = std::env::var("WORDS_HOLD").ok().and_then(|v| v.parse().ok()).unwrap_or(HOLD);
         if elapsed >= to + hold {
             eprintln!("LOOP {}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis()));
-            self.tracks = Way::ALL.iter().map(|w| Track::new(*w, now)).collect();
+            self.tracks = Way::shown().into_iter().map(|w| Track::new(w, now)).collect();
             self.began = now;
             self.fed = 0;
             // What was said before the stretch is already on the page.
@@ -87,9 +87,12 @@ impl Render for WordsStory {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let surface = theme.card;
+        if std::env::var("WORDS_DEBUG").is_ok() {
+            eprintln!("THEME primary={:?} accent={:?} info={:?} fg={:?} selection={:?}", theme.primary, theme.accent, theme.info, theme.foreground, theme.selection);
+        }
         let cards = self.tracks.iter().map(|track| {
             let highlights = track.words.iter().enumerate().take_while(|(_, w)| w.range.end <= track.shown_text().len()).map(|(_, w)| {
-                let ink = lay(theme.foreground, theme.primary, w.tint);
+                let ink = lay(theme.foreground, theme.accent, w.tint * 0.85);
                 let ink = lay(ink, surface, 1. - w.a);
                 (w.range.clone(), HighlightStyle { color: Some(ink), ..Default::default() })
             });
@@ -98,7 +101,7 @@ impl Render for WordsStory {
                 .flex()
                 .flex_col()
                 .gap(px(8.))
-                .w(px(400.))
+                .w(px(if Way::shown().len() <= 2 { 620. } else { 400. }))
                 .child(
                     div()
                         .flex()
