@@ -57,6 +57,8 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
   while one of its sessions works (accent) or needs the reader (warning), and how many need them. Sessions
   are every project's, so in Sessions the switcher narrows the list and the panels to one project or shows
   "All projects"; in Issues and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
+  A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O).
+  The sidebar's head does not repeat it.
 - Far left: the view rail, three lenses: Sessions, Issues and Code (`crates/app/src/shell/rail.rs`).
   Sessions carries a count of the sessions that need the reader, in every project. A press on another lens
   shows it with the sidebar; a press on the lens in front hides the sidebar, and the next press shows it

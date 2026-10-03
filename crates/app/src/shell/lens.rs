@@ -1,7 +1,8 @@
 //! What the lenses add to the window: the project switcher in the title bar, the Issues and Code lenses'
 //! sidebars, and the pull requests. Sessions are every project's; Issues and Code are about the project the switcher names.
 
-use atelier_ui::button::{Button, ButtonVariant};
+use atelier_ui::button::{Button, ButtonSize, ButtonVariant};
+use atelier_ui::button_group::ButtonGroup;
 use atelier_ui::menu::{self, Choice, Entry, Menu, MenuItem, MenuLook, Origin};
 use atelier_ui::popover::{Hang, Popover};
 use atelier_ui::project_badge::ProjectBadge;
@@ -221,16 +222,68 @@ impl Shell {
             .debug_name("project-switcher")
             .content(face)
             .trailing_icon(IconName::ChevronDown)
-            .variant(ButtonVariant::Ghost)
             .open(self.switcher_open)
             .on_click(move |_, _, cx| {
                 cx.stop_propagation();
                 drop(toggle.update(cx, |s, cx| {
                     s.switcher_open = !s.switcher_open;
+                    s.add_open = false;
                     cx.notify();
                 }))
             });
-        Some(div().relative().child(crate::control::marked("project-switcher", button)).children(menu).into_any_element())
+        let toggle = this.clone();
+        let add = Button::new("add-project")
+            .debug_name("add-project")
+            .icon(IconName::Add)
+            .tooltip("Add a project")
+            .open(self.add_open)
+            .on_click(move |_, _, cx| {
+                cx.stop_propagation();
+                drop(toggle.update(cx, |s, cx| {
+                    s.add_open = !s.add_open;
+                    s.switcher_open = false;
+                    cx.notify();
+                }))
+            });
+        let group = ButtonGroup::new("project-switcher-group").variant(ButtonVariant::Secondary).size(ButtonSize::Sm).child(button).child(add);
+        Some(
+            div()
+                .relative()
+                .child(crate::control::marked("project-switcher", group))
+                .children(menu)
+                .children(self.add_open.then(|| self.add_menu(cx)))
+                .into_any_element(),
+        )
+    }
+
+    /// What the add button next to the switcher offers: a folder on this machine, or one over SSH.
+    fn add_menu(&self, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity().downgrade();
+        let ask = |label: &'static str, debug: &'static str, cap: &'static str, remote: bool| {
+            let shell = this.clone();
+            Entry::from(MenuItem::new(label).debug_name(debug).cap(atelier_ui::keys::cap(cap)).on_select(move |window, cx| {
+                drop(shell.update(cx, |s, cx| {
+                    s.add_open = false;
+                    if remote { s.open_ssh_form(&super::structs::OpenRemote, window, cx) } else { s.open_folder(&super::structs::OpenFolder, window, cx) }
+                    cx.notify();
+                }))
+            }))
+        };
+        let entries = vec![ask("Open folder…", "add-folder", "⌘o", false), ask("Open over SSH…", "add-ssh", "⌘⇧o", true)];
+        let close = this.clone();
+        Popover::new("add-project-popover")
+            .open(true)
+            .hang(Hang::Left(0., 30.))
+            .keep_focus()
+            .height(menu::height_of(MenuLook::SELECT, &entries))
+            .on_close(move |_, cx| {
+                drop(close.update(cx, |s, cx| {
+                    s.add_open = false;
+                    cx.notify();
+                }))
+            })
+            .child(Menu::new("add-project-menu", entries).look(MenuLook::SELECT).min_width(200.).origin(Origin::TopLeft))
+            .into_any_element()
     }
 
     /// The switcher's choice: in Sessions it narrows the list and the panels to one project, or shows them all;
