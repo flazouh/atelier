@@ -11,11 +11,11 @@ use super::super::{
     wire::{Block, CanUseTool, Content, ControlBody, ControlRequest, Delta, Finish, Line, Message, Stream, StreamEvent, System},
 };
 use crate::{
-    session::{BlockId, Choice, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage},
+    session::{BlockId, Choice, ContextFill, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage},
     subprocess,
 };
 use super::types::{ALLOW, ALLOW_ALWAYS, DENY, Open};
-use super::helpers::{flatten, is_agent_task, task_number, todo_status, tool_output};
+use super::helpers::{context_tokens, context_window, flatten, known_window, is_agent_task, task_number, todo_status, tool_output};
 
 /// A question `claude` asked and atelier has not answered.
 struct Asked {
@@ -45,6 +45,9 @@ pub struct Mapper {
     asked: HashMap<RequestId, Asked>,
     turn_open: bool,
     ended: bool,
+    context: ContextFill,
+    /// The model of the latest main-thread reply, whose window the context fills.
+    model: Option<String>,
 }
 
 impl Mapper {
@@ -272,8 +275,17 @@ impl Mapper {
         }
         let parent = message.parent_tool_use_id.map(ToolId::new);
         let streamed = message.message.id.as_ref().is_some_and(|id| self.streamed.contains(id));
-        let Content::Blocks(blocks) = message.message.content else { return Vec::new() };
         let mut events = Vec::new();
+        if parent.is_none() {
+            if let Some(model) = message.message.model {
+                self.model = Some(model);
+            }
+            if let Some(usage) = &message.message.usage {
+                let window = self.model.as_deref().and_then(known_window).or(self.context.window);
+                events.extend(self.context_changed(ContextFill { used: context_tokens(usage), window }));
+            }
+        }
+        let Content::Blocks(blocks) = message.message.content else { return events };
         for block in blocks {
             match block {
                 Block::Text { text } if !streamed && !text.is_empty() => {
@@ -349,8 +361,16 @@ impl Mapper {
                 cost_usd: finish.total_cost_usd,
             }));
         }
+        if let Some(window) = context_window(&finish.model_usage, self.model.as_deref()) {
+            events.extend(self.context_changed(ContextFill { window: Some(window), ..self.context }));
+        }
         events.push(Event::TurnEnded(TurnEnd { outcome, summary: finish.result.filter(|text| !text.is_empty()) }));
         events
+    }
+
+    /// The event for a new reading of the context, or nothing when it is the same as the last.
+    fn context_changed(&mut self, context: ContextFill) -> Option<Event> {
+        (std::mem::replace(&mut self.context, context) != context).then_some(Event::Context(context))
     }
 
     fn control_request(&mut self, request: ControlRequest) -> Vec<Event> {

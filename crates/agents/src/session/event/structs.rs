@@ -117,6 +117,14 @@ pub struct Usage {
     pub cost_usd: Option<f64>,
 }
 
+/// How full the agent's context window is: the tokens its latest request carried, and the window's
+/// size once the agent has told it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ContextFill {
+    pub used: u64,
+    pub window: Option<u64>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TurnEnd {
     pub outcome: TurnOutcome,

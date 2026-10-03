@@ -266,7 +266,7 @@ impl Gallery {
             .and_then(|name| Story::ALL.into_iter().find(|s| s.title().eq_ignore_ascii_case(&name)))
             .unwrap_or(Story::AgentPanel);
         let prompt = cx.new(|cx| {
-            PromptInput::new(
+            let mut input = PromptInput::new(
                 "Ask the agent to do something…",
                 "Review the current implementation and suggest the next improvement.",
                 window,
@@ -274,13 +274,16 @@ impl Gallery {
             )
             .models(preview_models())
             .model("gpt-5.2")
-            .actions(preview_actions())
+            .actions(preview_actions());
+            input.set_context(84_000, 200_000, cx);
+            input
         });
         let panel_prompt = cx.new(|cx| {
             let mut input = PromptInput::new("Ask Claude Code", "", window, cx)
                 .models(vec![PromptModel::new("sonnet-5", "Sonnet 5")])
                 .model("sonnet-5");
             input.set_running(true, cx);
+            input.set_context(172_000, 200_000, cx);
             input
         });
         // The gallery only prints what the input asked for; the app will act on it.

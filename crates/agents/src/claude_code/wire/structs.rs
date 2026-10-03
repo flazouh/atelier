@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -39,6 +41,11 @@ pub(in super::super) struct Started {
 pub(in super::super) struct Body {
     pub id: Option<String>,
     pub content: Content,
+    /// An assistant message's own tokens: what its request carried, so how full the context is.
+    #[serde(default)]
+    pub usage: Option<RawUsage>,
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +72,15 @@ pub(in super::super) struct Finish {
     pub usage: Option<RawUsage>,
     #[serde(default)]
     pub errors: Vec<String>,
+    /// Each model the turn used, by name.
+    #[serde(default, rename = "modelUsage")]
+    pub model_usage: HashMap<String, ModelUsage>,
+}
+
+#[derive(Deserialize)]
+pub(in super::super) struct ModelUsage {
+    #[serde(rename = "contextWindow")]
+    pub context_window: Option<u64>,
 }
 
 #[derive(Deserialize, Default)]

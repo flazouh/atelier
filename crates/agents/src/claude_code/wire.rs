@@ -5,5 +5,5 @@
 mod structs;
 mod types;
 
-pub(super) use structs::{CanUseTool, ControlRequest, Finish, Message, Stream, System};
+pub(super) use structs::{CanUseTool, ControlRequest, Finish, Message, ModelUsage, RawUsage, Stream, System};
 pub(super) use types::{Block, Content, ControlBody, Delta, Line, StreamEvent};

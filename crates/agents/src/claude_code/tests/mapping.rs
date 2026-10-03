@@ -479,3 +479,52 @@ fn the_init_lists_the_agents_own_commands() {
     let [Event::Started(started)] = events.as_slice() else { panic!("{events:?}") };
     assert_eq!(started.commands, ["compact", "review", "goal"]);
 }
+
+fn contexts(events: &[Event]) -> Vec<crate::session::ContextFill> {
+    events.iter().filter_map(|e| if let Event::Context(context) = e { Some(*context) } else { None }).collect()
+}
+
+fn reply(model: &str, input: u64, cache: u64, parent: Option<&str>) -> String {
+    json!({
+        "type": "assistant",
+        "parent_tool_use_id": parent,
+        "message": {"id": format!("m-{input}"), "model": model, "content": [], "usage": {"input_tokens": input, "cache_read_input_tokens": cache, "output_tokens": 10}},
+    })
+    .to_string()
+}
+
+fn result_with_windows(windows: &[(&str, u64)]) -> String {
+    let models: serde_json::Map<_, _> = windows.iter().map(|(name, window)| (name.to_string(), json!({"contextWindow": window}))).collect();
+    json!({"type": "result", "subtype": "success", "result": "ok", "modelUsage": models}).to_string()
+}
+
+#[test]
+fn a_recorded_turn_tells_how_full_the_context_is_and_then_its_window() {
+    let told = contexts(&replay("plain"));
+    let first = told.first().expect("the reply tells the context");
+    assert!(first.used > 0 && first.window.is_none(), "the reply knows its tokens, not the window: {first:?}");
+    assert_eq!(told.last().and_then(|c| c.window), Some(1_000_000), "the result tells the model's window");
+}
+
+#[test]
+fn the_context_follows_the_latest_main_reply_and_the_window_its_model() {
+    let mut mapper = Mapper::new();
+    let now = Instant::now();
+    let mut events = mapper.line(&reply("opus", 100, 1_000, None), now);
+    events.extend(mapper.line(&reply("opus", 100, 1_000, None), now));
+    events.extend(mapper.line(&reply("haiku", 5, 90_000, Some("toolu_sub")), now));
+    events.extend(mapper.line(&reply("opus", 200, 2_000, None), now));
+    events.extend(mapper.line(&result_with_windows(&[("haiku", 1_000_000), ("opus", 200_000)]), now));
+    let told: Vec<_> = contexts(&events).iter().map(|c| (c.used, c.window)).collect();
+    assert_eq!(told, [(1_110, None), (2_210, None), (2_210, Some(200_000))], "a repeat and a subagent's reply tell nothing");
+}
+
+#[test]
+fn a_window_one_session_learned_shows_at_once_in_the_next() {
+    let now = Instant::now();
+    let mut first = Mapper::new();
+    first.line(&reply("model-learned-once", 100, 0, None), now);
+    first.line(&result_with_windows(&[("model-learned-once", 400_000)]), now);
+    let told = contexts(&Mapper::new().line(&reply("model-learned-once", 300, 0, None), now));
+    assert_eq!(told.iter().map(|c| (c.used, c.window)).collect::<Vec<_>>(), [(310, Some(400_000))]);
+}
