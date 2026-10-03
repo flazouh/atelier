@@ -15,7 +15,8 @@ impl ClaudeLineMapper {
         }
         let tail = subprocess::stderr_tail(stderr);
         let why = subprocess::exit_why(code, &tail);
-        let mut events = self.fail_open_tools(&why, false);
+        let mut events = self.flush_held();
+        events.extend(self.fail_open_tools(&why, false));
         events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
         let mut open: Vec<_> = self.subagents.drain().collect();
         open.sort();
@@ -39,10 +40,11 @@ impl ClaudeLineMapper {
         };
         let mut open: Vec<_> = self.running.drain().collect();
         open.sort();
-        let mut events: Vec<Event> = open
-            .into_iter()
-            .map(|id| Event::ToolFinished { id, output: ToolOutput { text: note.into(), is_error: !ok, truncated: false, full_at: None } })
-            .collect();
+        let mut events = self.flush_held();
+        events.extend(
+            open.into_iter()
+                .map(|id| Event::ToolFinished { id, output: ToolOutput { text: note.into(), is_error: !ok, truncated: false, full_at: None } }),
+        );
         let mut subagents: Vec<_> = self.subagents.drain().collect();
         subagents.sort();
         events.extend(subagents.into_iter().map(|id| Event::SubagentEnded { id, ok, summary: Some(note.into()) }));

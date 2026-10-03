@@ -18,7 +18,11 @@ impl ClaudeLineMapper {
             Line::System(system) => self.system(system),
             Line::StreamEvent(stream) => self.stream(stream, now),
             Line::Assistant(message) => self.assistant(message),
-            Line::User(message) => self.user(message),
+            Line::User(message) => {
+                let mut events = if message.sidechain || message.written_by_claude() { Vec::new() } else { self.flush_held() };
+                events.extend(self.user(message));
+                events
+            }
             Line::Finished(finish) => self.finished(finish),
             Line::ControlRequest(request) => self.control_request(request),
             Line::ControlCancelRequest { request_id } => self.permission_cancelled(request_id),

@@ -628,3 +628,38 @@ fn a_run_with_no_sign_in_tells_so_instead_of_showing_the_cli_s_advice() {
     let Some(Event::TurnEnded(end)) = events.last() else { panic!("the last event is {:?}", events.last()) };
     assert!(matches!(end.outcome, TurnOutcome::Failed(_)), "the turn did not go: {end:?}");
 }
+
+fn own_reply(text: &str) -> String {
+    json!({"type": "assistant", "message": {"id": "m", "model": "<synthetic>", "role": "assistant", "content": [{"type": "text", "text": text}], "usage": {"input_tokens": 0, "output_tokens": 0}}}).to_string()
+}
+
+fn failed_result(text: &str) -> String {
+    json!({"type": "result", "subtype": "success", "is_error": true, "result": text}).to_string()
+}
+
+#[test]
+fn a_reached_limit_is_told_once_not_again_in_the_reply_claude_wrote() {
+    let mut mapper = ClaudeLineMapper::new();
+    let now = Instant::now();
+    mapper.user_sent("m1".into());
+    let words = "You've hit your weekly limit · resets Oct 4, 9pm (UTC)";
+    // As `claude` orders them: the reply it wrote, then the limit, then the failed result.
+    let mut events = mapper.line(&own_reply(words), now);
+    assert!(events.is_empty(), "held until the result says whether the limit tells it");
+    events.extend(mapper.line(&rate_limit("rejected", "seven_day"), now));
+    events.extend(mapper.line(&failed_result(words), now));
+    assert!(events.iter().any(|e| matches!(e, Event::Limit(_))));
+    assert!(!events.iter().any(|e| matches!(e, Event::Text { .. })), "no text: {events:?}");
+    assert!(matches!(events.last(), Some(Event::TurnEnded(end)) if matches!(end.outcome, TurnOutcome::Failed(_))));
+}
+
+#[test]
+fn a_reply_claude_wrote_without_a_limit_shows_before_the_turn_ends() {
+    let mut mapper = ClaudeLineMapper::new();
+    let now = Instant::now();
+    mapper.user_sent("m1".into());
+    let mut events = mapper.line(&own_reply("Prompt is too long"), now);
+    events.extend(mapper.line(&failed_result("Prompt is too long"), now));
+    let [Event::Text { delta, .. }, Event::TurnEnded(_)] = events.as_slice() else { panic!("{events:?}") };
+    assert_eq!(delta, "Prompt is too long");
+}
