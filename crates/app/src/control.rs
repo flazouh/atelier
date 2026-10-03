@@ -6,13 +6,18 @@
 //! - `{"cmd":"state"}`: the open projects and sessions, each with its agent, status and the rows the list shows.
 //! - `{"cmd":"new_session"}` or `{"cmd":"new_session","agent":"Cursor"}`: opens a session in the active project.
 //! - `{"cmd":"send","text":"hello"}`: sends a message in the session in front, as the composer does.
+//! - `{"cmd":"find","name":"limit-continue"}` and `{"cmd":"click","name":"limit-continue"}`: where an element marked with
+//!   [`marked`] was last drawn, and a press on it. `{"cmd":"click","x":10,"y":20}` presses a point of the window.
+//! - `{"cmd":"limit"}`: pretends the account of the session in front reached its weekly limit, to see the box.
 //!
 //! `tools/atelier-ctl.sh` is the client, and `tools/dev-qa.sh` starts an app to drive.
 
 mod helpers;
+mod marks;
 mod types;
 
 pub use helpers::{serve, socket_path};
+pub use marks::marked;
 
 #[cfg(test)]
 mod tests;
