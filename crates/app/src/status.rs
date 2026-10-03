@@ -4,6 +4,7 @@
 
 use atelier_ui::session_status::{Need, SessionStatus, short_reason};
 use atelier_agents::session::{EndReason, Event, TurnOutcome};
+use atelier_agents::subprocess::strip_ansi;
 
 /// The status after `event`, from `now`. `seen` says the reader is looking at this session.
 pub fn after(now: &SessionStatus, event: &Event, seen: bool) -> SessionStatus {
@@ -12,17 +13,17 @@ pub fn after(now: &SessionStatus, event: &Event, seen: bool) -> SessionStatus {
         // An answered or withdrawn question hands the turn back to the agent.
         Event::PermissionCancelled(_) if matches!(now, SessionStatus::NeedsYou(_)) => SessionStatus::Working,
         Event::TurnEnded(end) => match &end.outcome {
-            TurnOutcome::Failed(why) => SessionStatus::Failed(short_reason(why)),
+            TurnOutcome::Failed(why) => SessionStatus::Failed(short_reason(&strip_ansi(why))),
             TurnOutcome::Completed | TurnOutcome::Interrupted if seen => SessionStatus::Idle,
             TurnOutcome::Completed | TurnOutcome::Interrupted => SessionStatus::Finished,
         },
-        Event::Ended(EndReason::Failed(why)) => SessionStatus::Failed(short_reason(why)),
+        Event::Ended(EndReason::Failed(why)) => SessionStatus::Failed(short_reason(&strip_ansi(why))),
         // Stopped by the reader: nothing runs any more, and nothing waits.
         Event::Ended(EndReason::Closed) if matches!(now, SessionStatus::Working | SessionStatus::NeedsYou(_)) => SessionStatus::Idle,
         Event::Ended(EndReason::Exited { code, stderr }) if !matches!(now, SessionStatus::Failed(_)) => match code {
             Some(0) if matches!(now, SessionStatus::Idle | SessionStatus::Finished) => now.clone(),
             // The row says the agent's own last words when it left any.
-            _ if !stderr.trim().is_empty() => SessionStatus::Failed(short_reason(last_line(stderr))),
+            _ if !stderr.trim().is_empty() => SessionStatus::Failed(short_reason(&strip_ansi(last_line(stderr)))),
             Some(code) => SessionStatus::Failed(format!("the agent exited with code {code}").into()),
             None => SessionStatus::Failed("the agent was stopped".into()),
         },

@@ -400,6 +400,8 @@ impl Protocol {
 
     /// Ends a connection that cannot go on.
     fn fail(&mut self, step: &mut Step, why: String, now: Instant) {
+        // The agent's own words can carry the terminal's colour codes; a row that shows them shows `[36m`.
+        let why = subprocess::strip_ansi(&why);
         if !matches!(self.goal, Goal::Open(_)) {
             return self.finish(step, Err(SessionError::Start(why)));
         }
