@@ -15,7 +15,8 @@ start)
   cargo build -q -p atelier-app
   TARGET=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
   FOLDER=${2:-$RUN/project}
-  if [ ! -d "$FOLDER/.git" ]; then
+  # Only a folder that is not a repository yet becomes a scratch one; a checkout or a worktree is left as it is.
+  if ! git -C "$FOLDER" rev-parse --git-dir >/dev/null 2>&1; then
     mkdir -p "$FOLDER"; git -C "$FOLDER" init -q
     echo "# scratch" >"$FOLDER/README.md"; git -C "$FOLDER" add -A
     git -C "$FOLDER" -c user.name=qa -c user.email=qa@qa -c commit.gpgsign=false commit -qm init

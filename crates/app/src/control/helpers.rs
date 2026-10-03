@@ -126,11 +126,20 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
             };
             match at {
                 Some(position) => {
-                    press(window, position, cx);
+                    // The press runs once the shell is no longer being updated, so a handler can update it.
+                    window.defer(cx, move |window, cx| press(window, position, cx));
                     json!({ "ok": true, "x": f32::from(position.x), "y": f32::from(position.y) })
                 }
                 None => json!({ "error": "click needs a name that has been drawn, or x and y" }),
             }
+        }
+        Request::View { name } => {
+            let view = crate::shell::ShellView::from_words(Some(&name));
+            if view.words() != name {
+                return json!({ "error": format!("no view named {name}") });
+            }
+            shell.go_to(view, window, cx);
+            json!({ "ok": true, "view": view.words() })
         }
         Request::Send { text } => match shell.front_session(cx) {
             Some(session) => {

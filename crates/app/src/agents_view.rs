@@ -8,7 +8,7 @@ mod helpers;
 mod structs;
 mod types;
 
-pub use helpers::{newest_first, panels, pick, project_id, sidebar};
+pub use helpers::{badges, newest_first, panels, pick, project_id, sidebar};
 #[cfg(test)]
 pub use helpers::badge_of;
 pub use structs::Badges;

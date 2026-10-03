@@ -98,6 +98,14 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
         .collect()
 }
 
+/// Each project's badge, in the order of `projects`, as the sidebar draws it.
+pub fn badges(projects: &[Entity<OpenProject>], badges: &Badges, cx: &App) -> Vec<Badge> {
+    let places: Vec<(String, String)> = projects.iter().map(|p| (project_id(p.read(cx)).to_string(), p.read(cx).name())).collect();
+    let pairs: Vec<(&str, &str)> = places.iter().map(|(place, name)| (place.as_str(), name.as_str())).collect();
+    let labels = project_badge::labels(&pairs);
+    places.iter().map(|(place, _)| badge_of(place, labels.get(place).map_or("", String::as_str), badges)).collect()
+}
+
 /// A panel for each open session, and the projects' order for grouping.
 /// The open sessions as panels. `view_of` gives each session's own view (`SessionPanel`), kept across syncs.
 pub fn panels(

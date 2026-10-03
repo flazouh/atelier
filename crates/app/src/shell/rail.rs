@@ -17,19 +17,20 @@ use crate::agent_session::AgentSession;
 use crate::open_project::OpenProject;
 use crate::review_pane::Scope;
 
-fn rail_view(view: ShellView) -> RailView {
+fn rail_view(view: ShellView, needs_you: usize) -> RailView {
     match view {
-        ShellView::Tasks => RailView { icon: IconName::Checklist, label: "Tasks".into(), debug: "rail-tasks" },
-        ShellView::Git => RailView { icon: IconName::PrOpen, label: "Git".into(), debug: "rail-git" },
-        _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions" },
+        ShellView::Tasks => RailView { icon: IconName::Checklist, label: "Issues".into(), debug: "rail-tasks", count: 0 },
+        ShellView::Git => RailView { icon: IconName::Code, label: "Code".into(), debug: "rail-git", count: 0 },
+        _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions", count: needs_you },
     }
 }
 
 impl Shell {
     /// The rail, with the view in front marked, folded while the sidebar is hidden.
     pub(super) fn view_rail(&self, open: bool, cx: &mut Context<Self>) -> AnyElement {
-        let views = ShellView::ON_RAIL.into_iter().map(rail_view).collect();
-        let selected = ShellView::ON_RAIL.iter().position(|v| *v == self.view).unwrap_or(usize::MAX);
+        let needs_you = self.needs_you(cx);
+        let views = ShellView::ON_RAIL.into_iter().map(|v| rail_view(v, needs_you)).collect();
+        let selected = ShellView::ON_RAIL.iter().position(|v| *v == self.view.lens()).unwrap_or(usize::MAX);
         let this = cx.entity().downgrade();
         ViewRail::new("view-rail", views, selected, open)
             .on_select(move |i, window, cx| {
@@ -42,7 +43,7 @@ impl Shell {
     /// hides or shows the sidebar.
     pub(super) fn pick_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         let fit = Fit::of(atelier_ui::scale::design(window.viewport_size().width));
-        if view == self.view {
+        if view == self.view.lens() {
             return self.flip_sidebar(fit, cx);
         }
         if !self.sidebar_shown(fit) {
@@ -50,7 +51,7 @@ impl Shell {
         }
         match view {
             ShellView::Tasks => self.show_tasks(window, cx),
-            ShellView::Git => self.show_git(window, cx),
+            ShellView::Git => self.show_code(self.code_view, window, cx),
             _ => self.show_view(view, window, cx),
         }
     }
@@ -126,10 +127,10 @@ impl Shell {
     /// The Git view's main area: the review, or a word on how to open one.
     pub(super) fn git_main(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         if let Some((pane, _)) = project.read(cx).review.as_ref() {
-            return div().debug_selector(|| "review-in-place".into()).size_full().pt(px(8.)).pr(px(8.)).pb(px(4.)).child(pane.clone()).into_any_element();
+            return div().debug_selector(|| "review-in-place".into()).size_full().pl(px(atelier_ui::panel_layout::GAP)).pr(px(8.)).pb(px(8.)).child(pane.clone()).into_any_element();
         }
         let muted = cx.theme().muted_foreground;
-        div()
+        let empty = div()
             .debug_selector(|| "git-empty".into())
             .flex()
             .size_full()
@@ -138,7 +139,8 @@ impl Shell {
             .text_size(TextSize::Xs.font_size())
             .text_color(muted)
             .child("Press a changed file to review it.")
-            .into_any_element()
+            .into_any_element();
+        self.code_card(empty, cx)
     }
 
     /// The Tasks view's main area: the board, loaded on the first look.
@@ -147,7 +149,7 @@ impl Shell {
             project.update(cx, |p, cx| p.mount_tasks(window, cx));
         }
         match project.read(cx).tasks.as_ref() {
-            Some(slot) => div().debug_selector(|| "tasks-view".into()).size_full().pt(px(8.)).pr(px(8.)).pb(px(4.)).child(slot.pane.clone()).into_any_element(),
+            Some(slot) => div().debug_selector(|| "tasks-view".into()).size_full().pl(px(atelier_ui::panel_layout::GAP)).pr(px(8.)).pb(px(8.)).child(slot.pane.clone()).into_any_element(),
             None => div().into_any_element(),
         }
     }
