@@ -5,6 +5,7 @@
 #   tools/atelier-ctl.sh state
 #   tools/atelier-ctl.sh new_session [agent]     e.g. Cursor, "Claude Code"
 #   tools/atelier-ctl.sh send "a message"
+#   tools/atelier-ctl.sh limit                  pretend the front session hit its weekly limit
 # Each prints the app's JSON answer, one line.
 set -euo pipefail
 [ $# -ge 1 ] || { sed -n 2,9p "$0"; exit 2; }
@@ -14,6 +15,11 @@ cmd, rest = sys.argv[1], sys.argv[2:]
 request = {"cmd": cmd}
 if cmd == "new_session" and rest:
     request["agent"] = rest[0]
+if cmd == "find" or cmd == "click":
+    if rest and not rest[0].isdigit():
+        request["name"] = rest[0]
+    elif len(rest) == 2:
+        request["x"], request["y"] = float(rest[0]), float(rest[1])
 if cmd == "send":
     request["text"] = " ".join(rest)
 

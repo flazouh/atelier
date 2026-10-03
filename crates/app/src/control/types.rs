@@ -1,12 +1,17 @@
 use serde::Deserialize;
 
 /// One line the socket takes.
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum Request {
     State,
     NewSession { agent: Option<String> },
     Send { text: String },
+    /// Pretends the front session's account reached its weekly limit, resetting in 30 h 39 min.
+    Limit,
+    Find { name: String },
+    /// A press on a marked element's centre, or on a point (`x`, `y`) of the window.
+    Click { name: Option<String>, x: Option<f32>, y: Option<f32> },
 }
 
 /// The longest text a row's description keeps.

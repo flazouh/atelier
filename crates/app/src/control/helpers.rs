@@ -102,6 +102,36 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
                 None => json!({ "error": "no project is open" }),
             }
         }
+        Request::Limit => match shell.front_session(cx) {
+            Some(session) => {
+                use atelier_agents::session::{Event, Limit, LimitState, LimitWindow};
+                let resets_at = Some(crate::agent_session::now() + 30 * 3600 + 39 * 60);
+                session.update(cx, |s, cx| {
+                    s.conversation.apply(&Event::Limit(Limit { state: LimitState::Reached, resets_at, window: Some(LimitWindow::Weekly) }));
+                    cx.notify();
+                });
+                json!({ "ok": true, "session": session.read(cx).key.as_ref() })
+            }
+            None => json!({ "error": "no session is in front" }),
+        },
+        Request::Find { name } => match super::marks::find(&name, cx) {
+            Some(b) => json!({ "x": f32::from(b.origin.x), "y": f32::from(b.origin.y), "w": f32::from(b.size.width), "h": f32::from(b.size.height) }),
+            None => json!({ "error": format!("{name} has not been drawn") }),
+        },
+        Request::Click { name, x, y } => {
+            let at = match (name, x, y) {
+                (Some(name), _, _) => super::marks::find(&name, cx).map(|b| b.center()),
+                (None, Some(x), Some(y)) => Some(gpui_kit::point(gpui_kit::px(x), gpui_kit::px(y))),
+                _ => None,
+            };
+            match at {
+                Some(position) => {
+                    press(window, position, cx);
+                    json!({ "ok": true, "x": f32::from(position.x), "y": f32::from(position.y) })
+                }
+                None => json!({ "error": "click needs a name that has been drawn, or x and y" }),
+            }
+        }
         Request::Send { text } => match shell.front_session(cx) {
             Some(session) => {
                 session.update(cx, |s, cx| s.send(text, cx));
@@ -169,4 +199,13 @@ fn item_json(item: &Item) -> Value {
 
 fn cut(text: &str) -> String {
     text.chars().take(TEXT_KEPT).collect()
+}
+
+/// A left press and release at `position`, as the pointer would do.
+fn press(window: &mut Window, position: gpui_kit::Point<gpui_kit::Pixels>, cx: &mut App) {
+    use gpui_kit::{Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput};
+    let modifiers = Modifiers::default();
+    window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position, pressed_button: None, modifiers }), cx);
+    window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: MouseButton::Left, position, modifiers, click_count: 1, first_mouse: false }), cx);
+    window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: MouseButton::Left, position, modifiers, click_count: 1 }), cx);
 }
