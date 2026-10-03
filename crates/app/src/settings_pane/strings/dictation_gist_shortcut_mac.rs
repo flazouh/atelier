@@ -1,0 +1,43 @@
+//! Hold it to talk; tap it to keep talking, and tap again to stop. A shortcut with the key still works.
+//!
+//! Muted small text under the dictation key choice, on a Mac, when the key is the Option key. 'It' is that key. May wrap to two lines.
+use atelier_i18n::Message;
+
+pub const DICTATION_GIST_SHORTCUT_MAC: Message = Message {
+    ar: "اضغط مطولًا للتحدث، أو اضغط مرةً لمواصلة الحديث ومرةً أخرى للتوقف. يظل الاختصار الذي يستخدم هذا المفتاح يعمل.",
+    ca: "Mantén-la premuda per parlar; prem-la per continuar parlant i torna-la a prémer per aturar-te. Les dreceres amb aquesta tecla continuen funcionant.",
+    cs: "Podržením začneš mluvit, klepnutím budeš pokračovat a dalším klepnutím přestaneš. Zkratky s touto klávesou dál fungují.",
+    da: "Hold den nede for at tale. Tryk på den for at fortsætte med at tale, og tryk igen for at stoppe. Genveje med tasten virker stadig.",
+    de: "Zum Sprechen gedrückt halten. Einmal drücken, um weiterzusprechen, und erneut drücken, um zu stoppen. Tastenkürzel mit dieser Taste funktionieren weiterhin.",
+    el: "Κράτησέ το πατημένο για να μιλήσεις. Πάτησέ το για να συνεχίσεις να μιλάς και ξανά για να σταματήσεις. Οι συντομεύσεις με αυτό το πλήκτρο εξακολουθούν να λειτουργούν.",
+    en: "Hold it to talk; tap it to keep talking, and tap again to stop. A shortcut with the key still works.",
+    es: "Manténla pulsada para hablar; púlsala para seguir hablando y vuelve a pulsarla para parar. Los atajos con esta tecla siguen funcionando.",
+    es_419: "Manténla presionada para hablar; presiónala para seguir hablando y vuelve a presionarla para detenerte. Los atajos con esta tecla siguen funcionando.",
+    fi: "Pidä näppäintä painettuna puhuaksesi. Jatka puhumista painamalla sitä ja lopeta painamalla uudelleen. Näppäintä käyttävät pikanäppäimet toimivat edelleen.",
+    fr: "Maintenez la touche enfoncée pour parler. Appuyez dessus pour continuer, puis appuyez à nouveau pour arrêter. Les raccourcis utilisant cette touche fonctionnent toujours.",
+    fr_ca: "Maintenez la touche enfoncée pour parler. Appuyez dessus pour continuer, puis appuyez de nouveau pour arrêter. Les raccourcis utilisant cette touche fonctionnent toujours.",
+    he: "החזיקו את המקש לחוץ כדי לדבר. לחצו עליו כדי להמשיך לדבר, ולחצו שוב כדי לעצור. קיצורי מקלדת עם המקש הזה עדיין פועלים.",
+    hi: "बोलने के लिए इसे दबाकर रखें। बोलना जारी रखने के लिए इसे दबाएँ और रोकने के लिए फिर से दबाएँ। इस कुंजी वाले शॉर्टकट फिर भी काम करते हैं।",
+    hr: "Drži tipku za govor. Pritisni je za nastavak govora, a zatim ponovno za zaustavljanje. Prečaci s tom tipkom i dalje rade.",
+    hu: "Beszédhez tartsd lenyomva. A folytatáshoz koppints rá, a leállításhoz pedig koppints rá újra. Az ezzel a billentyűvel működő gyorsbillentyűk továbbra is használhatók.",
+    id: "Tahan untuk berbicara. Ketuk untuk terus berbicara, lalu ketuk lagi untuk berhenti. Pintasan dengan tombol ini tetap berfungsi.",
+    it: "Tieni premuto per parlare; tocca per continuare a parlare e tocca di nuovo per fermarti. Le scorciatoie con questo tasto continuano a funzionare.",
+    ja: "押したまま話します。タップすると話し続けられ、もう一度タップすると停止します。このキーを使うショートカットも引き続き使えます。",
+    ko: "길게 눌러 말하고, 탭하면 계속 말할 수 있으며, 다시 탭하면 멈춥니다. 이 키를 사용하는 단축키도 계속 작동합니다.",
+    ms: "Tekan dan tahan untuk bercakap. Ketik untuk terus bercakap, kemudian ketik sekali lagi untuk berhenti. Pintasan yang menggunakan kekunci ini masih berfungsi.",
+    nl: "Houd de toets ingedrukt om te praten. Tik erop om door te praten en tik nogmaals om te stoppen. Sneltoetsen met deze toets blijven werken.",
+    no: "Hold den inne for å snakke. Trykk på den for å fortsette å snakke, og trykk igjen for å stoppe. Snarveier med denne tasten fungerer fortsatt.",
+    pl: "Przytrzymaj, aby mówić. Naciśnij, aby mówić dalej, i naciśnij ponownie, aby zakończyć. Skróty z tym klawiszem nadal działają.",
+    pt_br: "Mantenha pressionada para falar. Toque para continuar falando e toque novamente para parar. Os atalhos com essa tecla continuam funcionando.",
+    pt_pt: "Mantenha a tecla premida para falar. Toque-lhe para continuar a falar e toque-lhe novamente para parar. Os atalhos com esta tecla continuam a funcionar.",
+    ro: "Ține apăsată tasta pentru a vorbi. Apasă pe ea ca să continui să vorbești și apasă din nou ca să te oprești. Comenzile rapide cu această tastă funcționează în continuare.",
+    ru: "Удерживайте клавишу, чтобы говорить. Нажмите её, чтобы продолжить, и нажмите ещё раз, чтобы остановиться. Сочетания клавиш с этой клавишей по-прежнему работают.",
+    sk: "Podržaním začneš hovoriť, klepnutím budeš pokračovať a ďalším klepnutím prestaneš. Skratky s týmto klávesom naďalej fungujú.",
+    sv: "Håll ned tangenten för att prata. Tryck på den för att fortsätta prata och tryck igen för att sluta. Kortkommandon med den här tangenten fungerar fortfarande.",
+    th: "กดค้างไว้เพื่อพูด แตะเพื่อพูดต่อ แล้วแตะอีกครั้งเพื่อหยุด แป้นพิมพ์ลัดที่ใช้ปุ่มนี้ยังใช้งานได้",
+    tr: "Konuşmak için basılı tut. Konuşmaya devam etmek için dokun, durdurmak için tekrar dokun. Bu tuşu kullanan kısayollar çalışmaya devam eder.",
+    uk: "Утримуйте клавішу, щоб говорити. Натисніть її, щоб продовжити, і натисніть ще раз, щоб зупинити. Сполучення клавіш із цією клавішею й далі працюють.",
+    vi: "Nhấn giữ để nói. Chạm để tiếp tục nói, rồi chạm lần nữa để dừng. Các phím tắt dùng phím này vẫn hoạt động.",
+    zh_cn: "按住即可说话；轻点可继续说话，再轻点一次即可停止。使用此键的快捷键仍然有效。",
+    zh_tw: "按住即可說話；點一下可繼續說話，再點一下即可停止。使用此鍵的快速鍵仍然有效。",
+};

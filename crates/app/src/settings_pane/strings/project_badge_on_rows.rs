@@ -1,0 +1,43 @@
+//! Project badge on rows
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A badge is a small coloured mark with a project's initial.
+use atelier_i18n::Message;
+
+pub const PROJECT_BADGE_ON_ROWS: Message = Message {
+    ar: "شارة المشروع على الصفوف",
+    ca: "Insígnia del projecte a les files",
+    cs: "Odznak projektu na řádcích",
+    da: "Projektmærke på rækker",
+    de: "Projektmarkierung in Zeilen",
+    el: "Σήμα έργου στις γραμμές",
+    en: "Project badge on rows",
+    es: "Insignia del proyecto en las filas",
+    es_419: "Insignia del proyecto en las filas",
+    fi: "Projektimerkki riveillä",
+    fr: "Badge du projet dans les lignes",
+    fr_ca: "Badge du projet dans les rangées",
+    he: "תג פרויקט בשורות",
+    hi: "पंक्तियों में प्रोजेक्ट बैज",
+    hr: "Oznaka projekta u recima",
+    hu: "Projektjelvény a sorokban",
+    id: "Lencana proyek pada baris",
+    it: "Badge del progetto nelle righe",
+    ja: "行にプロジェクトバッジを表示",
+    ko: "행에 프로젝트 배지 표시",
+    ms: "Lencana projek pada baris",
+    nl: "Projectbadge op regels",
+    no: "Prosjektmerke på rader",
+    pl: "Odznaka projektu w wierszach",
+    pt_br: "Emblema do projeto nas linhas",
+    pt_pt: "Emblema do projeto nas linhas",
+    ro: "Insigna proiectului pe rânduri",
+    ru: "Значок проекта в строках",
+    sk: "Odznak projektu v riadkoch",
+    sv: "Projektmärke på rader",
+    th: "ป้ายโปรเจกต์บนแถว",
+    tr: "Satırlarda proje rozeti",
+    uk: "Позначка проєкту в рядках",
+    vi: "Huy hiệu dự án trên các hàng",
+    zh_cn: "在行中显示项目徽标",
+    zh_tw: "在列中顯示專案徽章",
+};

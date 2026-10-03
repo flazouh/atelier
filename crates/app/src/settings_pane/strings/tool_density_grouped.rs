@@ -1,0 +1,43 @@
+//! Grouped
+//!
+//! A choice for how much of the agent's tool calls to show: grouped into one summary line. A label on a segmented control: one or two words, so it must stay short.
+use atelier_i18n::Message;
+
+pub const TOOL_DENSITY_GROUPED: Message = Message {
+    ar: "مجمّعة",
+    ca: "Agrupades",
+    cs: "Seskupené",
+    da: "Grupperet",
+    de: "Gruppiert",
+    el: "Ομαδοποιημένα",
+    en: "Grouped",
+    es: "Agrupadas",
+    es_419: "Agrupadas",
+    fi: "Ryhmitelty",
+    fr: "Regroupés",
+    fr_ca: "Regroupés",
+    he: "בקבוצות",
+    hi: "समूहित",
+    hr: "Grupirano",
+    hu: "Csoportosítva",
+    id: "Dikelompokkan",
+    it: "Raggruppate",
+    ja: "グループ化",
+    ko: "그룹으로",
+    ms: "Berkumpulan",
+    nl: "Gegroepeerd",
+    no: "Gruppert",
+    pl: "Pogrupowane",
+    pt_br: "Agrupadas",
+    pt_pt: "Agrupadas",
+    ro: "Grupate",
+    ru: "Сгруппировано",
+    sk: "Zoskupené",
+    sv: "Grupperade",
+    th: "จัดกลุ่ม",
+    tr: "Gruplanmış",
+    uk: "Згруповано",
+    vi: "Theo nhóm",
+    zh_cn: "分组显示",
+    zh_tw: "分組顯示",
+};

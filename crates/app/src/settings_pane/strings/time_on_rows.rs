@@ -1,0 +1,43 @@
+//! Time on rows
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. Rows are the entries in the sidebar's session list.
+use atelier_i18n::Message;
+
+pub const TIME_ON_ROWS: Message = Message {
+    ar: "الوقت في الصفوف",
+    ca: "Hora a les files",
+    cs: "Čas v řádcích",
+    da: "Tid på rækker",
+    de: "Uhrzeit in Zeilen",
+    el: "Ώρα στις γραμμές",
+    en: "Time on rows",
+    es: "Hora en las filas",
+    es_419: "Hora en las filas",
+    fi: "Aika riveillä",
+    fr: "Heure dans les lignes",
+    fr_ca: "Heure dans les lignes",
+    he: "השעה בשורות",
+    hi: "पंक्तियों में समय",
+    hr: "Vrijeme u retcima",
+    hu: "Idő a sorokban",
+    id: "Waktu pada baris",
+    it: "Ora nelle righe",
+    ja: "行に時刻を表示",
+    ko: "행에 시간 표시",
+    ms: "Masa pada baris",
+    nl: "Tijd op regels",
+    no: "Tid på rader",
+    pl: "Godzina w wierszach",
+    pt_br: "Horário nas linhas",
+    pt_pt: "Hora nas linhas",
+    ro: "Ora în rânduri",
+    ru: "Время в строках",
+    sk: "Čas v riadkoch",
+    sv: "Tid på rader",
+    th: "เวลาในแถว",
+    tr: "Satırlarda saat",
+    uk: "Час у рядках",
+    vi: "Thời gian trên các hàng",
+    zh_cn: "在列表项中显示时间",
+    zh_tw: "在清單項目中顯示時間",
+};

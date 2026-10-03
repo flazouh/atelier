@@ -1,0 +1,43 @@
+//! Agents
+//!
+//! An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section. Agents are the AI coding programs, like Claude Code and Cursor.
+use atelier_i18n::Message;
+
+pub const SECTION_AGENTS: Message = Message {
+    ar: "الوكلاء",
+    ca: "Agents",
+    cs: "Agenti",
+    da: "Agenter",
+    de: "Agenten",
+    el: "Πράκτορες",
+    en: "Agents",
+    es: "Agentes",
+    es_419: "Agentes",
+    fi: "Agentit",
+    fr: "Agents",
+    fr_ca: "Agents",
+    he: "סוכנים",
+    hi: "एजेंट",
+    hr: "Agenti",
+    hu: "Ügynökök",
+    id: "Agen",
+    it: "Agenti",
+    ja: "エージェント",
+    ko: "에이전트",
+    ms: "Ejen",
+    nl: "Agents",
+    no: "Agenter",
+    pl: "Agenci",
+    pt_br: "Agentes",
+    pt_pt: "Agentes",
+    ro: "Agenți",
+    ru: "Агенты",
+    sk: "Agenti",
+    sv: "Agenter",
+    th: "เอเจนต์",
+    tr: "Ajanlar",
+    uk: "Агенти",
+    vi: "Tác nhân",
+    zh_cn: "智能体",
+    zh_tw: "智慧代理",
+};

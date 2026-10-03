@@ -1,0 +1,43 @@
+//! The keys of the review. They cannot be changed yet.
+//!
+//! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. The review is the screen where code changes are read and approved.
+use atelier_i18n::Message;
+
+pub const GIST_KEYS: Message = Message {
+    ar: "اختصارات لوحة المفاتيح للمراجعة. لا يمكن تغييرها بعد.",
+    ca: "Dreceres de teclat de la revisió. Encara no es poden canviar.",
+    cs: "Klávesové zkratky pro kontrolu. Zatím je nelze změnit.",
+    da: "Tastaturgenveje til gennemgangen. De kan ikke ændres endnu.",
+    de: "Tastenkürzel für die Überprüfung. Sie können noch nicht geändert werden.",
+    el: "Συντομεύσεις πληκτρολογίου για την αναθεώρηση. Δεν μπορούν να αλλάξουν ακόμη.",
+    en: "The keys of the review. They cannot be changed yet.",
+    es: "Atajos de teclado de la revisión. Aún no se pueden cambiar.",
+    es_419: "Atajos de teclado de la revisión. Todavía no se pueden cambiar.",
+    fi: "Katselmoinnin pikanäppäimet. Niitä ei voi vielä muuttaa.",
+    fr: "Raccourcis clavier de la revue. Ils ne peuvent pas encore être modifiés.",
+    fr_ca: "Raccourcis clavier de la revue. Ils ne peuvent pas encore être modifiés.",
+    he: "קיצורי המקשים של הסקירה. עדיין אי אפשר לשנות אותם.",
+    hi: "समीक्षा के कीबोर्ड शॉर्टकट। इन्हें अभी बदला नहीं जा सकता।",
+    hr: "Tipkovni prečaci za pregled. Još ih nije moguće promijeniti.",
+    hu: "A felülvizsgálat billentyűparancsai. Egyelőre nem módosíthatók.",
+    id: "Tombol pintasan untuk peninjauan. Belum dapat diubah.",
+    it: "Scorciatoie da tastiera della revisione. Non è ancora possibile modificarle.",
+    ja: "レビューのキー設定です。まだ変更できません。",
+    ko: "검토 키입니다. 아직 변경할 수 없습니다.",
+    ms: "Kekunci pintasan untuk semakan. Belum boleh diubah.",
+    nl: "Sneltoetsen voor de review. Je kunt ze nog niet wijzigen.",
+    no: "Tastatursnarveier for gjennomgangen. De kan ikke endres ennå.",
+    pl: "Skróty klawiszowe przeglądu. Nie można ich jeszcze zmienić.",
+    pt_br: "Atalhos de teclado da revisão. Ainda não é possível alterá-los.",
+    pt_pt: "Atalhos de teclado da revisão. Ainda não é possível alterá-los.",
+    ro: "Tastele pentru revizuire. Acestea nu pot fi schimbate încă.",
+    ru: "Клавиши для проверки. Их пока нельзя изменить.",
+    sk: "Klávesové skratky kontroly. Zatiaľ sa nedajú zmeniť.",
+    sv: "Kortkommandon för granskningen. De går inte att ändra än.",
+    th: "ปุ่มลัดสำหรับการตรวจสอบ ยังเปลี่ยนไม่ได้",
+    tr: "İnceleme kısayolları. Henüz değiştirilemiyor.",
+    uk: "Клавіші для перевірки. Їх поки що не можна змінити.",
+    vi: "Phím tắt cho phần xem xét. Hiện chưa thể thay đổi.",
+    zh_cn: "审查快捷键。目前无法更改。",
+    zh_tw: "審查快速鍵。目前無法變更。",
+};

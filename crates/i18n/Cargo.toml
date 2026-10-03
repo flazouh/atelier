@@ -1,0 +1,11 @@
+[package]
+name = "atelier-i18n"
+description = "The app's own languages: the locale list, one typed message per key, the glossary, and the tool that has a model translate a key."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json = "1"
+ureq = "3"

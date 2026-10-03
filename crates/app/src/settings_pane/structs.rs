@@ -1,3 +1,4 @@
+use atelier_i18n::{Locale, t};
 use atelier_ui::{
     ActiveTheme,
     ColorSelector,
@@ -21,6 +22,7 @@ use atelier_ui::scale::px;
 
 use crate::tool_density::ToolDensity;
 use crate::agent_session::dictation;
+use super::strings as words;
 use super::types::{Mode, PRIMARIES, Section, SettingsEvent, dictation_keys};
 use super::helpers::{colour, font_size_words, rule_switch, save};
 
@@ -51,6 +53,8 @@ pub struct SettingsPane {
     pub(super) mics: Vec<atelier_ui::VoiceDevice>,
     /// The Providers section's accounts and key, read when it is shown.
     pub(crate) providers: super::providers::ProvidersPage,
+    /// The language the reader picked; `None` follows the system.
+    pub(super) language: Option<Locale>,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -80,7 +84,18 @@ impl SettingsPane {
             zoom_preview: None,
             mics: Vec::new(),
             providers: Default::default(),
+            language: saved.language.as_deref().and_then(Locale::from_tag),
         }
+    }
+
+    /// Picks the language: entry 0 of the list is the system's, the rest are [`Locale::ALL`]. It takes hold of the words
+    /// read from here on and is kept in the settings.
+    pub(crate) fn choose_language(&mut self, entry: usize, cx: &mut Context<Self>) {
+        self.language = entry.checked_sub(1).and_then(|at| Locale::ALL.get(at).copied());
+        atelier_i18n::set_current(self.language.unwrap_or_else(atelier_i18n::system_locale));
+        let tag = self.language.map(|l| l.tag().to_string());
+        save(cx, move |s| s.language = tag);
+        cx.notify();
     }
 
     fn choose_mode(&mut self, mode: Mode, cx: &mut Context<Self>) {
@@ -180,9 +195,9 @@ impl Render for SettingsPane {
                 this.update(cx, |pane, cx| pane.choose_mode(Mode::ALL[i], cx)).ok();
             })
         };
-        let swatches = std::iter::once(Swatch::new("default", theme.foreground, "Default: the theme's ink")).chain(PRIMARIES.iter().map(|(name, bytes, words)| {
+        let swatches = std::iter::once(Swatch::new("default", theme.foreground, t(&words::DEFAULT_COLOUR))).chain(PRIMARIES.iter().map(|(name, bytes, words)| {
             let color = colour(*bytes);
-            Swatch::new(*name, color, *words).disabled(!can_be_primary(&theme, color))
+            Swatch::new(*name, color, t(words)).disabled(!can_be_primary(&theme, color))
         }));
         let picker = ColorSelector::new("primary", swatches).value(Some(self.primary.clone())).on_change({
             let this = this.clone();
@@ -224,21 +239,29 @@ impl Render for SettingsPane {
                         .child(agent.name.clone()),
                 )
                 .child(div().flex_1().min_w_0().text_size(TextSize::Xs.font_size()).text_color(muted).child(if agent.models.is_empty() {
-                    SharedString::from("No model to pick")
+                    SharedString::from(t(&words::NO_MODEL_TO_PICK))
                 } else {
                     SharedString::from(agent.models.iter().map(|m| m.as_ref()).collect::<Vec<_>>().join(", "))
                 }))
         });
 
+        let languages = {
+            let this = this.clone();
+            let at = self.language.and_then(|l| Locale::ALL.iter().position(|a| *a == l)).map_or(0, |i| i + 1);
+            let names = std::iter::once(SharedString::from(t(&words::LANGUAGE_SYSTEM))).chain(Locale::ALL.iter().map(|l| SharedString::from(l.name())));
+            atelier_ui::Select::new("language", names).selected(Some(at)).on_change(move |i, _, cx| {
+                this.update(cx, |pane, cx| pane.choose_language(i, cx)).ok();
+            })
+        };
         let appearance = div()
             .flex()
             .flex_col()
-            .child(row("Theme", div().w(px(220.)).child(theme_picker("settings-theme", &theme, |picked, cx| {
+            .child(row(t(&words::THEME), div().w(px(220.)).child(theme_picker("settings-theme", &theme, |picked, cx| {
                 let name = picked.name.to_string();
                 save(cx, move |s| s.theme = Some(name));
             })).into_any_element()))
-            .child(row("Mode", modes.into_any_element()))
-            .child(row("Interface font size", {
+            .child(row(t(&words::MODE), modes.into_any_element()))
+            .child(row(t(&words::INTERFACE_FONT_SIZE), {
                 let (this, ends) = (this.clone(), this.clone());
                 let zoom = self.shown_zoom();
                 div()
@@ -263,13 +286,15 @@ impl Render for SettingsPane {
                     .child(div().w(px(40.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(font_size_words(zoom)))
                     .into_any_element()
             }))
+            .child(row(t(&words::LANGUAGE), div().debug_selector(|| "language".into()).w(px(220.)).child(languages).into_any_element()))
+            .child(div().pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(t(&words::LANGUAGE_GIST)))
             .child(
                 div()
                     .pt(px(12.))
                     .flex()
                     .flex_col()
-                    .child(div().text_size(TextSize::Sm.font_size()).text_color(theme.foreground).child("Primary colour"))
-                    .child(div().pb(px(12.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("The main button's fill, and the highlight and the selection. A colour that no text reads on is not offered."))
+                    .child(div().text_size(TextSize::Sm.font_size()).text_color(theme.foreground).child(t(&words::PRIMARY_COLOUR)))
+                    .child(div().pb(px(12.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(t(&words::PRIMARY_COLOUR_GIST)))
                     .child(picker),
             );
         let sidebar = {
@@ -286,7 +311,7 @@ impl Render for SettingsPane {
                 .flex()
                 .flex_col()
                 .child(row(
-                    "Project badge on rows",
+                    t(&words::PROJECT_BADGE_ON_ROWS),
                     Segmented::new(
                         "sidebar-badge",
                         BadgeShow::ALL.iter().map(|b| Segment::new(b.words()).debug_name(match b {
@@ -302,7 +327,7 @@ impl Render for SettingsPane {
                     .into_any_element(),
                 ))
                 .child(row(
-                    "Time on rows",
+                    t(&words::TIME_ON_ROWS),
                     atelier_ui::Switch::new("sidebar-time", look.show_time)
                         .debug_name("sidebar-time")
                         .on_change(move |on, _, cx| {
@@ -311,7 +336,7 @@ impl Render for SettingsPane {
                         .into_any_element(),
                 ))
                 .child(row(
-                    "Agent icon on rows",
+                    t(&words::AGENT_ICON_ON_ROWS),
                     atelier_ui::Switch::new("sidebar-icon", look.show_agent_icon)
                         .debug_name("sidebar-icon")
                         .on_change(move |on, _, cx| {
@@ -319,8 +344,8 @@ impl Render for SettingsPane {
                         })
                         .into_any_element(),
                 ))
-                .child(row("Sessions shown for each project", numbers("sidebar-fold", &FOLD_CHOICES, look.fold_after, &["fold-3", "fold-5", "fold-8", "fold-12"], fold_pane, |l, n| l.fold_after = n)))
-                .child(row("Earlier sessions shown in Priority", numbers("sidebar-earlier", &EARLIER_CHOICES, look.earlier_shown, &["earlier-5", "earlier-8", "earlier-12", "earlier-20"], earlier_pane, |l, n| l.earlier_shown = n)))
+                .child(row(t(&words::SESSIONS_SHOWN_FOR_EACH_PROJECT), numbers("sidebar-fold", &FOLD_CHOICES, look.fold_after, &["fold-3", "fold-5", "fold-8", "fold-12"], fold_pane, |l, n| l.fold_after = n)))
+                .child(row(t(&words::EARLIER_SESSIONS_SHOWN_IN_PRIORITY), numbers("sidebar-earlier", &EARLIER_CHOICES, look.earlier_shown, &["earlier-5", "earlier-8", "earlier-12", "earlier-20"], earlier_pane, |l, n| l.earlier_shown = n)))
         };
         let tasks = div().flex().flex_col().children(atelier_tracker::Rule::ALL.into_iter().map(|rule| {
             let pane = this.clone();
@@ -350,9 +375,9 @@ impl Render for SettingsPane {
         let agents = div()
             .flex()
             .flex_col()
-            .child(row("Tool calls", density.into_any_element()))
+            .child(row(t(&words::TOOL_CALLS), density.into_any_element()))
             .child(row(
-                "Run a skill when you pick it",
+                t(&words::RUN_A_SKILL_WHEN_YOU_PICK_IT),
                 atelier_ui::Switch::new("skills-run-when-picked", crate::agent_session::runs_picked_skills(cx))
                     .debug_name("skills-run-when-picked")
                     .on_change(move |on, _, cx| {
@@ -361,14 +386,14 @@ impl Render for SettingsPane {
                     .into_any_element(),
             ))
             .children(agent_rows)
-            .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No agent is available.")));
+            .when(self.agents.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(t(&words::NO_AGENT_IS_AVAILABLE))));
         let speech = dictation::prefs(cx);
         let dictation_pane = {
             let (key_pane, mic_pane, hold_pane) = (this.clone(), this.clone(), this.clone());
             let choices = dictation_keys();
             let keys = Segmented::new(
                 "dictation-key",
-                choices.iter().map(|k| Segment::new(k.map_or("Off", |k| k.words())).debug_name(k.map_or("dictation-key-off", |k| match k {
+                choices.iter().map(|k| Segment::new(k.map_or(t(&words::DICTATION_KEY_OFF), |k| k.words())).debug_name(k.map_or("dictation-key-off", |k| match k {
                     atelier_voice::hotkey::Key::Fn => "dictation-key-fn",
                     atelier_voice::hotkey::Key::RightOption => "dictation-key-right-option",
                     atelier_voice::hotkey::Key::LeftOption => "dictation-key-left-option",
@@ -391,22 +416,21 @@ impl Render for SettingsPane {
                     .ok();
             });
             let key_gist = match speech.key {
-                Some(atelier_voice::hotkey::Key::Fn) if cfg!(target_os = "macos") => {
-                    "Hold it to talk; tap it to keep talking, and tap again to stop. In System Settings, Keyboard, set \"Press 🌐 key to\" to \"Do nothing\", or macOS takes the key for its own dictation."
-                }
-                Some(_) if cfg!(target_os = "macos") => "Hold it to talk; tap it to keep talking, and tap again to stop. A shortcut with the key still works.",
+                Some(atelier_voice::hotkey::Key::Fn) if cfg!(target_os = "macos") => t(&words::DICTATION_GIST_FN_MAC),
+                Some(_) if cfg!(target_os = "macos") => t(&words::DICTATION_GIST_SHORTCUT_MAC),
+                // Not in a language yet: these two words changed after the last translation.
                 Some(_) => "Hold it to talk; tap it to keep talking, and tap again to stop. Either side's key works, and a shortcut with it still does.",
-                None if cfg!(target_os = "macos") => "The microphone button still dictates.",
+                None if cfg!(target_os = "macos") => t(&words::DICTATION_GIST_NONE),
                 None => "Pick a key to dictate by holding it. The microphone button dictates either way.",
             };
             div()
                 .flex()
                 .flex_col()
-                .child(row("Dictation key", keys.into_any_element()))
+                .child(row(t(&words::DICTATION_KEY), keys.into_any_element()))
                 .child(div().debug_selector(|| "dictation-key-gist".into()).pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(key_gist))
-                .child(row("Microphone", div().debug_selector(|| "dictation-mic".into()).w(px(260.)).child(mics).into_any_element()))
+                .child(row(t(&words::MICROPHONE), div().debug_selector(|| "dictation-mic".into()).w(px(260.)).child(mics).into_any_element()))
                 .child(row(
-                    "Hold the microphone button to record",
+                    t(&words::HOLD_THE_MICROPHONE_BUTTON_TO_RECORD),
                     atelier_ui::Switch::new("dictation-hold", speech.hold)
                         .debug_name("dictation-hold")
                         .on_change(move |on, _, cx| {
@@ -436,7 +460,7 @@ impl Render for SettingsPane {
             .gap(px(4.))
             .px(px(12.))
             .pt(px(48.))
-            .child(div().px(px(8.)).pb(px(12.)).text_size(TextSize::Lg.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child("Settings"))
+            .child(div().px(px(8.)).pb(px(12.)).text_size(TextSize::Lg.font_size()).font_weight(FontWeight::MEDIUM).text_color(theme.foreground).child(t(&words::SETTINGS)))
             .children(Section::ALL.into_iter().map(|section| {
                 let pane = this.clone();
                 let front = section == self.section;

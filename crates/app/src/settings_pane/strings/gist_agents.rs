@@ -1,0 +1,43 @@
+//! How a picked skill runs, the agents this build can start, and the models each offers.
+//!
+//! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines.
+use atelier_i18n::Message;
+
+pub const GIST_AGENTS: Message = Message {
+    ar: "كيفية تشغيل المهارة المحددة، والوكلاء الذين يمكن لهذا الإصدار تشغيلهم، والنماذج التي يوفّرها كل منهم.",
+    ca: "Com s’executa una habilitat seleccionada, quins agents pot iniciar aquesta versió i quins models ofereix cadascun.",
+    cs: "Jak se spouští vybraná dovednost, které agenty může tato verze spustit a jaké modely každý nabízí.",
+    da: "Sådan kører en valgt færdighed, hvilke agenter denne version kan starte, og hvilke modeller de hver især tilbyder.",
+    de: "Wie ein ausgewählter Skill ausgeführt wird, welche Agents dieser Build starten kann und welche Modelle sie jeweils anbieten.",
+    el: "Πώς εκτελείται μια επιλεγμένη δεξιότητα, ποιοι πράκτορες μπορούν να ξεκινήσουν σε αυτήν την έκδοση και ποια μοντέλα προσφέρει ο καθένας.",
+    en: "How a picked skill runs, the agents this build can start, and the models each offers.",
+    es: "Cómo se ejecuta una habilidad seleccionada, qué agentes puede iniciar esta versión y qué modelos ofrece cada uno.",
+    es_419: "Cómo se ejecuta una habilidad seleccionada, qué agentes puede iniciar esta versión y qué modelos ofrece cada uno.",
+    fi: "Miten valittu taito suoritetaan, mitkä agentit tämä koontiversio voi käynnistää ja mitä malleja kukin tarjoaa.",
+    fr: "Comment une compétence sélectionnée s’exécute, quels agents cette version peut lancer et quels modèles chacun propose.",
+    fr_ca: "Comment une compétence sélectionnée s’exécute, quels agents cette version peut lancer et quels modèles chacun propose.",
+    he: "איך מיומנות שנבחרה פועלת, אילו סוכנים הגרסה הזו יכולה להפעיל ואילו מודלים כל אחד מציע.",
+    hi: "चुना गया कौशल कैसे चलता है, यह बिल्ड किन एजेंटों को शुरू कर सकता है और हर एजेंट कौन-से मॉडल देता है।",
+    hr: "Kako se pokreće odabrana vještina, koje agente ova verzija može pokrenuti i koje modele svaki nudi.",
+    hu: "Hogyan fut a kiválasztott képesség, mely ügynököket tudja elindítani ez a build, és milyen modelleket kínálnak.",
+    id: "Cara kerja skill yang dipilih, agen yang dapat dijalankan oleh build ini, dan model yang ditawarkan masing-masing.",
+    it: "Come viene eseguita una competenza selezionata, quali agenti può avviare questa build e quali modelli offre ciascuno.",
+    ja: "選択したスキルの実行方法、このビルドで起動できるエージェントと、それぞれが提供するモデル。",
+    ko: "선택한 스킬의 실행 방식, 이 빌드에서 시작할 수 있는 에이전트와 각 에이전트가 제공하는 모델입니다.",
+    ms: "Cara kemahiran yang dipilih dijalankan, ejen yang boleh dimulakan oleh binaan ini dan model yang ditawarkan oleh setiap ejen.",
+    nl: "Hoe een geselecteerde vaardigheid wordt uitgevoerd, welke agents deze build kan starten en welke modellen ze bieden.",
+    no: "Hvordan en valgt ferdighet kjøres, hvilke agenter denne versjonen kan starte, og hvilke modeller hver av dem tilbyr.",
+    pl: "Jak działa wybrana umiejętność, które agenty może uruchomić ta kompilacja i jakie modele oferuje każdy z nich.",
+    pt_br: "Como uma habilidade selecionada é executada, quais agentes esta versão pode iniciar e quais modelos cada um oferece.",
+    pt_pt: "Como é executada uma competência selecionada, que agentes esta versão pode iniciar e que modelos cada um oferece.",
+    ro: "Cum rulează o abilitate selectată, ce agenți poate porni această versiune și ce modele oferă fiecare.",
+    ru: "Как работает выбранный навык, каких агентов может запускать эта сборка и какие модели предлагает каждый из них.",
+    sk: "Ako sa spúšťa vybraná zručnosť, ktorých agentov môže táto verzia spustiť a aké modely každý ponúka.",
+    sv: "Hur en vald färdighet körs, vilka agenter den här versionen kan starta och vilka modeller de erbjuder.",
+    th: "วิธีทำงานของทักษะที่เลือก เอเจนต์ที่บิลด์นี้เริ่มได้ และโมเดลที่แต่ละเอเจนต์มีให้",
+    tr: "Seçilen bir becerinin nasıl çalıştığı, bu derlemenin başlatabildiği ajanlar ve her birinin sunduğu modeller.",
+    uk: "Як працює вибрана навичка, яких агентів може запускати ця збірка та які моделі пропонує кожен із них.",
+    vi: "Cách kỹ năng được chọn hoạt động, các tác nhân mà bản dựng này có thể khởi chạy và những mô hình mỗi tác nhân cung cấp.",
+    zh_cn: "所选技能的运行方式、此版本可启动的代理，以及每个代理提供的模型。",
+    zh_tw: "所選技能的執行方式、此版本可啟動的代理，以及各代理提供的模型。",
+};

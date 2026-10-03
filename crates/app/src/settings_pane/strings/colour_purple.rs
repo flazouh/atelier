@@ -1,0 +1,43 @@
+//! Purple
+//!
+//! Tooltip on a colour swatch. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_PURPLE: Message = Message {
+    ar: "بنفسجي",
+    ca: "Morat",
+    cs: "Fialová",
+    da: "Lilla",
+    de: "Lila",
+    el: "Μωβ",
+    en: "Purple",
+    es: "Morado",
+    es_419: "Morado",
+    fi: "Violetti",
+    fr: "Violet",
+    fr_ca: "Violet",
+    he: "סגול",
+    hi: "बैंगनी",
+    hr: "Ljubičasta",
+    hu: "Lila",
+    id: "Ungu",
+    it: "Viola",
+    ja: "紫",
+    ko: "보라색",
+    ms: "Ungu",
+    nl: "Paars",
+    no: "Lilla",
+    pl: "Fioletowy",
+    pt_br: "Roxo",
+    pt_pt: "Roxo",
+    ro: "Mov",
+    ru: "Фиолетовый",
+    sk: "Fialová",
+    sv: "Lila",
+    th: "ม่วง",
+    tr: "Mor",
+    uk: "Фіолетовий",
+    vi: "Tím",
+    zh_cn: "紫色",
+    zh_tw: "紫色",
+};

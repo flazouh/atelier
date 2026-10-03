@@ -1,0 +1,43 @@
+//! Language
+//!
+//! Row label for choosing the app's language on the Settings page. One word.
+use atelier_i18n::Message;
+
+pub const LANGUAGE: Message = Message {
+    ar: "اللغة",
+    ca: "Idioma",
+    cs: "Jazyk",
+    da: "Sprog",
+    de: "Sprache",
+    el: "Γλώσσα",
+    en: "Language",
+    es: "Idioma",
+    es_419: "Idioma",
+    fi: "Kieli",
+    fr: "Langue",
+    fr_ca: "Langue",
+    he: "שפה",
+    hi: "भाषा",
+    hr: "Jezik",
+    hu: "Nyelv",
+    id: "Bahasa",
+    it: "Lingua",
+    ja: "言語",
+    ko: "언어",
+    ms: "Bahasa",
+    nl: "Taal",
+    no: "Språk",
+    pl: "Język",
+    pt_br: "Idioma",
+    pt_pt: "Idioma",
+    ro: "Limbă",
+    ru: "Язык",
+    sk: "Jazyk",
+    sv: "Språk",
+    th: "ภาษา",
+    tr: "Dil",
+    uk: "Мова",
+    vi: "Ngôn ngữ",
+    zh_cn: "语言",
+    zh_tw: "語言",
+};

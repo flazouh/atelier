@@ -1,0 +1,43 @@
+//! Pink
+//!
+//! Tooltip on a colour swatch. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_PINK: Message = Message {
+    ar: "وردي",
+    ca: "Rosa",
+    cs: "Růžová",
+    da: "Pink",
+    de: "Rosa",
+    el: "Ροζ",
+    en: "Pink",
+    es: "Rosa",
+    es_419: "Rosa",
+    fi: "Vaaleanpunainen",
+    fr: "Rose",
+    fr_ca: "Rose",
+    he: "ורוד",
+    hi: "गुलाबी",
+    hr: "Ružičasta",
+    hu: "Rózsaszín",
+    id: "Merah muda",
+    it: "Rosa",
+    ja: "ピンク",
+    ko: "분홍색",
+    ms: "Merah jambu",
+    nl: "Roze",
+    no: "Rosa",
+    pl: "Różowy",
+    pt_br: "Rosa",
+    pt_pt: "Cor-de-rosa",
+    ro: "Roz",
+    ru: "Розовый",
+    sk: "Ružová",
+    sv: "Rosa",
+    th: "ชมพู",
+    tr: "Pembe",
+    uk: "Рожевий",
+    vi: "Hồng",
+    zh_cn: "粉色",
+    zh_tw: "粉紅色",
+};

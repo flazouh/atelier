@@ -1,0 +1,43 @@
+//! Speak instead of typing. The words are heard on this machine, and nothing leaves it.
+//!
+//! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines.
+use atelier_i18n::Message;
+
+pub const GIST_DICTATION: Message = Message {
+    ar: "تحدّث بدلًا من الكتابة. يُعالَج الكلام على هذا الجهاز ولا يغادره.",
+    ca: "Parla en lloc d’escriure. La veu es processa en aquest dispositiu i no en surt.",
+    cs: "Mluvte místo psaní. Řeč se zpracovává v tomto zařízení a nikam se neodesílá.",
+    da: "Tal i stedet for at skrive. Tale behandles på denne enhed og forlader den ikke.",
+    de: "Sprich statt zu tippen. Deine Sprache wird auf diesem Gerät verarbeitet und verlässt es nicht.",
+    el: "Μιλήστε αντί να πληκτρολογείτε. Η ομιλία επεξεργάζεται σε αυτήν τη συσκευή και δεν φεύγει από αυτή.",
+    en: "Speak instead of typing. The words are heard on this machine, and nothing leaves it.",
+    es: "Habla en lugar de escribir. La voz se procesa en este dispositivo y no sale de él.",
+    es_419: "Habla en vez de escribir. La voz se procesa en este dispositivo y no sale de él.",
+    fi: "Puhu kirjoittamisen sijaan. Puhe käsitellään tällä laitteella eikä poistu sieltä.",
+    fr: "Parlez au lieu de taper. La voix est traitée sur cet appareil et n’en sort pas.",
+    fr_ca: "Parlez au lieu de taper. La voix est traitée sur cet appareil et ne le quitte pas.",
+    he: "דברו במקום להקליד. הדיבור מעובד במכשיר הזה ולא יוצא ממנו.",
+    hi: "टाइप करने के बजाय बोलें। आपकी आवाज़ इसी डिवाइस पर प्रोसेस होती है और इससे बाहर नहीं जाती।",
+    hr: "Govorite umjesto da tipkate. Govor se obrađuje na ovom uređaju i ne napušta ga.",
+    hu: "Gépelés helyett beszélj. A beszéd feldolgozása ezen az eszközön történik, és nem kerül ki róla.",
+    id: "Bicara alih-alih mengetik. Ucapan diproses di perangkat ini dan tidak dikirim ke mana pun.",
+    it: "Parla invece di digitare. La voce viene elaborata su questo dispositivo e non ne esce.",
+    ja: "入力する代わりに話せます。音声はこのデバイス上で処理され、外部に送信されません。",
+    ko: "입력하는 대신 말하세요. 음성은 이 기기에서 처리되며 외부로 전송되지 않습니다.",
+    ms: "Bercakap, bukan menaip. Pertuturan diproses pada peranti ini dan tidak keluar daripadanya.",
+    nl: "Spreek in plaats van te typen. Je spraak wordt op dit apparaat verwerkt en verlaat het niet.",
+    no: "Snakk i stedet for å skrive. Tale behandles på denne enheten og forlater den ikke.",
+    pl: "Mów zamiast pisać. Mowa jest przetwarzana na tym urządzeniu i nie opuszcza go.",
+    pt_br: "Fale em vez de digitar. A fala é processada neste dispositivo e não sai dele.",
+    pt_pt: "Fale em vez de escrever. A voz é processada neste dispositivo e não sai dele.",
+    ro: "Vorbește în loc să tastezi. Vocea este procesată pe acest dispozitiv și nu îl părăsește.",
+    ru: "Говорите вместо того, чтобы печатать. Речь обрабатывается на этом устройстве и не покидает его.",
+    sk: "Hovorte namiesto písania. Reč sa spracúva v tomto zariadení a neopúšťa ho.",
+    sv: "Prata i stället för att skriva. Talet behandlas på den här enheten och lämnar den inte.",
+    th: "พูดแทนการพิมพ์ ระบบจะประมวลผลเสียงบนอุปกรณ์นี้และจะไม่มีข้อมูลออกไป",
+    tr: "Yazmak yerine konuşun. Konuşma bu cihazda işlenir ve cihazdan dışarı çıkmaz.",
+    uk: "Говоріть замість того, щоб друкувати. Мовлення обробляється на цьому пристрої й не залишає його.",
+    vi: "Nói thay vì nhập. Giọng nói được xử lý trên thiết bị này và không rời khỏi thiết bị.",
+    zh_cn: "用说话代替打字。语音在此设备上处理，不会离开此设备。",
+    zh_tw: "用說話取代打字。語音會在這部裝置上處理，不會離開裝置。",
+};

@@ -1,0 +1,43 @@
+//! Settings
+//!
+//! The title above the list of sections on the Settings page. About 14 characters of room.
+use atelier_i18n::Message;
+
+pub const SETTINGS: Message = Message {
+    ar: "الإعدادات",
+    ca: "Configuració",
+    cs: "Nastavení",
+    da: "Indstillinger",
+    de: "Einstellungen",
+    el: "Ρυθμίσεις",
+    en: "Settings",
+    es: "Configuración",
+    es_419: "Configuración",
+    fi: "Asetukset",
+    fr: "Paramètres",
+    fr_ca: "Réglages",
+    he: "הגדרות",
+    hi: "सेटिंग्स",
+    hr: "Postavke",
+    hu: "Beállítások",
+    id: "Pengaturan",
+    it: "Impostazioni",
+    ja: "設定",
+    ko: "설정",
+    ms: "Tetapan",
+    nl: "Instellingen",
+    no: "Innstillinger",
+    pl: "Ustawienia",
+    pt_br: "Configurações",
+    pt_pt: "Definições",
+    ro: "Setări",
+    ru: "Настройки",
+    sk: "Nastavenia",
+    sv: "Inställningar",
+    th: "การตั้งค่า",
+    tr: "Ayarlar",
+    uk: "Налаштування",
+    vi: "Cài đặt",
+    zh_cn: "设置",
+    zh_tw: "設定",
+};

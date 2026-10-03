@@ -1,0 +1,43 @@
+//! Light
+//!
+//! A choice between light, dark, or the system's appearance. A label on a segmented control: one or two words, so it must stay short.
+use atelier_i18n::Message;
+
+pub const MODE_LIGHT: Message = Message {
+    ar: "فاتح",
+    ca: "Clar",
+    cs: "Světlý",
+    da: "Lys",
+    de: "Hell",
+    el: "Ανοιχτό",
+    en: "Light",
+    es: "Claro",
+    es_419: "Claro",
+    fi: "Vaalea",
+    fr: "Clair",
+    fr_ca: "Clair",
+    he: "בהיר",
+    hi: "हल्का",
+    hr: "Svijetlo",
+    hu: "Világos",
+    id: "Terang",
+    it: "Chiaro",
+    ja: "ライト",
+    ko: "라이트",
+    ms: "Cerah",
+    nl: "Licht",
+    no: "Lys",
+    pl: "Jasny",
+    pt_br: "Claro",
+    pt_pt: "Claro",
+    ro: "Luminos",
+    ru: "Светлая",
+    sk: "Svetlý",
+    sv: "Ljust",
+    th: "สว่าง",
+    tr: "Açık",
+    uk: "Світла",
+    vi: "Sáng",
+    zh_cn: "浅色",
+    zh_tw: "淺色",
+};

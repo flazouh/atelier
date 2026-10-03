@@ -1,0 +1,43 @@
+//! The microphone button still dictates.
+//!
+//! Muted small text under the dictation key choice when the key is Off: the microphone button in the message box still records speech.
+use atelier_i18n::Message;
+
+pub const DICTATION_GIST_NONE: Message = Message {
+    ar: "يظل زر الميكروفون يملي الكلام.",
+    ca: "El botó del micròfon continua dictant.",
+    cs: "Tlačítko mikrofonu stále převádí řeč na text.",
+    da: "Mikrofonknappen dikterer stadig.",
+    de: "Über die Mikrofontaste kannst du weiterhin diktieren.",
+    el: "Το κουμπί μικροφώνου εξακολουθεί να υπαγορεύει.",
+    en: "The microphone button still dictates.",
+    es: "El botón del micrófono sigue permitiendo dictar.",
+    es_419: "El botón del micrófono sigue permitiendo dictar.",
+    fi: "Mikrofonipainikkeella voi edelleen sanella.",
+    fr: "Le bouton du micro permet toujours de dicter.",
+    fr_ca: "Le bouton du micro permet toujours de dicter.",
+    he: "כפתור המיקרופון עדיין מאפשר להכתיב.",
+    hi: "माइक्रोफ़ोन बटन से अब भी बोलकर लिख सकते हैं।",
+    hr: "Gumb mikrofona i dalje omogućuje diktiranje.",
+    hu: "A mikrofon gombbal továbbra is diktálhatsz.",
+    id: "Tombol mikrofon tetap bisa digunakan untuk mendikte.",
+    it: "Il pulsante del microfono continua a permettere la dettatura.",
+    ja: "マイクボタンからは引き続き音声入力できます。",
+    ko: "마이크 버튼으로 계속 음성 입력을 할 수 있어요.",
+    ms: "Butang mikrofon masih boleh digunakan untuk mendikte.",
+    nl: "Met de microfoonknop kun je nog steeds dicteren.",
+    no: "Mikrofonknappen lar deg fortsatt diktere.",
+    pl: "Przycisk mikrofonu nadal umożliwia dyktowanie.",
+    pt_br: "O botão do microfone continua permitindo ditar.",
+    pt_pt: "O botão do microfone continua a permitir ditar.",
+    ro: "Butonul microfonului permite în continuare dictarea.",
+    ru: "Кнопка микрофона по-прежнему позволяет диктовать.",
+    sk: "Tlačidlo mikrofónu naďalej umožňuje diktovať.",
+    sv: "Mikrofonknappen kan fortfarande användas för diktering.",
+    th: "ปุ่มไมโครโฟนยังใช้ป้อนข้อความด้วยเสียงได้",
+    tr: "Mikrofon düğmesiyle konuşmayı yazıya dökmeye devam edebilirsin.",
+    uk: "Кнопка мікрофона й далі дає змогу диктувати.",
+    vi: "Bạn vẫn có thể đọc chính tả bằng nút micrô.",
+    zh_cn: "仍可通过麦克风按钮进行语音输入。",
+    zh_tw: "仍可透過麥克風按鈕進行語音輸入。",
+};
