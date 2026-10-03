@@ -684,7 +684,7 @@ fn a_queued_message_shows_when_it_goes(cx: &mut TestAppContext) {
         (s.conversation.items().to_vec(), s.list.item_count())
     });
     assert!(matches!(items.last(), Some(atelier_agents::session::Item::User { text }) if text == "second"), "the queued message is the last item");
-    assert_eq!(rows, items.len(), "and it has a row");
+    assert_eq!(rows, items.len() + 1, "and it has a row, with the waiting line under it until the agent answers");
 }
 
 /// The composer runs from the moment a message goes: ⌘↵ typed before the agent's first word queues.
@@ -702,4 +702,26 @@ fn a_message_queued_before_the_agent_answers_waits(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(sent_texts(&fake), ["first"]);
     assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["later"]);
+}
+
+/// A message sent to an agent that has not said a word yet shows the waiting line at once, and keeps it.
+#[gpui_kit::test]
+fn a_first_message_shows_the_waiting_line_while_the_agent_is_silent(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hello".into(), cx)));
+    let last = |cx: &mut gpui_kit::VisualTestContext| cx.update(|_, cx| session.read(cx).shown.last().copied());
+    assert_eq!(last(cx), Some(crate::list_diff::Row::Waiting), "at once");
+    cx.run_until_parked();
+    assert_eq!(last(cx), Some(crate::list_diff::Row::Waiting), "after the turn was handed over");
+}
+
+/// The same when the agent could not start and starts again for the message: the line shows while it connects.
+#[gpui_kit::test]
+fn a_message_shows_the_waiting_line_while_the_agent_connects(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![], true);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hello".into(), cx)));
+    let last = |cx: &mut gpui_kit::VisualTestContext| cx.update(|_, cx| session.read(cx).shown.last().copied());
+    assert_eq!(last(cx), Some(crate::list_diff::Row::Waiting), "while it connects");
+    cx.run_until_parked();
+    assert_eq!(last(cx), Some(crate::list_diff::Row::Waiting), "once it has connected");
 }

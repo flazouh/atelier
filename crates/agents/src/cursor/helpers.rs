@@ -43,7 +43,7 @@ pub fn look() -> AgentLook {
         mark: Mark { working: CUBE, orbiting: CUBE, color: color(GREY), icon_frame: 0 },
         message: color(GREY),
         glimmer: color(GLIMMER),
-        labels: PhaseLabels { waiting: "Waiting for Cursor…".into(), ..PhaseLabels::default() },
+        labels: PhaseLabels { waiting: atelier_i18n::t(&crate::strings::PLANNING_NEXT_MOVES).into(), ..PhaseLabels::default() },
     }
 }
 

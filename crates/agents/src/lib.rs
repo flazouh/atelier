@@ -15,6 +15,7 @@ pub mod own;
 mod partial_json;
 pub mod registry;
 pub mod session;
+mod strings;
 pub mod subprocess;
 
 pub use assets::Assets;

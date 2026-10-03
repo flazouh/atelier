@@ -136,8 +136,18 @@ pub(super) fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyEle
         Some(Row::Item(item)) => item_row(session, item, ix, cx),
         Some(Row::Changes { turn }) => changes_row(session, turn, cx),
         Some(Row::Activity { from, to }) => activity_row(session, from, to, cx),
+        Some(Row::Waiting) => waiting_row(session, cx),
         None => div().into_any_element(),
     }
+}
+
+/// The status line between a sent message and the agent's first word: the agent's own words for waiting, shimmering.
+fn waiting_row(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
+    let s = session.read(cx);
+    let look = s.agent.look.clone();
+    let loading = if look.mark.working == atelier_agents::claude::mark().working { atelier_agents::claude::loading_strips() } else { Vec::new() };
+    let id = gpui_kit::ElementId::Name(format!("{}-waiting", s.key).into());
+    div().px(px(16.)).pb(px(14.)).child(Thinking::new(id, look, ThinkingPhase::Waiting).loading(loading)).into_any_element()
 }
 
 /// The files turn `turn` changed, with its `+a −r`: Review opens the review at a file, and a file's
