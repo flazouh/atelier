@@ -24,7 +24,7 @@ fn cursor_is_offered_with_its_mark_and_found_by_its_backend() {
 #[test]
 fn cursors_look_names_cursor_and_its_mark_is_served() {
     let look = look();
-    assert_eq!(look.labels.waiting.as_ref(), "Waiting for Cursor…");
+    assert_eq!(look.labels.waiting.as_ref(), "Planning next moves…");
     assert_eq!(look.mark.working.frames, 1, "the cube holds still");
     assert!(crate::assets::strip_bytes(look.mark.working.path).is_some(), "the app can load the cube");
 }

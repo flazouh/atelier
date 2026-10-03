@@ -818,7 +818,11 @@ fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
         cx.notify();
     });
     cx.run_until_parked();
-    let last = session.read_with(cx, |s, _| s.shown.len() - 1);
+    // The message is followed by the waiting line, which holds the agent's place until it answers.
+    let last = session.read_with(cx, |s, _| {
+        assert_eq!(s.shown.last(), Some(&crate::list_diff::Row::Waiting));
+        s.shown.len() - 2
+    });
     let row_selector: &'static str = format!("row-{last}").leak();
     for _ in 0..20 {
         if cx.debug_bounds(row_selector).is_some() {
