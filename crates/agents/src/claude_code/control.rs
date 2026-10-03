@@ -1,11 +1,40 @@
 //! The lines atelier writes to `claude`'s stdin. Each is one JSON object; the caller adds the line end.
+use std::{
+    sync::atomic::{AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use serde_json::{Value, json};
 
 use crate::session::{Attachment, PermissionMode, message_text};
 
-pub(super) fn user_message(text: &str, attachments: &[Attachment]) -> String {
+/// `id` comes back in the result of the turn that takes the message, so a message `claude` holds for
+/// later is told apart from one it has answered.
+pub(super) fn user_message(id: &str, text: &str, attachments: &[Attachment]) -> String {
     let content = message_text(text, attachments);
-    json!({"type": "user", "message": {"role": "user", "content": content}}).to_string()
+    json!({"type": "user", "uuid": id, "message": {"role": "user", "content": content}}).to_string()
+}
+
+/// The ids of the messages one session sends, in the UUID form `claude` takes: a seed from the time the
+/// session started, then a count.
+pub(super) struct MessageIds {
+    seed: u32,
+    next: AtomicU64,
+}
+
+impl MessageIds {
+    pub fn new() -> Self {
+        let since = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+        Self { seed: since.subsec_nanos() ^ since.as_secs() as u32, next: AtomicU64::new(1) }
+    }
+
+    pub fn next(&self) -> String {
+        message_id(self.seed, self.next.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
+pub(super) fn message_id(seed: u32, number: u64) -> String {
+    format!("{seed:08x}-0000-4000-8000-{:012x}", number & 0xffff_ffff_ffff)
 }
 
 pub(super) fn interrupt(request_id: &str) -> String {

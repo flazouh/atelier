@@ -3,7 +3,7 @@ use gpui_kit::TestAppContext;
 use atelier_agents::session::{Choice, ChoiceId, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
 
 use super::*;
-use crate::fake_agent::{ended, git_project, git_project_in, start, start_in};
+use crate::fake_agent::{ended, git_project, git_project_in, start, start_in, start_shown_in};
 
 fn ask() -> PermissionRequest {
     PermissionRequest {
@@ -642,6 +642,12 @@ fn a_queued_message_waits_for_the_turn_to_complete(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(sent_texts(&fake), ["first", "second"], "a Stop keeps the queue");
     assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["third"]);
+
+    agent(Event::Text { block: atelier_agents::session::BlockId(1), delta: "the background task finished".into() });
+    agent(ended());
+    cx.run_until_parked();
+    assert_eq!(sent_texts(&fake), ["first", "second"], "a turn the agent started itself leaves the queue alone");
+    assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["third"]);
 }
 
 /// With no turn running a queued message goes at once; a queued one can go now, or come out.
@@ -660,4 +666,40 @@ fn the_queue_sends_at_once_when_idle_and_rows_send_now_or_come_out(cx: &mut Test
     cx.run_until_parked();
     assert_eq!(sent_texts(&fake), ["now", "steered"]);
     assert!(cx.update(|_, cx| session.read(cx).queued.is_empty()));
+}
+
+/// A queued message that goes when the turn completes shows as the reader's message, like any other.
+#[gpui_kit::test]
+fn a_queued_message_shows_when_it_goes(cx: &mut TestAppContext) {
+    let (session, fake, cx) = start(cx, vec![vec![], vec![]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("first".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.queue("second".into(), cx)));
+    let agent = fake.sinks.lock().unwrap()[0].clone();
+    agent(Event::Text { block: atelier_agents::session::BlockId(1), delta: "done".into() });
+    agent(ended());
+    cx.run_until_parked();
+    let (items, rows) = cx.update(|_, cx| {
+        let s = session.read(cx);
+        (s.conversation.items().to_vec(), s.list.item_count())
+    });
+    assert!(matches!(items.last(), Some(atelier_agents::session::Item::User { text }) if text == "second"), "the queued message is the last item");
+    assert_eq!(rows, items.len(), "and it has a row");
+}
+
+/// The composer runs from the moment a message goes: ⌘↵ typed before the agent's first word queues.
+#[gpui_kit::test]
+fn a_message_queued_before_the_agent_answers_waits(cx: &mut TestAppContext) {
+    let (session, fake, cx) = start_shown_in(cx, crate::test_dirs::path(), vec![vec![], vec![]]);
+    cx.update(|window, cx| {
+        let composer = session.read(cx).composer.clone();
+        window.focus(&gpui_kit::Focusable::focus_handle(&composer, cx), cx);
+    });
+    cx.simulate_input("first");
+    cx.simulate_keystrokes("enter");
+    cx.simulate_input("later");
+    cx.simulate_keystrokes("secondary-enter");
+    cx.run_until_parked();
+    assert_eq!(sent_texts(&fake), ["first"]);
+    assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["later"]);
 }

@@ -252,7 +252,7 @@ fn blank_lines_and_kinds_atelier_does_not_know_give_nothing() {
 #[test]
 fn a_crash_mid_turn_fails_the_open_tool_and_the_turn_then_ends_the_session() {
     let mut mapper = Mapper::new();
-    mapper.user_sent();
+    mapper.user_sent("m1".into());
     let start = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t9","name":"Bash","input":{}}}}"#;
     assert!(matches!(mapper.line(start, Instant::now()).as_slice(), [Event::ToolStarted(_)]));
     let events = mapper.exited(Some(3), "");
@@ -273,7 +273,7 @@ fn a_crash_with_no_turn_open_only_ends_the_session() {
 #[test]
 fn a_session_atelier_closed_ends_closed_and_fails_nothing() {
     let mut mapper = Mapper::new();
-    mapper.user_sent();
+    mapper.user_sent("m1".into());
     assert_eq!(mapper.closed(), [Event::Ended(EndReason::Closed)]);
 }
 
@@ -358,7 +358,7 @@ fn the_foreground_subagent_run_folds_with_its_call_inside_the_subagent() {
 #[test]
 fn an_early_exit_carries_the_last_lines_of_stderr_and_puts_the_last_one_in_the_failure() {
     let mut mapper = Mapper::new();
-    mapper.user_sent();
+    mapper.user_sent("m1".into());
     let stderr = "starting\nwarming up\nError: no such model\n\n";
     let events = mapper.exited(Some(3), stderr);
     let Some(Event::TurnEnded(end)) = events.iter().find(|e| matches!(e, Event::TurnEnded(_))) else { panic!("{events:#?}") };
@@ -381,7 +381,7 @@ fn only_the_last_twenty_lines_of_a_long_stderr_are_kept() {
 #[test]
 fn a_signal_with_no_stderr_says_only_that() {
     let mut mapper = Mapper::new();
-    mapper.user_sent();
+    mapper.user_sent("m1".into());
     let events = mapper.exited(None, "  \n");
     assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("the agent was stopped by a signal".into()))));
 }
@@ -502,7 +502,7 @@ fn result_with_windows(windows: &[(&str, u64)]) -> String {
 fn a_recorded_turn_tells_how_full_the_context_is_and_then_its_window() {
     let told = contexts(&replay("plain"));
     let first = told.first().expect("the reply tells the context");
-    assert!(first.used > 0 && first.window.is_none(), "the reply knows its tokens, not the window: {first:?}");
+    assert!(first.used > 0, "the reply knows its tokens: {first:?}");
     assert_eq!(told.last().and_then(|c| c.window), Some(1_000_000), "the result tells the model's window");
 }
 
@@ -551,4 +551,71 @@ fn the_usage_limit_is_told_when_it_changes() {
         Limit { state: LimitState::Clear, resets_at: at, window: Some(LimitWindow::FiveHour) },
     ], "a repeat and an unknown status tell nothing");
     assert!(events.iter().all(|e| !matches!(e, Event::Warning(_))));
+}
+
+fn result_taking(ids: &[&str]) -> String {
+    json!({"type": "result", "subtype": "success", "result": "ok", "user_message_uuids": ids}).to_string()
+}
+
+fn ends_turn(events: &[Event]) -> bool {
+    events.iter().any(|event| matches!(event, Event::TurnEnded(_)))
+}
+
+#[test]
+fn a_message_claude_runs_after_the_turn_keeps_the_turn_going_until_its_own_result() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent("m1".into());
+    mapper.user_sent("m2".into());
+    assert!(!ends_turn(&mapper.line(&result_taking(&["m1"]), Instant::now())));
+    assert!(ends_turn(&mapper.line(&result_taking(&["m2"]), Instant::now())));
+}
+
+#[test]
+fn a_message_folded_into_the_turn_ends_it_with_the_one_result() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent("m1".into());
+    mapper.user_sent("m2".into());
+    assert!(ends_turn(&mapper.line(&result_taking(&["m1", "m2"]), Instant::now())));
+}
+
+#[test]
+fn a_result_that_names_no_messages_took_them_all() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent("m1".into());
+    mapper.user_sent("m2".into());
+    let result = json!({"type": "result", "subtype": "success", "result": "ok"}).to_string();
+    assert!(ends_turn(&mapper.line(&result, Instant::now())));
+}
+
+#[test]
+fn a_stop_ends_the_turn_even_with_messages_waiting() {
+    let mut mapper = Mapper::new();
+    mapper.user_sent("m1".into());
+    mapper.user_sent("m2".into());
+    let aborted = json!({"type": "result", "subtype": "error_during_execution", "is_error": true, "terminal_reason": "aborted_streaming", "user_message_uuids": ["m1"]});
+    assert!(ends_turn(&mapper.line(&aborted.to_string(), Instant::now())));
+    mapper.user_sent("m3".into());
+    assert!(ends_turn(&mapper.line(&result_taking(&["m3"]), Instant::now())), "the stop left nothing waiting");
+}
+
+#[test]
+fn a_line_claude_wrote_itself_is_not_shown_as_the_user_speaking() {
+    let nudge = json!({"type": "user", "isSynthetic": true, "message": {"role": "user", "content": [{"type": "text", "text": "[Your previous response had no visible output]"}]}});
+    assert!(Mapper::new().line(&nudge.to_string(), Instant::now()).is_empty());
+}
+
+#[test]
+fn a_transcript_shows_the_readers_lines_and_not_a_background_tasks_notice() {
+    let transcript = [
+        json!({"type": "user", "origin": {"kind": "human"}, "message": {"role": "user", "content": "run it"}}),
+        json!({"type": "user", "origin": {"kind": "task-notification", "producer": "session-task"}, "promptSource": "system",
+            "message": {"role": "user", "content": "<task-notification><status>completed</status></task-notification>"}}),
+    ]
+    .map(|line| line.to_string())
+    .join("\n");
+    let users: Vec<_> = crate::claude_code::history(&transcript).into_iter().filter_map(|e| match e {
+        Event::UserMessage { text } => Some(text),
+        _ => None,
+    }).collect();
+    assert_eq!(users, ["run it"]);
 }

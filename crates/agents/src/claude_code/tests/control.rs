@@ -8,9 +8,18 @@ fn parse(line: &str) -> Value {
 }
 
 #[test]
-fn a_user_message_is_a_user_line_with_the_text() {
-    let line = parse(&control::user_message("fix \"it\"\nnow", &[]));
-    assert_eq!(line, json!({"type": "user", "message": {"role": "user", "content": "fix \"it\"\nnow"}}));
+fn a_user_message_is_a_user_line_with_its_id_and_the_text() {
+    let line = parse(&control::user_message("m1", "fix \"it\"\nnow", &[]));
+    assert_eq!(line, json!({"type": "user", "uuid": "m1", "message": {"role": "user", "content": "fix \"it\"\nnow"}}));
+}
+
+#[test]
+fn a_message_id_has_the_uuid_form_and_differs_by_number() {
+    let id = control::message_id(0xabc, 7);
+    assert_eq!(id, "00000abc-0000-4000-8000-000000000007");
+    assert_ne!(control::message_id(0xabc, 8), id);
+    let ids = control::MessageIds::new();
+    assert_ne!(ids.next(), ids.next());
 }
 
 #[test]
@@ -41,7 +50,7 @@ fn a_message_carries_its_attachments_as_text_after_its_own() {
         quote: "let a = 1;\nlet b = 2;".into(),
         body: "Why not a struct?".into(),
     };
-    let line = parse(&control::user_message("Please look", &[comment, Attachment::File { path: "src/b.rs".into() }]));
+    let line = parse(&control::user_message("m1", "Please look", &[comment, Attachment::File { path: "src/b.rs".into() }]));
     assert_eq!(
         line["message"]["content"],
         "Please look\n\nReview comment on src/a.rs, lines 10-12:\n> let a = 1;\n> let b = 2;\nWhy not a struct?\n\nFile: src/b.rs"

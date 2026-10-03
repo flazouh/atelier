@@ -1,6 +1,6 @@
 use atelier_agents::session::{Limit, LimitState, LimitWindow};
 
-use super::helpers::{limit_words, resets_in};
+use super::helpers::{limit_words, resets_in, still_reached};
 
 const NOW: u64 = 1_790_000_000;
 
@@ -24,4 +24,13 @@ fn the_box_names_the_limit_and_when_it_resets() {
     );
     assert_eq!(limit_words("Claude Code", &reached(Some(LimitWindow::Weekly), None), NOW), "Claude Code reached its weekly limit.");
     assert_eq!(limit_words("Claude Code", &reached(None, None), NOW), "Claude Code reached its usage limit.");
+}
+
+#[test]
+fn the_limit_holds_until_its_reset_passes() {
+    let limit = |state, resets_at| Limit { state, resets_at, window: Some(LimitWindow::FiveHour) };
+    assert!(still_reached(&limit(LimitState::Reached, Some(NOW + 60)), NOW));
+    assert!(!still_reached(&limit(LimitState::Reached, Some(NOW)), NOW), "the reset has come");
+    assert!(still_reached(&limit(LimitState::Reached, None), NOW), "no reset time: it holds until claude says so");
+    assert!(!still_reached(&limit(LimitState::Near, Some(NOW + 60)), NOW));
 }
