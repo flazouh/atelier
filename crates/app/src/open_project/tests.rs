@@ -355,7 +355,7 @@ fn a_session_that_continues_another_keeps_it_when_it_takes_another_agent(cx: &mu
         title: TITLE.into(),
     };
     let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, None, window, cx)));
-    cx.update(|_, cx| session.update(cx, |s, cx| s.continue_from(source, cx)));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.continue_from(source, None, cx)));
     let key = cx.update(|_, cx| session.read(cx).key.clone());
 
     cx.update(|window, cx| project.update(cx, |p, cx| p.choose_agent(&key, crate::fake_agent::fake_agent("second"), window, cx)));

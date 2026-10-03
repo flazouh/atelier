@@ -333,10 +333,27 @@ fn open_files_from_the_menu(shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTest
     settle(shell, cx);
 }
 
-/// "Continue with…" in a session's menu opens a new session in its project that carries it on, in front.
+/// The project offers two agents; the second is the target of a handoff.
+fn offering_two_agents(shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext) {
+    let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+    project.update(cx, |p, cx| {
+        p.offer(vec![crate::fake_agent::named_agent("alpha"), crate::fake_agent::named_agent("beta")], cx);
+    });
+    settle(shell, cx);
+}
+
+fn the_second_session(shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext) -> Option<(&'static str, bool)> {
+    shell.read_with(cx, |s, cx| {
+        let next = s.active().unwrap().read(cx).sessions.get(1)?.read(cx);
+        Some((next.agent.name, next.continues().is_some()))
+    })
+}
+
+/// "Handoff" in a session's menu opens a new session in its project, on the agent it names, that carries the old one on, in front.
 #[gpui_kit::test]
-fn continue_with_opens_a_new_session_that_carries_the_old_one_on(cx: &mut TestAppContext) {
+fn a_handoff_from_the_sidebar_opens_a_session_on_the_chosen_agent_that_carries_the_old_one_on(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    offering_two_agents(&shell, cx);
     let (project, first) = shell.read_with(cx, |s, cx| {
         let p = s.active().unwrap().read(cx);
         (crate::agents_view::project_id(p), p.sessions[0].read(cx).key.clone())
@@ -344,25 +361,40 @@ fn continue_with_opens_a_new_session_that_carries_the_old_one_on(cx: &mut TestAp
 
     shell.update_in(cx, |s, window, cx| {
         let sidebar = s.agents_sidebar.clone();
-        s.sidebar_event(&sidebar, &atelier_ui::sidebar::SidebarEvent::ContinueWith { project, session: first.clone() }, window, cx);
+        s.sidebar_event(&sidebar, &atelier_ui::sidebar::SidebarEvent::Handoff { project, session: first.clone(), target: "beta".into() }, window, cx);
     });
     settle(&shell, cx);
 
-    let (count, continues) = shell.read_with(cx, |s, cx| {
-        let p = s.active().unwrap().read(cx);
-        (p.sessions.len(), p.sessions[1].read(cx).continues().map(|source| source.id.clone()))
-    });
-    assert_eq!(count, 2);
-    assert!(continues.is_some(), "the new session continues the first");
+    assert_eq!(the_second_session(&shell, cx), Some(("beta", true)), "on beta, continuing the first");
     assert!(cx.debug_bounds("session-heading").is_some());
 }
 
-/// An account at its usage limit says so over the composer, and its "Continue with…" carries the session on
-/// in a new one.
+/// A target the project does not offer opens nothing.
 #[gpui_kit::test]
-fn a_reached_limit_offers_to_continue_with_another_provider(cx: &mut TestAppContext) {
+fn a_handoff_to_an_agent_the_project_does_not_offer_opens_nothing(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    offering_two_agents(&shell, cx);
+    let (project, first) = shell.read_with(cx, |s, cx| {
+        let p = s.active().unwrap().read(cx);
+        (crate::agents_view::project_id(p), p.sessions[0].read(cx).key.clone())
+    });
+
+    shell.update_in(cx, |s, window, cx| {
+        let sidebar = s.agents_sidebar.clone();
+        s.sidebar_event(&sidebar, &atelier_ui::sidebar::SidebarEvent::Handoff { project, session: first, target: "gamma".into() }, window, cx);
+    });
+    settle(&shell, cx);
+
+    assert_eq!(the_second_session(&shell, cx), None);
+}
+
+/// An account at its usage limit says so over the composer, and its Handoff menu carries the session on in a new one,
+/// on the agent the reader chooses.
+#[gpui_kit::test]
+fn a_reached_limit_offers_a_handoff_menu_of_the_agents(cx: &mut TestAppContext) {
     use atelier_agents::session::{Event, Limit, LimitState, LimitWindow};
     let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    offering_two_agents(&shell, cx);
     assert!(cx.debug_bounds("limit-notice").is_none(), "no box while there is room");
     let first = shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).sessions[0].clone());
     first.update(cx, |s, cx| {
@@ -372,14 +404,14 @@ fn a_reached_limit_offers_to_continue_with_another_provider(cx: &mut TestAppCont
     settle(&shell, cx);
     assert!(cx.debug_bounds("limit-notice").is_some(), "the box shows");
 
-    let button = cx.debug_bounds("limit-continue").expect("with its button");
+    let button = cx.debug_bounds("limit-handoff").expect("with its button");
     cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    let continues = shell.read_with(cx, |s, cx| {
-        let p = s.active().unwrap().read(cx);
-        p.sessions.get(1).and_then(|next| next.read(cx).continues().map(|source| source.id.clone()))
-    });
-    assert!(continues.is_some(), "a new session continues the first");
+    let beta = cx.debug_bounds("branch-beta").expect("the button opens the agents");
+    cx.simulate_click(beta.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+
+    assert_eq!(the_second_session(&shell, cx), Some(("beta", true)));
 }
 
 /// Views and commands, part 2: the Sessions view and the Files view, one on screen at a time. The sidebar

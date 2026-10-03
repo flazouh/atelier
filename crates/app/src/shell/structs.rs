@@ -193,7 +193,13 @@ impl Shell {
             }
         }
         let now = agent_session::now();
-        self.agents_sidebar.update(cx, |s, cx| s.set_projects(all, now, cx));
+        let handoff: Vec<_> = self.projects.iter().map(|p| (agents_view::project_id(p.read(cx)), p.read(cx).handoff_branches())).collect();
+        self.agents_sidebar.update(cx, |s, cx| {
+            for (project, targets) in handoff {
+                s.set_handoff(project, targets, cx);
+            }
+            s.set_projects(all, now, cx);
+        });
     }
 
     /// Hears the sidebar and the panels. Called once the window exists.
@@ -334,16 +340,20 @@ impl Shell {
         self.show_session(project, &session, window, cx);
     }
 
-    /// Opens a new session in the project at `project` that carries on the session on the sidebar's row `row`. It starts
-    /// on the project's agent and default provider; until its first message, the reader can pick others.
-    fn continue_with(&mut self, project: usize, row: &str, window: &mut Window, cx: &mut Context<Self>) {
+    /// Opens a new session in the project at `project` that carries on the session on the sidebar's row `row`, on the agent
+    /// and provider the id `target` names. It shows in front.
+    fn handoff(&mut self, project: usize, row: &str, target: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(source) = self.source_of(project, row, cx) else {
-            return self.say("This session has not started, so there is nothing to continue yet.".into(), cx);
+            return self.say("This session has not started, so there is nothing to hand off yet.".into(), cx);
         };
         let Some(p) = self.projects.get(project).cloned() else { return };
-        let session = p.update(cx, |p, cx| p.open_session(None, None, window, cx));
-        session.update(cx, |s, cx| s.continue_from(source, cx));
-        self.show_session(project, &session, window, cx);
+        let Some(target) = crate::handoff_targets::Target::parse(target) else {
+            return self.say("This target is not known.".into(), cx);
+        };
+        match p.update(cx, |p, cx| p.handoff(source, &target, window, cx)) {
+            Some(session) => self.show_session(project, &session, window, cx),
+            None => self.say("This project does not offer that agent.".into(), cx),
+        }
     }
 
     /// The session on the sidebar's row `row`, as a new session continues it; `None` before its agent named it.
@@ -419,9 +429,9 @@ impl Shell {
                 None => self.say("This session has not started, so it has no id yet.".into(), cx),
             },
             SidebarEvent::CloseSession { session, .. } => self.close_session(session.as_ref(), cx),
-            SidebarEvent::ContinueWith { project, session } => {
+            SidebarEvent::Handoff { project, session, target } => {
                 if let Some(at) = self.project_by_id(project, cx) {
-                    self.continue_with(at, session, window, cx);
+                    self.handoff(at, session, target, window, cx);
                 }
             }
             SidebarEvent::NewSession { project } => {
@@ -914,9 +924,9 @@ impl Shell {
                 }
             }
             ProjectEvent::ArchiveSession(key) => this.set_archived(key.as_ref(), true, cx),
-            ProjectEvent::ContinueWith(key) => {
+            ProjectEvent::Handoff { session, target } => {
                 if let Some(at) = this.projects.iter().position(|p| p == project) {
-                    this.continue_with(at, key.as_ref(), window, cx);
+                    this.handoff(at, session.as_ref(), target.as_ref(), window, cx);
                 }
             }
             ProjectEvent::ShowFiles => {

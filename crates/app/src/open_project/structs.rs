@@ -120,6 +120,10 @@ pub struct OpenProject {
     /// Hands the link's ups and downs to this entity.
     linking: Task<()>,
     listing_task: Task<()>,
+    /// The agents a handoff can go to, and the providers of each, read once and again when asked.
+    pub(super) offered: Vec<Agent>,
+    pub(super) handoff_targets: crate::handoff_targets::Targets,
+    pub(super) reading_targets: Task<()>,
 }
 
 impl OpenProject {
@@ -168,7 +172,11 @@ impl OpenProject {
             watching: Task::ready(()),
             linking: Task::ready(()),
             listing_task: Task::ready(()),
+            offered: atelier_agents::registry::agents(),
+            handoff_targets: crate::handoff_targets::Targets::default(),
+            reading_targets: Task::ready(()),
         };
+        this.read_handoff_targets(cx);
         this.relist(cx);
         this.read_git(cx);
         this.list_sessions(cx);
@@ -237,9 +245,11 @@ impl OpenProject {
         let chips = self.pr_chips.clone();
         #[cfg(test)]
         let agent = if super::TEST_THREAD_ONLY.get() { Agent { backend: crate::fake_agent::fake_agent("fake").backend, ..agent } } else { agent };
+        let branches = self.handoff_targets.branches();
         let session = cx.new(|cx| {
             let mut session = AgentSession::start(key, agent, project, resume, window, cx);
             session.pr_chips = chips;
+            session.handoff_branches = branches;
             session
         });
         self._session_events.push(cx.subscribe_in(&session, window, |this, session, event: &SessionEvent, window, cx| {
@@ -271,7 +281,7 @@ impl OpenProject {
                 SessionEvent::Close => return cx.emit(ProjectEvent::CloseSession(session.read(cx).key.clone())),
                 SessionEvent::NewSession => return cx.emit(ProjectEvent::NewSessionHere),
                 SessionEvent::Archive => return cx.emit(ProjectEvent::ArchiveSession(session.read(cx).key.clone())),
-                SessionEvent::ContinueWith => return cx.emit(ProjectEvent::ContinueWith(session.read(cx).key.clone())),
+                SessionEvent::Handoff(target) => return cx.emit(ProjectEvent::Handoff { session: session.read(cx).key.clone(), target: target.clone() }),
                 SessionEvent::ShowFiles => return cx.emit(ProjectEvent::ShowFiles),
                 SessionEvent::ShowTasks => return cx.emit(ProjectEvent::ShowTasks),
                 SessionEvent::Renamed => {
@@ -296,7 +306,7 @@ impl OpenProject {
         let continues = self.sessions[at].read(cx).continues().cloned();
         self.sessions[at] = self.start_session(key.to_string().into(), agent, None, window, cx);
         if let Some(source) = continues {
-            self.sessions[at].update(cx, |s, cx| s.continue_from(source, cx));
+            self.sessions[at].update(cx, |s, cx| s.continue_from(source, None, cx));
         }
         cx.emit(ProjectEvent::Sessions);
     }
