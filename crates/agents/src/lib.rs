@@ -9,6 +9,7 @@ pub mod claude_code;
 pub mod coding_agents;
 pub mod commands;
 pub mod cursor;
+pub mod handoff;
 pub mod labs;
 pub mod own;
 mod partial_json;
