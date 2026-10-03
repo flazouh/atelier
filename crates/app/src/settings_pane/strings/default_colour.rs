@@ -1,0 +1,43 @@
+//! Default: the theme's ink
+//!
+//! Tooltip on the first colour swatch, which means: no custom colour, use the theme's own text colour. About 30 characters.
+use atelier_i18n::Message;
+
+pub const DEFAULT_COLOUR: Message = Message {
+    ar: "الافتراضي: لون نص السمة",
+    ca: "Per defecte: color del text del tema",
+    cs: "Výchozí: barva textu motivu",
+    da: "Standard: temaets tekstfarve",
+    de: "Standard: Textfarbe des Designs",
+    el: "Προεπιλογή: χρώμα κειμένου θέματος",
+    en: "Default: the theme's ink",
+    es: "Predeterminado: color de texto del tema",
+    es_419: "Predeterminado: color de texto del tema",
+    fi: "Oletus: teeman tekstiväri",
+    fr: "Par défaut : couleur du texte du thème",
+    fr_ca: "Par défaut : couleur du texte du thème",
+    he: "ברירת מחדל: צבע הטקסט של ערכת הנושא",
+    hi: "डिफ़ॉल्ट: थीम का टेक्स्ट रंग",
+    hr: "Zadano: boja teksta teme",
+    hu: "Alapértelmezett: a téma szövegszíne",
+    id: "Default: warna teks tema",
+    it: "Predefinito: colore del testo del tema",
+    ja: "デフォルト：テーマの文字色",
+    ko: "기본값: 테마의 텍스트 색상",
+    ms: "Lalai: warna teks tema",
+    nl: "Standaard: tekstkleur van het thema",
+    no: "Standard: temaets tekstfarge",
+    pl: "Domyślny: kolor tekstu motywu",
+    pt_br: "Padrão: cor do texto do tema",
+    pt_pt: "Predefinição: cor do texto do tema",
+    ro: "Implicit: culoarea textului temei",
+    ru: "По умолчанию: цвет текста темы",
+    sk: "Predvolené: farba textu motívu",
+    sv: "Standard: temats textfärg",
+    th: "ค่าเริ่มต้น: สีข้อความของธีม",
+    tr: "Varsayılan: temanın metin rengi",
+    uk: "За замовчуванням: колір тексту теми",
+    vi: "Mặc định: màu chữ của giao diện",
+    zh_cn: "默认：主题文字颜色",
+    zh_tw: "預設：主題文字顏色",
+};

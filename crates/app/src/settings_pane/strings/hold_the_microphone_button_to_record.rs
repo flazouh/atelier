@@ -1,0 +1,43 @@
+//! Hold the microphone button to record
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A switch.
+use atelier_i18n::Message;
+
+pub const HOLD_THE_MICROPHONE_BUTTON_TO_RECORD: Message = Message {
+    ar: "اضغط مطولًا على زر الميكروفون للتسجيل",
+    ca: "Mantén premut el botó del micròfon per gravar",
+    cs: "Podržením tlačítka mikrofonu spustíte nahrávání",
+    da: "Hold mikrofonknappen nede for at optage",
+    de: "Zum Aufnehmen die Mikrofontaste gedrückt halten",
+    el: "Κρατήστε πατημένο το κουμπί μικροφώνου για εγγραφή",
+    en: "Hold the microphone button to record",
+    es: "Mantén pulsado el botón del micrófono para grabar",
+    es_419: "Mantén presionado el botón del micrófono para grabar",
+    fi: "Aloita tallennus pitämällä mikrofonipainiketta painettuna",
+    fr: "Maintenez le bouton du micro enfoncé pour enregistrer",
+    fr_ca: "Maintenez le bouton du micro enfoncé pour enregistrer",
+    he: "לחיצה ממושכת על כפתור המיקרופון מתחילה הקלטה",
+    hi: "रिकॉर्ड करने के लिए माइक्रोफ़ोन बटन दबाए रखें",
+    hr: "Za snimanje držite pritisnut gumb mikrofona",
+    hu: "Felvételhez tartsa lenyomva a mikrofon gombját",
+    id: "Tekan dan tahan tombol mikrofon untuk merekam",
+    it: "Tieni premuto il pulsante del microfono per registrare",
+    ja: "録音するにはマイクボタンを長押し",
+    ko: "녹음하려면 마이크 버튼을 길게 누르세요",
+    ms: "Tekan dan tahan butang mikrofon untuk merakam",
+    nl: "Houd de microfoonknop ingedrukt om op te nemen",
+    no: "Hold mikrofonknappen inne for å ta opp",
+    pl: "Przytrzymaj przycisk mikrofonu, aby nagrać",
+    pt_br: "Mantenha o botão do microfone pressionado para gravar",
+    pt_pt: "Mantenha o botão do microfone premido para gravar",
+    ro: "Ține apăsat butonul microfonului pentru a înregistra",
+    ru: "Удерживайте кнопку микрофона, чтобы записать",
+    sk: "Nahrávanie spustíte podržaním tlačidla mikrofónu",
+    sv: "Håll mikrofonknappen intryckt för att spela in",
+    th: "กดปุ่มไมโครโฟนค้างไว้เพื่อบันทึก",
+    tr: "Kayıt yapmak için mikrofon düğmesini basılı tutun",
+    uk: "Щоб записати, натисніть і утримуйте кнопку мікрофона",
+    vi: "Nhấn giữ nút micrô để ghi âm",
+    zh_cn: "按住麦克风按钮即可录音",
+    zh_tw: "按住麥克風按鈕即可錄音",
+};

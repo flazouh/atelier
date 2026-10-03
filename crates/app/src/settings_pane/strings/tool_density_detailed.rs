@@ -1,0 +1,43 @@
+//! Full detail
+//!
+//! A choice for how much of the agent's tool calls to show: everything, with the call's output. A label on a segmented control: one or two words, so it must stay short.
+use atelier_i18n::Message;
+
+pub const TOOL_DENSITY_DETAILED: Message = Message {
+    ar: "تفاصيل كاملة",
+    ca: "Detall complet",
+    cs: "Vše podrobně",
+    da: "Alle detaljer",
+    de: "Alle Details",
+    el: "Πλήρεις λεπτομέρειες",
+    en: "Full detail",
+    es: "Detalle completo",
+    es_419: "Detalle completo",
+    fi: "Kaikki tiedot",
+    fr: "Détails complets",
+    fr_ca: "Détails complets",
+    he: "פירוט מלא",
+    hi: "पूरा विवरण",
+    hr: "Sve pojedinosti",
+    hu: "Teljes részletesség",
+    id: "Detail lengkap",
+    it: "Dettagli completi",
+    ja: "すべて表示",
+    ko: "자세히",
+    ms: "Butiran penuh",
+    nl: "Alle details",
+    no: "Alle detaljer",
+    pl: "Pełne szczegóły",
+    pt_br: "Detalhes completos",
+    pt_pt: "Detalhes completos",
+    ro: "Detalii complete",
+    ru: "Подробно",
+    sk: "Všetky podrobnosti",
+    sv: "Alla detaljer",
+    th: "รายละเอียดทั้งหมด",
+    tr: "Tüm ayrıntılar",
+    uk: "Усі подробиці",
+    vi: "Đầy đủ chi tiết",
+    zh_cn: "完整详情",
+    zh_tw: "完整詳細",
+};

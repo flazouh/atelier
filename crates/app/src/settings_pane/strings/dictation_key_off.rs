@@ -1,0 +1,43 @@
+//! Off
+//!
+//! A choice for the dictation key: none. A label on a segmented control: one or two words, so it must stay short.
+use atelier_i18n::Message;
+
+pub const DICTATION_KEY_OFF: Message = Message {
+    ar: "بدون",
+    ca: "Cap",
+    cs: "Žádná",
+    da: "Ingen",
+    de: "Keine",
+    el: "Καμία",
+    en: "Off",
+    es: "Ninguna",
+    es_419: "Ninguna",
+    fi: "Ei mitään",
+    fr: "Aucune",
+    fr_ca: "Aucune",
+    he: "ללא",
+    hi: "कोई नहीं",
+    hr: "Nijedna",
+    hu: "Nincs",
+    id: "Tidak ada",
+    it: "Nessuno",
+    ja: "なし",
+    ko: "없음",
+    ms: "Tiada",
+    nl: "Geen",
+    no: "Ingen",
+    pl: "Brak",
+    pt_br: "Nenhuma",
+    pt_pt: "Nenhuma",
+    ro: "Niciuna",
+    ru: "Нет",
+    sk: "Žiadna",
+    sv: "Ingen",
+    th: "ไม่มี",
+    tr: "Yok",
+    uk: "Немає",
+    vi: "Không",
+    zh_cn: "无",
+    zh_tw: "無",
+};

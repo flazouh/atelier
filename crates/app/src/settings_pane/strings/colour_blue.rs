@@ -1,0 +1,43 @@
+//! Blue
+//!
+//! Tooltip on a colour swatch. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_BLUE: Message = Message {
+    ar: "أزرق",
+    ca: "Blau",
+    cs: "Modrá",
+    da: "Blå",
+    de: "Blau",
+    el: "Μπλε",
+    en: "Blue",
+    es: "Azul",
+    es_419: "Azul",
+    fi: "Sininen",
+    fr: "Bleu",
+    fr_ca: "Bleu",
+    he: "כחול",
+    hi: "नीला",
+    hr: "Plava",
+    hu: "Kék",
+    id: "Biru",
+    it: "Blu",
+    ja: "青",
+    ko: "파랑",
+    ms: "Biru",
+    nl: "Blauw",
+    no: "Blå",
+    pl: "Niebieski",
+    pt_br: "Azul",
+    pt_pt: "Azul",
+    ro: "Albastru",
+    ru: "Синий",
+    sk: "Modrá",
+    sv: "Blå",
+    th: "สีน้ำเงิน",
+    tr: "Mavi",
+    uk: "Синій",
+    vi: "Xanh dương",
+    zh_cn: "蓝色",
+    zh_tw: "藍色",
+};

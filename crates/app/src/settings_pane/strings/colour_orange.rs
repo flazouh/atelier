@@ -1,0 +1,43 @@
+//! Orange
+//!
+//! Tooltip on a colour swatch. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_ORANGE: Message = Message {
+    ar: "برتقالي",
+    ca: "Taronja",
+    cs: "Oranžová",
+    da: "Orange",
+    de: "Orange",
+    el: "Πορτοκαλί",
+    en: "Orange",
+    es: "Naranja",
+    es_419: "Naranja",
+    fi: "Oranssi",
+    fr: "Orange",
+    fr_ca: "Orange",
+    he: "כתום",
+    hi: "नारंगी",
+    hr: "Narančasta",
+    hu: "Narancssárga",
+    id: "Oranye",
+    it: "Arancione",
+    ja: "オレンジ",
+    ko: "주황색",
+    ms: "Jingga",
+    nl: "Oranje",
+    no: "Oransje",
+    pl: "Pomarańczowy",
+    pt_br: "Laranja",
+    pt_pt: "Laranja",
+    ro: "Portocaliu",
+    ru: "Оранжевый",
+    sk: "Oranžová",
+    sv: "Orange",
+    th: "สีส้ม",
+    tr: "Turuncu",
+    uk: "Помаранчевий",
+    vi: "Cam",
+    zh_cn: "橙色",
+    zh_tw: "橙色",
+};

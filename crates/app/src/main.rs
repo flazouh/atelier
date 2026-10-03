@@ -63,6 +63,8 @@ fn main() {
     }
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
+    // The reader's pick, else the system's; before any window draws a word.
+    atelier_i18n::set_current(saved.language.as_deref().and_then(atelier_i18n::Locale::from_tag).unwrap_or_else(atelier_i18n::system_locale));
     let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let folders: Vec<Opening> = folders.into_iter().map(Opening::from).collect();
     gpui_kit::application().with_assets(atelier_agents::Assets).run(move |cx| {

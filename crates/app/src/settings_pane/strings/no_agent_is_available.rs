@@ -1,0 +1,43 @@
+//! No agent is available.
+//!
+//! Muted small text shown when the app can start no agent. A full sentence with a full stop.
+use atelier_i18n::Message;
+
+pub const NO_AGENT_IS_AVAILABLE: Message = Message {
+    ar: "لا يتوفر أي وكيل.",
+    ca: "No hi ha cap agent disponible.",
+    cs: "Není k dispozici žádný agent.",
+    da: "Der er ingen agent tilgængelig.",
+    de: "Kein Agent verfügbar.",
+    el: "Δεν υπάρχει διαθέσιμος agent.",
+    en: "No agent is available.",
+    es: "No hay ningún agente disponible.",
+    es_419: "No hay ningún agente disponible.",
+    fi: "Agenttia ei ole saatavilla.",
+    fr: "Aucun agent n’est disponible.",
+    fr_ca: "Aucun agent n’est disponible.",
+    he: "אין סוכן זמין.",
+    hi: "कोई एजेंट उपलब्ध नहीं है।",
+    hr: "Nijedan agent nije dostupan.",
+    hu: "Nem érhető el ügynök.",
+    id: "Tidak ada agen yang tersedia.",
+    it: "Nessun agente disponibile.",
+    ja: "利用可能なエージェントがありません。",
+    ko: "사용 가능한 에이전트가 없습니다.",
+    ms: "Tiada ejen yang tersedia.",
+    nl: "Er is geen agent beschikbaar.",
+    no: "Ingen agent er tilgjengelig.",
+    pl: "Żaden agent nie jest dostępny.",
+    pt_br: "Nenhum agente está disponível.",
+    pt_pt: "Não está disponível nenhum agente.",
+    ro: "Nu este disponibil niciun agent.",
+    ru: "Нет доступных агентов.",
+    sk: "Nie je k dispozícii žiadny agent.",
+    sv: "Ingen agent är tillgänglig.",
+    th: "ไม่มีเอเจนต์ที่พร้อมใช้งาน",
+    tr: "Kullanılabilir bir aracı yok.",
+    uk: "Немає доступних агентів.",
+    vi: "Không có agent nào khả dụng.",
+    zh_cn: "没有可用的代理。",
+    zh_tw: "沒有可用的代理。",
+};

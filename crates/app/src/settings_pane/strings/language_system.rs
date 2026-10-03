@@ -1,0 +1,43 @@
+//! System
+//!
+//! The first choice in the list of languages: use the language the computer is set to. One word.
+use atelier_i18n::Message;
+
+pub const LANGUAGE_SYSTEM: Message = Message {
+    ar: "النظام",
+    ca: "Sistema",
+    cs: "Systém",
+    da: "System",
+    de: "System",
+    el: "Σύστημα",
+    en: "System",
+    es: "Sistema",
+    es_419: "Sistema",
+    fi: "Järjestelmä",
+    fr: "Système",
+    fr_ca: "Système",
+    he: "מערכת",
+    hi: "सिस्टम",
+    hr: "Sustav",
+    hu: "Rendszer",
+    id: "Sistem",
+    it: "Sistema",
+    ja: "システム",
+    ko: "시스템",
+    ms: "Sistem",
+    nl: "Systeem",
+    no: "System",
+    pl: "System",
+    pt_br: "Sistema",
+    pt_pt: "Sistema",
+    ro: "Sistem",
+    ru: "Система",
+    sk: "Systém",
+    sv: "System",
+    th: "ระบบ",
+    tr: "Sistem",
+    uk: "Система",
+    vi: "Hệ thống",
+    zh_cn: "系统",
+    zh_tw: "系統",
+};

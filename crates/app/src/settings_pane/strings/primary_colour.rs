@@ -1,0 +1,43 @@
+//! Primary colour
+//!
+//! Heading above a row of colour swatches on the Settings page. Short. Use the spelling the language's own region uses.
+use atelier_i18n::Message;
+
+pub const PRIMARY_COLOUR: Message = Message {
+    ar: "اللون الأساسي",
+    ca: "Color principal",
+    cs: "Primární barva",
+    da: "Primærfarve",
+    de: "Primärfarbe",
+    el: "Βασικό χρώμα",
+    en: "Primary colour",
+    es: "Color principal",
+    es_419: "Color principal",
+    fi: "Pääväri",
+    fr: "Couleur principale",
+    fr_ca: "Couleur principale",
+    he: "צבע ראשי",
+    hi: "प्राथमिक रंग",
+    hr: "Primarna boja",
+    hu: "Elsődleges szín",
+    id: "Warna utama",
+    it: "Colore primario",
+    ja: "プライマリカラー",
+    ko: "기본 색상",
+    ms: "Warna utama",
+    nl: "Primaire kleur",
+    no: "Primærfarge",
+    pl: "Kolor podstawowy",
+    pt_br: "Cor primária",
+    pt_pt: "Cor principal",
+    ro: "Culoare principală",
+    ru: "Основной цвет",
+    sk: "Primárna farba",
+    sv: "Primärfärg",
+    th: "สีหลัก",
+    tr: "Birincil renk",
+    uk: "Основний колір",
+    vi: "Màu chính",
+    zh_cn: "主色",
+    zh_tw: "主色",
+};

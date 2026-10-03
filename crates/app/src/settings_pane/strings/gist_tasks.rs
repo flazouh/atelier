@@ -1,0 +1,43 @@
+//! What moves a task by itself. Every move shows in its activity, and you can move it back.
+//!
+//! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. A task is a card on a board that moves between columns.
+use atelier_i18n::Message;
+
+pub const GIST_TASKS: Message = Message {
+    ar: "ما الذي ينقل المهمة تلقائيًا. يظهر كل نقل في سجلّ النشاط، ويمكنك التراجع عنه.",
+    ca: "Què mou una tasca automàticament. Cada moviment apareix a l’activitat i el pots desfer.",
+    cs: "Co automaticky přesouvá úkol. Každý přesun se zobrazí v aktivitě a můžete ho vrátit zpět.",
+    da: "Hvad der flytter en opgave automatisk. Hver flytning vises i aktiviteten, og du kan flytte den tilbage.",
+    de: "Was eine Aufgabe automatisch verschiebt. Jede Verschiebung erscheint in der Aktivität und lässt sich rückgängig machen.",
+    el: "Τι μετακινεί αυτόματα μια εργασία. Κάθε μετακίνηση εμφανίζεται στη δραστηριότητά της και μπορείτε να την αναιρέσετε.",
+    en: "What moves a task by itself. Every move shows in its activity, and you can move it back.",
+    es: "Qué mueve una tarea automáticamente. Cada movimiento aparece en su actividad y puedes devolverla a su sitio.",
+    es_419: "Qué mueve una tarea automáticamente. Cada movimiento aparece en su actividad y puedes devolverla a su lugar.",
+    fi: "Mikä siirtää tehtävää automaattisesti. Jokainen siirto näkyy tehtävän tapahtumissa, ja voit siirtää sen takaisin.",
+    fr: "Ce qui déplace une tâche automatiquement. Chaque déplacement apparaît dans son activité, et vous pouvez la remettre à sa place.",
+    fr_ca: "Ce qui déplace une tâche automatiquement. Chaque déplacement apparaît dans son activité, et vous pouvez la remettre à sa place.",
+    he: "מה מעביר משימה באופן אוטומטי. כל העברה מופיעה בפעילות שלה, ואפשר להחזיר אותה.",
+    hi: "किसी टास्क को अपने-आप कौन आगे बढ़ाता है। हर बदलाव उसकी गतिविधि में दिखता है, और आप उसे वापस ले जा सकते हैं।",
+    hr: "Što automatski premješta zadatak. Svako premještanje prikazuje se u njegovoj aktivnosti i možete ga vratiti.",
+    hu: "Mi helyez át automatikusan egy feladatot. Minden áthelyezés megjelenik a tevékenységei között, és visszahelyezheted.",
+    id: "Hal yang memindahkan tugas secara otomatis. Setiap perpindahan tercatat di aktivitasnya, dan Anda bisa memindahkannya kembali.",
+    it: "Cosa sposta automaticamente un’attività. Ogni spostamento compare nelle sue attività e puoi riportarla indietro.",
+    ja: "タスクが自動で移動する仕組みです。移動はすべてアクティビティに表示され、元に戻すこともできます。",
+    ko: "작업을 자동으로 이동하는 항목입니다. 모든 이동은 활동에 표시되며, 다시 되돌릴 수 있습니다.",
+    ms: "Perkara yang menggerakkan tugas secara automatik. Setiap pergerakan dipaparkan dalam aktivitinya dan anda boleh mengalihkannya kembali.",
+    nl: "Wat een taak automatisch verplaatst. Elke verplaatsing staat in de activiteit en je kunt de taak terugzetten.",
+    no: "Hva som flytter en oppgave automatisk. Hver flytting vises i aktiviteten, og du kan flytte den tilbake.",
+    pl: "Co automatycznie przenosi zadanie. Każde przeniesienie pojawia się w jego aktywności i możesz je cofnąć.",
+    pt_br: "O que move uma tarefa automaticamente. Cada movimentação aparece na atividade dela, e você pode movê-la de volta.",
+    pt_pt: "O que move uma tarefa automaticamente. Cada movimento aparece na atividade da tarefa e pode movê-la de volta.",
+    ro: "Ce mută automat o sarcină. Fiecare mutare apare în activitatea ei și o poți muta înapoi.",
+    ru: "Что автоматически перемещает задачу. Каждое перемещение отображается в истории активности, и вы можете вернуть задачу обратно.",
+    sk: "Čo automaticky presúva úlohu. Každé presunutie sa zobrazí v jej aktivite a môžete ju presunúť späť.",
+    sv: "Vad som flyttar en uppgift automatiskt. Varje flytt visas i aktiviteten och du kan flytta tillbaka den.",
+    th: "สิ่งที่ย้ายงานโดยอัตโนมัติ การย้ายทุกครั้งจะแสดงในกิจกรรมของงาน และคุณย้ายกลับได้",
+    tr: "Bir görevi otomatik olarak neyin taşıdığı. Her taşıma etkinliğinde görünür ve görevi geri alabilirsiniz.",
+    uk: "Що автоматично переміщує завдання. Кожне переміщення відображається в його активності, і ви можете повернути його назад.",
+    vi: "Điều gì tự động di chuyển một tác vụ. Mọi lần di chuyển đều hiển thị trong hoạt động của tác vụ và bạn có thể chuyển tác vụ về lại.",
+    zh_cn: "自动移动任务的原因。每次移动都会显示在任务动态中，你也可以将任务移回。",
+    zh_tw: "自動移動任務的原因。每次移動都會顯示在任務動態中，你也可以將任務移回。",
+};

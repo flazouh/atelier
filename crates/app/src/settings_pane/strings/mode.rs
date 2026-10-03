@@ -1,0 +1,43 @@
+//! Mode
+//!
+//! Row label for choosing light or dark appearance. Short.
+use atelier_i18n::Message;
+
+pub const MODE: Message = Message {
+    ar: "الوضع",
+    ca: "Mode",
+    cs: "Režim",
+    da: "Tilstand",
+    de: "Modus",
+    el: "Λειτουργία",
+    en: "Mode",
+    es: "Modo",
+    es_419: "Modo",
+    fi: "Tila",
+    fr: "Mode",
+    fr_ca: "Mode",
+    he: "מצב",
+    hi: "मोड",
+    hr: "Način",
+    hu: "Mód",
+    id: "Mode",
+    it: "Modalità",
+    ja: "モード",
+    ko: "모드",
+    ms: "Mod",
+    nl: "Modus",
+    no: "Modus",
+    pl: "Tryb",
+    pt_br: "Modo",
+    pt_pt: "Modo",
+    ro: "Mod",
+    ru: "Режим",
+    sk: "Režim",
+    sv: "Läge",
+    th: "โหมด",
+    tr: "Mod",
+    uk: "Режим",
+    vi: "Chế độ",
+    zh_cn: "模式",
+    zh_tw: "模式",
+};

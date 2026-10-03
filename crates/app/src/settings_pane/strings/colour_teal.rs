@@ -1,0 +1,43 @@
+//! Teal
+//!
+//! Tooltip on a colour swatch: a blue-green. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_TEAL: Message = Message {
+    ar: "فيروزي",
+    ca: "Turquesa",
+    cs: "Tyrkysová",
+    da: "Turkis",
+    de: "Türkis",
+    el: "Πετρόλ",
+    en: "Teal",
+    es: "Turquesa",
+    es_419: "Turquesa",
+    fi: "Sinivihreä",
+    fr: "Sarcelle",
+    fr_ca: "Sarcelle",
+    he: "טורקיז",
+    hi: "टील",
+    hr: "Tirkizna",
+    hu: "Türkiz",
+    id: "Teal",
+    it: "Ottanio",
+    ja: "青緑",
+    ko: "청록색",
+    ms: "Teal",
+    nl: "Turquoise",
+    no: "Turkis",
+    pl: "Turkusowy",
+    pt_br: "Turquesa",
+    pt_pt: "Turquesa",
+    ro: "Turcoaz",
+    ru: "Бирюзовый",
+    sk: "Tyrkysová",
+    sv: "Turkos",
+    th: "เขียวน้ำทะเล",
+    tr: "Turkuaz",
+    uk: "Бірюзовий",
+    vi: "Xanh ngọc",
+    zh_cn: "蓝绿色",
+    zh_tw: "藍綠色",
+};

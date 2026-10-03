@@ -1,0 +1,43 @@
+//! Appearance
+//!
+//! An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section.
+use atelier_i18n::Message;
+
+pub const SECTION_APPEARANCE: Message = Message {
+    ar: "المظهر",
+    ca: "Aparença",
+    cs: "Vzhled",
+    da: "Udseende",
+    de: "Darstellung",
+    el: "Εμφάνιση",
+    en: "Appearance",
+    es: "Apariencia",
+    es_419: "Apariencia",
+    fi: "Ulkoasu",
+    fr: "Apparence",
+    fr_ca: "Apparence",
+    he: "מראה",
+    hi: "दिखावट",
+    hr: "Izgled",
+    hu: "Megjelenés",
+    id: "Tampilan",
+    it: "Aspetto",
+    ja: "外観",
+    ko: "모양",
+    ms: "Penampilan",
+    nl: "Weergave",
+    no: "Utseende",
+    pl: "Wygląd",
+    pt_br: "Aparência",
+    pt_pt: "Aspeto",
+    ro: "Aspect",
+    ru: "Внешний вид",
+    sk: "Vzhľad",
+    sv: "Utseende",
+    th: "ลักษณะที่ปรากฏ",
+    tr: "Görünüm",
+    uk: "Вигляд",
+    vi: "Giao diện",
+    zh_cn: "外观",
+    zh_tw: "外觀",
+};

@@ -1,0 +1,43 @@
+//! Tasks
+//!
+//! An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section.
+use atelier_i18n::Message;
+
+pub const SECTION_TASKS: Message = Message {
+    ar: "المهام",
+    ca: "Tasques",
+    cs: "Úkoly",
+    da: "Opgaver",
+    de: "Aufgaben",
+    el: "Εργασίες",
+    en: "Tasks",
+    es: "Tareas",
+    es_419: "Tareas",
+    fi: "Tehtävät",
+    fr: "Tâches",
+    fr_ca: "Tâches",
+    he: "משימות",
+    hi: "कार्य",
+    hr: "Zadaci",
+    hu: "Feladatok",
+    id: "Tugas",
+    it: "Attività",
+    ja: "タスク",
+    ko: "작업",
+    ms: "Tugasan",
+    nl: "Taken",
+    no: "Oppgaver",
+    pl: "Zadania",
+    pt_br: "Tarefas",
+    pt_pt: "Tarefas",
+    ro: "Sarcini",
+    ru: "Задачи",
+    sk: "Úlohy",
+    sv: "Uppgifter",
+    th: "งาน",
+    tr: "Görevler",
+    uk: "Завдання",
+    vi: "Tác vụ",
+    zh_cn: "任务",
+    zh_tw: "任務",
+};

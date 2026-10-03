@@ -192,3 +192,12 @@ fn saves_made_together_all_keep_their_change() {
         assert_eq!(kept, want, "round {round}");
     }
 }
+
+#[test]
+fn the_language_is_kept_by_its_tag() {
+    let file = scratch("language");
+    update(&file, |s| s.language = Some("pt-BR".into())).unwrap();
+    assert_eq!(load(&file).language.as_deref(), Some("pt-BR"));
+    update(&file, |s| s.language = None).unwrap();
+    assert_eq!(load(&file).language, None, "unset follows the system");
+}

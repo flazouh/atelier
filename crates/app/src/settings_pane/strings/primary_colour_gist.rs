@@ -1,0 +1,43 @@
+//! The main button's fill, and the highlight and the selection. A colour that no text reads on is not offered.
+//!
+//! Explanation under the heading Primary colour, in muted small text. May wrap to three lines. The main button is the app's main call-to-action button; the selection is selected text.
+use atelier_i18n::Message;
+
+pub const PRIMARY_COLOUR_GIST: Message = Message {
+    ar: "لون تعبئة الزر الرئيسي، ولون التمييز والتحديد. لا تُعرض الألوان التي يصعب قراءة النص عليها.",
+    ca: "El color de fons del botó principal, dels elements destacats i de la selecció. No s’ofereixen colors sobre els quals el text no es pugui llegir.",
+    cs: "Výplň hlavního tlačítka, zvýraznění a výběru. Barvy, na kterých není text čitelný, se nenabízejí.",
+    da: "Fyldfarven på hovedknappen samt fremhævning og markering. Farver, som gør teksten ulæselig, tilbydes ikke.",
+    de: "Die Füllfarbe der Hauptschaltfläche sowie die Hervorhebungs- und Auswahlfarbe. Farben, auf denen Text nicht lesbar ist, werden nicht angeboten.",
+    el: "Το χρώμα γεμίσματος του κύριου κουμπιού, καθώς και της επισήμανσης και της επιλογής. Δεν προσφέρονται χρώματα στα οποία δεν διαβάζεται το κείμενο.",
+    en: "The main button's fill, and the highlight and the selection. A colour that no text reads on is not offered.",
+    es: "El relleno del botón principal, el resaltado y la selección. No se ofrecen colores en los que no se pueda leer el texto.",
+    es_419: "El relleno del botón principal, el resaltado y la selección. No se ofrecen colores sobre los que no se pueda leer el texto.",
+    fi: "Pääpainikkeen täyttöväri sekä korostus- ja valintaväri. Värejä, joista tekstiä ei voi lukea, ei tarjota.",
+    fr: "Le fond du bouton principal, la mise en évidence et la sélection. Les couleurs qui rendent le texte illisible ne sont pas proposées.",
+    fr_ca: "Le remplissage du bouton principal, la mise en évidence et la sélection. Les couleurs qui rendent le texte illisible ne sont pas proposées.",
+    he: "צבע המילוי של הכפתור הראשי, ההדגשה והבחירה. צבעים שאי אפשר לקרוא עליהם טקסט לא מוצעים.",
+    hi: "मुख्य बटन का भरा हुआ रंग, हाइलाइट और चयन। ऐसे रंग उपलब्ध नहीं हैं जिन पर टेक्स्ट पढ़ा न जा सके।",
+    hr: "Boja ispune glavnog gumba te isticanja i odabira. Ne nude se boje na kojima tekst nije čitljiv.",
+    hu: "A fő gomb kitöltőszíne, valamint a kiemelés és a kijelölés színe. Az olyan színek nem érhetők el, amelyeken nem olvasható a szöveg.",
+    id: "Warna isian tombol utama, sorotan, dan pilihan. Warna yang membuat teks sulit dibaca tidak ditawarkan.",
+    it: "Il riempimento del pulsante principale, l’evidenziazione e la selezione. Non vengono proposti colori su cui il testo non è leggibile.",
+    ja: "メインボタンの塗りつぶし、ハイライト、選択範囲の色です。テキストが読めない色は選べません。",
+    ko: "기본 버튼의 채우기 색상과 강조 및 선택 색상입니다. 텍스트가 읽히지 않는 색상은 제공되지 않습니다.",
+    ms: "Warna isian butang utama, serlahan dan pilihan. Warna yang menyebabkan teks sukar dibaca tidak ditawarkan.",
+    nl: "De vulkleur van de hoofdknop, de markering en de selectie. Kleuren waarop tekst niet leesbaar is, worden niet aangeboden.",
+    no: "Fyllfargen på hovedknappen, utheving og markering. Farger som gjør teksten uleselig, tilbys ikke.",
+    pl: "Wypełnienie głównego przycisku, wyróżnienie i zaznaczenie. Kolory, na których tekst jest nieczytelny, nie są dostępne.",
+    pt_br: "O preenchimento do botão principal, o realce e a seleção. Cores que dificultam a leitura do texto não são oferecidas.",
+    pt_pt: "O preenchimento do botão principal, o realce e a seleção. Não são disponibilizadas cores sobre as quais o texto não seja legível.",
+    ro: "Culoarea de umplere a butonului principal, evidențierea și selecția. Nu sunt oferite culori pe care textul nu poate fi citit.",
+    ru: "Заливка главной кнопки, подсветка и выделение. Цвета, на которых текст неразборчив, не предлагаются.",
+    sk: "Výplň hlavného tlačidla, zvýraznenie a výber. Farby, na ktorých text nie je čitateľný, sa neponúkajú.",
+    sv: "Fyllnadsfärgen på huvudknappen, markering och markering av text. Färger som gör texten oläslig erbjuds inte.",
+    th: "สีพื้นของปุ่มหลัก สีไฮไลต์ และสีข้อความที่เลือก จะไม่มีสีที่ทำให้อ่านข้อความไม่ออกให้เลือก",
+    tr: "Ana düğmenin dolgu rengi, vurgu ve seçim rengi. Metnin okunamadığı renkler sunulmaz.",
+    uk: "Колір заливки головної кнопки, підсвічування та виділення. Кольори, на яких текст нечитабельний, не пропонуються.",
+    vi: "Màu nền của nút chính, màu tô sáng và màu vùng chọn. Không cung cấp màu khiến văn bản khó đọc.",
+    zh_cn: "主按钮的填充色，以及高亮和选中状态的颜色。不提供无法清晰显示文字的颜色。",
+    zh_tw: "主要按鈕的填滿色，以及醒目提示和選取狀態的顏色。不提供無法清楚顯示文字的顏色。",
+};

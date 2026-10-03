@@ -1,0 +1,43 @@
+//! Amber
+//!
+//! Tooltip on a colour swatch: a yellow-orange. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_AMBER: Message = Message {
+    ar: "كهرماني",
+    ca: "ambre",
+    cs: "jantarová",
+    da: "rav",
+    de: "Bernstein",
+    el: "κεχριμπαρί",
+    en: "Amber",
+    es: "ámbar",
+    es_419: "ámbar",
+    fi: "meripihka",
+    fr: "ambre",
+    fr_ca: "ambre",
+    he: "ענברי",
+    hi: "एम्बर",
+    hr: "jantarna",
+    hu: "borostyán",
+    id: "ambar",
+    it: "ambra",
+    ja: "アンバー",
+    ko: "호박색",
+    ms: "ambar",
+    nl: "amber",
+    no: "rav",
+    pl: "bursztynowy",
+    pt_br: "âmbar",
+    pt_pt: "âmbar",
+    ro: "chihlimbar",
+    ru: "янтарный",
+    sk: "jantárová",
+    sv: "bärnsten",
+    th: "สีเหลืองอำพัน",
+    tr: "kehribar",
+    uk: "бурштиновий",
+    vi: "hổ phách",
+    zh_cn: "琥珀色",
+    zh_tw: "琥珀色",
+};
