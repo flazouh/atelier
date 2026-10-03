@@ -984,3 +984,48 @@ fn the_project_switcher_narrows_sessions_and_names_the_project_of_code(cx: &mut 
     press("project-switcher", cx);
     assert!(cx.debug_bounds("switcher-all").is_none(), "with no All projects");
 }
+
+/// The History view lists the branch's commits, newest first, and shows the newest in full until another is
+/// picked.
+#[gpui_kit::test]
+fn history_lists_the_commits_and_shows_the_newest(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(["-c", "user.name=Ada", "-c", "user.email=ada@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "First"]);
+    std::fs::write(dir.path().join("a.txt"), "two\n").unwrap();
+    git(&["commit", "-qam", "Second\n\nWhy it changed."]);
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::History, window, cx));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let (subjects, picked) = shell.read_with(cx, |s, cx| {
+        let p = s.active().unwrap().read(cx);
+        let subjects = match &p.log {
+            Some(crate::history::Read::Ready(commits)) => commits.iter().map(|c| c.subject.to_string()).collect::<Vec<_>>(),
+            other => panic!("the log is read: {other:?}"),
+        };
+        let picked = match &p.commit {
+            Some((_, crate::history::Read::Ready(shown))) => (shown.message.to_string(), shown.files.len()),
+            other => panic!("the newest commit is read: {other:?}"),
+        };
+        (subjects, picked)
+    });
+    assert_eq!(subjects, ["Second", "First"]);
+    assert_eq!(picked, ("Second\n\nWhy it changed.".to_string(), 1));
+    assert!(cx.debug_bounds("history-list").is_some() && cx.debug_bounds("history-commit").is_some(), "the list and the commit are drawn");
+    assert!(cx.debug_bounds("code-nav-history").is_some(), "the Code sidebar names the view");
+}

@@ -25,6 +25,7 @@ mod fake_forge;
 mod frame_meter;
 mod glide;
 mod handoff_targets;
+mod history;
 mod key_table;
 mod list_diff;
 mod look_rules;

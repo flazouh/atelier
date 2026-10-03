@@ -222,9 +222,11 @@ impl Shell {
             .p(px(6.))
             .child(row(ShellView::Pulls, IconName::PrOpen, "Pull requests", pulls, cx))
             .child(row(ShellView::Files, IconName::Folder, "Files", None, cx))
+            .child(row(ShellView::History, IconName::Schedule, "History", None, cx))
             .child(row(ShellView::Git, IconName::Commit, "Changes", changes, cx));
         let below = match self.view {
             ShellView::Files => Some(self.files_tree(project, cx)),
+            ShellView::History => Some(self.history_list(project, cx)),
             ShellView::Git => Some(self.git_sidebar(cx)),
             _ => None,
         };
@@ -309,6 +311,12 @@ impl Shell {
                 self.show_view(view, window, cx);
                 if let Some(project) = self.active().cloned() {
                     project.update(cx, |p, cx| p.load_pulls(window, cx));
+                }
+            }
+            ShellView::History => {
+                self.show_view(view, window, cx);
+                if let Some(project) = self.active().cloned() {
+                    project.update(cx, |p, cx| p.load_log(cx));
                 }
             }
             _ => self.show_view(view, window, cx),

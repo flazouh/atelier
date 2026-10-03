@@ -1,7 +1,7 @@
 //! The views of a window, one on screen at a time. The rail holds three lenses: Sessions (every project's
 //! sessions and their panels), Issues (one project's tasks) and Code (one project's pull requests, files and
-//! changes). Code is three views: Pulls, Files (the tree and the editor) and Git (the focused session's
-//! changed files and their review).
+//! changes). Code is four views: Pulls, Files (the tree and the editor), History (the branch's commits) and
+//! Git (the focused session's changed files and their review).
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ShellView {
@@ -11,6 +11,7 @@ pub enum ShellView {
     Git,
     Files,
     Pulls,
+    History,
 }
 
 impl ShellView {
@@ -22,6 +23,7 @@ impl ShellView {
             Self::Git => "git",
             Self::Files => "files",
             Self::Pulls => "pulls",
+            Self::History => "history",
         }
     }
 
@@ -32,6 +34,7 @@ impl ShellView {
             Some("git") => Self::Git,
             Some("files") => Self::Files,
             Some("pulls") => Self::Pulls,
+            Some("history") => Self::History,
             _ => Self::Sessions,
         }
     }
@@ -40,7 +43,7 @@ impl ShellView {
     pub const ON_RAIL: [Self; 3] = [Self::Sessions, Self::Tasks, Self::Git];
 
     /// The views of the Code lens, in the order its sidebar lists them.
-    pub const IN_CODE: [Self; 3] = [Self::Pulls, Self::Files, Self::Git];
+    pub const IN_CODE: [Self; 4] = [Self::Pulls, Self::Files, Self::History, Self::Git];
 
     /// The lens on the rail this view is part of.
     pub fn lens(self) -> Self {
