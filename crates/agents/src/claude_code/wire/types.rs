@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::structs::{CanUseTool, ControlRequest, Finish, Message, Started, Stream, System};
+use super::structs::{CanUseTool, ControlRequest, Finish, Message, RateLimit, Started, Stream, System};
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -16,6 +16,7 @@ pub(in super::super) enum Line {
     ControlCancelRequest {
         request_id: String,
     },
+    RateLimitEvent(RateLimit),
     #[serde(other)]
     Ignored,
 }

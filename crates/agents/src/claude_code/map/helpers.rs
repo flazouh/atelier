@@ -5,8 +5,8 @@ use std::{
 
 use serde_json::Value;
 
-use super::super::wire::{ModelUsage, RawUsage};
-use crate::session::{TodoStatus, ToolOutput};
+use super::super::wire::{ModelUsage, RateLimitInfo, RawUsage};
+use crate::session::{Limit, LimitState, LimitWindow, TodoStatus, ToolOutput};
 
 /// The tokens a request carried, which is what the context holds: the new input, what the cache gave
 /// and what it took in, and the reply that joins them.
@@ -23,6 +23,23 @@ pub(super) fn context_window(models: &HashMap<String, ModelUsage>, model: Option
         .and_then(|name| models.get(name))
         .and_then(|usage| usage.context_window)
         .or_else(|| models.values().filter_map(|usage| usage.context_window).max())
+}
+
+/// What `claude` tells of the account's usage limit, or `None` for a status it does not know.
+pub(super) fn limit(info: RateLimitInfo) -> Option<Limit> {
+    let state = match info.status.as_str() {
+        "allowed" => LimitState::Clear,
+        "allowed_warning" => LimitState::Near,
+        "rejected" => LimitState::Reached,
+        _ => return None,
+    };
+    let window = info.rate_limit_type.as_deref().and_then(|kind| match kind {
+        "five_hour" => Some(LimitWindow::FiveHour),
+        "overage" => Some(LimitWindow::Overage),
+        weekly if weekly.starts_with("seven_day") => Some(LimitWindow::Weekly),
+        _ => None,
+    });
+    Some(Limit { state, resets_at: info.resets_at, window })
 }
 
 /// The window of `model` as some session's result told it. Only a result tells a window, so a session

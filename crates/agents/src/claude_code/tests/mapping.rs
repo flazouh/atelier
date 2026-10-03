@@ -528,3 +528,27 @@ fn a_window_one_session_learned_shows_at_once_in_the_next() {
     let told = contexts(&Mapper::new().line(&reply("model-learned-once", 300, 0, None), now));
     assert_eq!(told.iter().map(|c| (c.used, c.window)).collect::<Vec<_>>(), [(310, Some(400_000))]);
 }
+
+fn rate_limit(status: &str, kind: &str) -> String {
+    json!({"type": "rate_limit_event", "rate_limit_info": {"status": status, "resetsAt": 1_790_000_000u64, "rateLimitType": kind}, "uuid": "u", "session_id": "s"}).to_string()
+}
+
+#[test]
+fn the_usage_limit_is_told_when_it_changes() {
+    use crate::session::{Limit, LimitState, LimitWindow};
+    let mut mapper = Mapper::new();
+    let now = Instant::now();
+    let mut events = mapper.line(&rate_limit("allowed_warning", "seven_day_opus"), now);
+    events.extend(mapper.line(&rate_limit("rejected", "five_hour"), now));
+    events.extend(mapper.line(&rate_limit("rejected", "five_hour"), now));
+    events.extend(mapper.line(&rate_limit("allowed", "five_hour"), now));
+    events.extend(mapper.line(&rate_limit("something_new", "five_hour"), now));
+    let told: Vec<Limit> = events.iter().filter_map(|e| if let Event::Limit(limit) = e { Some(*limit) } else { None }).collect();
+    let at = Some(1_790_000_000);
+    assert_eq!(told, [
+        Limit { state: LimitState::Near, resets_at: at, window: Some(LimitWindow::Weekly) },
+        Limit { state: LimitState::Reached, resets_at: at, window: Some(LimitWindow::FiveHour) },
+        Limit { state: LimitState::Clear, resets_at: at, window: Some(LimitWindow::FiveHour) },
+    ], "a repeat and an unknown status tell nothing");
+    assert!(events.iter().all(|e| !matches!(e, Event::Warning(_))));
+}

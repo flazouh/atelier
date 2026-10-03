@@ -914,6 +914,11 @@ impl Shell {
                 }
             }
             ProjectEvent::ArchiveSession(key) => this.set_archived(key.as_ref(), true, cx),
+            ProjectEvent::ContinueWith(key) => {
+                if let Some(at) = this.projects.iter().position(|p| p == project) {
+                    this.continue_with(at, key.as_ref(), window, cx);
+                }
+            }
             ProjectEvent::ShowFiles => {
                 if let Some(at) = this.projects.iter().position(|p| p == project) {
                     this.active = at;

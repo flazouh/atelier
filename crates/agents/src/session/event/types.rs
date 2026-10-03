@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use super::structs::{
-    BlockId, ContextFill, FileEdit, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
+    BlockId, ContextFill, FileEdit, Limit, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
     ToolOutput, TurnEnd, Usage,
 };
 
@@ -41,6 +41,25 @@ pub enum ChoiceKind {
     /// Allow now and stop asking for the same thing.
     AllowAlways,
     Deny,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimitState {
+    /// Within the limit.
+    Clear,
+    /// Close to it: the agent still works.
+    Near,
+    /// Reached: no turn runs until it resets.
+    Reached,
+}
+
+/// Which of the plan's limits it is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LimitWindow {
+    FiveHour,
+    Weekly,
+    /// Usage past the plan, paid as it goes.
+    Overage,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -94,6 +113,8 @@ pub enum Event {
     Usage(Usage),
     /// How full the context is, each time it changes.
     Context(ContextFill),
+    /// Where the account stands against its usage limit, each time it changes.
+    Limit(Limit),
     TurnEnded(TurnEnd),
     /// Something went wrong that did not end the session, such as a line that did not parse.
     Warning(String),
