@@ -1029,3 +1029,29 @@ fn history_lists_the_commits_and_shows_the_newest(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("history-list").is_some() && cx.debug_bounds("history-commit").is_some(), "the list and the commit are drawn");
     assert!(cx.debug_bounds("code-nav-history").is_some(), "the Code sidebar names the view");
 }
+
+/// A project over SSH says where it lives in the switcher, on the face and on its row, as the sidebar does; a
+/// local one says nothing of the kind.
+#[gpui_kit::test]
+fn the_switcher_names_the_host_of_a_project_over_ssh(cx: &mut TestAppContext) {
+    let (shell, cx, dir) = with_a_session(cx, 1600.);
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Files, window, cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("switcher-host").is_none(), "a local project has no host");
+    let remote = tempfile::tempdir().unwrap();
+    let project = atelier_project::LocalProject::open(remote.path().to_path_buf()).unwrap();
+    let location = atelier_settings::Location::Ssh { host: "pro".into(), path: remote.path().to_path_buf() };
+    shell.update_in(cx, |s, window, cx| {
+        s.add(location, std::sync::Arc::new(project), window, cx);
+        s.active = s.projects.len() - 1;
+        cx.notify();
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("switcher-host").is_some(), "the face names the host");
+    let face = cx.debug_bounds("project-switcher").unwrap();
+    cx.simulate_click(face.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    let row = cx.debug_bounds("switcher-host").unwrap();
+    assert!(row.top() > face.bottom(), "and so does the project's row in the menu: {row:?} under {face:?}");
+    drop(dir);
+}

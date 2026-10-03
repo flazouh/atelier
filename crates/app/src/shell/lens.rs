@@ -21,6 +21,8 @@ use super::structs::Shell;
 use super::view::ShellView;
 use crate::agents_view;
 use crate::open_project::OpenProject;
+use atelier_project::Link;
+use atelier_settings::Location;
 use crate::tasks::pane::Scope;
 
 /// A row of a lens's sidebar: a mark, the words, and a count at the end. `id` names it for the control socket.
@@ -54,6 +56,51 @@ fn nav_heading(words: &'static str, cx: &App) -> AnyElement {
         .text_size(TextSize::Xs.font_size())
         .text_color(cx.theme().muted_foreground)
         .child(words)
+        .into_any_element()
+}
+
+/// Where a project over SSH lives, and whether its link is down; `None` for a local one.
+fn remote_place(project: &OpenProject) -> Option<(SharedString, bool)> {
+    match &project.location {
+        Location::Ssh { host, .. } => Some((host.clone().into(), matches!(project.link, Link::Down(_)))),
+        Location::Local { .. } => None,
+    }
+}
+
+/// The server mark and the host of a project over SSH, as the sidebar shows them; in the warning colour
+/// while the link is down.
+fn place_mark(host: SharedString, down: bool, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let ink = if down { theme.warning } else { theme.muted_foreground };
+    div()
+        .debug_selector(|| "switcher-host".into())
+        .flex()
+        .items_center()
+        .gap(px(4.))
+        .text_size(TextSize::Xs.font_size())
+        .text_color(ink)
+        .child(Icon::new(IconName::Dns).size(px(12.)).color(ink))
+        .child(if down { SharedString::from(format!("{host} · Reconnecting…")) } else { host })
+        .into_any_element()
+}
+
+/// The switcher's face after a remote project's name.
+fn host_mark(project: &OpenProject, cx: &App) -> Option<AnyElement> {
+    remote_place(project).map(|(host, down)| place_mark(host, down, cx))
+}
+
+/// The end of a switcher row, on its one line: where the project lives when it is remote, then how many of
+/// its sessions are open or wait, in the warning colour when they wait.
+fn row_end(place: Option<(SharedString, bool)>, count: Option<(String, bool)>, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    div()
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .children(place.map(|(host, down)| place_mark(host, down, cx)))
+        .children(count.map(|(words, waits)| {
+            div().text_size(TextSize::Xs.font_size()).text_color(if waits { theme.warning } else { theme.muted_foreground }).child(words)
+        }))
         .into_any_element()
 }
 
@@ -116,7 +163,8 @@ impl Shell {
                 .items_center()
                 .gap(px(7.))
                 .child(marked_badge(&badges[at], Self::mark_of(&self.projects[at], cx), cx))
-                .child(self.projects[at].read(cx).name()),
+                .child(self.projects[at].read(cx).name())
+                .children(host_mark(self.projects[at].read(cx), cx)),
             None => div().child("All projects"),
         };
         let this = cx.entity().downgrade();
@@ -128,7 +176,7 @@ impl Shell {
                 entries.push(Entry::from(
                     MenuItem::new("All projects")
                         .debug_name("switcher-all")
-                        .description(format!("{count} open sessions"))
+                        .trailing(move |cx| row_end(None, Some((format!("{count} open"), false)), cx))
                         .choice(Choice::Radio(current.is_none()))
                         .on_select(move |window, cx| drop(all.update(cx, |s, cx| s.switch_project(None, window, cx)))),
                 ));
@@ -145,11 +193,13 @@ impl Shell {
                     .lead(move |cx| marked_badge(&badge, mark, cx))
                     .choice(Choice::Radio(current == Some(at)))
                     .on_select(move |window, cx| drop(pick.update(cx, |s, cx| s.switch_project(Some(at), window, cx))));
-                let item = match (waiting, p.sessions.len()) {
-                    (0, 0) => item,
-                    (0, open) => item.description(format!("{open} open")),
-                    (waiting, _) => item.description(format!("{waiting} need you")),
+                let count = match (waiting, p.sessions.len()) {
+                    (0, 0) => None,
+                    (0, open) => Some((format!("{open} open"), false)),
+                    (waiting, _) => Some((format!("{waiting} need you"), true)),
                 };
+                let place = remote_place(p);
+                let item = if place.is_none() && count.is_none() { item } else { item.trailing(move |cx| row_end(place.clone(), count.clone(), cx)) };
                 entries.push(Entry::from(item));
             }
             let close = this.clone();
