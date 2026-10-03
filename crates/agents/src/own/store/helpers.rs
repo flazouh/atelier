@@ -114,7 +114,7 @@ pub fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> 
             && valid_id(&meta.id)
             && !meta.title.is_empty()
         {
-            out.push(SessionSummary { id: SessionId::new(meta.id), title: meta.title, updated: Some(meta.updated) });
+            out.push(SessionSummary { id: SessionId::new(meta.id), title: meta.title, updated: Some(meta.updated), account: None });
         }
     }
     // A moved session has the time of its move; the time in its meta is the one that says when it was last used.

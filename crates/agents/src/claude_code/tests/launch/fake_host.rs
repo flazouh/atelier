@@ -16,6 +16,8 @@ use super::CLAUDE;
 const FAKE_CLAUDE_SCRIPT: &str = "#!/bin/sh\nprintf '%s\\n%s' \"$CLAUDE_CONFIG_DIR\" \"$1\"\n";
 const FAKE_CLAUDE_FILE: &str = "fake-claude";
 const EXECUTABLE: u32 = 0o755;
+const USUAL_FOLDER: &str = ".claude";
+const SOME_PROJECT: &str = "-home-alex-code-atelier";
 
 /// What the fake `claude` saw.
 #[derive(Debug, PartialEq, Eq)]
@@ -44,6 +46,17 @@ impl FakeHost {
 
     pub fn sign_in(&self, account: &str) {
         fs::create_dir(self.account_folder(account)).expect("the account folder is made");
+    }
+
+    /// Saves an empty session file under `account`, or under `~/.claude` when `None`.
+    pub fn save_session(&self, account: Option<&str>, id: &str) {
+        let config = match account {
+            Some(account) => self.account_folder(account),
+            None => format!("{}/{USUAL_FOLDER}", self.home.path().display()),
+        };
+        let project = format!("{config}/projects/{SOME_PROJECT}");
+        fs::create_dir_all(&project).expect("the project folder is made");
+        fs::write(format!("{project}/{id}.jsonl"), "").expect("the session is saved");
     }
 
     pub fn has(&self, file: &str) -> bool {

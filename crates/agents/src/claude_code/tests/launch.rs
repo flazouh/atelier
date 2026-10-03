@@ -20,6 +20,8 @@ const TEAM_ACCOUNT: &str = "team";
 const HOSTILE_ACCOUNT: &str = "a b'$(touch pwned)\"`touch pwned`";
 const HOSTILE_LEFTOVER: &str = "pwned";
 
+const SAVED_SESSION: &str = "5e55-1011";
+
 const OPENROUTER_KEY: &str = "sk-or-v1-secret";
 const OPENROUTER_URL: &str = "https://openrouter.ai/api";
 const BLANKED_FOR_OPENROUTER: [&str; 4] = ["ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX"];
@@ -105,6 +107,26 @@ fn an_account_on_a_host_without_claude_says_claude_is_missing() {
 }
 
 #[test]
+fn a_resume_runs_on_the_account_that_holds_the_session() {
+    let host = FakeHost::new();
+    host.save_session(Some(WORK_ACCOUNT), SAVED_SESSION);
+
+    let started = host.run(&command(CLAUDE, &resuming(SAVED_SESSION)));
+
+    assert_eq!(started, Ok(Started { account_folder: host.account_folder(WORK_ACCOUNT), first_arg: FIRST_FLAG.into() }));
+}
+
+#[test]
+fn a_resume_of_a_session_on_the_usual_account_leaves_claude_as_it_is() {
+    let host = FakeHost::new();
+    host.save_session(None, SAVED_SESSION);
+
+    let started = host.run(&command(CLAUDE, &resuming(SAVED_SESSION)));
+
+    assert_eq!(started, Ok(Started { account_folder: String::new(), first_arg: FIRST_FLAG.into() }));
+}
+
+#[test]
 fn openrouter_points_claude_at_openrouter_with_the_key() {
     let command = command(CLAUDE, &on(openrouter()));
 
@@ -135,6 +157,10 @@ fn a_key_never_prints() {
 
 fn on(provider: Provider) -> OpenRequest {
     OpenRequest { provider: Some(provider), ..OpenRequest::default() }
+}
+
+fn resuming(session: &str) -> OpenRequest {
+    OpenRequest { resume: Some(SessionId::new(session)), ..OpenRequest::default() }
 }
 
 fn account(name: &str) -> Provider {

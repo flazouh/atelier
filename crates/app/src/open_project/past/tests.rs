@@ -1,7 +1,7 @@
 use atelier_agents::session::{SessionId, SessionSummary};
 use super::*;
 fn past(id: &str, updated: u64) -> SessionSummary {
-    SessionSummary { id: SessionId::new(id), title: format!("Session {id}"), updated: Some(updated) }
+    SessionSummary { id: SessionId::new(id), title: format!("Session {id}"), updated: Some(updated), account: None }
 }
 /// A session that is open shows once, as the open one: the past list leaves it out.
 #[test]

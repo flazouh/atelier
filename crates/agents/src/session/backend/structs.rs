@@ -39,4 +39,6 @@ pub struct SessionSummary {
     pub title: String,
     /// Seconds since the Unix epoch of the last activity, when known.
     pub updated: Option<u64>,
+    /// The agent's sign-in the session was saved under; its usual one when `None`.
+    pub account: Option<String>,
 }
