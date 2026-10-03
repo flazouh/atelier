@@ -53,7 +53,7 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 
 - The window draws its own title bar area. On macOS the traffic lights sit inset in the page, as in
   Zed and Cursor. On Linux the layout is the same, without them.
-- Top left: the sidebar's toggle (⌘B), then the project switcher: each open project's badge, with a dot
+- Top left: the sidebar's toggle (⌘B), drawn as a rail icon, then the project switcher: each open project's badge, with a dot
   while one of its sessions works (accent) or needs the reader (warning), and how many need them. Sessions
   are every project's, so in Sessions the switcher narrows the list and the panels to one project or shows
   "All projects"; in Issues and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
@@ -71,8 +71,10 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
     - **Files:** the tree in the sidebar and the editor in the main area.
     - **History:** the checked-out branch's newest 300 commits in the sidebar, read again on each look;
       the picked one (the newest at first) in the main area: its message, then each file's diff.
-    - **Changes:** the focused session's repository, branch, changed files and worktrees, and the review
-      in the main area. A press on a file opens the review at it; a review opened anywhere opens here.
+    - **Changes:** what the project's checkout holds uncommitted, tracked or new: the branch and each file
+      in the sidebar, then the repository's other worktrees; every file's diff in the main area, read again as
+      files change. A press on a file scrolls to its diff. A session's review opens here, in the main area;
+      a press on a file gives the area back to the checkout.
     The lens comes back on the view it was left on; it opens on Files the first time.
 - The sidebar and the main areas are cards 2 px apart, like the agent panels.
 - Right: the pull requests, or a task opened from a session.

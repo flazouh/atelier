@@ -108,6 +108,8 @@ pub struct Shell {
     pub(super) session_filter: Option<SharedString>,
     /// The project switcher's menu is open.
     pub(super) switcher_open: bool,
+    /// The Changes view's column of diffs, so a press on a file in the sidebar scrolls to it.
+    pub(super) changes_scroll: gpui_kit::ScrollHandle,
     /// In a narrow window, the Files view's tree or editor.
     files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
@@ -171,6 +173,7 @@ impl Shell {
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             session_filter: None,
             switcher_open: false,
+            changes_scroll: gpui_kit::ScrollHandle::new(),
             archived: saved.archived_sessions.iter().cloned().collect(),
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
@@ -1439,15 +1442,9 @@ impl Shell {
     /// The sidebar's toggle at the left of the title bar, lit while the sidebar shows.
     fn sidebar_toggle(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity();
-        let shown = self.sidebar_shown(Fit::of(self.width));
-        Button::new("sidebar-toggle")
+        atelier_ui::view_rail::RailButton::new("sidebar-toggle", atelier_ui::IconName::SidebarLeft, "Toggle the sidebar (⌘b)")
             .debug_name("sidebar-toggle")
-            .icon(atelier_ui::IconName::SidebarLeft)
-            .variant(ButtonVariant::Ghost)
-            .size(ButtonSize::IconSm)
-            .tooltip("Toggle the sidebar (⌘b)")
-            .open(shown)
-            .on_click(move |_, window, cx| {
+            .on_click(move |window, cx| {
                 let fit = Fit::of(atelier_ui::scale::design(window.viewport_size().width));
                 this.update(cx, |this, cx| this.flip_sidebar(fit, cx))
             })
@@ -1895,7 +1892,7 @@ impl Shell {
     fn center(&self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         match self.view {
             ShellView::Tasks => self.tasks_main(project, window, cx),
-            ShellView::Git => self.git_main(project, cx),
+            ShellView::Git => self.changes_main(project, cx),
             ShellView::Files => self.files_editor(project, cx),
             ShellView::Pulls => self.pulls_main(project, cx),
             ShellView::History => self.history_main(project, cx),

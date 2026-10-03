@@ -836,7 +836,7 @@ fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
     assert!(rising.top() > row.top(), "it starts below its place: {rising:?} in {row:?}");
 }
 
-/// A review opens in the Git view: in place of the panels, with the session's changes in the sidebar, and
+/// A review opens in the Git view: in place of the panels, with the checkout's changes in the sidebar, and
 /// the right pane as it was; when it closes, Sessions comes back.
 #[gpui_kit::test]
 fn a_review_opens_in_the_git_view_and_closing_it_goes_back(cx: &mut TestAppContext) {
@@ -849,7 +849,7 @@ fn a_review_opens_in_the_git_view_and_closing_it_goes_back(cx: &mut TestAppConte
     assert!(cx.debug_bounds("review-in-place").is_some(), "the review is where the panels were");
     assert!(cx.debug_bounds("panel-close").is_none(), "the panels make way");
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
-    assert!(cx.debug_bounds("git-panel").is_some(), "the sidebar shows the session's changes");
+    assert!(cx.debug_bounds("changes-list").is_some(), "the sidebar lists the checkout's changes");
     assert_eq!(shell.read_with(cx, |s, _| (s.right, s.right_width)), right_before, "the right pane neither opens nor widens");
     let pane = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).review.as_ref().map(|(p, _)| p.clone()).unwrap());
     pane.update(cx, |_, cx| cx.emit(crate::review_pane::PaneEvent::Close));
@@ -892,7 +892,7 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Files, "the Code lens opens on its files first");
     press("code-nav-git", cx);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
-    assert!(cx.debug_bounds("git-panel").is_some() && cx.debug_bounds("git-empty").is_some(), "no change yet: nothing to review");
+    assert!(cx.debug_bounds("changes-list").is_some() && cx.debug_bounds("review-in-place").is_none(), "the checkout's changes, no review");
     press("rail-sessions", cx);
     press("rail-git", cx);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git, "the lens comes back on the view it was left on");
@@ -1054,4 +1054,39 @@ fn the_switcher_names_the_host_of_a_project_over_ssh(cx: &mut TestAppContext) {
     let row = cx.debug_bounds("switcher-host").unwrap();
     assert!(row.top() > face.bottom(), "and so does the project's row in the menu: {row:?} under {face:?}");
     drop(dir);
+}
+
+/// Changes is about the project's checkout, not a session: it lists the files the checkout holds uncommitted,
+/// tracked or new, and shows each one's diff.
+#[gpui_kit::test]
+fn changes_lists_what_the_checkout_holds_uncommitted(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(["-c", "user.name=Ada", "-c", "user.email=ada@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "First"]);
+    std::fs::write(dir.path().join("a.txt"), "two\n").unwrap();
+    std::fs::write(dir.path().join("new.txt"), "fresh\n").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Git, window, cx));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let paths = shell.read_with(cx, |s, cx| match &s.active().unwrap().read(cx).uncommitted {
+        Some(crate::history::Read::Ready(files)) => files.iter().map(|f| f.path.to_string()).collect::<Vec<_>>(),
+        other => panic!("the changes are read: {other:?}"),
+    });
+    assert_eq!(paths, ["a.txt", "new.txt"], "the changed file, then the new one");
+    assert!(cx.debug_bounds("changes-list").is_some() && cx.debug_bounds("changes-diffs").is_some(), "the list and the diffs are drawn");
 }

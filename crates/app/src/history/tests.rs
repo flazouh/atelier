@@ -56,3 +56,12 @@ fn a_commit_with_no_changes_has_no_files() {
     assert_eq!(shown.message, "Empty");
     assert!(shown.files.is_empty());
 }
+
+#[test]
+fn an_untracked_file_reads_as_all_new_under_its_own_path() {
+    let patch = "diff --git a/notes.txt b/notes.txt\nnew file mode 100644\nindex 0000000..e69de29\n--- /dev/null\n+++ b/notes.txt\n@@ -0,0 +1,2 @@\n+one\n+two\n";
+    let files = split_patch(patch);
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0].path, "notes.txt");
+    assert_eq!(files[0].lines.iter().filter(|l| l.kind == DiffLineKind::Added).count(), 2);
+}
