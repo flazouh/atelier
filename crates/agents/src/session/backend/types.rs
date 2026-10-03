@@ -6,6 +6,35 @@ use super::super::event::Event;
 /// the event and wake the UI (see `super::EventQueue`).
 pub type EventSink = Arc<dyn Fn(Event) + Send + Sync>;
 
+/// Who serves a session's model and is billed for it. An agent with no choice of provider ignores it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Provider {
+    /// One of the agent's own sign-ins, each in its own folder. `default` is the agent's usual one.
+    Account(String),
+    /// OpenRouter's API, paid per token with this key.
+    OpenRouter { key: ApiKey },
+}
+
+/// A secret that never shows in a log or a debug print.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ApiKey(String);
+
+impl ApiKey {
+    pub fn new(key: impl Into<String>) -> Self {
+        Self(key.into())
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for ApiKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("ApiKey(hidden)")
+    }
+}
+
 #[derive(Debug)]
 pub enum SessionError {
     /// The agent's program is not on the host.

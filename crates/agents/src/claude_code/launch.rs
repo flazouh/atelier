@@ -2,7 +2,7 @@
 use atelier_project::Command;
 
 use super::control::mode_name;
-use crate::session::{OpenRequest, PermissionMode};
+use crate::session::{ApiKey, OpenRequest, PermissionMode, Provider};
 
 /// The command line for one piece of text: `claude --print` with the prompt on stdin, the answer as
 /// plain text on stdout, in Plan mode (it changes nothing) and with no session saved, so it never shows
@@ -47,5 +47,87 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
     if let Some(mode) = request.mode.filter(|mode| *mode != PermissionMode::Ask) {
         args.extend(["--permission-mode".into(), mode_name(mode).into()]);
     }
-    Command::new(program).args(args)
+    match &request.provider {
+        None => Command::new(program).args(args),
+        Some(Provider::Account(name)) if name == DEFAULT_ACCOUNT => Command::new(program).args(args),
+        Some(Provider::Account(name)) => on_account(program, name, args),
+        Some(Provider::OpenRouter { key }) => on_openrouter(program, key, args),
+    }
+}
+
+/// The account `~/.claude` holds. Setting `CLAUDE_CONFIG_DIR` to `~/.claude` is not the same as leaving it unset.
+const DEFAULT_ACCOUNT: &str = "default";
+
+const SHELL: &str = "sh";
+/// Carries the account's name into [`ACCOUNT_SCRIPT`], so the script never holds it.
+const ACCOUNT_ENV: &str = "ATELIER_CLAUDE_ACCOUNT";
+
+/// Runs `claude` with `CLAUDE_CONFIG_DIR` at `~/.claude-<name>` on the host, whose home only a shell there knows.
+/// A missing `claude` is told in the words of [`crate::session::SessionError::Missing`].
+const ACCOUNT_SCRIPT: &str = r#"if ! command -v "$0" >/dev/null 2>&1; then
+  printf '%s is not installed on this host\n' "$0" >&2
+  exit 127
+fi
+CLAUDE_CONFIG_DIR="$HOME/.claude-$ATELIER_CLAUDE_ACCOUNT"
+if [ ! -d "$CLAUDE_CONFIG_DIR" ]; then
+  printf 'The Claude account "%s" is not signed in. Sign in with: CLAUDE_CONFIG_DIR="%s" claude auth login\n' "$ATELIER_CLAUDE_ACCOUNT" "$CLAUDE_CONFIG_DIR" >&2
+  exit 1
+fi
+export CLAUDE_CONFIG_DIR
+exec "$0" "$@""#;
+
+fn on_account(program: &str, name: &str, args: Vec<String>) -> Command {
+    let mut command = Command::new(SHELL).args(["-c", ACCOUNT_SCRIPT, program]).args(args);
+    command.env.push((ACCOUNT_ENV.into(), name.into()));
+    command
+}
+
+const OPENROUTER_URL: &str = "https://openrouter.ai/api";
+const BASE_URL_ENV: &str = "ANTHROPIC_BASE_URL";
+const API_KEY_ENV: &str = "ANTHROPIC_API_KEY";
+const SETTINGS_FLAG: &str = "--settings";
+
+/// Every other way `claude` could find a model or a credential, blanked so OpenRouter is the only one left.
+const COMPETING_ENV: [&str; 16] = [
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_AWS_BASE_URL",
+    "ANTHROPIC_BEDROCK_BASE_URL",
+    "ANTHROPIC_BEDROCK_MANTLE_BASE_URL",
+    "ANTHROPIC_FOUNDRY_BASE_URL",
+    "ANTHROPIC_GOOGLE_CLOUD_BASE_URL",
+    "ANTHROPIC_UNIX_SOCKET",
+    "ANTHROPIC_VERTEX_BASE_URL",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_USE_ANTHROPIC_AWS",
+    "CLAUDE_CODE_USE_ANTHROPIC_GOOGLE_CLOUD",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_FOUNDRY",
+    "CLAUDE_CODE_USE_GATEWAY",
+    "CLAUDE_CODE_USE_MANTLE",
+    "CLAUDE_CODE_USE_VERTEX",
+];
+
+/// A settings file's `env` beats the process's, so the same values also go in an inline `--settings`, which
+/// beats the files. The key stays out of it: the command line shows in `ps`.
+fn on_openrouter(program: &str, key: &ApiKey, mut args: Vec<String>) -> Command {
+    let openrouter_only = openrouter_env();
+    args.extend([SETTINGS_FLAG.into(), settings_json(&openrouter_only)]);
+
+    let mut command = Command::new(program).args(args);
+    command.env = openrouter_only;
+    command.env.push((API_KEY_ENV.into(), key.expose().into()));
+    command
+}
+
+/// OpenRouter's address, and every competing variable blank.
+fn openrouter_env() -> Vec<(String, String)> {
+    let blanks = COMPETING_ENV.iter().map(|name| (name.to_string(), String::new()));
+    let address = std::iter::once((BASE_URL_ENV.to_string(), OPENROUTER_URL.to_string()));
+    blanks.chain(address).collect()
+}
+
+/// A settings document that sets `env`.
+fn settings_json(env: &[(String, String)]) -> String {
+    let env: serde_json::Map<String, serde_json::Value> = env.iter().map(|(name, value)| (name.clone(), value.clone().into())).collect();
+    serde_json::json!({ "env": env }).to_string()
 }

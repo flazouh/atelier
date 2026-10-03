@@ -1,4 +1,5 @@
 use super::super::{command::PermissionMode, event::SessionId};
+use super::types::Provider;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelChoice {
@@ -26,6 +27,8 @@ pub struct OpenRequest {
     pub resume: Option<SessionId>,
     pub model: Option<String>,
     pub mode: Option<PermissionMode>,
+    /// The agent as it is set up on the host when `None`.
+    pub provider: Option<Provider>,
 }
 
 /// One row of a project's session list.
