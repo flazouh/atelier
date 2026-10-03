@@ -71,6 +71,8 @@ pub struct Shell {
     pub(super) agents_sidebar: Entity<Sidebar>,
     /// The open sessions' panels.
     pub(super) panels: Entity<AgentPanels>,
+    /// The open sessions' keys from the left of the strip: a new session stands first.
+    pub(super) order: Vec<SharedString>,
     /// Names the reader gave sessions, by the agent's id.
     pub(super) names: BTreeMap<String, String>,
     /// The colours and images the reader gave projects' badges.
@@ -142,6 +144,7 @@ impl Shell {
             focus: cx.focus_handle(),
             agents_sidebar,
             panels,
+            order: Vec::new(),
             names: saved.session_names.clone(),
             badges: agents_view::Badges::saved(saved),
             icon: None,
@@ -221,9 +224,10 @@ impl Shell {
                 .or_insert_with(|| cx.new(|cx| crate::session_panel::SessionPanel::new(session.clone(), cx)));
         }
         let views = &self.panel_views;
-        let (panels, order) = agents_view::panels(&self.projects, &|s| views[&s.entity_id()].clone().into(), cx);
+        let (panels, project_order) = agents_view::panels(&self.projects, &|s| views[&s.entity_id()].clone().into(), cx);
+        let panels = agents_view::newest_first(panels, |p| &p.id, &mut self.order);
         self.push_sidebar(cx);
-        self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));
+        self.panels.update(cx, |p, cx| p.set_panels(panels, project_order, cx));
         self.mark_open_session(cx);
         self.save_open(cx);
         cx.notify();
@@ -241,15 +245,18 @@ impl Shell {
             for session in &p.sessions {
                 let s = session.read(cx);
                 if let Some(id) = &s.id {
-                    open.push(atelier_settings::OpenSession {
+                    open.push((s.key.clone(), atelier_settings::OpenSession {
                         location: p.location.clone(),
                         id: id.as_str().to_string(),
                         title: s.shown_title().to_string(),
                         agent: Some(s.agent.backend.name().to_string()),
-                    });
+                    }));
                 }
             }
         }
+        // From the left of the strip, so the next launch opens them in the same order.
+        open.sort_by_key(|(key, _)| self.order.iter().position(|k| k == key));
+        let open: Vec<_> = open.into_iter().map(|(_, session)| session).collect();
         let front = self.panels.read(cx).active().and_then(|key| self.session_by_key(key, cx)).and_then(|(_, s)| s.read(cx).id.clone()).map(|id| id.as_str().to_string());
         let now = (open, front);
         if now == self.saved_open {
@@ -303,6 +310,8 @@ impl Shell {
             let title = self.names.get(&saved.id).cloned().unwrap_or(saved.title.clone());
             let agent = saved.agent.as_deref().and_then(atelier_agents::registry::by_backend);
             let session = project.update(cx, |p, cx| p.open_session(Some((id, title.into())), agent, window, cx));
+            // A session from the last run keeps its place; only one opened now stands first.
+            self.order.push(session.read(cx).key.clone());
             if let Some(name) = self.names.get(&saved.id) {
                 session.update(cx, |s, _| s.name = Some(name.clone().into()));
             }
@@ -1805,7 +1814,7 @@ impl Shell {
                 cx.notify();
             }))
             .child(self.view_rail(widths.sidebar.is_some(), cx))
-            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("sidebar", self.sidebar(cx).into_any_element())).child(handle(Edge::Sidebar))))
+            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pl(px(8.)).pb(px(8.)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
             .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, window, cx))))
             .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
