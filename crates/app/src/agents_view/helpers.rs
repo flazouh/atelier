@@ -60,6 +60,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
                 let s = s.read(cx);
                 SessionData {
                     in_panel: true,
+                    provider: s.provider.as_ref().and_then(crate::providers::row_words),
                     archived: s.id.as_ref().is_some_and(|id| archived.contains(id.as_str())),
                     id: s.key.clone(),
                     title: s.shown_title(),
@@ -70,6 +71,7 @@ pub fn sidebar(projects: &[Entity<OpenProject>], names: &BTreeMap<String, String
             });
             let past = p.past.iter().map(|past| SessionData {
                 in_panel: false,
+                provider: past.account.clone().map(crate::providers::Choice::Account).as_ref().and_then(crate::providers::row_words),
                 archived: archived.contains(&past.id.0),
                 id: format!("{PAST}{}", past.id.0).into(),
                 title: names.get(&past.id.0).cloned().unwrap_or_else(|| past.title.clone()).into(),

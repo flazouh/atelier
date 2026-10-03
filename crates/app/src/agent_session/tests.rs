@@ -353,3 +353,97 @@ fn a_density_of_lines_gives_each_call_its_own_row_and_follows_the_setting(cx: &m
     cx.run_until_parked();
     assert_eq!(rows(cx), [list_diff::Row::Item(0), list_diff::Row::Activity { from: 1, to: 4 }], "grouped again");
 }
+
+mod providers {
+    use std::sync::Arc;
+
+    use atelier_agents::session::{Account, ApiKey, Provider};
+    use atelier_settings::secrets::{InMemory, OPENROUTER_KEY, Secrets};
+    use gpui_kit::TestAppContext;
+
+    use crate::{
+        fake_agent::{start, start_on_providers},
+        providers::{Choice, DefaultProvider, NO_KEY, ProviderServices},
+    };
+
+    const WORK: &str = "work";
+    const TEAM: &str = "team";
+    const KEY: &str = "sk-or-v1-test";
+
+    fn accounts() -> Vec<Account> {
+        vec![
+            Account { name: atelier_agents::claude_code::accounts::DEFAULT_ACCOUNT.into(), signed_in: true, plan: Some("max".into()), email: None },
+            Account { name: WORK.into(), signed_in: true, plan: Some("max".into()), email: None },
+            Account { name: TEAM.into(), signed_in: false, plan: None, email: None },
+        ]
+    }
+
+    /// Keeps `secrets` as the keychain and `default` as the default, before the session starts.
+    fn set_up(cx: &mut TestAppContext, secrets: &Arc<InMemory>, default: Choice) {
+        let services = ProviderServices { secrets: secrets.clone(), ..ProviderServices::isolated() };
+        cx.update(|cx| {
+            cx.set_global(services);
+            cx.set_global(DefaultProvider(default));
+        });
+    }
+
+    #[gpui_kit::test]
+    fn a_new_session_starts_on_the_default_provider(cx: &mut TestAppContext) {
+        set_up(cx, &Arc::new(InMemory::default()), Choice::Account(WORK.into()));
+
+        let (session, fake, cx) = start_on_providers(cx, accounts());
+
+        assert_eq!(cx.update(|_, cx| session.read(cx).provider.clone()), Some(Choice::Account(WORK.into())));
+        assert_eq!(fake.opened.lock().unwrap()[0].provider, Some(Provider::Account(WORK.into())));
+    }
+
+    #[gpui_kit::test]
+    fn an_agent_with_no_providers_starts_as_it_is(cx: &mut TestAppContext) {
+        set_up(cx, &Arc::new(InMemory::default()), Choice::Account(WORK.into()));
+
+        let (session, fake, cx) = start(cx, Vec::new(), false);
+
+        assert_eq!(cx.update(|_, cx| session.read(cx).provider.clone()), None);
+        assert_eq!(fake.opened.lock().unwrap()[0].provider, None);
+    }
+
+    #[gpui_kit::test]
+    fn the_choices_are_the_signed_in_accounts_and_openrouter_with_a_key(cx: &mut TestAppContext) {
+        let secrets = Arc::new(InMemory::default());
+        secrets.write(OPENROUTER_KEY, KEY).unwrap();
+        set_up(cx, &secrets, Choice::usual());
+
+        let (session, _, cx) = start_on_providers(cx, accounts());
+
+        assert_eq!(
+            cx.update(|_, cx| session.read(cx).provider_choices()),
+            vec![Choice::usual(), Choice::Account(WORK.into()), Choice::OpenRouter],
+            "the team account is not signed in"
+        );
+    }
+
+    #[gpui_kit::test]
+    fn switching_provider_starts_the_agent_again_on_it(cx: &mut TestAppContext) {
+        let secrets = Arc::new(InMemory::default());
+        secrets.write(OPENROUTER_KEY, KEY).unwrap();
+        set_up(cx, &secrets, Choice::usual());
+        let (session, fake, cx) = start_on_providers(cx, accounts());
+
+        cx.update(|_, cx| session.update(cx, |s, cx| s.set_provider(Choice::OpenRouter, cx)));
+        cx.run_until_parked();
+
+        let opened = fake.opened.lock().unwrap();
+        assert_eq!(opened.len(), 2);
+        assert_eq!(opened[1].provider, Some(Provider::OpenRouter { key: ApiKey::new(KEY) }));
+    }
+
+    #[gpui_kit::test]
+    fn openrouter_with_no_key_says_where_to_add_one(cx: &mut TestAppContext) {
+        set_up(cx, &Arc::new(InMemory::default()), Choice::OpenRouter);
+
+        let (session, fake, cx) = start_on_providers(cx, accounts());
+
+        assert!(fake.opened.lock().unwrap().is_empty(), "the agent never started");
+        assert!(cx.update(|_, cx| session.read(cx).problem.clone()).is_some_and(|p| p.contains(NO_KEY)));
+    }
+}

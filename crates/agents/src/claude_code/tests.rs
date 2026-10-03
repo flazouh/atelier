@@ -7,6 +7,7 @@ use crate::session::Event;
 
 use super::Mapper;
 
+mod accounts;
 mod control;
 mod launch;
 mod mapping;

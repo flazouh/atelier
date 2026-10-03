@@ -1,7 +1,7 @@
 //! The command line that starts `claude` as a session atelier can drive.
 use atelier_project::Command;
 
-use super::control::mode_name;
+use super::{accounts::DEFAULT_ACCOUNT, control::mode_name};
 use crate::session::{ApiKey, OpenRequest, PermissionMode, Provider, SessionId};
 
 /// The command line for one piece of text: `claude --print` with the prompt on stdin, the answer as
@@ -57,9 +57,6 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
         },
     }
 }
-
-/// The account `~/.claude` holds. Setting `CLAUDE_CONFIG_DIR` to `~/.claude` is not the same as leaving it unset.
-const DEFAULT_ACCOUNT: &str = "default";
 
 const SHELL: &str = "sh";
 /// Carries the account's name into the script, so the script never holds it.

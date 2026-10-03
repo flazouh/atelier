@@ -57,6 +57,8 @@ pub struct Settings {
     pub ui_zoom: Option<f32>,
     /// A skill picked from the composer's `/` list runs at once; unset or false, it waits in the box.
     pub run_picked_skills: Option<bool>,
+    /// The provider new sessions start on, as `account:<name>` or `openrouter`. Unset: the agent's usual account.
+    pub default_provider: Option<String>,
     /// The microphone chosen for dictation, by `atelier_voice::Device::id`. Unset: the system's default.
     pub dictation_device: Option<String>,
     /// Dictation records only while the microphone button is held down, and stops when it is let go.

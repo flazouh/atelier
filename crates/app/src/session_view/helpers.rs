@@ -614,10 +614,11 @@ fn changed_files(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement>
 /// The agents this build can start, as a picker a new session shows until its first message.
 fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
     let agents = atelier_agents::registry::agents();
-    if agents.len() < 2 {
+    let s = session.read(cx);
+    let provider = provider_picker(session, cx);
+    if agents.len() < 2 && provider.is_none() {
         return None;
     }
-    let s = session.read(cx);
     let current = agents.iter().position(|a| a.backend.name() == s.agent.backend.name());
     let options: Vec<SelectOption> = agents
         .iter()
@@ -634,13 +635,50 @@ fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> 
     Some(
         div()
             .mt(px(12.))
-            .w(px(220.))
+            .flex()
+            .items_center()
+            .gap(px(6.))
             .child(
-                Select::new(gpui_kit::ElementId::Name(format!("{}-agent", s.key).into()), options)
-                    .selected(current)
+                div().w(px(200.)).child(
+                    Select::new(gpui_kit::ElementId::Name(format!("{}-agent", s.key).into()), options)
+                        .selected(current)
+                        .on_change(move |ix, _, cx| {
+                            let Some(backend) = backends.get(ix).cloned() else { return };
+                            pick.update(cx, |_, cx| cx.emit(SessionEvent::ChooseAgent(backend)));
+                        }),
+                ),
+            )
+            .children(provider)
+            .into_any_element(),
+    )
+}
+
+/// Where the agent runs, for an agent with a choice of provider: the session's accounts and OpenRouter.
+fn provider_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
+    let s = session.read(cx);
+    let current = s.provider.clone()?;
+    let choices = s.provider_choices();
+    let words: Vec<SelectOption> = choices
+        .iter()
+        .map(|c| {
+            let option = SelectOption::from(crate::providers::label(c, &s.provider_accounts));
+            match crate::providers::mark(c) {
+                Some(mark) => option.mark(mark),
+                None => option,
+            }
+        })
+        .collect();
+    let pick = session.clone();
+    Some(
+        div()
+            .w(px(180.))
+            .debug_selector(|| "provider-picker".into())
+            .child(
+                Select::new(gpui_kit::ElementId::Name(format!("{}-provider", s.key).into()), words)
+                    .selected(choices.iter().position(|c| *c == current))
                     .on_change(move |ix, _, cx| {
-                        let Some(backend) = backends.get(ix).cloned() else { return };
-                        pick.update(cx, |_, cx| cx.emit(SessionEvent::ChooseAgent(backend)));
+                        let Some(choice) = choices.get(ix).cloned() else { return };
+                        pick.update(cx, |s, cx| s.set_provider(choice, cx));
                     }),
             )
             .into_any_element(),

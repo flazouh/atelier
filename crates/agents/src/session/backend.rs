@@ -6,6 +6,6 @@ mod structs;
 mod traits;
 mod types;
 
-pub use structs::{Capabilities, ModelChoice, OpenRequest, SessionSummary};
+pub use structs::{Account, Capabilities, ModelChoice, OpenRequest, SessionSummary};
 pub use traits::{Backend, Session};
 pub use types::{ApiKey, EventSink, Provider, SessionError};

@@ -3,6 +3,7 @@
 //! `control` writes the lines it needs, `launch` builds its command line, `store` reads its past
 //! sessions. Only `session` touches a process; the rest is pure and tested on captured runs.
 //! The protocol is written down in `docs/agents.md`.
+pub mod accounts;
 mod control;
 mod launch;
 mod map;
@@ -20,7 +21,7 @@ pub use store::history;
 
 use crate::{
     session::{
-        Backend, Capabilities, EventSink, ModelChoice, OpenRequest, PermissionMode, Session, SessionError,
+        Account, Backend, Capabilities, EventSink, ModelChoice, OpenRequest, PermissionMode, Session, SessionError,
         SessionId, SessionSummary,
     },
     subprocess,
@@ -68,6 +69,7 @@ impl Backend for ClaudeCode {
             thinking: true,
             subagents: true,
             todos: true,
+            providers: true,
         }
     }
 
@@ -80,6 +82,14 @@ impl Backend for ClaudeCode {
         let command = launch::command(&self.program, &request);
         let process = subprocess::start(project.as_ref(), &command)?;
         Ok(Box::new(session::ClaudeSession::run(process, sink)))
+    }
+
+    fn accounts(&self, project: &dyn Project) -> Result<Vec<Account>, SessionError> {
+        accounts::accounts(project, &self.program)
+    }
+
+    fn sign_in(&self, account: &str) -> Option<atelier_project::Command> {
+        Some(accounts::sign_in_command(&self.program, account))
     }
 
     fn sessions(&self, project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {

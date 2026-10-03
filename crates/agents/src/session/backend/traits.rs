@@ -3,7 +3,7 @@ use std::sync::Arc;
 use atelier_project::Project;
 
 use super::super::{command::Command, event::{Event, SessionId}};
-use super::structs::{Capabilities, OpenRequest, SessionSummary};
+use super::structs::{Account, Capabilities, OpenRequest, SessionSummary};
 use super::types::{EventSink, SessionError};
 
 pub trait Backend: Send + Sync {
@@ -36,6 +36,16 @@ pub trait Backend: Send + Sync {
     /// seconds: never call it on the UI thread.
     fn draft(&self, _project: &dyn Project, _prompt: &str, _model: Option<&str>) -> Result<String, SessionError> {
         Err(SessionError::Unsupported("drafts"))
+    }
+
+    /// The agent's sign-ins on the project's host, for an agent with [`Capabilities::providers`]. May be slow.
+    fn accounts(&self, _project: &dyn Project) -> Result<Vec<Account>, SessionError> {
+        Ok(Vec::new())
+    }
+
+    /// The command that signs in to `account` on the host, making it when it is new. It opens a browser.
+    fn sign_in(&self, _account: &str) -> Option<atelier_project::Command> {
+        None
     }
 }
 
