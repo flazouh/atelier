@@ -6,7 +6,7 @@ mod helpers;
 mod types;
 
 pub use types::CANCELLED;
-pub use helpers::{exit_why, lines, output, run, start, stderr_tail};
+pub use helpers::{exit_why, lines, output, run, start, stderr_tail, strip_ansi};
 
 #[cfg(test)]
 mod tests;

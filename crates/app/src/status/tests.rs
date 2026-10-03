@@ -38,6 +38,16 @@ fn a_turn_works_asks_and_ends_finished_unless_the_reader_looks() {
 }
 
 #[test]
+fn a_failure_shows_no_colour_codes() {
+    let painted = "Run \u{1b}[36msecurity\u{1b}[0m first";
+    let clean = SessionStatus::Failed("Run security first".into());
+    assert_eq!(after(&SessionStatus::Working, &turn(TurnOutcome::Failed(painted.into())), true), clean);
+    assert_eq!(after(&SessionStatus::Working, &Event::Ended(EndReason::Failed(painted.into())), true), clean);
+    let exited = Event::Ended(EndReason::Exited { code: Some(1), stderr: format!("starting\n{painted}\n") });
+    assert_eq!(after(&SessionStatus::Working, &exited, true), clean);
+}
+
+#[test]
 fn a_failure_says_why_short() {
     let failed = after(&SessionStatus::Working, &turn(TurnOutcome::Failed("the agent exited with code 1\nmore".into())), true);
     assert_eq!(failed, SessionStatus::Failed("the agent exited with code 1".into()));

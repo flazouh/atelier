@@ -119,7 +119,7 @@ impl Backend for ClaudeCode {
         let code = process.control.wait().map_err(|e| SessionError::Start(e.to_string()))?;
         if code != Some(0) || written.is_err() || read.is_err() {
             let stderr = process.control.stderr();
-            let why = stderr.lines().rev().find(|l| !l.trim().is_empty()).map(str::to_string);
+            let why = crate::subprocess::strip_ansi(&stderr).lines().rev().find(|l| !l.trim().is_empty()).map(str::to_string);
             return Err(SessionError::Start(why.unwrap_or_else(|| format!("the draft ended with {code:?}"))));
         }
         Ok(text.trim().to_string())

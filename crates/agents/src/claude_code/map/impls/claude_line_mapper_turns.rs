@@ -34,7 +34,7 @@ impl ClaudeLineMapper {
             TurnOutcome::Completed
         } else {
             let why = if finish.errors.is_empty() { finish.result.clone().unwrap_or(finish.subtype) } else { finish.errors.join("; ") };
-            TurnOutcome::Failed(why)
+            TurnOutcome::Failed(crate::subprocess::strip_ansi(&why))
         };
         let goes_on = self.goes_on(&outcome, finish.user_message_uuids.as_deref());
         self.turn_open = goes_on;

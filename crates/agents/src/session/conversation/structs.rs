@@ -227,11 +227,11 @@ impl Conversation {
                 if let TurnOutcome::Failed(why) = &end.outcome
                     && !self.signed_out
                 {
-                    self.items.push(Item::Notice(why.clone()));
+                    self.items.push(Item::Notice(crate::subprocess::strip_ansi(why)));
                 }
                 self.last_turn = Some(end.clone());
             }
-            Event::Warning(text) => self.items.push(Item::Notice(text.clone())),
+            Event::Warning(text) => self.items.push(Item::Notice(crate::subprocess::strip_ansi(text))),
             Event::Ended(reason) => {
                 self.working = false;
                 self.ended = Some(reason.clone());
