@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::{collections::HashMap, time::Instant};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
@@ -93,6 +94,9 @@ pub struct AgentSession {
     /// When each row that came in live arrived, for its entrance; a loaded conversation has none.
     pub arrived: HashMap<list_diff::Arrival, std::time::Instant>,
     pub(super) rows: Vec<(u8, usize, usize)>,
+    /// The number of the latest open. An agent a later open replaced still runs a moment, and its events, its end
+    /// above all, are not this session's.
+    live_open: Arc<AtomicU64>,
     /// The turn being recorded, shared with the sink on the agent's thread.
     pub(super) tracker: Arc<Mutex<Option<TurnTracker>>>,
     /// Turns the sink finished, waiting for the next drain.
@@ -304,6 +308,7 @@ impl AgentSession {
             shown: Vec::new(),
             arrived: HashMap::new(),
             rows: Vec::new(),
+            live_open: Arc::default(),
             tracker,
             finished,
             pr_chips: std::rc::Rc::default(),
@@ -430,7 +435,8 @@ impl AgentSession {
     /// Opens the agent's session off the UI thread: its history first when it resumes and the panel
     /// has not got it (`read_history`), then the agent.
     pub(super) fn open(&mut self, resume: Option<SessionId>, read_history: bool, cx: &mut Context<Self>) {
-        let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink());
+        let this_open = self.live_open.fetch_add(1, Ordering::SeqCst) + 1;
+        let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink(this_open));
         let fork = self.native_fork().filter(|_| resume.is_none());
         let mut request = OpenRequest { resume: resume.clone().or(fork.clone()), model: self.model.clone(), mode: self.mode, provider: None, fork: fork.is_some() };
         let (choice, secrets) = (self.provider.clone(), crate::providers::secrets(cx));
@@ -503,9 +509,13 @@ impl AgentSession {
 
     /// The sink the agent gets: each event passes the turn's tracker first, on the agent's thread, then
     /// goes to the queue. The turn's end finishes the tracker there, before its event reaches the UI.
-    fn tracking_sink(&self) -> atelier_agents::session::EventSink {
+    fn tracking_sink(&self, this_open: u64) -> atelier_agents::session::EventSink {
         let (queue, tracker, finished, project) = (self.queue.sink(), self.tracker.clone(), self.finished.clone(), self.project.clone());
+        let live_open = self.live_open.clone();
         Arc::new(move |event: Event| {
+            if live_open.load(Ordering::SeqCst) != this_open {
+                return;
+            }
             {
                 let mut tracker = tracker.lock().unwrap_or_else(|p| p.into_inner());
                 if let Some(t) = tracker.as_mut() {

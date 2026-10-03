@@ -533,14 +533,10 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
     let strip = SubagentStrip::new(gpui_kit::ElementId::Name(format!("{}-strip", s.key).into()), strip);
     let starting = s.starting;
     let agent_name = s.agent.name;
-    let (heading, words): (SharedString, SharedString) = match (s.continues(), starting) {
-        (Some(source), _) if s.continues_natively() => {
-            (format!("Continues “{}”", source.title).into(), format!("{agent_name} picks it up where it stopped, on this account.").into())
-        }
-        (Some(source), _) => (
-            format!("Continues “{}”", source.title).into(),
-            format!("Its conversation goes to {agent_name} with your first message.").into(),
-        ),
+    let continues = s.continues().map(|source| format!("Continues “{}”", short_title(&source.title)));
+    let (heading, words): (SharedString, SharedString) = match (continues, starting) {
+        (Some(heading), _) if s.continues_natively() => (heading.into(), format!("{agent_name} picks it up where it stopped, on this account.").into()),
+        (Some(heading), _) => (heading.into(), format!("Its conversation goes to {agent_name} with your first message.").into()),
         (None, true) => ("Starting…".into(), format!("Ask {agent_name} anything about this project.").into()),
         (None, false) => ("A new session".into(), format!("Ask {agent_name} anything about this project.").into()),
     };
@@ -552,6 +548,8 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
             .items_center()
             .justify_center()
             .gap(px(4.))
+            .px(px(24.))
+            .text_center()
             .child(div().debug_selector(|| "session-heading".into()).text_size(TextSize::Sm.font_size()).child(heading))
             .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(words))
             .children(s.can_choose_agent().then(|| agent_picker(session, cx)).flatten())
@@ -872,4 +870,14 @@ fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Op
                 }),
         )
         .children(menu)
+}
+
+/// How much of a session's title the heading of the session that continues it shows.
+const HEADING_TITLE_MAX: usize = 60;
+
+fn short_title(title: &str) -> String {
+    match title.char_indices().nth(HEADING_TITLE_MAX) {
+        Some((cut, _)) => format!("{}…", title[..cut].trim_end()),
+        None => title.to_string(),
+    }
 }
