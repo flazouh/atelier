@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use gpui_kit::Entity;
 use atelier_agents::session::{
-    Backend, Capabilities, Command, Event, EventSink, OpenRequest, Session, SessionError,
+    Account, Backend, Capabilities, Command, Event, EventSink, OpenRequest, Session, SessionError,
     SessionId, Started,
 };
 use atelier_project::Project;
@@ -11,12 +11,18 @@ use crate::agent_session::AgentSession;
 
 /// A backend in the test's thread: each message plays the next scripted turn into the sink, and every
 /// command is kept. `fail_first` makes the first open fail as a missing program does.
+#[derive(Default)]
 pub struct Fake {
     pub turns: Mutex<Vec<Vec<Event>>>,
     pub received: Arc<Mutex<Vec<Command>>>,
     pub(super) fail_first: Mutex<bool>,
     /// Runs before each message's turn plays, as the agent's own work on the files would.
     pub work: Mutex<Vec<Box<dyn FnOnce() + Send>>>,
+    /// It runs on a provider the session picks, among `accounts`.
+    pub providers: bool,
+    pub accounts: Vec<Account>,
+    /// Every request it was opened with, in order.
+    pub opened: Arc<Mutex<Vec<OpenRequest>>>,
 }
 
 struct FakeSession {
@@ -47,9 +53,13 @@ impl Backend for FakeBackend {
         "fake"
     }
     fn capabilities(&self) -> Capabilities {
-        Capabilities::default()
+        Capabilities { providers: self.0.providers, ..Capabilities::default() }
+    }
+    fn accounts(&self, _: &dyn Project) -> Result<Vec<Account>, SessionError> {
+        Ok(self.0.accounts.clone())
     }
     fn open(&self, _: Arc<dyn Project>, request: OpenRequest, sink: EventSink) -> Result<Box<dyn Session>, SessionError> {
+        self.0.opened.lock().unwrap().push(request.clone());
         if std::mem::take(&mut *self.0.fail_first.lock().unwrap()) {
             return Err(SessionError::Missing { program: "fake".into() });
         }

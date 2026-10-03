@@ -19,6 +19,8 @@ pub struct Capabilities {
     pub thinking: bool,
     pub subagents: bool,
     pub todos: bool,
+    /// It runs on a [`super::types::Provider`] the session picks.
+    pub providers: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -29,6 +31,17 @@ pub struct OpenRequest {
     pub mode: Option<PermissionMode>,
     /// The agent as it is set up on the host when `None`.
     pub provider: Option<Provider>,
+}
+
+/// One of the agent's sign-ins on a host, which a [`super::types::Provider::Account`] names.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Account {
+    /// The agent's usual sign-in is `default`.
+    pub name: String,
+    pub signed_in: bool,
+    /// The subscription, as the agent names it, such as `max`.
+    pub plan: Option<String>,
+    pub email: Option<String>,
 }
 
 /// One row of a project's session list.

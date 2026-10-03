@@ -11,6 +11,7 @@ use atelier_ui::scale::px;
 mod activity;
 mod agent_session;
 mod project_icons;
+mod providers;
 mod agents_view;
 mod file_glyphs;
 mod dirty;
@@ -68,6 +69,8 @@ fn main() {
         file_glyphs::install(cx);
         cx.set_global(agent_session::RunPickedSkills(saved.run_picked_skills.unwrap_or(false)));
         cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));
+        cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));
+        cx.set_global(providers::ProviderServices::system());
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
         // or the system's, which keeps the pick.

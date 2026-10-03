@@ -92,6 +92,7 @@ impl Backend for Acp {
             thinking: self.agent.thinking,
             subagents: false,
             todos: self.agent.todos,
+            providers: false,
         }
     }
 

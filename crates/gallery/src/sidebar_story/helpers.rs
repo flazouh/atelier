@@ -6,7 +6,7 @@ use atelier_agents::claude;
 use super::types::BASE;
 
 pub(super) fn session(id: &str, title: &str, look: &AgentLook, status: SessionStatus, minutes_ago: u64) -> SessionData {
-    SessionData { archived: false, in_panel: false, id: id.to_string().into(), title: title.to_string().into(), look: look.clone(), status, active_at: BASE - minutes_ago * 60 }
+    SessionData { archived: false, in_panel: false, provider: None, id: id.to_string().into(), title: title.to_string().into(), look: look.clone(), status, active_at: BASE - minutes_ago * 60 }
 }
 
 pub(super) fn sample(other: &AgentLook) -> Vec<ProjectData> {

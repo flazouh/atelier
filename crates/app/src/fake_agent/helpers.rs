@@ -20,21 +20,26 @@ pub fn start(cx: &mut TestAppContext, turns: Vec<Vec<Event>>, fail_first: bool) 
 
 /// The same, on a project at `dir`.
 pub fn start_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, fail_first: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
-    start_with(cx, dir, turns, fail_first, false)
+    start_with(cx, dir, Fake { turns: Mutex::new(turns), fail_first: Mutex::new(fail_first), ..Fake::default() }, false)
+}
+
+/// A session on an agent that runs on providers, with `accounts` on its host.
+pub fn start_on_providers(cx: &mut TestAppContext, accounts: Vec<atelier_agents::session::Account>) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+    start_with(cx, crate::test_dirs::path(), Fake { providers: true, accounts, ..Fake::default() }, false)
 }
 
 /// The same, with the session's view drawn in the window.
 pub fn start_shown_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
-    start_with(cx, dir, turns, false, true)
+    start_with(cx, dir, Fake { turns: Mutex::new(turns), ..Fake::default() }, true)
 }
 
-fn start_with(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>, fail_first: bool, shown: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+fn start_with(cx: &mut TestAppContext, dir: PathBuf, fake: Fake, shown: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         atelier_ui::init(cx);
         atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Dark, cx);
     });
-    let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(fail_first), work: Mutex::default() });
+    let fake = Arc::new(fake);
     // Its data folder is the test's own, never this machine's.
     let data = crate::test_dirs::path();
     let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap().with_data_dir(&data));
@@ -72,7 +77,7 @@ pub fn git_project_in(dir: PathBuf, files: &[(&str, &str)]) -> PathBuf {
 
 /// An agent named `name` on a fake backend, for a test that starts a session itself.
 pub fn fake_agent(name: &'static str) -> atelier_agents::registry::Agent {
-    let fake = Arc::new(Fake { turns: Mutex::default(), received: Arc::default(), fail_first: Mutex::new(false), work: Mutex::default() });
+    let fake = Arc::new(Fake::default());
     let mut agent = atelier_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(fake));
     agent.name = name;
@@ -81,7 +86,7 @@ pub fn fake_agent(name: &'static str) -> atelier_agents::registry::Agent {
 
 /// An agent named `name` on a fake backend that plays `turns`, one for each message, and that backend.
 pub fn scripted_agent(name: &'static str, turns: Vec<Vec<Event>>) -> (atelier_agents::registry::Agent, Arc<Fake>) {
-    let fake = Arc::new(Fake { turns: Mutex::new(turns), received: Arc::default(), fail_first: Mutex::new(false), work: Mutex::default() });
+    let fake = Arc::new(Fake { turns: Mutex::new(turns), ..Fake::default() });
     let mut agent = atelier_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(fake.clone()));
     agent.name = name;

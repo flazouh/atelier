@@ -47,6 +47,8 @@ pub struct SettingsPane {
     pub(super) zoom_preview: Option<f32>,
     /// The microphones found when the Dictation section was last shown, its rows as the composer's menu has them.
     pub(super) mics: Vec<atelier_ui::VoiceDevice>,
+    /// The Providers section's accounts and key, read when it is shown.
+    pub(crate) providers: super::providers::ProvidersPage,
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPane {}
@@ -75,6 +77,7 @@ impl SettingsPane {
             look: crate::sidebar_layout::from_settings(saved),
             zoom_preview: None,
             mics: Vec::new(),
+            providers: Default::default(),
         }
     }
 
@@ -89,6 +92,9 @@ impl SettingsPane {
         self.section = section;
         if section == Section::Dictation {
             self.mics = dictation::device_rows(&atelier_voice::devices(), None).0;
+        }
+        if section == Section::Providers {
+            self.read_providers(cx);
         }
         cx.notify();
     }
@@ -401,6 +407,7 @@ impl Render for SettingsPane {
             Section::Appearance => appearance.into_any_element(),
             Section::Sidebar => sidebar.into_any_element(),
             Section::Agents => agents.into_any_element(),
+            Section::Providers => self.providers_body(cx),
             Section::Dictation => dictation_pane.into_any_element(),
             Section::Tasks => tasks.into_any_element(),
             Section::Keys => keys_list.into_any_element(),

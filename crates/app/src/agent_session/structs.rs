@@ -63,6 +63,9 @@ pub struct AgentSession {
     pub seen: bool,
     pub model: Option<String>,
     pub mode: Option<PermissionMode>,
+    /// What its agent runs on, for an agent with a choice; `None` leaves the agent as the host has it, and a resume
+    /// finds the account that holds the session.
+    pub provider: Option<crate::providers::Choice>,
     /// The task the session began from, for the header's chip and the first signal.
     pub task: Option<crate::tasks::TaskRef>,
     /// The task heard that the session started.
@@ -115,6 +118,11 @@ pub struct AgentSession {
     pub(super) project_commands: Vec<atelier_agents::commands::CommandInfo>,
     agent_commands: Vec<String>,
     _lists: Task<()>,
+    /// The agent's accounts on the project's host, for the provider choice.
+    pub provider_accounts: Vec<atelier_agents::session::Account>,
+    /// An OpenRouter key is kept, so OpenRouter is offered.
+    pub key_kept: bool,
+    _providers: Task<()>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
     _renaming: Option<Subscription>,
@@ -253,6 +261,7 @@ impl AgentSession {
                 super::dictation::key_away(cx);
             }
         });
+        let agent_has_providers = agent.backend.capabilities().providers;
         let (id, title) = match &resume {
             Some((id, title)) => (Some(id.clone()), title.clone()),
             None => (None, "New session".into()),
@@ -276,6 +285,7 @@ impl AgentSession {
             seen: false,
             model: None,
             mode: None,
+            provider: (resume.is_none() && agent_has_providers).then(|| crate::providers::default_choice(cx)),
             task: None,
             task_told: false,
             problem: None,
@@ -305,6 +315,9 @@ impl AgentSession {
             project_commands: Vec::new(),
             agent_commands: Vec::new(),
             _lists: Task::ready(()),
+            provider_accounts: Vec::new(),
+            key_kept: false,
+            _providers: Task::ready(()),
             renaming: None,
             _renaming: None,
             thinking_since: HashMap::new(),
@@ -329,6 +342,9 @@ impl AgentSession {
         });
         this.open(resume.map(|(id, _)| id), true, cx);
         this.read_lists(cx);
+        if this.provider.is_some() {
+            this.read_provider_choices(cx);
+        }
         this
     }
 
@@ -344,6 +360,40 @@ impl AgentSession {
                 s.offer_commands(cx);
             });
         });
+    }
+
+    /// Reads the host's accounts and whether an OpenRouter key is kept, off the UI thread, for the provider choice.
+    fn read_provider_choices(&mut self, cx: &mut Context<Self>) {
+        let (backend, project, secrets) = (self.agent.backend.clone(), self.project.clone(), crate::providers::secrets(cx));
+        let reading = cx.background_spawn(async move {
+            let accounts = backend.accounts(project.as_ref()).unwrap_or_default();
+            let key_kept = matches!(secrets.read(atelier_settings::secrets::OPENROUTER_KEY), Ok(Some(_)));
+            (accounts, key_kept)
+        });
+        self._providers = cx.spawn(async move |this, cx| {
+            let (accounts, key_kept) = reading.await;
+            _ = this.update(cx, |s, cx| {
+                s.provider_accounts = accounts;
+                s.key_kept = key_kept;
+                cx.notify();
+            });
+        });
+    }
+
+    /// The providers the session can switch to: the signed-in accounts, OpenRouter when a key is kept, and the one
+    /// it is on.
+    pub fn provider_choices(&self) -> Vec<crate::providers::Choice> {
+        use crate::providers::Choice;
+        let mut choices: Vec<Choice> = self.provider_accounts.iter().filter(|a| a.signed_in).map(|a| Choice::Account(a.name.clone())).collect();
+        if self.key_kept {
+            choices.push(Choice::OpenRouter);
+        }
+        if let Some(current) = &self.provider
+            && !choices.contains(current)
+        {
+            choices.insert(0, current.clone());
+        }
+        choices
     }
 
     /// Gives the composer the `/` list: atelier's, the project's and the agent's own.
@@ -378,8 +428,10 @@ impl AgentSession {
     /// has not got it (`read_history`), then the agent.
     pub(super) fn open(&mut self, resume: Option<SessionId>, read_history: bool, cx: &mut Context<Self>) {
         let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink());
-        let request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode, provider: None };
+        let mut request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode, provider: None };
+        let (choice, secrets) = (self.provider.clone(), crate::providers::secrets(cx));
         let opening = cx.background_spawn(async move {
+            let provider = choice.map(|choice| crate::providers::provider(&choice, secrets.as_ref())).transpose();
             let (history, record) = match &resume {
                 Some(id) if read_history => {
                     // The review kept with the session; none, or one this build cannot read, is a fresh one.
@@ -388,7 +440,14 @@ impl AgentSession {
                 }
                 _ => (Vec::new(), None),
             };
-            (history, record, backend.open(project, request, sink))
+            let opened = match provider {
+                Ok(provider) => {
+                    request.provider = provider;
+                    backend.open(project, request, sink)
+                }
+                Err(why) => Err(atelier_agents::session::SessionError::Start(why)),
+            };
+            (history, record, opened)
         });
         self._start = cx.spawn(async move |this, cx| {
             let (history, record, opened) = opening.await;
@@ -703,6 +762,21 @@ impl AgentSession {
         if self.session.is_some() {
             self.command(Command::SetModel { model }, cx);
         }
+    }
+
+    /// Runs the session on `choice` from here: the agent starts again on it. Only before the first message.
+    pub fn set_provider(&mut self, choice: crate::providers::Choice, cx: &mut Context<Self>) {
+        if !self.can_choose_agent() || self.provider.as_ref() == Some(&choice) {
+            return;
+        }
+        self.provider = Some(choice);
+        self.session = None;
+        self.problem = None;
+        self.status = SessionStatus::Idle;
+        self.starting = true;
+        self.open(None, false, cx);
+        cx.emit(SessionEvent::Changed);
+        cx.notify();
     }
 
     pub fn set_mode(&mut self, mode: PermissionMode, cx: &mut Context<Self>) {

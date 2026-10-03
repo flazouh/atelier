@@ -69,19 +69,21 @@ pub enum Section {
     Appearance,
     Sidebar,
     Agents,
+    Providers,
     Dictation,
     Tasks,
     Keys,
 }
 
 impl Section {
-    pub const ALL: [Section; 6] = [Section::Appearance, Section::Sidebar, Section::Agents, Section::Dictation, Section::Tasks, Section::Keys];
+    pub const ALL: [Section; 7] = [Section::Appearance, Section::Sidebar, Section::Agents, Section::Providers, Section::Dictation, Section::Tasks, Section::Keys];
 
     pub fn words(self) -> &'static str {
         match self {
             Section::Appearance => "Appearance",
             Section::Sidebar => "Sidebar",
             Section::Agents => "Agents",
+            Section::Providers => "Providers",
             Section::Dictation => "Dictation",
             Section::Tasks => "Tasks",
             Section::Keys => "Keys",
@@ -94,6 +96,7 @@ impl Section {
             Section::Appearance => "The theme, light or dark, and the colour of the main button.",
             Section::Sidebar => "What a session row shows, and how many sessions the sidebar shows before it folds the rest.",
             Section::Agents => "How a picked skill runs, the agents this build can start, and the models each offers.",
+            Section::Providers => "Where Claude Code gets its model. A session picks one beside its agent.",
             Section::Dictation => "Speak instead of typing. The words are heard on this machine, and nothing leaves it.",
             Section::Tasks => "What moves a task by itself. Every move shows in its activity, and you can move it back.",
             Section::Keys => "The keys of the review. They cannot be changed yet.",
@@ -106,6 +109,7 @@ impl Section {
             Section::Appearance => "section-appearance",
             Section::Sidebar => "section-sidebar",
             Section::Agents => "section-agents",
+            Section::Providers => "section-providers",
             Section::Dictation => "section-dictation",
             Section::Tasks => "section-tasks",
             Section::Keys => "section-keys",
