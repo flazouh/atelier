@@ -63,10 +63,14 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
   again. The lens in front has a wash, or an edge bar while its sidebar is hidden.
   - **Sessions:** the sidebar with the projects open in this window and each project's sessions, the
     agent panels, and the right pane. A new session opens at the left of the strip.
-  - **Issues:** the sidebar, and the task board in the main area.
-  - **Code:** a sidebar that lists its three views, then what the one in front lists:
+  - **Issues:** a sidebar of views over the project's issues (My issues, Active, Backlog, All issues), its
+    labels, and the agents that hold issues, each with a count; the list or the board in the main area
+    shows the one picked.
+  - **Code:** a sidebar that lists its four views, then what the one in front lists:
     - **Pull requests:** the project's pull requests, read on the first look, and the one open.
     - **Files:** the tree in the sidebar and the editor in the main area.
+    - **History:** the checked-out branch's newest 300 commits in the sidebar, read again on each look;
+      the picked one (the newest at first) in the main area: its message, then each file's diff.
     - **Changes:** the focused session's repository, branch, changed files and worktrees, and the review
       in the main area. A press on a file opens the review at it; a review opened anywhere opens here.
     The lens comes back on the view it was left on; it opens on Files the first time.
@@ -90,7 +94,7 @@ them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
 - **From 1100 px:** the sidebar, the session column and the right pane, side by side.
 - **From 900 to 1099 px:** the session column and the right pane. The sidebar shows on ⌘B.
 - **Below 900 px:** one pane at a time, with tabs: Projects (⌘B), Session, and Editor (⌘⇧B). The
-  third tab says Tasks or Pull requests while one of them is in the right pane. Opening a session
+  third tab says Issues or Pull requests while one of them is in the right pane. Opening a session
   or a review shows the Session tab, which holds the view's main area.
 - **Least widths:** the session column 320 px, the right pane 320 px, and the sidebar 180 px.
 - **Who gives way:** the session column keeps its least width. The right pane gives way first, down

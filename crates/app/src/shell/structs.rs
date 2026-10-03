@@ -1898,6 +1898,7 @@ impl Shell {
             ShellView::Git => self.git_main(project, cx),
             ShellView::Files => self.files_editor(project, cx),
             ShellView::Pulls => self.pulls_main(project, cx),
+            ShellView::History => self.history_main(project, cx),
             _ => self.agent_panel(cx),
         }
     }

@@ -111,6 +111,12 @@ pub struct OpenProject {
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
     reading_dirty: Task<()>,
+    /// The commits of the checked-out branch, newest first, for the History view; `None` until asked.
+    pub(crate) log: Option<crate::history::Read<Vec<crate::history::Commit>>>,
+    reading_log: Task<()>,
+    /// The commit the History view shows in full, by its sha, and what was read of it.
+    pub(crate) commit: Option<(SharedString, crate::history::Read<crate::history::Shown>)>,
+    reading_commit: Task<()>,
     /// Files being read for a tab, so a second click does not read them twice.
     opening: HashSet<String>,
     /// Where the caret goes in a file still being read, after a jump to it.
@@ -168,6 +174,10 @@ impl OpenProject {
             merged_told: HashSet::new(),
             dirty: None,
             reading_dirty: Task::ready(()),
+            log: None,
+            reading_log: Task::ready(()),
+            commit: None,
+            reading_commit: Task::ready(()),
             opening: HashSet::new(),
             caret_at: HashMap::new(),
             _watch: None,
@@ -422,6 +432,71 @@ impl OpenProject {
             _ = this.update(cx, |this, cx| {
                 if this.dirty != dirty {
                     this.dirty = dirty;
+                    cx.notify();
+                }
+            });
+        });
+    }
+
+    /// Reads the newest commits of the checked-out branch, off the UI thread. The commits read before stay
+    /// shown while they are read again.
+    pub fn load_log(&mut self, cx: &mut Context<Self>) {
+        let project = self.project.clone();
+        let asked = cx.background_spawn(async move {
+            let args = crate::history::log_args("HEAD");
+            project.git(&args.iter().map(String::as_str).collect::<Vec<_>>())
+        });
+        if !matches!(self.log, Some(crate::history::Read::Ready(_))) {
+            self.log = Some(crate::history::Read::Reading);
+        }
+        self.reading_log = cx.spawn(async move |this, cx| {
+            let log = match asked.await {
+                Ok(out) if out.ok() => crate::history::Read::Ready(crate::history::parse_log(&out.stdout)),
+                // A repository with no commit yet has an empty history, not a broken one.
+                Ok(out) if out.stderr.contains("does not have any commits") => crate::history::Read::Ready(Vec::new()),
+                Ok(out) => crate::history::Read::Failed(out.stderr.trim().to_string().into()),
+                Err(error) => crate::history::Read::Failed(error.to_string().into()),
+            };
+            _ = this.update(cx, |this, cx| {
+                // The newest commit is the one shown until the reader picks another.
+                let newest = match &log {
+                    crate::history::Read::Ready(commits) if this.commit.is_none() => commits.first().map(|c| c.sha.clone()),
+                    _ => None,
+                };
+                if this.log.as_ref() != Some(&log) {
+                    this.log = Some(log);
+                    cx.notify();
+                }
+                if let Some(sha) = newest {
+                    this.show_commit(sha, cx);
+                }
+            });
+        });
+    }
+
+    /// Reads the commit `sha` in full, off the UI thread, and makes it the one the History view shows.
+    pub fn show_commit(&mut self, sha: SharedString, cx: &mut Context<Self>) {
+        if self.commit.as_ref().is_some_and(|(at, _)| *at == sha) {
+            return;
+        }
+        let project = self.project.clone();
+        let asked_sha = sha.clone();
+        let asked = cx.background_spawn(async move {
+            let args = crate::history::show_args(&asked_sha);
+            let out = project.git(&args.iter().map(String::as_str).collect::<Vec<_>>());
+            match out {
+                Ok(out) if out.ok() => crate::history::Read::Ready(crate::history::split_show(&asked_sha, &out.stdout)),
+                Ok(out) => crate::history::Read::Failed(out.stderr.trim().to_string().into()),
+                Err(error) => crate::history::Read::Failed(error.to_string().into()),
+            }
+        });
+        self.commit = Some((sha.clone(), crate::history::Read::Reading));
+        cx.notify();
+        self.reading_commit = cx.spawn(async move |this, cx| {
+            let shown = asked.await;
+            _ = this.update(cx, |this, cx| {
+                if this.commit.as_ref().is_some_and(|(at, _)| *at == sha) {
+                    this.commit = Some((sha, shown));
                     cx.notify();
                 }
             });

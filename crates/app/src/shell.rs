@@ -8,6 +8,7 @@
 mod fit;
 mod helpers;
 mod impls;
+mod history;
 mod lens;
 mod rail;
 mod restore;
