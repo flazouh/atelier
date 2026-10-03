@@ -68,8 +68,8 @@ pub enum ProjectEvent {
     NewSessionHere,
     /// The reader asked in a panel's menu to archive the session, by its key.
     ArchiveSession(SharedString),
-    /// The reader asked to go on with the session, by its key, in a new one.
-    ContinueWith(SharedString),
+    /// The reader asked to go on with the session, by its key, in a new one on this agent and provider.
+    ContinueOn { key: SharedString, backend: String, provider: Option<crate::providers::Choice> },
     /// The reader ran `/files` in a session: the Files view comes to the front.
     ShowFiles,
     /// The reader ran `/tasks` in a session: the tasks come to the right pane.

@@ -11,8 +11,10 @@ fn the_reset_reads_in_the_largest_units_that_matter() {
     assert_eq!(resets_in(NOW + 14 * 60, NOW), "in 14 min");
     assert_eq!(resets_in(NOW + 2 * 3600, NOW), "in 2 h");
     assert_eq!(resets_in(NOW + 2 * 3600 + 14 * 60 + 9, NOW), "in 2 h 14 min");
-    assert_eq!(resets_in(NOW + 30 * 3600, NOW), "in a day");
-    assert_eq!(resets_in(NOW + 3 * 86_400 + 5, NOW), "in 3 days");
+    assert_eq!(resets_in(NOW + 2 * 3600 + 39 * 60, NOW), "in 2 h 39 min");
+    assert_eq!(resets_in(NOW + 86_400, NOW), "in 1 d");
+    assert_eq!(resets_in(NOW + 30 * 3600 + 39 * 60, NOW), "in 1 d 6 h", "past a day the minutes stop mattering");
+    assert_eq!(resets_in(NOW + 3 * 86_400 + 5, NOW), "in 3 d");
 }
 
 #[test]

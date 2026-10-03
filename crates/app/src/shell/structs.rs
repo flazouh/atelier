@@ -346,6 +346,30 @@ impl Shell {
         self.show_session(project, &session, window, cx);
     }
 
+    /// Opens a new session in the project at `project` that carries on the open session keyed `key`, already on the
+    /// agent `backend` names and on `provider` (the default one with `None`): the reader picked both where the
+    /// session's account reached its limit, so nothing is left to pick in the new panel.
+    fn continue_on(&mut self, project: usize, key: &str, backend: &str, provider: Option<crate::providers::Choice>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((_, from)) = self.session_by_key(key, cx) else { return };
+        let Some(agent) = atelier_agents::registry::by_backend(backend) else { return };
+        let source = {
+            let s = from.read(cx);
+            let Some(id) = s.id.clone() else {
+                return self.say("This session has not started, so there is nothing to continue yet.".into(), cx);
+            };
+            crate::agent_session::handoff::Source { backend: s.agent.backend.clone(), agent: s.agent.name.into(), id, title: s.shown_title() }
+        };
+        let Some(p) = self.projects.get(project).cloned() else { return };
+        let session = p.update(cx, |p, cx| p.open_session(None, Some(agent), window, cx));
+        session.update(cx, |s, cx| {
+            if let Some(provider) = provider {
+                s.set_provider(provider, cx);
+            }
+            s.continue_from(source, cx);
+        });
+        self.show_session(project, &session, window, cx);
+    }
+
     /// The session on the sidebar's row `row`, as a new session continues it; `None` before its agent named it.
     fn source_of(&self, project: usize, row: &str, cx: &App) -> Option<crate::agent_session::handoff::Source> {
         use crate::agent_session::handoff::Source;
@@ -914,9 +938,9 @@ impl Shell {
                 }
             }
             ProjectEvent::ArchiveSession(key) => this.set_archived(key.as_ref(), true, cx),
-            ProjectEvent::ContinueWith(key) => {
+            ProjectEvent::ContinueOn { key, backend, provider } => {
                 if let Some(at) = this.projects.iter().position(|p| p == project) {
-                    this.continue_with(at, key.as_ref(), window, cx);
+                    this.continue_on(at, key.as_ref(), backend, provider.clone(), window, cx);
                 }
             }
             ProjectEvent::ShowFiles => {

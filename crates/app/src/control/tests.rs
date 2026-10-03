@@ -11,6 +11,10 @@ fn a_line_names_its_command() {
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"new_session"}"#).unwrap(), Request::NewSession { agent: None });
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"new_session","agent":"Cursor"}"#).unwrap(), Request::NewSession { agent: Some("Cursor".into()) });
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"send","text":"hi"}"#).unwrap(), Request::Send { text: "hi".into() });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"limit"}"#).unwrap(), Request::Limit);
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"find","name":"a"}"#).unwrap(), Request::Find { name: "a".into() });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"click","name":"a"}"#).unwrap(), Request::Click { name: Some("a".into()), x: None, y: None });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"click","x":1,"y":2.5}"#).unwrap(), Request::Click { name: None, x: Some(1.), y: Some(2.5) });
     assert!(serde_json::from_str::<Request>(r#"{"cmd":"explode"}"#).is_err());
     assert!(serde_json::from_str::<Request>(r#"{"cmd":"send"}"#).is_err(), "a message needs its text");
 }

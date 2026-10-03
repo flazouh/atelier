@@ -357,8 +357,8 @@ fn continue_with_opens_a_new_session_that_carries_the_old_one_on(cx: &mut TestAp
     assert!(cx.debug_bounds("session-heading").is_some());
 }
 
-/// An account at its usage limit says so over the composer, and its "Continue with…" carries the session on
-/// in a new one.
+/// An account at its usage limit says so over the composer, and its "Continue with…" opens the agents to go on
+/// with: the pick carries the session on in a new one that already runs on it.
 #[gpui_kit::test]
 fn a_reached_limit_offers_to_continue_with_another_provider(cx: &mut TestAppContext) {
     use atelier_agents::session::{Event, Limit, LimitState, LimitWindow};
@@ -371,15 +371,24 @@ fn a_reached_limit_offers_to_continue_with_another_provider(cx: &mut TestAppCont
     });
     settle(&shell, cx);
     assert!(cx.debug_bounds("limit-notice").is_some(), "the box shows");
+    assert!(cx.debug_bounds("limit-continue-Cursor").is_none(), "the agents show once the button is pressed");
 
     let button = cx.debug_bounds("limit-continue").expect("with its button");
     cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    let continues = shell.read_with(cx, |s, cx| {
+    let sessions = |shell: &gpui_kit::Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).sessions.len());
+    assert_eq!(sessions(&shell, cx), 1, "the button opens a choice, not a session");
+
+    let cursor = cx.debug_bounds("limit-continue-Cursor").expect("Cursor is one of the choices");
+    cx.simulate_click(cursor.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    let (continues, agent) = shell.read_with(cx, |s, cx| {
         let p = s.active().unwrap().read(cx);
-        p.sessions.get(1).and_then(|next| next.read(cx).continues().map(|source| source.id.clone()))
+        let next = p.sessions.get(1).map(|next| next.read(cx));
+        (next.and_then(|next| next.continues().map(|source| source.id.clone())), next.map(|next| next.agent.name))
     });
     assert!(continues.is_some(), "a new session continues the first");
+    assert_eq!(agent, Some("Cursor"), "and it already runs on the pick");
 }
 
 /// Views and commands, part 2: the Sessions view and the Files view, one on screen at a time. The sidebar

@@ -35,8 +35,9 @@ pub enum SessionEvent {
     NewSession,
     /// The reader asked, in the panel's menu, to archive this session.
     Archive,
-    /// The reader asked to go on with this session's conversation in a new session, on another agent or account.
-    ContinueWith,
+    /// The reader chose, where the session's account is at its limit, to go on with its conversation in a new session
+    /// on `backend` (an agent's name for its backend) and `provider`, or the default provider with `None`.
+    ContinueOn { backend: String, provider: Option<crate::providers::Choice> },
     /// The reader ran `/files`: the Files view comes to the front.
     ShowFiles,
     /// The reader ran `/tasks`: the project's tasks come to the right pane.

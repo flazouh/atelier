@@ -271,7 +271,9 @@ impl OpenProject {
                 SessionEvent::Close => return cx.emit(ProjectEvent::CloseSession(session.read(cx).key.clone())),
                 SessionEvent::NewSession => return cx.emit(ProjectEvent::NewSessionHere),
                 SessionEvent::Archive => return cx.emit(ProjectEvent::ArchiveSession(session.read(cx).key.clone())),
-                SessionEvent::ContinueWith => return cx.emit(ProjectEvent::ContinueWith(session.read(cx).key.clone())),
+                SessionEvent::ContinueOn { backend, provider } => {
+                    return cx.emit(ProjectEvent::ContinueOn { key: session.read(cx).key.clone(), backend: backend.clone(), provider: provider.clone() });
+                }
                 SessionEvent::ShowFiles => return cx.emit(ProjectEvent::ShowFiles),
                 SessionEvent::ShowTasks => return cx.emit(ProjectEvent::ShowTasks),
                 SessionEvent::Renamed => {
