@@ -3,7 +3,7 @@ use std::sync::Arc;
 use atelier_ui::BrandMark;
 
 use crate::{
-    acp::Acp, claude, claude_code::ClaudeCode, coding_agents::CodingAgent, cursor, labs::Lab,
+    acp::Acp, claude, claude_code::ClaudeCode, codex::Codex, coding_agents::CodingAgent, cursor, labs::Lab,
     own::OwnAgent,
 };
 use super::structs::Agent;
@@ -25,6 +25,14 @@ pub fn agents() -> Vec<Agent> {
             mark: CodingAgent::Cursor.mark(),
             look: cursor::look(),
             lab: Lab::Custom,
+        },
+        // Codex over ACP, through the adapter that runs its app server. Its models are OpenAI's.
+        Agent {
+            backend: Arc::new(Acp::new(Codex::agent())),
+            name: CodingAgent::Codex.name(),
+            mark: CodingAgent::Codex.mark(),
+            look: Codex::look(),
+            lab: Lab::OpenAi,
         },
         // atelier's own agent. With no key set it still shows, and opening it says which to set. The
         // look is a stand-in until atelier has its own.
