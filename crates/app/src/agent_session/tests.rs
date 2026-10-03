@@ -452,9 +452,14 @@ mod handoff {
     use atelier_agents::session::{BlockId, Command, Event, Item, SessionId};
     use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 
+    use std::sync::Arc;
+
+    use atelier_settings::secrets::{InMemory, OPENROUTER_KEY, Secrets};
+
     use crate::{
         agent_session::{AgentSession, handoff::Source},
-        fake_agent::{backend_with_history, start},
+        fake_agent::{backend_with_history, start, start_forking},
+        providers::{Choice, DefaultProvider, ProviderServices},
     };
 
     const AGENT: &str = "Claude Code";
@@ -545,5 +550,47 @@ mod handoff {
         let kept = cx.update(|_, cx| session.read(cx).project.data_read(&format!("handoffs/{SOURCE_ID}.md"))).expect("the transcript is kept");
         assert!(String::from_utf8_lossy(&kept).contains(EARLIER_ANSWER));
         assert!(sent_texts(&fake.received.lock().unwrap())[0].contains(&format!("handoffs/{SOURCE_ID}.md")));
+    }
+
+    /// Keeps an OpenRouter key and the usual account as the default.
+    fn set_up_providers(cx: &mut TestAppContext) {
+        let secrets = Arc::new(InMemory::default());
+        secrets.write(OPENROUTER_KEY, "sk-or-v1-test").unwrap();
+        cx.update(|cx| {
+            cx.set_global(ProviderServices { secrets, ..ProviderServices::isolated() });
+            cx.set_global(DefaultProvider(Choice::usual()));
+        });
+    }
+
+    #[gpui_kit::test]
+    fn the_same_agent_on_an_account_resumes_a_fork_and_sends_no_brief(cx: &mut TestAppContext) {
+        set_up_providers(cx);
+        let (session, fake, cx) = start_forking(cx);
+        continue_from_source(&session, cx);
+        cx.run_until_parked();
+
+        send(&session, NEXT_ASK, cx);
+        cx.run_until_parked();
+
+        let last = fake.opened.lock().unwrap().last().cloned().unwrap();
+        assert_eq!((last.resume, last.fork), (Some(SessionId::new(SOURCE_ID)), true));
+        assert_eq!(sent_texts(&fake.received.lock().unwrap()), vec![NEXT_ASK.to_string()]);
+    }
+
+    #[gpui_kit::test]
+    fn the_same_agent_on_openrouter_starts_fresh_and_takes_the_brief(cx: &mut TestAppContext) {
+        set_up_providers(cx);
+        let (session, fake, cx) = start_forking(cx);
+        continue_from_source(&session, cx);
+        cx.run_until_parked();
+        cx.update(|_, cx| session.update(cx, |s, cx| s.set_provider(Choice::OpenRouter, cx)));
+        cx.run_until_parked();
+
+        send(&session, NEXT_ASK, cx);
+        cx.run_until_parked();
+
+        let last = fake.opened.lock().unwrap().last().cloned().unwrap();
+        assert_eq!((last.resume, last.fork), (None, false));
+        assert!(sent_texts(&fake.received.lock().unwrap())[0].contains(EARLIER_ANSWER));
     }
 }

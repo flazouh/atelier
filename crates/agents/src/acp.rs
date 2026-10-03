@@ -93,6 +93,7 @@ impl Backend for Acp {
             subagents: false,
             todos: self.agent.todos,
             providers: false,
+            forks: false,
         }
     }
 

@@ -21,6 +21,8 @@ pub struct Capabilities {
     pub todos: bool,
     /// It runs on a [`super::types::Provider`] the session picks.
     pub providers: bool,
+    /// It can start a new session from a past one's history, which stays as it was ([`OpenRequest::fork`]).
+    pub forks: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -31,6 +33,9 @@ pub struct OpenRequest {
     pub mode: Option<PermissionMode>,
     /// The agent as it is set up on the host when `None`.
     pub provider: Option<Provider>,
+    /// `resume` starts a new session from that one's history, which stays as it was. Only for an agent that
+    /// [`Capabilities::forks`].
+    pub fork: bool,
 }
 
 /// One of the agent's sign-ins on a host, which a [`super::types::Provider::Account`] names.

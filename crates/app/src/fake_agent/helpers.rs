@@ -28,6 +28,11 @@ pub fn start_on_providers(cx: &mut TestAppContext, accounts: Vec<atelier_agents:
     start_with(cx, crate::test_dirs::path(), Fake { providers: true, accounts, ..Fake::default() }, false)
 }
 
+/// A session on an agent that runs on providers and forks past sessions, as Claude Code does.
+pub fn start_forking(cx: &mut TestAppContext) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+    start_with(cx, crate::test_dirs::path(), Fake { providers: true, forks: true, ..Fake::default() }, false)
+}
+
 /// The same, with the session's view drawn in the window.
 pub fn start_shown_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
     start_with(cx, dir, Fake { turns: Mutex::new(turns), ..Fake::default() }, true)

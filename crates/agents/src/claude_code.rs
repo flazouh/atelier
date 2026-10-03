@@ -70,6 +70,7 @@ impl Backend for ClaudeCode {
             subagents: true,
             todos: true,
             providers: true,
+            forks: true,
         }
     }
 

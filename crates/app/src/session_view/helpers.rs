@@ -534,6 +534,9 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
     let starting = s.starting;
     let agent_name = s.agent.name;
     let (heading, words): (SharedString, SharedString) = match (s.continues(), starting) {
+        (Some(source), _) if s.continues_natively() => {
+            (format!("Continues “{}”", source.title).into(), format!("{agent_name} picks it up where it stopped, on this account.").into())
+        }
         (Some(source), _) => (
             format!("Continues “{}”", source.title).into(),
             format!("Its conversation goes to {agent_name} with your first message.").into(),

@@ -46,7 +46,24 @@ impl AgentSession {
             _ = this.update(cx, |s, cx| s.brief_read(brief, cx));
         });
         self.handoff = Some(Handoff { source, brief: None, waiting: None, _reading });
+        if self.continues_natively() {
+            self.restart(cx);
+        }
         cx.notify();
+    }
+
+    /// It resumes a fork of the session it continues, so it needs no brief: the same agent, one that forks, on one
+    /// of its accounts. OpenRouter takes the brief, as thinking signed by one backend may fail on another.
+    pub fn continues_natively(&self) -> bool {
+        self.native_fork().is_some()
+    }
+
+    /// The session to fork when it starts, while its first message has not gone.
+    pub(super) fn native_fork(&self) -> Option<SessionId> {
+        let handoff = self.handoff.as_ref()?;
+        let same_agent = handoff.source.backend.name() == self.agent.backend.name();
+        let on_an_account = matches!(self.provider, Some(crate::providers::Choice::Account(_)));
+        (same_agent && on_an_account && self.agent.backend.capabilities().forks).then(|| handoff.source.id.clone())
     }
 
     /// The session this one continues, while its first message has not gone.
@@ -57,6 +74,10 @@ impl AgentSession {
     /// The message to send now: `command` with the brief in front, or `None` while the brief is read, when it goes
     /// once read. Every message after the first goes as it is.
     pub(super) fn with_brief(&mut self, command: Command, cx: &mut Context<Self>) -> Option<Command> {
+        if self.continues_natively() {
+            self.handoff = None;
+            return Some(command);
+        }
         let Some(handoff) = &mut self.handoff else { return Some(command) };
         match handoff.brief.take() {
             None => {

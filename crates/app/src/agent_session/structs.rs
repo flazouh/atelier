@@ -431,7 +431,8 @@ impl AgentSession {
     /// has not got it (`read_history`), then the agent.
     pub(super) fn open(&mut self, resume: Option<SessionId>, read_history: bool, cx: &mut Context<Self>) {
         let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink());
-        let mut request = OpenRequest { resume: resume.clone(), model: self.model.clone(), mode: self.mode, provider: None };
+        let fork = self.native_fork().filter(|_| resume.is_none());
+        let mut request = OpenRequest { resume: resume.clone().or(fork.clone()), model: self.model.clone(), mode: self.mode, provider: None, fork: fork.is_some() };
         let (choice, secrets) = (self.provider.clone(), crate::providers::secrets(cx));
         let opening = cx.background_spawn(async move {
             let provider = choice.map(|choice| crate::providers::provider(&choice, secrets.as_ref())).transpose();
@@ -779,6 +780,11 @@ impl AgentSession {
             return;
         }
         self.provider = Some(choice);
+        self.restart(cx);
+    }
+
+    /// Drops the agent and starts a new session in its place, as the provider or a handoff now says.
+    pub(super) fn restart(&mut self, cx: &mut Context<Self>) {
         self.session = None;
         self.problem = None;
         self.status = SessionStatus::Idle;

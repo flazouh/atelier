@@ -23,6 +23,8 @@ pub struct Fake {
     pub accounts: Vec<Account>,
     /// Every request it was opened with, in order.
     pub opened: Arc<Mutex<Vec<OpenRequest>>>,
+    /// It can start a new session from a past one.
+    pub forks: bool,
     /// What it reads back as any past session's history.
     pub history: Vec<Event>,
 }
@@ -55,7 +57,7 @@ impl Backend for FakeBackend {
         "fake"
     }
     fn capabilities(&self) -> Capabilities {
-        Capabilities { providers: self.0.providers, ..Capabilities::default() }
+        Capabilities { providers: self.0.providers, forks: self.0.forks, ..Capabilities::default() }
     }
     fn history(&self, _: &dyn Project, _: &SessionId) -> Result<Vec<Event>, SessionError> {
         Ok(self.0.history.clone())
