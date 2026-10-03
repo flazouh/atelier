@@ -619,3 +619,12 @@ fn a_transcript_shows_the_readers_lines_and_not_a_background_tasks_notice() {
     }).collect();
     assert_eq!(users, ["run it"]);
 }
+
+#[test]
+fn a_run_with_no_sign_in_tells_so_instead_of_showing_the_cli_s_advice() {
+    let events = replay("signed_out");
+    assert!(events.iter().any(|e| matches!(e, Event::SignedOut)), "{events:#?}");
+    assert_eq!(text_of(&events), "", "`claude` says to run /login, which a headless run cannot; the notice says what to do");
+    let Some(Event::TurnEnded(end)) = events.last() else { panic!("the last event is {:?}", events.last()) };
+    assert!(matches!(end.outcome, TurnOutcome::Failed(_)), "the turn did not go: {end:?}");
+}

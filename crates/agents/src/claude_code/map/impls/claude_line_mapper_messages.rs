@@ -17,6 +17,10 @@ impl ClaudeLineMapper {
         if message.sidechain {
             return Vec::new();
         }
+        // Its text tells the reader to run `/login`, which a headless run cannot: the notice says what to do.
+        if message.is_signed_out() {
+            return vec![Event::SignedOut];
+        }
         let parent = message.parent_tool_use_id.map(ToolId::new);
         let streamed = message.message.id.as_ref().is_some_and(|id| self.streamed.contains(id));
         let mut events = Vec::new();

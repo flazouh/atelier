@@ -17,6 +17,7 @@ pub mod handoff;
 mod helpers;
 mod limit_clock;
 mod queue;
+mod sign_in;
 mod structs;
 mod types;
 

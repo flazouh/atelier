@@ -29,6 +29,7 @@ fn agent() -> AcpAgent {
         thinking: true,
         todos: true,
         resume: true,
+        login: Vec::new(),
     }
 }
 

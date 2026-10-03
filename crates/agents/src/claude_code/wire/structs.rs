@@ -5,6 +5,9 @@ use serde_json::Value;
 
 use super::types::{Content, ControlBody, StreamEvent};
 
+/// The `error` of the assistant line `claude` writes when it has no sign-in.
+const SIGN_IN_FAILED: &str = "authentication_failed";
+
 /// A `system` line: `init`, `task_started`, `task_progress`, `task_notification`, and more that
 /// atelier ignores. One shape holds every field any of them uses.
 #[derive(Deserialize)]
@@ -66,6 +69,10 @@ pub(in super::super) struct Message {
     /// task's notice.
     #[serde(default)]
     pub origin: Option<Origin>,
+    /// Why `claude` wrote this assistant line itself instead of the model: `authentication_failed` for a run with no
+    /// sign-in, `rate_limit` for a limit, and more.
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -74,6 +81,11 @@ pub(in super::super) struct Origin {
 }
 
 impl Message {
+    /// Whether this is the line `claude` writes for a run with no sign-in.
+    pub fn is_signed_out(&self) -> bool {
+        self.error.as_deref() == Some(SIGN_IN_FAILED)
+    }
+
     /// Whether `claude` wrote this user line itself, rather than the reader.
     pub fn written_by_claude(&self) -> bool {
         self.meta || self.synthetic || self.origin.as_ref().is_some_and(|origin| origin.kind != "human")

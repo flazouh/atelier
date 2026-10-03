@@ -204,6 +204,15 @@ atelier reads it through a process the project spawns (`sh`), never from disk di
   finishes what is open: each running call fails, each waiting question is cancelled, each subagent ends,
   then `TurnEnded(Failed("the agent exited with code N: <its last stderr line>"))` and `Ended(Exited { code, stderr })`, where `stderr` is the last 20 lines the process wrote. `Ended` comes once.
 - **A line does not parse:** a `Warning`. The stream goes on.
+- **There is no sign-in:** `claude` writes an `assistant` line with `"error": "authentication_failed"` (its text,
+  "Not logged in · Please run /login", is advice a headless run cannot follow) and a `result` with `is_error`. The
+  mapper tells `Event::SignedOut` and no text, then the failed turn. `Conversation::signed_out()` holds until a
+  turn completes or the reader signs in; a turn that fails while it holds leaves no line of its own, since the
+  notice over the composer speaks for it. A run over ACP tells the same event for error `-32000`, on `open` and in
+  the middle of a turn. The notice's button runs `Backend::sign_in(account)` (`claude auth login`, or `agent login`
+  for Cursor) on this machine through `subprocess::run`; when it exits 0 the agent starts again on the same session
+  and the message it refused goes once more. A project on another host cannot be signed in from here, and the
+  notice says where to. `/login` is atelier's own command and runs the same sign-in.
 - **atelier dies** (a crash, a kill): every process a local project starts has a watchdog (`sh`, detached)
   that stops it, and kills it two seconds later if it still runs, once atelier is gone. An agent that ignores
   the end of its stdin, as Cursor's does, ends too. On a remote project `atelier-remote` kills its processes
@@ -227,7 +236,7 @@ over the protocol. The agent starts through `Project::spawn`, on the host.
 
 | atelier | ACP |
 | --- | --- |
-| `open` | `initialize`, then `session/new`, or `session/load` to resume when the agent says it can. On error `-32000` (sign-in needed) atelier calls `authenticate` once with the agent's first method and asks again. |
+| `open` | `initialize`, then `session/new`, or `session/load` to resume when the agent says it can. On error `-32000` (sign-in needed) atelier calls `authenticate` once with the agent's first method and asks again; an agent still signed out, or signed out in the middle of a turn, is told as `SignedOut`. |
 | `Command::Send` | `session/prompt`, one turn at a time. Messages sent during a turn wait. Its response carries the stop reason and ends the turn. |
 | `Command::Interrupt` | `session/cancel` (a notification). A waiting question is answered `cancelled`. The turn ends with stop reason `cancelled`. |
 | `SetPermissionMode` | `session/set_mode` with the agent's name for the mode. A mode it has no name for is `Unsupported`. |

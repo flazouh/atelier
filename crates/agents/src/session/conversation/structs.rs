@@ -22,6 +22,7 @@ pub struct Conversation {
     pub(super) usage: Usage,
     context: ContextFill,
     limit: Option<Limit>,
+    signed_out: bool,
     working: bool,
     started: Option<Started>,
     pub(super) ended: Option<EndReason>,
@@ -58,6 +59,11 @@ impl Conversation {
         self.limit
     }
 
+    /// Whether the agent found no sign-in to work with, until [`Self::signed_in`].
+    pub fn signed_out(&self) -> bool {
+        self.signed_out
+    }
+
     /// Whether a turn is open: the agent works, or waits for an answer.
     pub fn working(&self) -> bool {
         self.working
@@ -84,6 +90,23 @@ impl Conversation {
     pub fn user_sent(&mut self, text: impl Into<String>) {
         self.items.push(Item::User { text: text.into() });
         self.working = true;
+    }
+
+    /// The reader signed in again: what [`Self::signed_out`] showed is over.
+    pub fn signed_in(&mut self) {
+        self.signed_out = false;
+    }
+
+    /// The message the conversation ends with when no agent answered it, taken out so the reader's send can put it
+    /// back: the one a missing sign-in refused.
+    pub fn take_unanswered(&mut self) -> Option<String> {
+        match self.items.last() {
+            Some(Item::User { .. }) => match self.items.pop() {
+                Some(Item::User { text }) => Some(text),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     /// The user picked a choice. The card shows it before the agent's next event arrives.
@@ -195,9 +218,15 @@ impl Conversation {
             }
             Event::Context(context) => self.context = *context,
             Event::Limit(limit) => self.limit = (limit.state != LimitState::Clear).then_some(*limit),
+            Event::SignedOut => self.signed_out = true,
             Event::TurnEnded(end) => {
                 self.working = false;
-                if let TurnOutcome::Failed(why) = &end.outcome {
+                // A turn that ran shows the agent is signed in, whoever signed it in.
+                self.signed_out &= end.outcome != TurnOutcome::Completed;
+                // The notice for a missing sign-in says it; the agent's own failure text would say it twice.
+                if let TurnOutcome::Failed(why) = &end.outcome
+                    && !self.signed_out
+                {
                     self.items.push(Item::Notice(why.clone()));
                 }
                 self.last_turn = Some(end.clone());

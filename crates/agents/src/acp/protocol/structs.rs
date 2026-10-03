@@ -206,7 +206,10 @@ impl Protocol {
                 let method = self.auth_methods[0].clone();
                 step.lines.push(self.request(Asked::Authenticate, client::authenticate(&method)));
             }
-            (Asked::Initialize | Asked::Authenticate | Asked::Open, Err(error)) => self.fail(&mut step, error.to_string(), now),
+            (Asked::Initialize | Asked::Authenticate | Asked::Open, Err(error)) => {
+                self.tell_signed_out(&mut step, &error);
+                self.fail(&mut step, error.to_string(), now)
+            }
             (Asked::Open, Ok(result)) => self.opened(&mut step, parse(result).unwrap_or_default(), now),
             (Asked::List, Ok(result)) => {
                 let found = parse::<wire::Listed>(result).map(|listed| Found::Sessions(summaries(listed)));
@@ -217,7 +220,10 @@ impl Protocol {
                 let (outcome, usage) = match outcome.map(parse::<wire::Prompted>) {
                     Ok(Ok(prompted)) => (stop_outcome(&prompted.stop_reason), prompted.usage.map(usage)),
                     Ok(Err(error)) => (TurnOutcome::Failed(format!("the agent's answer did not parse: {error}")), None),
-                    Err(error) => (TurnOutcome::Failed(error.to_string()), None),
+                    Err(error) => {
+                        self.tell_signed_out(&mut step, &error);
+                        (TurnOutcome::Failed(error.to_string()), None)
+                    }
                 };
                 self.end_turn(&mut step, outcome, usage, now);
                 self.prompt_next(&mut step);
@@ -229,6 +235,14 @@ impl Protocol {
         }
         self.prompt_next(&mut step);
         step
+    }
+
+    /// Tells a session that the agent wants a sign-in, before the failure that follows. A list or a history has no
+    /// session to tell.
+    fn tell_signed_out(&self, step: &mut Step, error: &RpcError) {
+        if error.code == AUTH_REQUIRED && matches!(self.goal, Goal::Open(_)) {
+            step.events.push(Event::SignedOut);
+        }
     }
 
     fn can_sign_in(&self, error: &RpcError) -> bool {

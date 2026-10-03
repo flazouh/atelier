@@ -560,6 +560,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
     let composer = s.composer.clone();
     let changed = changed_files(session, cx);
     let pull_card = session.read(cx).pull_card.clone();
+    let sign_in = super::sign_in::sign_in_notice(session, window, cx);
     let limit = super::limit::limit_notice(session, window, cx);
     let header = header(session, window, cx);
     let interrupt = session.clone();
@@ -580,6 +581,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         .child(header)
         .child(body)
         .children(failure)
+        .children(sign_in)
         .children(limit)
         .child(reading_width(
             div()

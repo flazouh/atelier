@@ -33,6 +33,11 @@ pub fn start_forking(cx: &mut TestAppContext) -> (Entity<AgentSession>, Arc<Fake
     start_with(cx, crate::test_dirs::path(), Fake { providers: true, forks: true, ..Fake::default() }, false)
 }
 
+/// A session on an agent that signs in with `command` (`None`: it cannot), with its view drawn in the window.
+pub fn start_signing_in(cx: &mut TestAppContext, turns: Vec<Vec<Event>>, command: Option<atelier_project::Command>) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+    start_with(cx, crate::test_dirs::path(), Fake { turns: Mutex::new(turns), sign_in: command, ..Fake::default() }, true)
+}
+
 /// The same, with the session's view drawn in the window.
 pub fn start_shown_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
     start_with(cx, dir, Fake { turns: Mutex::new(turns), ..Fake::default() }, true)

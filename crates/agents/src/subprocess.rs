@@ -5,4 +5,7 @@
 mod helpers;
 mod types;
 
-pub use helpers::{exit_why, lines, output, start, stderr_tail};
+pub use helpers::{exit_why, lines, output, run, start, stderr_tail};
+
+#[cfg(test)]
+mod tests;

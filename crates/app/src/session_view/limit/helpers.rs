@@ -1,8 +1,6 @@
 use atelier_agents::session::{Limit, LimitState, LimitWindow};
 use atelier_ui::{
-    menu::{self, Entry, Lead, Menu, MenuLook, Origin, Pick, entries_of, lead_icon},
-    popover::{Hang, Popover},
-    button::{Button, ButtonVariant},
+    menu::{Lead, lead_icon},
     icon::{Icon, IconName},
     scale::px,
     theme::{ActiveTheme, radius},
@@ -10,8 +8,9 @@ use atelier_ui::{
 };
 use gpui_kit::{AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, Styled, Window, div};
 
-use crate::agent_session::{AgentSession, SessionEvent, now};
-use super::types::{DAY, HOUR, MINUTE, HANDOFF, MENU_GAP};
+use crate::agent_session::{AgentSession, now};
+use crate::session_view::handoff_button::handoff_button;
+use super::types::{DAY, HOUR, MINUTE};
 
 /// How long until `resets_at`, both in seconds since the Unix epoch: "in 2 h 14 min", "in 3 days".
 pub fn resets_in(resets_at: u64, now: u64) -> String {
@@ -54,57 +53,6 @@ pub fn still_reached(limit: &Limit, now: u64) -> bool {
     limit.state == LimitState::Reached && limit.resets_at.is_none_or(|at| now < at)
 }
 
-/// The button that opens the handoff menu over the notice: the agents, and for an agent with a choice its providers.
-/// A choice hands the session off at once.
-fn handoff_button(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement + use<> {
-    let s = session.read(cx);
-    let (key, branches) = (s.key.clone(), s.handoff_branches.clone());
-    let open = window.use_keyed_state(gpui_kit::ElementId::Name(format!("{key}-handoff-open").into()), cx, |_, _| false);
-    let is_open = *open.read(cx) && !branches.is_empty();
-    let shut = {
-        let open = open.clone();
-        move |cx: &mut App| open.update(cx, |o, cx| {
-            *o = false;
-            cx.notify();
-        })
-    };
-    let menu = is_open.then(|| {
-        let (owner, closing) = (session.clone(), shut.clone());
-        // A choice shuts the menu, then asks for the handoff.
-        let pick: Pick = std::rc::Rc::new(move |target, _, cx| {
-            closing(cx);
-            owner.update(cx, |_, cx| cx.emit(SessionEvent::Handoff(target.clone())));
-        });
-        let entries: Vec<Entry> = entries_of(&branches, &pick);
-        let rows = entries.len();
-        let close = shut.clone();
-        Popover::new(gpui_kit::ElementId::Name(format!("{key}-handoff-popover").into()))
-            .open(true)
-            .hang(Hang::Right(0., -(menu::height_in(MenuLook::PROJECT, rows) + MENU_GAP)))
-            .keep_focus()
-            .height(menu::height_in(MenuLook::PROJECT, rows))
-            .on_close(move |_, cx| close(cx))
-            .child(Menu::new(gpui_kit::ElementId::Name(format!("{key}-handoff-menu").into()), entries).look(MenuLook::PROJECT).origin(Origin::BottomRight))
-    });
-    let toggle = open.clone();
-    div()
-        .relative()
-        .child(
-            Button::new(gpui_kit::ElementId::Name(format!("{key}-limit-handoff").into()))
-                .label(HANDOFF)
-                .variant(ButtonVariant::Secondary)
-                .debug_name("limit-handoff")
-                .open(is_open)
-                .on_click(move |_, _, cx| {
-                    toggle.update(cx, |o, cx| {
-                        *o = !*o;
-                        cx.notify();
-                    })
-                }),
-        )
-        .children(menu)
-}
-
 /// The box over the composer while the session's account is at its limit, or `None`.
 pub fn limit_notice(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> Option<AnyElement> {
     let s = session.read(cx);
@@ -112,7 +60,7 @@ pub fn limit_notice(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
     let limit = s.conversation.limit().filter(|limit| still_reached(limit, now))?;
     let words = limit_words(s.agent.name, &limit, now);
     let (name, mark) = (s.agent.name, s.agent.mark.clone());
-    let go_on = handoff_button(session, window, cx);
+    let go_on = handoff_button(session, "limit-handoff", window, cx);
     let theme = cx.theme();
     let lead = lead_icon(&name.into(), Lead::of(mark), 14., theme);
     Some(

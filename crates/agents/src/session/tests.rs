@@ -282,6 +282,59 @@ mod conversation {
     }
 
     #[test]
+    fn a_turn_that_found_no_sign_in_leaves_a_sign_out_to_show_and_no_failure_line() {
+        let mut conversation = Conversation::new();
+        conversation.user_sent("hi");
+        conversation.apply(&Event::SignedOut);
+        conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("Not logged in".into()), summary: None }));
+        assert!(conversation.signed_out());
+        assert!(!conversation.working());
+        assert_eq!(conversation.items(), [Item::User { text: "hi".into() }], "the notice speaks for it, not a line of the transcript");
+        conversation.signed_in();
+        assert!(!conversation.signed_out());
+    }
+
+    #[test]
+    fn a_turn_that_completes_shows_the_agent_is_signed_in_after_all() {
+        let mut conversation = Conversation::new();
+        conversation.user_sent("hi");
+        conversation.apply(&Event::SignedOut);
+        conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("Not logged in".into()), summary: None }));
+        conversation.user_sent("hi again");
+        conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Completed, summary: None }));
+        assert!(!conversation.signed_out(), "the reader signed in somewhere else, and the agent noticed");
+    }
+
+    #[test]
+    fn the_message_nobody_answered_is_taken_back_to_be_sent_again() {
+        let mut conversation = Conversation::new();
+        conversation.user_sent("hi");
+        conversation.apply(&Event::SignedOut);
+        conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("Not logged in".into()), summary: None }));
+        assert_eq!(conversation.take_unanswered().as_deref(), Some("hi"));
+        assert_eq!(conversation.items(), []);
+        assert_eq!(conversation.take_unanswered(), None, "taken once");
+    }
+
+    #[test]
+    fn a_message_the_agent_answered_stays() {
+        let mut conversation = Conversation::new();
+        conversation.user_sent("hi");
+        conversation.apply(&text(1, "hello"));
+        assert_eq!(conversation.take_unanswered(), None);
+        assert_eq!(conversation.items().len(), 2);
+    }
+
+    #[test]
+    fn a_turn_that_fails_otherwise_still_leaves_its_line() {
+        let mut conversation = Conversation::new();
+        conversation.user_sent("hi");
+        conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("boom".into()), summary: None }));
+        assert!(!conversation.signed_out());
+        assert_eq!(conversation.items().len(), 2);
+    }
+
+    #[test]
     fn the_context_is_the_latest_reading_not_a_sum() {
         let reading = |used, window| Event::Context(ContextFill { used, window });
         let conversation = fold(vec![reading(90_000, None), reading(4_000, Some(200_000))]);

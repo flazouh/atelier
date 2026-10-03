@@ -242,10 +242,10 @@ fn the_composer_offers_the_projects_commands_and_files(cx: &mut TestAppContext) 
         let composer = session.read(cx).composer.read(cx);
         (composer.commands().iter().map(|c| c.name.to_string()).collect::<Vec<_>>(), composer.files().iter().map(|f| f.to_string()).collect::<Vec<_>>())
     });
-    for name in ["files", "tasks", "review", "ship", "tidy"] {
+    for name in ["files", "tasks", "review", "login", "ship", "tidy"] {
         assert!(names.iter().any(|n| n == name), "{name} is offered: {names:?}");
     }
-    assert!(!names.iter().any(|n| n == "goal" || n == "login"), "a command atelier cannot run yet is not offered: {names:?}");
+    assert!(!names.iter().any(|n| n == "goal"), "a command atelier cannot run yet is not offered: {names:?}");
     assert!(files.iter().any(|f| f == "a.txt") && files.iter().any(|f| f == "src.rs"), "the tracked files are offered: {files:?}");
 }
 
@@ -714,4 +714,135 @@ fn a_message_queued_before_the_agent_answers_waits(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(sent_texts(&fake), ["first"]);
     assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["later"]);
+}
+
+/// A message the agent refuses for want of a sign-in: it says so, then its turn fails.
+fn refused_for_sign_in() -> Vec<Event> {
+    vec![Event::SignedOut, Event::TurnEnded(atelier_agents::session::TurnEnd { outcome: atelier_agents::session::TurnOutcome::Failed("Not logged in".into()), summary: None })]
+}
+
+fn answer(text: &str) -> Vec<Event> {
+    vec![Event::Text { block: atelier_agents::session::BlockId(7), delta: text.into() }, ended()]
+}
+
+fn signed_out(session: &Entity<AgentSession>, cx: &mut gpui_kit::VisualTestContext) -> bool {
+    cx.update(|_, cx| session.read(cx).conversation.signed_out())
+}
+
+/// A message refused for want of a sign-in goes again once the reader has signed in: the agent starts again on the
+/// same session, and the reader does not type it twice.
+#[gpui_kit::test]
+fn signing_in_starts_the_agent_again_and_sends_the_refused_message_once_more(cx: &mut TestAppContext) {
+    let (session, fake, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in(), answer("hello")], Some(atelier_project::Command::new("true")));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    assert!(signed_out(&session, cx));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    cx.run_until_parked();
+    assert!(!signed_out(&session, cx), "the sign-in is over");
+    assert_eq!(fake.signed_in_as.lock().unwrap().as_slice(), ["default"], "the account the session runs on");
+    let opened = fake.opened.lock().unwrap().clone();
+    assert_eq!(opened.len(), 2, "the agent started again");
+    assert_eq!(opened[1].resume.as_ref().map(|id| id.as_str()), Some("fake-1"), "on the same session");
+    let sent: Vec<_> = fake.received.lock().unwrap().iter().filter_map(|c| if let Command::Send { text, .. } = c { Some(text.clone()) } else { None }).collect();
+    assert_eq!(sent, ["hi", "hi"], "the refused message went again");
+    let items = cx.update(|_, cx| session.read(cx).conversation.items().to_vec());
+    assert_eq!(items.iter().filter(|i| matches!(i, atelier_agents::session::Item::User { .. })).count(), 1, "and shows once: {items:?}");
+}
+
+/// A sign-in that does not finish keeps the notice, and says why.
+#[gpui_kit::test]
+fn a_sign_in_that_fails_keeps_the_notice_and_says_why(cx: &mut TestAppContext) {
+    let failing = atelier_project::Command::new("sh").args(["-c", "echo 'browser closed' >&2; exit 1"]);
+    let (session, fake, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in()], Some(failing));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    cx.run_until_parked();
+    assert!(signed_out(&session, cx), "still signed out");
+    let state = cx.update(|_, cx| session.read(cx).sign_in_state());
+    assert!(matches!(&state, Some(atelier_ui::SignInState::Failed(why)) if why.contains("browser closed")), "{state:?}");
+    assert_eq!(fake.opened.lock().unwrap().len(), 1, "the agent did not start again");
+}
+
+/// An agent atelier has no sign-in for is told so in the notice, which still offers the way on.
+#[gpui_kit::test]
+fn an_agent_with_no_sign_in_command_says_to_sign_in_by_hand(cx: &mut TestAppContext) {
+    let (session, _, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in()], None);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    cx.run_until_parked();
+    let state = cx.update(|_, cx| session.read(cx).sign_in_state());
+    assert!(matches!(&state, Some(atelier_ui::SignInState::Failed(why)) if why.contains("by hand")), "{state:?}");
+}
+
+/// `/login` is atelier's: it signs in, it does not go to the agent as text.
+#[gpui_kit::test]
+fn typing_login_signs_in_and_the_agent_never_hears_it(cx: &mut TestAppContext) {
+    let (session, fake, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in()], Some(atelier_project::Command::new("true")));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.run_command("login", "", cx)));
+    cx.run_until_parked();
+    assert_eq!(fake.signed_in_as.lock().unwrap().len(), 1);
+    assert!(fake.received.lock().unwrap().iter().all(|c| !matches!(c, Command::Send { .. })), "nothing was sent to the agent");
+}
+
+/// The notice over the composer shows while the agent has no sign-in; its button signs in, and the notice goes with it.
+#[gpui_kit::test]
+fn the_notice_shows_a_sign_in_button_until_the_reader_has_signed_in(cx: &mut TestAppContext) {
+    let (session, _, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in(), answer("hello")], Some(atelier_project::Command::new("true")));
+    assert!(cx.debug_bounds("sign-in-notice").is_none(), "an agent that works needs no notice");
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("sign-in-notice").is_some(), "the agent has no sign-in");
+    let button = cx.debug_bounds("sign-in-button").expect("with its button");
+    cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("sign-in-notice").is_none(), "signed in");
+}
+
+/// The notice is not a dead end: the reader can hand the session off instead of signing in.
+#[gpui_kit::test]
+fn the_notice_offers_a_handoff_when_there_is_somewhere_to_go(cx: &mut TestAppContext) {
+    let (session, _, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in()], None);
+    cx.update(|_, cx| {
+        session.update(cx, |s, _| s.handoff_branches = vec![atelier_ui::menu::Branch { id: "cursor".into(), label: "Cursor".into(), lead: None, branches: Vec::new() }])
+    });
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("sign-in-handoff").is_some(), "the way on is beside the button");
+}
+
+/// With nowhere to go, the notice does not offer an empty menu.
+#[gpui_kit::test]
+fn the_notice_has_no_handoff_with_nowhere_to_go(cx: &mut TestAppContext) {
+    let (session, _, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in()], None);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("sign-in-notice").is_some());
+    assert!(cx.debug_bounds("sign-in-handoff").is_none());
+}
+
+/// The reader signed in some other way and sent the message again: the agent works, and the notice about the sign-in
+/// that did not finish goes.
+#[gpui_kit::test]
+fn a_turn_that_works_takes_the_failed_sign_in_notice_away(cx: &mut TestAppContext) {
+    let failing = atelier_project::Command::new("sh").args(["-c", "exit 1"]);
+    let (session, _, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in(), answer("hello")], Some(failing));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    cx.run_until_parked();
+    assert!(cx.update(|_, cx| session.read(cx).sign_in_state()).is_some());
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("again".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).sign_in_state()), None);
 }

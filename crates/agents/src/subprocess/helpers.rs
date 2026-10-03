@@ -61,3 +61,26 @@ pub fn output(project: &dyn Project, command: &Command) -> Result<String, Sessio
     let _ = control.wait();
     Ok(text)
 }
+
+/// Runs `command` to the end, for a command that does its work by running (a sign-in): done when it exits with code 0,
+/// else the reason, in words for the reader: the program is missing, or how it ended and the last thing it wrote to stderr.
+pub fn run(project: &dyn Project, command: &Command) -> Result<(), String> {
+    let Process { stdin, stdout, mut control } = start(project, command).map_err(|error| match error {
+        SessionError::Start(why) => why,
+        other => other.to_string(),
+    })?;
+    drop(stdin);
+    lines(stdout).for_each(drop);
+    let code = control.wait().map_err(|error| error.to_string())?;
+    match code {
+        Some(0) => Ok(()),
+        _ => {
+            let how = code.map_or_else(|| "it was stopped by a signal".to_string(), |code| format!("it exited with code {code}"));
+            let tail = stderr_tail(&control.stderr());
+            Err(match tail.lines().rev().find(|line| !line.trim().is_empty()).map(str::trim) {
+                Some(line) => format!("{how}: {line}"),
+                None => how,
+            })
+        }
+    }
+}

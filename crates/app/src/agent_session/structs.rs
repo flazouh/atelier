@@ -61,6 +61,9 @@ pub struct AgentSession {
     titled: bool,
     _titling: Task<()>,
     pub(super) limit_clock: Task<()>,
+    /// Where the sign-in of its agent stands.
+    pub(super) signing_in: super::types::SignIn,
+    pub(super) _signing: Task<()>,
     /// The reader is looking at it: a turn that ends is seen.
     pub seen: bool,
     pub model: Option<String>,
@@ -299,6 +302,8 @@ impl AgentSession {
             titled: false,
             _titling: Task::ready(()),
             limit_clock: Task::ready(()),
+            signing_in: super::types::SignIn::Idle,
+            _signing: Task::ready(()),
             seen: false,
             model: None,
             mode: None,
@@ -441,6 +446,7 @@ impl AgentSession {
         match name {
             "files" if super::composer_lists::atelier_runs(name) => cx.emit(SessionEvent::ShowFiles),
             "tasks" if super::composer_lists::atelier_runs(name) => cx.emit(SessionEvent::ShowTasks),
+            "login" if super::composer_lists::atelier_runs(name) => self.sign_in(cx),
             "review" if super::composer_lists::atelier_runs(name) => cx.emit(SessionEvent::Review { turn: None, path: None }),
             _ => self.send(super::composer_lists::agent_text(name, args), cx),
         }
@@ -578,6 +584,7 @@ impl AgentSession {
                 Event::Limit(_) => self.watch_limit(cx),
                 Event::TurnEnded(end) => {
                     let ok = matches!(end.outcome, atelier_agents::session::TurnOutcome::Completed);
+                    self.turn_ran(ok);
                     cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::TurnEnded { ok }));
                 }
                 Event::Ended(end) => {
