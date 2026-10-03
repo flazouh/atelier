@@ -4,7 +4,7 @@ use serde_json::json;
 
 use super::{fixture, replay, replay_with};
 use crate::{
-    claude_code::Mapper,
+    claude_code::{ClaudeLineMapper, LineMapper},
     session::{
         ChoiceKind, EndReason, Event, RequestId, ToolId, ToolKind, ToolOutput, TodoStatus, TurnOutcome,
     },
@@ -51,7 +51,7 @@ fn thinking_streams_from_its_start_and_ends_with_its_time() {
 
 #[test]
 fn a_thinking_block_reports_the_time_between_its_start_and_its_stop() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let start = Instant::now();
     let start_line = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}}"#;
     let stop_line = r#"{"type":"stream_event","event":{"type":"content_block_stop","index":0}}"#;
@@ -80,7 +80,7 @@ fn a_tool_call_starts_gets_its_input_and_finishes_with_its_output() {
 
 #[test]
 fn a_permission_request_names_the_tool_its_file_and_its_choices() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let events = replay_with(&mut mapper, &fixture("permission_allow"));
     let request = events
         .iter()
@@ -96,7 +96,7 @@ fn a_permission_request_names_the_tool_its_file_and_its_choices() {
 
 #[test]
 fn an_answer_is_written_once_and_only_for_a_request_that_waits() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let events = replay_with(&mut mapper, &fixture("permission_allow"));
     let Some(Event::Permission(request)) = events.iter().find(|e| matches!(e, Event::Permission(_))) else {
         panic!("no request")
@@ -109,7 +109,7 @@ fn an_answer_is_written_once_and_only_for_a_request_that_waits() {
 
 #[test]
 fn allow_and_deny_answer_with_the_input_and_a_message() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let ask = r#"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"ls"},"tool_use_id":"t1"}}"#;
     let events = mapper.line(ask, Instant::now());
     let Event::Permission(request) = &events[0] else { panic!("no request") };
@@ -130,7 +130,7 @@ fn allow_and_deny_answer_with_the_input_and_a_message() {
 
 #[test]
 fn always_allow_is_offered_only_with_rules_and_sends_them_back() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let rules = json!([{"type": "addRules", "rules": [{"toolName": "Bash"}], "behavior": "allow"}]);
     let ask = json!({"type": "control_request", "request_id": "r1", "request": {
         "subtype": "can_use_tool", "tool_name": "Bash", "input": {}, "permission_suggestions": rules}});
@@ -176,7 +176,7 @@ fn the_task_tools_build_the_todo_list() {
 
 #[test]
 fn todo_write_replaces_the_whole_list() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let call = json!({"type": "assistant", "message": {"id": "m", "content": [{"type": "tool_use", "id": "t", "name": "TodoWrite",
         "input": {"todos": [{"content": "a", "status": "completed"}, {"content": "b", "status": "pending"}]}}]}});
     let events = mapper.line(&call.to_string(), Instant::now());
@@ -219,7 +219,7 @@ fn a_saved_output_passes_on_its_preview_and_its_path() {
 
 #[test]
 fn a_ten_megabyte_result_keeps_a_head_and_says_it_was_cut() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let call = json!({"type": "assistant", "message": {"id": "m", "content": [{"type": "tool_use", "id": "t", "name": "Read", "input": {}}]}});
     mapper.line(&call.to_string(), Instant::now());
     let big = "é".repeat(5 * 1024 * 1024);
@@ -232,7 +232,7 @@ fn a_ten_megabyte_result_keeps_a_head_and_says_it_was_cut() {
 
 #[test]
 fn a_line_that_is_not_json_or_is_cut_short_is_a_warning_and_the_stream_goes_on() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     for bad in ["not json at all", "{", r#"{"type":"assistant","message":"#, r#"{"type":"assistant","message":5}"#] {
         let events = mapper.line(bad, Instant::now());
         assert!(matches!(events.as_slice(), [Event::Warning(_)]), "{bad}: {events:?}");
@@ -243,7 +243,7 @@ fn a_line_that_is_not_json_or_is_cut_short_is_a_warning_and_the_stream_goes_on()
 
 #[test]
 fn blank_lines_and_kinds_atelier_does_not_know_give_nothing() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     for line in ["", "   ", r#"{"type":"rate_limit_event"}"#, r#"{"type":"something_new","x":1}"#, r#"{"type":"system","subtype":"status"}"#] {
         assert!(mapper.line(line, Instant::now()).is_empty(), "{line}");
     }
@@ -251,7 +251,7 @@ fn blank_lines_and_kinds_atelier_does_not_know_give_nothing() {
 
 #[test]
 fn a_crash_mid_turn_fails_the_open_tool_and_the_turn_then_ends_the_session() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     let start = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"t9","name":"Bash","input":{}}}}"#;
     assert!(matches!(mapper.line(start, Instant::now()).as_slice(), [Event::ToolStarted(_)]));
@@ -267,19 +267,19 @@ fn a_crash_mid_turn_fails_the_open_tool_and_the_turn_then_ends_the_session() {
 
 #[test]
 fn a_crash_with_no_turn_open_only_ends_the_session() {
-    assert_eq!(Mapper::new().exited(None, ""), [Event::Ended(EndReason::Exited { code: None, stderr: String::new() })]);
+    assert_eq!(ClaudeLineMapper::new().exited(None, ""), [Event::Ended(EndReason::Exited { code: None, stderr: String::new() })]);
 }
 
 #[test]
 fn a_session_atelier_closed_ends_closed_and_fails_nothing() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     assert_eq!(mapper.closed(), [Event::Ended(EndReason::Closed)]);
 }
 
 #[test]
 fn a_session_ends_once() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     assert_eq!(mapper.exited(Some(0), "").len(), 1);
     assert!(mapper.closed().is_empty());
     assert!(mapper.exited(None, "").is_empty());
@@ -287,7 +287,7 @@ fn a_session_ends_once() {
 
 #[test]
 fn a_permission_question_left_open_by_a_crash_is_cancelled() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let ask = r#"{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{}}}"#;
     mapper.line(ask, Instant::now());
     let events = mapper.exited(Some(1), "");
@@ -357,7 +357,7 @@ fn the_foreground_subagent_run_folds_with_its_call_inside_the_subagent() {
 
 #[test]
 fn an_early_exit_carries_the_last_lines_of_stderr_and_puts_the_last_one_in_the_failure() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     let stderr = "starting\nwarming up\nError: no such model\n\n";
     let events = mapper.exited(Some(3), stderr);
@@ -372,7 +372,7 @@ fn an_early_exit_carries_the_last_lines_of_stderr_and_puts_the_last_one_in_the_f
 #[test]
 fn only_the_last_twenty_lines_of_a_long_stderr_are_kept() {
     let stderr: String = (1..=50).map(|i| format!("line {i}\n")).collect();
-    let events = Mapper::new().exited(Some(1), &stderr);
+    let events = ClaudeLineMapper::new().exited(Some(1), &stderr);
     let Some(Event::Ended(EndReason::Exited { stderr: kept, .. })) = events.last() else { panic!() };
     let lines: Vec<&str> = kept.lines().collect();
     assert_eq!((lines.len(), lines[0], lines[19]), (20, "line 31", "line 50"));
@@ -380,7 +380,7 @@ fn only_the_last_twenty_lines_of_a_long_stderr_are_kept() {
 
 #[test]
 fn a_signal_with_no_stderr_says_only_that() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     let events = mapper.exited(None, "  \n");
     assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("the agent was stopped by a signal".into()))));
@@ -409,7 +409,7 @@ fn a_background_shell_command_is_a_running_shell_call_not_a_subagent() {
 
 #[test]
 fn a_background_command_ends_as_failed_when_the_process_dies_first() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let now = Instant::now();
     let lines = fixture("background_bash");
     let up_to_start: Vec<&str> = lines.lines().take_while(|l| !l.contains("task_notification")).collect();
@@ -471,7 +471,7 @@ fn history_does_not_end_a_subagent_twice() {
 /// The agent's own commands come with its init, so the composer can offer them after `/`.
 #[test]
 fn the_init_lists_the_agents_own_commands() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let events = mapper.line(
         r#"{"type":"system","subtype":"init","session_id":"s","slash_commands":["compact","review","goal"]}"#,
         Instant::now(),
@@ -508,7 +508,7 @@ fn a_recorded_turn_tells_how_full_the_context_is_and_then_its_window() {
 
 #[test]
 fn the_context_follows_the_latest_main_reply_and_the_window_its_model() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let now = Instant::now();
     let mut events = mapper.line(&reply("opus", 100, 1_000, None), now);
     events.extend(mapper.line(&reply("opus", 100, 1_000, None), now));
@@ -522,10 +522,10 @@ fn the_context_follows_the_latest_main_reply_and_the_window_its_model() {
 #[test]
 fn a_window_one_session_learned_shows_at_once_in_the_next() {
     let now = Instant::now();
-    let mut first = Mapper::new();
+    let mut first = ClaudeLineMapper::new();
     first.line(&reply("model-learned-once", 100, 0, None), now);
     first.line(&result_with_windows(&[("model-learned-once", 400_000)]), now);
-    let told = contexts(&Mapper::new().line(&reply("model-learned-once", 300, 0, None), now));
+    let told = contexts(&ClaudeLineMapper::new().line(&reply("model-learned-once", 300, 0, None), now));
     assert_eq!(told.iter().map(|c| (c.used, c.window)).collect::<Vec<_>>(), [(310, Some(400_000))]);
 }
 
@@ -536,7 +536,7 @@ fn rate_limit(status: &str, kind: &str) -> String {
 #[test]
 fn the_usage_limit_is_told_when_it_changes() {
     use crate::session::{Limit, LimitState, LimitWindow};
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let now = Instant::now();
     let mut events = mapper.line(&rate_limit("allowed_warning", "seven_day_opus"), now);
     events.extend(mapper.line(&rate_limit("rejected", "five_hour"), now));
@@ -563,7 +563,7 @@ fn ends_turn(events: &[Event]) -> bool {
 
 #[test]
 fn a_message_claude_runs_after_the_turn_keeps_the_turn_going_until_its_own_result() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     mapper.user_sent("m2".into());
     assert!(!ends_turn(&mapper.line(&result_taking(&["m1"]), Instant::now())));
@@ -572,7 +572,7 @@ fn a_message_claude_runs_after_the_turn_keeps_the_turn_going_until_its_own_resul
 
 #[test]
 fn a_message_folded_into_the_turn_ends_it_with_the_one_result() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     mapper.user_sent("m2".into());
     assert!(ends_turn(&mapper.line(&result_taking(&["m1", "m2"]), Instant::now())));
@@ -580,7 +580,7 @@ fn a_message_folded_into_the_turn_ends_it_with_the_one_result() {
 
 #[test]
 fn a_result_that_names_no_messages_took_them_all() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     mapper.user_sent("m2".into());
     let result = json!({"type": "result", "subtype": "success", "result": "ok"}).to_string();
@@ -589,7 +589,7 @@ fn a_result_that_names_no_messages_took_them_all() {
 
 #[test]
 fn a_stop_ends_the_turn_even_with_messages_waiting() {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     mapper.user_sent("m2".into());
     let aborted = json!({"type": "result", "subtype": "error_during_execution", "is_error": true, "terminal_reason": "aborted_streaming", "user_message_uuids": ["m1"]});
@@ -601,7 +601,7 @@ fn a_stop_ends_the_turn_even_with_messages_waiting() {
 #[test]
 fn a_line_claude_wrote_itself_is_not_shown_as_the_user_speaking() {
     let nudge = json!({"type": "user", "isSynthetic": true, "message": {"role": "user", "content": [{"type": "text", "text": "[Your previous response had no visible output]"}]}});
-    assert!(Mapper::new().line(&nudge.to_string(), Instant::now()).is_empty());
+    assert!(ClaudeLineMapper::new().line(&nudge.to_string(), Instant::now()).is_empty());
 }
 
 #[test]

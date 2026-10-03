@@ -4,7 +4,7 @@
 use std::time::{Duration, Instant};
 
 use atelier_agents::{
-    claude_code::Mapper,
+    claude_code::{ClaudeLineMapper, LineMapper},
     session::{BlockId, Event, EventQueue},
 };
 
@@ -46,7 +46,7 @@ fn a_ten_megabyte_transcript_parses_in_under_a_quarter_second() {
     let lines = text.lines().count();
     let mut events = 0;
     let (median, p95) = measure(|| {
-        let mut mapper = Mapper::new();
+        let mut mapper = ClaudeLineMapper::new();
         let now = Instant::now();
         events = text.lines().map(|line| mapper.line(line, now).len()).sum::<usize>();
     });
@@ -64,7 +64,7 @@ fn a_ten_megabyte_transcript_parses_in_under_a_quarter_second() {
 fn one_streamed_text_line_maps_in_under_ten_microseconds() {
     let line = r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"a few words of streamed text"}},"session_id":"s","parent_tool_use_id":null,"uuid":"u"}"#;
     let start_line = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}},"session_id":"s"}"#;
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let now = Instant::now();
     mapper.line(start_line, now);
     const LINES: usize = 20_000;

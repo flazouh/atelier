@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use atelier_project::Project;
 
-pub use map::Mapper;
+pub use map::{ClaudeLineMapper, LineMapper};
 pub use store::history;
 
 use crate::{

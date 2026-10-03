@@ -1,9 +1,11 @@
 //! `claude`'s lines to atelier's events. The mapper keeps what one session needs between lines: which
-//! blocks stream, which tools run, the todo list, the questions waiting for an answer. It reads no
-//! clock and touches no process: the caller passes the time with each line.
+//! blocks stream, which tools run, the todo list, the questions waiting for an answer.
 
-mod helpers;
+mod consts;
+mod enums;
+mod impls;
 mod structs;
-mod types;
+mod traits;
 
-pub use structs::Mapper;
+pub use structs::ClaudeLineMapper;
+pub use traits::LineMapper;

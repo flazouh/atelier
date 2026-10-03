@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use super::{fixture, replay};
 use crate::{
-    claude_code::{Mapper, tools::file_in_partial_input},
+    claude_code::{ClaudeLineMapper, LineMapper, tools::file_in_partial_input},
     session::{Conversation, Event, ToolKind},
 };
 
@@ -48,7 +48,7 @@ fn a_captured_write_names_its_file_before_the_whole_input_arrives() {
 #[test]
 fn the_conversation_shows_the_file_from_the_target() {
     let mut conversation = Conversation::new();
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let start = Instant::now();
     for line in fixture("permission_allow").lines() {
         for event in mapper.line(line, start) {

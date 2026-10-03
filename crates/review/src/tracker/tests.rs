@@ -2,7 +2,7 @@
 use std::{fs, path::Path, process::Command, sync::Arc};
 
 use atelier_agents::{
-    claude_code::Mapper,
+    claude_code::{ClaudeLineMapper, LineMapper},
     session::{Event, PermissionRequest, ToolCall, ToolId, ToolKind, ToolStatus},
 };
 use atelier_project::LocalProject;
@@ -396,7 +396,7 @@ fn the_files_come_sorted_by_path() {
 fn captured(name: &str, root: &Path) -> Vec<Event> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../agents/tests/fixtures/claude_code").join(format!("{name}.jsonl"));
     let text = fs::read_to_string(path).unwrap();
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let now = std::time::Instant::now();
     let root = root.to_string_lossy().to_string();
     text.lines()

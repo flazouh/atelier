@@ -5,7 +5,7 @@ use std::{
 
 use crate::session::Event;
 
-use super::Mapper;
+use super::{ClaudeLineMapper, LineMapper};
 
 mod accounts;
 mod control;
@@ -24,10 +24,10 @@ fn fixture(name: &str) -> String {
 
 /// The events of a captured run, each line one millisecond after the last.
 fn replay(name: &str) -> Vec<Event> {
-    replay_with(&mut Mapper::new(), &fixture(name))
+    replay_with(&mut ClaudeLineMapper::new(), &fixture(name))
 }
 
-fn replay_with(mapper: &mut Mapper, text: &str) -> Vec<Event> {
+fn replay_with(mapper: &mut ClaudeLineMapper, text: &str) -> Vec<Event> {
     let start = Instant::now();
     text.lines()
         .enumerate()

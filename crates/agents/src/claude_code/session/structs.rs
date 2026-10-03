@@ -6,7 +6,7 @@ use std::{
 
 use atelier_project::{Control, Process};
 
-use super::super::{control, map::Mapper};
+use super::super::{control, map::{ClaudeLineMapper, LineMapper}};
 use crate::{
     session::{Command, EventSink, Session, SessionError},
     subprocess,
@@ -15,7 +15,7 @@ use super::helpers::{lock, write_lines};
 
 pub(in super::super) struct ClaudeSession {
     pub(super) lines: Option<mpsc::Sender<String>>,
-    mapper: Arc<Mutex<Mapper>>,
+    mapper: Arc<Mutex<dyn LineMapper + Send>>,
     control: Arc<Mutex<Box<dyn Control>>>,
     closing: Arc<AtomicBool>,
     sink: EventSink,
@@ -26,7 +26,7 @@ pub(in super::super) struct ClaudeSession {
 impl ClaudeSession {
     pub(in super::super) fn run(process: Process, sink: EventSink) -> Self {
         let Process { stdin, stdout, control } = process;
-        let mapper = Arc::new(Mutex::new(Mapper::new()));
+        let mapper = Arc::new(Mutex::new(ClaudeLineMapper::new()));
         let control = Arc::new(Mutex::new(control));
         let closing = Arc::new(AtomicBool::new(false));
 

@@ -3,7 +3,7 @@ use std::time::Instant;
 use atelier_project::{Command, Project};
 use serde_json::Value;
 
-use super::super::map::Mapper;
+use super::super::map::{ClaudeLineMapper, LineMapper};
 use crate::{
     session::{Event, SessionError, SessionId, SessionSummary},
     subprocess,
@@ -118,7 +118,7 @@ pub(in super::super) fn read_history(project: &dyn Project, session: &SessionId)
 /// A transcript as events, as if the session had just run. Nothing streams, so text comes whole and
 /// thinking has no time.
 pub fn history(transcript: &str) -> Vec<Event> {
-    let mut mapper = Mapper::new();
+    let mut mapper = ClaudeLineMapper::new();
     let now = Instant::now();
     let mut events: Vec<Event> = transcript.lines().flat_map(|line| mapper.line(line, now)).collect();
     events.extend(mapper.end_of_history());

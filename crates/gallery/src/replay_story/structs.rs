@@ -10,7 +10,7 @@ use gpui_kit::{
 };
 use atelier_agents::{
     claude,
-    claude_code::Mapper,
+    claude_code::{ClaudeLineMapper, LineMapper},
     session::{Answer, ChoiceKind, Conversation, EventQueue, Item, PermissionRequest, SubagentStatus, TodoStatus},
 };
 
@@ -25,7 +25,7 @@ pub struct ReplayStory {
     asking_since: Option<Instant>,
     next: usize,
     per_frame: usize,
-    pub(super) mapper: Mapper,
+    pub(super) mapper: ClaudeLineMapper,
     pub(super) queue: EventQueue,
     pub(super) conversation: Conversation,
     page: ScrollHandle,
@@ -38,8 +38,8 @@ impl ReplayStory {
         let run = RUNS.iter().find(|(name, ..)| *name == wanted).unwrap_or(&RUNS[7]);
         let mut conversation = Conversation::new();
         conversation.user_sent("Replay of a captured run");
-        let mut mapper = Mapper::new();
-        mapper.user_sent();
+        let mut mapper = ClaudeLineMapper::new();
+        mapper.user_sent("replay".into());
         Self {
             lines: run.1.lines().collect(),
             decision: run.2,
