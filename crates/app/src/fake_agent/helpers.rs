@@ -94,6 +94,8 @@ pub fn named_agent(name: &'static str) -> atelier_agents::registry::Agent {
     let mut agent = atelier_agents::registry::agents().remove(0);
     agent.backend = Arc::new(FakeBackend(Arc::new(Fake { named: Some(name), ..Fake::default() })));
     agent.name = name;
+    // No mark, so its rows lead with its monogram.
+    agent.mark = None;
     agent
 }
 

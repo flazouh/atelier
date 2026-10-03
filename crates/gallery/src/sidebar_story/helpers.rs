@@ -12,19 +12,22 @@ pub(super) fn session(id: &str, title: &str, look: &AgentLook, status: SessionSt
 /// Where a session can be handed off to, as the app gives it: Claude Code opens its accounts and OpenRouter, the
 /// other agents hand off at once.
 pub(super) fn handoff_targets() -> Vec<atelier_ui::menu::Branch> {
-    use atelier_ui::menu::Branch;
+    use atelier_agents::{coding_agents::CodingAgent, labs::Lab};
+    use atelier_ui::menu::{Branch, Lead};
+    let anthropic = || Lead::of(Lab::Anthropic.mark());
     vec![
         Branch::with(
             "claude-code",
             "Claude Code",
             vec![
-                Branch::leaf("claude-code/account:default", "Max"),
-                Branch::leaf("claude-code/account:work", "Max · work"),
-                Branch::leaf("claude-code/openrouter", "OpenRouter"),
+                Branch::leaf("claude-code/account:default", "Max").led(anthropic()),
+                Branch::leaf("claude-code/account:work", "Max · work").led(anthropic()),
+                Branch::leaf("claude-code/openrouter", "OpenRouter").led(Lead::of(Lab::OpenRouter.mark())),
             ],
-        ),
-        Branch::leaf("cursor", "Cursor"),
-        Branch::leaf("codex", "Codex"),
+        )
+        .led(Lead::of(CodingAgent::ClaudeCode.mark())),
+        Branch::leaf("cursor", "Cursor").led(Lead::of(CodingAgent::Cursor.mark())),
+        Branch::leaf("codex", "Codex").led(Lead::of(CodingAgent::Codex.mark())),
     ]
 }
 

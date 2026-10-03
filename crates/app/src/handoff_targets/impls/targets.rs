@@ -29,5 +29,5 @@ fn choices_of(agent: &Agent, project: &dyn Project, key_kept: bool) -> AgentChoi
     if runs_on_providers && key_kept {
         choices.push(Choice::OpenRouter);
     }
-    AgentChoices { backend: agent.backend.name().into(), name: agent.name.into(), choices, accounts }
+    AgentChoices { backend: agent.backend.name().into(), name: agent.name.into(), mark: agent.mark.clone(), choices, accounts }
 }

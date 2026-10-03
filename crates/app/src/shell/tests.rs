@@ -407,6 +407,7 @@ fn a_reached_limit_offers_a_handoff_menu_of_the_agents(cx: &mut TestAppContext) 
     let button = cx.debug_bounds("limit-handoff").expect("with its button");
     cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
+    assert!(cx.debug_bounds("menu-lead-beta").is_some(), "each agent leads with its mark or monogram");
     let beta = cx.debug_bounds("branch-beta").expect("the button opens the agents");
     cx.simulate_click(beta.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);

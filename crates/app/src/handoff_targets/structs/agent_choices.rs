@@ -1,4 +1,5 @@
 use atelier_agents::session::Account;
+use atelier_ui::BrandMark;
 
 use crate::providers::Choice;
 
@@ -9,6 +10,8 @@ pub struct AgentChoices {
     pub backend: String,
     /// What a person calls it.
     pub name: String,
+    /// Its mark, or `None` for a monogram.
+    pub mark: Option<BrandMark>,
     pub choices: Vec<Choice>,
     /// The accounts the choices name, for their labels.
     pub accounts: Vec<Account>,
