@@ -46,7 +46,9 @@ errors, the gallery build, and the tests of the patched copies in `vendor`.
   a `<module>/` folder (`lib.rs` at a crate root). The root file holds only its docs, its `mod` lines and its
   `pub use` lines. Inside the folder, each kind has a folder and a file that lists it:
   - `traits/`: one trait per file.
-  - `structs/`: one struct per file, its fields only. Fields the module's `impls/` use are `pub(crate)`.
+  - `structs/`: one struct per file, its fields only. Fields the module's `impls/` use are
+    `pub(in super::super)`: seen by the module and no further. A function two `impls/` files share is
+    `pub(super)`.
   - `enums/`: one enum per file.
   - `impls/`: the functions, one file per struct or enum, named the same, with every `impl` block of that
     type: its own and each `impl Trait for Type`. A type with many functions splits by topic, with the topic
