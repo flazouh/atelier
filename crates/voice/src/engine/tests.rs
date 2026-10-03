@@ -1,4 +1,4 @@
-use super::helpers::{join, pause_end, verdict};
+use super::helpers::{join, pause_end, speech_only, verdict};
 
 const ONE_SECOND: usize = 16_000;
 
@@ -65,4 +65,47 @@ fn stretches_join_into_one_text_and_their_seams_heal() {
     let parts = ["Then add a test for that case.".to_string(), "and one for a blank line.".into(), "".into(), "After that, run it.".into()];
     assert_eq!(join(&parts), "Then add a test for that case, and one for a blank line. After that, run it.");
     assert_eq!(join(&["Is it done?".into(), "and then?".into()]), "Is it done? and then?");
+}
+
+fn seconds(samples: &[f32]) -> f32 {
+    samples.len() as f32 / ONE_SECOND as f32
+}
+
+#[test]
+fn the_quiet_after_speech_is_not_given_to_the_model() {
+    // The model puts a word to a long silence: "Yeah." at the end of a sentence that was finished.
+    let heard = speech_only(&[room(0.5, 0.001), voice(1.5), room(4., 0.001)].concat()).to_vec();
+    let kept = seconds(&heard);
+    assert!((1.5..2.6).contains(&kept), "the speech and a little room around it: {kept}");
+}
+
+#[test]
+fn a_noisy_room_after_speech_is_trimmed_too() {
+    let heard = speech_only(&[room(0.5, 0.004), voice(1.5), room(4., 0.004)].concat()).to_vec();
+    assert!(seconds(&heard) < 2.6, "the room is the room, whatever its level: {}", seconds(&heard));
+}
+
+#[test]
+fn a_room_with_no_speech_gives_the_model_nothing() {
+    assert!(speech_only(&room(4., 0.003)).is_empty());
+    assert!(speech_only(&[0.; 4 * ONE_SECOND]).is_empty());
+}
+
+#[test]
+fn a_click_is_not_speech() {
+    let click = [voice(0.02), room(3.5, 0.001)].concat();
+    assert!(speech_only(&[room(2., 0.001), click].concat()).is_empty());
+}
+
+#[test]
+fn speech_keeps_its_pauses_and_both_ends() {
+    let samples = [room(1., 0.001), voice(1.), room(0.4, 0.001), voice(1.), room(1., 0.001)].concat();
+    let heard = speech_only(&samples);
+    assert!(seconds(heard) > 2.4, "what lies between the first sound and the last stays: {}", seconds(heard));
+    assert!(seconds(heard) < 3.1, "the room around it goes: {}", seconds(heard));
+}
+
+#[test]
+fn speech_with_no_quiet_in_it_is_whole() {
+    assert_eq!(speech_only(&voice(3.)).len(), 3 * ONE_SECOND);
 }

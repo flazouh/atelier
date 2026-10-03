@@ -19,7 +19,7 @@ use crate::{
     kept,
     recognizer::Recognizer,
 };
-use super::helpers::{join, pause_end, verdict};
+use super::helpers::{join, pause_end, speech_only, verdict};
 use super::types::{Command, Event, LEVEL_EVERY, MAX_PRESS, PARTIAL_EVERY, PROGRESS_EVERY, Press, Reading};
 
 pub struct Engine {
@@ -182,7 +182,7 @@ impl Worker {
             .name("atelier-dictation-read".into())
             .spawn(move || {
                 let mut recognizer = recognizer.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                let mut read = |s: &[f32]| recognizer.transcribe(s).unwrap_or_default();
+                let mut read = |s: &[f32]| recognizer.transcribe(speech_only(s)).unwrap_or_default();
                 let going = &samples[from..];
                 let reading = match pause_end(going) {
                     Some(end) => Reading { cut: Some((from + end, read(&going[..end]))), tail: read(&going[end..]) },
@@ -314,7 +314,7 @@ impl Worker {
     fn transcribe_from(&mut self, press: Press, samples: &[f32], cut: usize, mut said: Vec<String>) {
         let Some(recognizer) = self.recognizer.clone() else { return };
         (self.emit)(Event::Transcribing(press));
-        let tail = recognizer.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).transcribe(&samples[cut.min(samples.len())..]);
+        let tail = recognizer.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).transcribe(speech_only(&samples[cut.min(samples.len())..]));
         let words = tail.map(|tail| {
             said.push(tail);
             join(&said)
