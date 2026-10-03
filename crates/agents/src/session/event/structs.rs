@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use super::super::command::PermissionMode;
-use super::types::{ChoiceKind, TodoStatus, ToolKind, ToolStatus, TurnOutcome};
+use super::types::{ChoiceKind, LimitState, LimitWindow, TodoStatus, ToolKind, ToolStatus, TurnOutcome};
 
 text_id!(
     /// A session's id, the one a backend takes back to resume it.
@@ -123,6 +123,15 @@ pub struct Usage {
 pub struct ContextFill {
     pub used: u64,
     pub window: Option<u64>,
+}
+
+/// Where the account stands against its plan's usage limit, as the agent last told it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limit {
+    pub state: LimitState,
+    /// When the limit's window starts again, in seconds since the Unix epoch.
+    pub resets_at: Option<u64>,
+    pub window: Option<LimitWindow>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

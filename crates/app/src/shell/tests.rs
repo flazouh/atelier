@@ -357,6 +357,31 @@ fn continue_with_opens_a_new_session_that_carries_the_old_one_on(cx: &mut TestAp
     assert!(cx.debug_bounds("session-heading").is_some());
 }
 
+/// An account at its usage limit says so over the composer, and its "Continue with…" carries the session on
+/// in a new one.
+#[gpui_kit::test]
+fn a_reached_limit_offers_to_continue_with_another_provider(cx: &mut TestAppContext) {
+    use atelier_agents::session::{Event, Limit, LimitState, LimitWindow};
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    assert!(cx.debug_bounds("limit-notice").is_none(), "no box while there is room");
+    let first = shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).sessions[0].clone());
+    first.update(cx, |s, cx| {
+        s.conversation.apply(&Event::Limit(Limit { state: LimitState::Reached, resets_at: None, window: Some(LimitWindow::FiveHour) }));
+        cx.notify();
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("limit-notice").is_some(), "the box shows");
+
+    let button = cx.debug_bounds("limit-continue").expect("with its button");
+    cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    let continues = shell.read_with(cx, |s, cx| {
+        let p = s.active().unwrap().read(cx);
+        p.sessions.get(1).and_then(|next| next.read(cx).continues().map(|source| source.id.clone()))
+    });
+    assert!(continues.is_some(), "a new session continues the first");
+}
+
 /// Views and commands, part 2: the Sessions view and the Files view, one on screen at a time. The sidebar
 /// holds no tree; the Files view holds the tree and the editor, which shows nothing until a file is open.
 #[gpui_kit::test]

@@ -273,6 +273,15 @@ mod conversation {
     }
 
     #[test]
+    fn a_reached_limit_is_kept_until_it_clears() {
+        let told = |state| Event::Limit(Limit { state, resets_at: Some(10), window: Some(LimitWindow::FiveHour) });
+        let mut conversation = fold(vec![told(LimitState::Reached)]);
+        assert_eq!(conversation.limit().map(|l| l.state), Some(LimitState::Reached));
+        conversation.apply(&told(LimitState::Clear));
+        assert_eq!(conversation.limit(), None);
+    }
+
+    #[test]
     fn the_context_is_the_latest_reading_not_a_sum() {
         let reading = |used, window| Event::Context(ContextFill { used, window });
         let conversation = fold(vec![reading(90_000, None), reading(4_000, Some(200_000))]);

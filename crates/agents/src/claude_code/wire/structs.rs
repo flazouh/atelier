@@ -96,6 +96,23 @@ pub(in super::super) struct RawUsage {
 }
 
 #[derive(Deserialize)]
+pub(in super::super) struct RateLimit {
+    #[serde(default)]
+    pub rate_limit_info: Option<RateLimitInfo>,
+}
+
+/// `status` is `allowed`, `allowed_warning` or `rejected`; `rateLimitType` names the window, such as
+/// `five_hour` or `seven_day`.
+#[derive(Deserialize)]
+pub(in super::super) struct RateLimitInfo {
+    pub status: String,
+    #[serde(rename = "resetsAt")]
+    pub resets_at: Option<u64>,
+    #[serde(rename = "rateLimitType")]
+    pub rate_limit_type: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub(in super::super) struct ControlRequest {
     pub request_id: String,
     pub request: ControlBody,

@@ -11,11 +11,11 @@ use super::super::{
     wire::{Block, CanUseTool, Content, ControlBody, ControlRequest, Delta, Finish, Line, Message, Stream, StreamEvent, System},
 };
 use crate::{
-    session::{BlockId, Choice, ContextFill, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage},
+    session::{BlockId, Choice, ContextFill, Limit, ChoiceId, ChoiceKind, EndReason, Event, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo, TodoStatus, ToolCall, ToolId, ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage},
     subprocess,
 };
 use super::types::{ALLOW, ALLOW_ALWAYS, DENY, Open};
-use super::helpers::{context_tokens, context_window, flatten, known_window, is_agent_task, task_number, todo_status, tool_output};
+use super::helpers::{context_tokens, context_window, flatten, known_window, limit, is_agent_task, task_number, todo_status, tool_output};
 
 /// A question `claude` asked and atelier has not answered.
 struct Asked {
@@ -46,6 +46,7 @@ pub struct Mapper {
     turn_open: bool,
     ended: bool,
     context: ContextFill,
+    limit: Option<Limit>,
     /// The model of the latest main-thread reply, whose window the context fills.
     model: Option<String>,
 }
@@ -84,6 +85,10 @@ impl Mapper {
             Line::ControlCancelRequest { request_id } => {
                 let id = RequestId::new(request_id);
                 if self.asked.remove(&id).is_some() { vec![Event::PermissionCancelled(id)] } else { Vec::new() }
+            }
+            Line::RateLimitEvent(event) => {
+                let Some(told) = event.rate_limit_info.and_then(limit) else { return Vec::new() };
+                if self.limit.replace(told) == Some(told) { Vec::new() } else { vec![Event::Limit(told)] }
             }
             Line::Ignored => Vec::new(),
         }
