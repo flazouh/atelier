@@ -128,10 +128,14 @@ pub struct Shell {
     right_view: Entity<crate::right_pane::RightPane>,
     /// Gives the cached sidebar the time each minute, so a session's age moves on.
     _ages: gpui_kit::Task<()>,
+    /// The numbers of the bar at the foot, and the loops that keep them.
+    pub(super) vitals: Entity<crate::vitals::Vitals>,
+    _vitals: Vec<gpui_kit::Task<()>>,
 }
 
 impl Shell {
     pub fn new(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Self {
+        let (vitals, _vitals) = Self::start_vitals(cx);
         // The zoom the reader left it at.
         atelier_ui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
         // Projects are added from the title bar, beside the switcher.
@@ -191,6 +195,8 @@ impl Shell {
             archived: saved.archived_sessions.iter().cloned().collect(),
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
+            vitals,
+            _vitals,
             _ages: cx.spawn(async move |this, cx| {
                 loop {
                     cx.background_executor().timer(AGE_TICK).await;
@@ -1450,7 +1456,7 @@ impl Shell {
                 .on_click(move |_, window, cx| this.update(cx, |this, cx| this.close_settings(window, cx)))
                 .into_any_element();
         }
-        div().flex().items_center().gap(px(4.)).child(self.sidebar_toggle(cx)).children(self.project_switcher(cx)).into_any_element()
+        self.sidebar_toggle(cx)
     }
 
     /// The sidebar's toggle at the left of the title bar, lit while the sidebar shows.
@@ -1664,6 +1670,12 @@ impl Shell {
 
     /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
     pub(super) fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        // The project switcher heads every sidebar: which project the lens is about.
+        let head = self.project_switcher(cx).map(|switcher| div().flex().flex_none().items_center().px(px(8.)).pt(px(8.)).pb(px(4.)).child(switcher));
+        div().flex().flex_col().size_full().children(head).child(div().flex_1().min_h_0().child(self.sidebar_body(cx)))
+    }
+
+    fn sidebar_body(&self, cx: &mut Context<Self>) -> impl IntoElement {
         // The projects and their sessions, or in the Git view the focused session's changes; the files
         // are the Files view's.
         if self.view.in_code()
@@ -2003,6 +2015,7 @@ impl Shell {
             .child(self.title_bar(cx))
             .children(banner)
             .child(div().flex().flex_1().min_h_0().child(body))
+            .children(self.footer())
             .children((self.settings.is_none() && self.active().is_some()).then(|| self.said.clone()).flatten().map(|words| {
                 // A notice floats over the foot of the window: it is not a bar that takes the room.
                 div()

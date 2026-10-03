@@ -53,12 +53,14 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 
 - The window draws its own title bar area. On macOS the traffic lights sit inset in the page, as in
   Zed and Cursor. On Linux the layout is the same, without them.
-- Top left: the sidebar's toggle (⌘B), drawn as a rail icon, then the project switcher: each open project's badge, with a dot
+- Top left: the sidebar's toggle (⌘B), drawn as a rail icon.
+- Head of the sidebar, in every lens: the project switcher: each open project's badge, with a dot
   while one of its sessions works (accent) or needs the reader (warning), and how many need them. Sessions
   are every project's, so in Sessions the switcher narrows the list and the panels to one project or shows
   "All projects"; in Issues and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
-  A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O).
-  The sidebar's head does not repeat it.
+  A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O). The
+  "+" is as wide as it is tall: a button with only an icon pads to a square in every size. With the sidebar
+  hidden the switcher is hidden with it.
 - Far left: the view rail, three lenses: Sessions, Issues and Code (`crates/app/src/shell/rail.rs`).
   Sessions carries a count of the sessions that need the reader, in every project. A press on another lens
   shows it with the sidebar; a press on the lens in front hides the sidebar, and the next press shows it
@@ -81,7 +83,15 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 - The sidebar and the main areas are cards 2 px apart, like the agent panels.
 - Right: the pull requests, or a task opened from a session.
 - A pane's edge is a handle that shows only as a wash on hover; a drag sizes the pane beside it.
-- Foot: the status line: the project, its branch, and the language server's state.
+- Foot: the status bar (`crates/app/src/vitals/`, drawn by atelier-ui's `StatusBar`), once a project is open. At
+  the left: the processor (the last 24 seconds as bars, and the percent now), memory (used of all, and what atelier
+  itself holds on hover), and the sessions at work and the sessions that wait on the reader, in every project. At
+  the right: each provider's tightest window of its allowance with a bar and a percent; a hover lists the rest and
+  when each resets. Colour is by how much is used: muted, amber from 60%, red from 85%. The machine is sampled each
+  second, the providers each minute (the first after 2 s). A provider that fails keeps its last numbers, dimmed and
+  marked old on hover; one that has never answered (no Codex on this machine) does not show. Where the numbers come
+  from is in `docs/agents.md`, "Usage".
+- The project's status line: the project, its branch, and the language server's state.
 - Keys: GitQuiet's table where a command applies (⌘B the left pane, ⌘⇧B the right pane), ⌘O open
   folder, ⌘S save, ⌘W close tab, ⌘J the bottom panel once there is one. The side panes keep their
   width when one hides; the agent panel takes what is left, within the width rules below.

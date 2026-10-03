@@ -138,6 +138,11 @@ pub struct OpenProject {
 }
 
 impl OpenProject {
+    /// The project's host: where its processes run.
+    pub fn host(&self) -> Arc<dyn Project> {
+        self.project.clone()
+    }
+
     pub fn new(location: Location, project: Arc<dyn Project>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // A remote project's servers run on its host, found by the host's PATH, at the project's root.
         let workers = match project.host() {

@@ -12,6 +12,7 @@ mod activity;
 mod agent_session;
 mod project_icons;
 mod providers;
+mod vitals;
 mod agents_view;
 mod file_glyphs;
 mod dirty;
