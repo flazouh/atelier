@@ -964,14 +964,24 @@ impl OpenProject {
             return;
         }
         let (tx, mut rx) = mpsc::unbounded::<Vec<Change>>();
-        match self.project.watch(Box::new(move |batch| drop(tx.unbounded_send(batch)))) {
-            Ok(watch) => self._watch = Some(watch),
-            Err(error) => {
-                cx.emit(ProjectEvent::Said(format!("Not watching for changes: {error}").into()));
+        let project = self.project.clone();
+        // Over SSH the call returns once the host watches every folder: seconds in a big tree.
+        let started = cx.background_spawn(async move { project.watch(Box::new(move |batch| drop(tx.unbounded_send(batch)))) });
+        self.watching = cx.spawn_in(window, async move |this, cx| {
+            let started = started.await;
+            let watching = this.update(cx, |this, cx| match started {
+                Ok(watch) => {
+                    this._watch = Some(watch);
+                    true
+                }
+                Err(error) => {
+                    cx.emit(ProjectEvent::Said(format!("Not watching for changes: {error}").into()));
+                    false
+                }
+            });
+            if !matches!(watching, Ok(true)) {
                 return;
             }
-        }
-        self.watching = cx.spawn_in(window, async move |this, cx| {
             while let Some(batch) = rx.next().await {
                 _ = this.update_in(cx, |this, window, cx| this.changed(batch, window, cx));
             }
