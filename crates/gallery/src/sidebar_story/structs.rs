@@ -11,7 +11,7 @@ use gpui_kit::{
 
 use super::run::Run;
 use super::types::{BASE, STEP};
-use super::helpers::{big, sample, session};
+use super::helpers::{big, handoff_targets, sample, session};
 
 pub struct SidebarStory {
     pub(super) sidebar: Entity<Sidebar>,
@@ -33,6 +33,9 @@ impl SidebarStory {
         let data = if measuring { big(env("SIDEBAR_PROJECTS", 50), env("SIDEBAR_SESSIONS", 40)) } else { sample(&other) };
         let sidebar = cx.new(|cx| {
             let mut sidebar = Sidebar::new(cx);
+            for project in &data {
+                sidebar.set_handoff(project.id.clone(), handoff_targets(), cx);
+            }
             sidebar.set_projects(data.clone(), BASE, cx);
             if measuring && std::env::var("SIDEBAR_OPEN").is_ok_and(|v| v == "1") {
                 sidebar.open_all_older(cx);

@@ -9,6 +9,25 @@ pub(super) fn session(id: &str, title: &str, look: &AgentLook, status: SessionSt
     SessionData { archived: false, in_panel: false, provider: None, id: id.to_string().into(), title: title.to_string().into(), look: look.clone(), status, active_at: BASE - minutes_ago * 60 }
 }
 
+/// Where a session can be handed off to, as the app gives it: Claude Code opens its accounts and OpenRouter, the
+/// other agents hand off at once.
+pub(super) fn handoff_targets() -> Vec<atelier_ui::menu::Branch> {
+    use atelier_ui::menu::Branch;
+    vec![
+        Branch::with(
+            "claude-code",
+            "Claude Code",
+            vec![
+                Branch::leaf("claude-code/account:default", "Max"),
+                Branch::leaf("claude-code/account:work", "Max · work"),
+                Branch::leaf("claude-code/openrouter", "OpenRouter"),
+            ],
+        ),
+        Branch::leaf("cursor", "Cursor"),
+        Branch::leaf("codex", "Codex"),
+    ]
+}
+
 pub(super) fn sample(other: &AgentLook) -> Vec<ProjectData> {
     let claude = claude::look();
     let atelier = ProjectData {
