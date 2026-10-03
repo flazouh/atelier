@@ -127,3 +127,40 @@ fn a_read_shows_no_file_content_and_only_its_error_when_it_fails() {
     assert!(shows_output(ToolKind::Shell, ToolStatus::Done));
     assert!(shows_output(ToolKind::Search, ToolStatus::Done));
 }
+
+/// An edit's diff shows a few rows that do not scroll; pressing it opens the review on that file.
+#[gpui_kit::test]
+fn pressing_an_edits_diff_opens_the_review_on_its_file(cx: &mut TestAppContext) {
+    use std::{cell::RefCell, rc::Rc};
+    use atelier_agents::session::{Event, FileEdit, ToolCall, ToolId, ToolKind, ToolOutput, ToolStatus};
+    let dir = crate::fake_agent::git_project(&[("a.rs", "one\n")]);
+    let id = ToolId::new("e1");
+    let new = (0..30).map(|n| format!("line {n}")).collect::<Vec<_>>().join("\n");
+    let turn = vec![
+        Event::ToolStarted(ToolCall { id: id.clone(), name: "Edit".into(), kind: ToolKind::Edit, input: serde_json::json!({}), file: None, parent: None, status: ToolStatus::Running }),
+        Event::ToolEdit { id: id.clone(), edit: FileEdit { path: dir.join("a.rs").to_string_lossy().into(), old: String::new(), new } },
+        Event::ToolFinished { id, output: ToolOutput { text: "ok".into(), truncated: false, full_at: None, is_error: false } },
+        crate::fake_agent::ended(),
+    ];
+    let (session, _fake, cx) = crate::fake_agent::start_shown_in(cx, dir, vec![turn]);
+    cx.update(|_, cx| cx.set_global(crate::tool_density::ToolDensity::Detailed));
+    cx.simulate_resize(gpui_kit::size(px(600.), px(900.)));
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let log = heard.clone();
+    cx.update(|_, cx| {
+        cx.subscribe(&session, move |_, event: &crate::agent_session::SessionEvent, _| {
+            if let crate::agent_session::SessionEvent::Review { turn, path } = event {
+                log.borrow_mut().push((*turn, path.clone()));
+            }
+        })
+        .detach()
+    });
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("edit".into(), cx)));
+    cx.run_until_parked();
+    let rows = cx.debug_bounds("diff-rows").expect("the edit shows its rows");
+    assert_eq!(f32::from(rows.size.height), atelier_ui::preview_clamp::PREVIEW_ROWS as f32 * atelier_ui::file_diff::ROW_HEIGHT, "a few rows, not a scroller");
+    assert!(heard.borrow().is_empty());
+    cx.simulate_click(rows.center(), gpui_kit::Modifiers::default());
+    cx.run_until_parked();
+    assert_eq!(heard.borrow().as_slice(), [(None, Some("a.rs".to_string()))]);
+}
