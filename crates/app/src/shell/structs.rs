@@ -108,6 +108,8 @@ pub struct Shell {
     pub(super) session_filter: Option<SharedString>,
     /// The project switcher's menu is open.
     pub(super) switcher_open: bool,
+    /// The add button's menu next to the switcher.
+    pub(super) add_open: bool,
     /// The Changes view's column of diffs, so a press on a file in the sidebar scrolls to it.
     pub(super) changes_scroll: gpui_kit::ScrollHandle,
     /// In a narrow window, the Files view's tree or editor.
@@ -128,7 +130,12 @@ impl Shell {
     pub fn new(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Self {
         // The zoom the reader left it at.
         atelier_ui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
-        let agents_sidebar = cx.new(Sidebar::new);
+        // Projects are added from the title bar, beside the switcher.
+        let agents_sidebar = cx.new(|cx| {
+            let mut sidebar = Sidebar::new(cx);
+            sidebar.set_add_button(false, cx);
+            sidebar
+        });
         agents_sidebar.update(cx, |s, cx| s.set_layout(crate::sidebar_layout::from_settings(saved), cx));
         let panels = cx.new(|cx| {
             let mut panels = AgentPanels::new(cx);
@@ -173,6 +180,7 @@ impl Shell {
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             session_filter: None,
             switcher_open: false,
+            add_open: false,
             changes_scroll: gpui_kit::ScrollHandle::new(),
             archived: saved.archived_sessions.iter().cloned().collect(),
             session_right: None,
@@ -706,7 +714,7 @@ impl Shell {
         cx.notify();
     }
 
-    fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
         let form = cx.new(|cx| SshForm::new(Vec::new(), window, cx));
         // ~/.ssh/config is read off the UI thread; the form fills its hosts in when it has them.
         let reading = cx.background_spawn(async { atelier_remote::ssh::known_hosts() });
@@ -1030,7 +1038,7 @@ impl Shell {
         cx.notify();
     }
 
-    fn open_folder(&mut self, _: &OpenFolder, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn open_folder(&mut self, _: &OpenFolder, window: &mut Window, cx: &mut Context<Self>) {
         let picked = cx.prompt_for_paths(PathPromptOptions { files: false, directories: true, multiple: false, prompt: Some("Open".into()) });
         cx.spawn_in(window, async move |this, cx| {
             let path = match picked.await {
@@ -1817,7 +1825,7 @@ impl Shell {
                 cx.notify();
             }))
             .child(self.view_rail(widths.sidebar.is_some(), cx))
-            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pl(px(8.)).pb(px(8.)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
+            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pb(px(8.)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
             .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, window, cx))))
             .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
