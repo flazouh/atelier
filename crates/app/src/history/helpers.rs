@@ -59,6 +59,11 @@ pub fn show_args(sha: &str) -> Vec<String> {
 /// one, or the old one for a file the commit deleted.
 pub fn split_show(sha: &str, out: &str) -> Shown {
     let (message, patch) = out.split_once(RECORD).unwrap_or((out, ""));
+    Shown { sha: sha.to_string().into(), message: message.trim().to_string().into(), files: split_patch(patch) }
+}
+
+/// Each file's lines in a patch, in its order: what `git diff` or `git show` prints after the message.
+pub fn split_patch(patch: &str) -> Vec<CommitFile> {
     let mut files: Vec<CommitFile> = Vec::new();
     let mut chunk = String::new();
     let mut path: Option<String> = None;
@@ -79,7 +84,23 @@ pub fn split_show(sha: &str, out: &str) -> Shown {
         chunk.push('\n');
     }
     flush(&mut path, &mut chunk);
-    Shown { sha: sha.to_string().into(), message: message.trim().to_string().into(), files }
+    files
+}
+
+/// The tree of a repository with no commit, to diff a first checkout against.
+pub const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+/// The arguments of `git diff` for what the checkout holds that `base` does not, staged or not.
+pub fn diff_args(base: &str) -> Vec<String> {
+    ["diff", "--no-color", "--no-ext-diff", base, "--"].map(String::from).to_vec()
+}
+
+/// The arguments of `git ls-files` for the files git does not track and does not ignore.
+pub const UNTRACKED_ARGS: [&str; 4] = ["ls-files", "--others", "--exclude-standard", "-z"];
+
+/// The arguments of `git diff` for an untracked file, as a file that is all new. It exits 1 when it prints one.
+pub fn new_file_args(path: &str) -> Vec<String> {
+    ["diff", "--no-color", "--no-ext-diff", "--no-index", "--", "/dev/null", path].map(String::from).to_vec()
 }
 
 /// The path in `a/<path> b/<path>`, the rest of a `diff --git` line. Both halves name the same file

@@ -9,11 +9,11 @@ use gpui_kit::prelude::*;
 use gpui_kit::{AnyElement, Context, Entity, FontWeight, SharedString, div};
 
 use super::structs::Shell;
-use crate::history::Read;
+use crate::history::{CommitFile, Read};
 use crate::open_project::OpenProject;
 
 /// A note in the middle of a pane: why there is nothing to show yet.
-fn note(words: impl Into<SharedString>, muted: gpui_kit::Hsla) -> AnyElement {
+pub(super) fn note(words: impl Into<SharedString>, muted: gpui_kit::Hsla) -> AnyElement {
     div()
         .flex()
         .size_full()
@@ -31,6 +31,19 @@ const SHOWN_ROWS: usize = 200;
 
 fn now() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
+}
+
+/// A card for each file's diff, for a column that scrolls. Its rows are plain, all of a file up to a long one:
+/// a list that scrolls inside the card would scroll inside the column.
+pub(super) fn diff_cards<'a>(prefix: &'a str, files: &'a [CommitFile]) -> impl Iterator<Item = AnyElement> + 'a {
+    files.iter().enumerate().map(move |(i, f)| {
+        let diff = FileDiff::new(SharedString::from(format!("{prefix}-{i}")), f.path.clone(), f.lines.clone())
+            .preview_rows(f.lines.len().min(SHOWN_ROWS))
+            .status(FileDiffStatus::Complete)
+            .collapse_on_complete(false);
+        // In a column of a fixed height, a card would shrink to fit; each keeps its own and the column scrolls.
+        div().flex_none().child(diff).into_any_element()
+    })
 }
 
 impl Shell {
@@ -117,16 +130,7 @@ impl Shell {
                     .when(!rest.trim().is_empty(), |d| {
                         d.child(div().pt(px(4.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(rest.trim().to_string()))
                     });
-                // Plain rows, all of a file up to a long one: a list that scrolls inside the card would scroll
-                // inside the commit, which scrolls already.
-                let files = shown.files.iter().enumerate().map(|(i, f)| {
-                    FileDiff::new(SharedString::from(format!("commit-file-{i}")), f.path.clone(), f.lines.clone())
-                        .preview_rows(f.lines.len().min(SHOWN_ROWS))
-                        .status(FileDiffStatus::Complete)
-                        .collapse_on_complete(false)
-                })
-                // In a column of a fixed height, a card would shrink to fit; each keeps its own and the column scrolls.
-                .map(|diff| div().flex_none().child(diff));
+                let files = diff_cards("commit-file", &shown.files);
                 div()
                     .id("history-commit")
                     .debug_selector(|| "history-commit".into())

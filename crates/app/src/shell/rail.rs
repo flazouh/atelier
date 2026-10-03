@@ -1,14 +1,11 @@
 //! The left rail and what its views draw: Tasks shows the board, Sessions the session list and the
 //! panels, Git the focused session's changed files and their review.
 
-use atelier_ui::git_panel::GitPanel;
 use atelier_ui::view_rail::{RailView, ViewRail};
 use atelier_ui::scale::px;
-use atelier_ui::theme::ActiveTheme;
-use atelier_ui::typography::TextSize;
 use atelier_ui::IconName;
 use gpui_kit::prelude::*;
-use gpui_kit::{AnyElement, App, Context, Entity, SharedString, Window, div};
+use gpui_kit::{AnyElement, App, Context, Entity, Window, div};
 
 use super::view::ShellView;
 use super::fit::Fit;
@@ -88,59 +85,6 @@ impl Shell {
         project.update(cx, |p, cx| p.open_review(session, scope, path, window, cx));
         self.narrow = super::fit::Pane::Session;
         cx.notify();
-    }
-
-    /// A press on a file of the Git sidebar: the open review of that session goes to it, else a
-    /// review opens on it.
-    fn open_change(&mut self, path: &SharedString, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((project, session)) = self.focused(cx) else { return };
-        let pane = project.read(cx).review.as_ref().map(|(pane, _)| pane.clone()).filter(|pane| pane.read(cx).session == session);
-        match pane {
-            Some(pane) => pane.update(cx, |pane, cx| pane.open(path, window, cx)),
-            None => self.review(&project, session, Scope::Whole, Some(path), window, cx),
-        }
-    }
-
-    /// The Git view's sidebar: the focused session's repository, branch and changed files.
-    pub(super) fn git_sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
-        let Some((project, session)) = self.focused(cx) else {
-            let Some(project) = self.active() else { return GitPanel::new("git-panel", "").into_any_element() };
-            let p = project.read(cx);
-            return GitPanel::new("git-panel", p.name()).branch(p.git.branch().cloned()).worktrees(p.worktree_rows()).into_any_element();
-        };
-        let p = project.read(cx);
-        let s = session.read(cx);
-        let current = p.review.as_ref().map(|(pane, _)| pane.read(cx)).filter(|pane| pane.session == session).and_then(|pane| pane.files.get(pane.current)).map(|f| SharedString::from(f.review.path.clone()));
-        let this = cx.entity().downgrade();
-        GitPanel::new("git-panel", p.name())
-            .branch(p.git.branch().cloned())
-            .worktrees(p.worktree_rows())
-            .session(Some(s.title.clone()))
-            .files(s.changed_files().to_vec())
-            .current(current)
-            .on_open(move |path, window, cx| {
-                this.update(cx, |this, cx| this.open_change(path, window, cx)).ok();
-            })
-            .into_any_element()
-    }
-
-    /// The Git view's main area: the review, or a word on how to open one.
-    pub(super) fn git_main(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        if let Some((pane, _)) = project.read(cx).review.as_ref() {
-            return div().debug_selector(|| "review-in-place".into()).size_full().pl(px(atelier_ui::panel_layout::GAP)).pr(px(8.)).pb(px(8.)).child(pane.clone()).into_any_element();
-        }
-        let muted = cx.theme().muted_foreground;
-        let empty = div()
-            .debug_selector(|| "git-empty".into())
-            .flex()
-            .size_full()
-            .items_center()
-            .justify_center()
-            .text_size(TextSize::Xs.font_size())
-            .text_color(muted)
-            .child("Press a changed file to review it.")
-            .into_any_element();
-        self.code_card(empty, cx)
     }
 
     /// The Tasks view's main area: the board, loaded on the first look.

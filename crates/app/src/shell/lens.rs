@@ -277,7 +277,7 @@ impl Shell {
         let below = match self.view {
             ShellView::Files => Some(self.files_tree(project, cx)),
             ShellView::History => Some(self.history_list(project, cx)),
-            ShellView::Git => Some(self.git_sidebar(cx)),
+            ShellView::Git => Some(self.changes_list(project, cx)),
             _ => None,
         };
         div()
@@ -356,7 +356,12 @@ impl Shell {
     pub(super) fn show_code(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         self.code_view = view;
         match view {
-            ShellView::Git => self.show_git(window, cx),
+            ShellView::Git => {
+                self.show_git(window, cx);
+                if let Some(project) = self.active().cloned() {
+                    project.update(cx, |p, cx| p.load_uncommitted(cx));
+                }
+            }
             ShellView::Pulls => {
                 self.show_view(view, window, cx);
                 if let Some(project) = self.active().cloned() {

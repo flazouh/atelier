@@ -117,6 +117,10 @@ pub struct OpenProject {
     /// The commit the History view shows in full, by its sha, and what was read of it.
     pub(crate) commit: Option<(SharedString, crate::history::Read<crate::history::Shown>)>,
     reading_commit: Task<()>,
+    /// What the checkout holds that its last commit does not, file by file, for the Changes view; `None`
+    /// until asked.
+    pub(crate) uncommitted: Option<crate::history::Read<Vec<crate::history::CommitFile>>>,
+    reading_uncommitted: Task<()>,
     /// Files being read for a tab, so a second click does not read them twice.
     opening: HashSet<String>,
     /// Where the caret goes in a file still being read, after a jump to it.
@@ -178,6 +182,8 @@ impl OpenProject {
             reading_log: Task::ready(()),
             commit: None,
             reading_commit: Task::ready(()),
+            uncommitted: None,
+            reading_uncommitted: Task::ready(()),
             opening: HashSet::new(),
             caret_at: HashMap::new(),
             _watch: None,
@@ -472,6 +478,55 @@ impl OpenProject {
                 }
             });
         });
+    }
+
+    /// Reads what the checkout holds uncommitted, staged or not, and the files git does not track, off the UI
+    /// thread. What was read before stays shown while it is read again; a new ask drops the one before it.
+    pub fn load_uncommitted(&mut self, cx: &mut Context<Self>) {
+        // An untracked file is read on its own, so a folder of new files stops at this many.
+        const UNTRACKED_SHOWN: usize = 50;
+        let project = self.project.clone();
+        let asked = cx.background_spawn(async move {
+            let run = |args: &[String]| project.git(&args.iter().map(String::as_str).collect::<Vec<_>>());
+            let born = project.git(&["rev-parse", "--verify", "-q", "HEAD"]).is_ok_and(|o| o.ok());
+            let base = if born { "HEAD" } else { crate::history::EMPTY_TREE };
+            let tracked = match run(&crate::history::diff_args(base)) {
+                Ok(out) if out.ok() => out.stdout,
+                Ok(out) => return crate::history::Read::Failed(out.stderr.trim().to_string().into()),
+                Err(error) => return crate::history::Read::Failed(error.to_string().into()),
+            };
+            let mut files = crate::history::split_patch(&tracked);
+            let untracked = project.git(&crate::history::UNTRACKED_ARGS).map(|o| o.stdout).unwrap_or_default();
+            for path in untracked.split('\0').filter(|p| !p.is_empty()).take(UNTRACKED_SHOWN) {
+                // `--no-index` exits 1 when the files differ, which a new file always does.
+                if let Ok(out) = run(&crate::history::new_file_args(path))
+                    && out.code.is_some_and(|c| c <= 1)
+                {
+                    files.extend(crate::history::split_patch(&out.stdout));
+                }
+            }
+            crate::history::Read::Ready(files)
+        });
+        if !matches!(self.uncommitted, Some(crate::history::Read::Ready(_))) {
+            self.uncommitted = Some(crate::history::Read::Reading);
+        }
+        self.reading_uncommitted = cx.spawn(async move |this, cx| {
+            let read = asked.await;
+            _ = this.update(cx, |this, cx| {
+                if this.uncommitted.as_ref() != Some(&read) {
+                    this.uncommitted = Some(read);
+                    cx.notify();
+                }
+            });
+        });
+    }
+
+    /// Closes a session's review, so the Changes view shows the checkout again.
+    pub fn close_review(&mut self, cx: &mut Context<Self>) {
+        if self.review.take().is_some() {
+            cx.emit(ProjectEvent::ReviewClosed);
+            cx.notify();
+        }
     }
 
     /// Reads the commit `sha` in full, off the UI thread, and makes it the one the History view shows.
@@ -965,6 +1020,9 @@ impl OpenProject {
             self.relist(cx);
         }
         self.read_dirty(cx);
+        if self.uncommitted.is_some() {
+            self.load_uncommitted(cx);
+        }
         if let Some((pane, _)) = &self.review {
             let paths = batch.iter().map(|c| c.path.clone()).collect();
             pane.update(cx, |p, cx| p.check_disk(paths, window, cx));
