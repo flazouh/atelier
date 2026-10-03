@@ -4,15 +4,15 @@
 use atelier_agents::session::Event;
 use gpui_kit::{Context, SharedString};
 
-use super::{AgentSession, helpers::completes_turn};
+use super::{AgentSession, chips::Draft, helpers::completes_turn};
 
 impl AgentSession {
-    /// Holds `text` until the running turn completes, or sends it now when no turn runs.
-    pub fn queue(&mut self, text: String, cx: &mut Context<Self>) {
+    /// Holds `draft` until the running turn completes, or sends it now when no turn runs.
+    pub fn queue(&mut self, draft: Draft, cx: &mut Context<Self>) {
         if !self.conversation.working() {
-            return self.send(text, cx);
+            return self.send_draft(draft, cx);
         }
-        self.queued.push(text);
+        self.queued.push(draft);
         self.show_queue(cx);
     }
 
@@ -26,9 +26,9 @@ impl AgentSession {
     /// Sends the queued message at `place` now, into the running turn if one runs.
     pub fn send_queued(&mut self, place: usize, cx: &mut Context<Self>) {
         if place < self.queued.len() {
-            let text = self.queued.remove(place);
+            let draft = self.queued.remove(place);
             self.show_queue(cx);
-            self.send(text, cx);
+            self.send_draft(draft, cx);
         }
     }
 
@@ -51,7 +51,7 @@ impl AgentSession {
     }
 
     fn show_queue(&self, cx: &mut Context<Self>) {
-        let rows: Vec<SharedString> = self.queued.iter().cloned().map(SharedString::from).collect();
+        let rows: Vec<SharedString> = self.queued.iter().map(|d| SharedString::from(super::chips::shown(&d.text, &d.attachments))).collect();
         self.composer.update(cx, |c, cx| c.set_queued(rows, cx));
     }
 }
