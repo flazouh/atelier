@@ -495,7 +495,7 @@ mod handoff {
     }
 
     fn continue_from_source(session: &Entity<AgentSession>, cx: &mut VisualTestContext) {
-        cx.update(|_, cx| session.update(cx, |s, cx| s.continue_from(source(), cx)));
+        cx.update(|_, cx| session.update(cx, |s, cx| s.continue_from(source(), None, cx)));
     }
 
     fn send(session: &Entity<AgentSession>, text: &str, cx: &mut VisualTestContext) {
@@ -591,6 +591,18 @@ mod handoff {
         let last = fake.opened.lock().unwrap().last().cloned().unwrap();
         assert_eq!((last.resume, last.fork), (Some(SessionId::new(SOURCE_ID)), true));
         assert_eq!(sent_texts(&fake.received.lock().unwrap()), vec![NEXT_ASK.to_string()]);
+    }
+
+    #[gpui_kit::test]
+    fn a_handoff_that_names_a_provider_starts_the_agent_on_it(cx: &mut TestAppContext) {
+        set_up_providers(cx);
+        let (session, fake, cx) = start_forking(cx);
+        cx.update(|_, cx| session.update(cx, |s, cx| s.continue_from(source(), Some(Choice::OpenRouter), cx)));
+        cx.run_until_parked();
+
+        assert_eq!(cx.update(|_, cx| session.read(cx).provider.clone()), Some(Choice::OpenRouter));
+        let last = fake.opened.lock().unwrap().last().cloned().unwrap();
+        assert!(matches!(last.provider, Some(atelier_agents::session::Provider::OpenRouter { .. })), "the agent started again on OpenRouter");
     }
 
     #[gpui_kit::test]

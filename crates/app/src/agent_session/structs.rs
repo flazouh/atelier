@@ -134,6 +134,8 @@ pub struct AgentSession {
     /// An OpenRouter key is kept, so OpenRouter is offered.
     pub key_kept: bool,
     _providers: Task<()>,
+    /// Where the project says this session can be handed off to, for the limit notice's menu.
+    pub handoff_branches: Vec<atelier_ui::menu::Branch>,
     /// The name being typed, while the reader renames the session.
     pub renaming: Option<Entity<gpui_kit::component::input::InputState>>,
     _renaming: Option<Subscription>,
@@ -337,6 +339,7 @@ impl AgentSession {
             provider_accounts: Vec::new(),
             key_kept: false,
             _providers: Task::ready(()),
+            handoff_branches: Vec::new(),
             renaming: None,
             _renaming: None,
             thinking_since: HashMap::new(),

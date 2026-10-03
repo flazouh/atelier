@@ -9,6 +9,7 @@
 
 mod chips;
 pub mod front;
+mod handoff;
 mod helpers;
 mod past;
 mod structs;

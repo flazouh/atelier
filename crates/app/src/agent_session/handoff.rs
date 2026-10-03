@@ -37,8 +37,13 @@ pub(super) struct Handoff {
 }
 
 impl AgentSession {
-    /// Continues `source`: its brief goes with the first message.
-    pub fn continue_from(&mut self, source: Source, cx: &mut Context<Self>) {
+    /// Continues `source`: its brief goes with the first message. It runs on `provider` when that is given and the
+    /// agent runs on providers; the agent starts again on it.
+    pub fn continue_from(&mut self, source: Source, provider: Option<crate::providers::Choice>, cx: &mut Context<Self>) {
+        let changes_provider = self.provider.is_some() && provider.is_some() && self.provider != provider;
+        if changes_provider {
+            self.provider = provider;
+        }
         let (project, reading_source) = (self.project.clone(), source.clone());
         let reading = cx.background_spawn(async move { read_brief(&reading_source, project.as_ref()) });
         let _reading = cx.spawn(async move |this, cx| {
@@ -46,7 +51,7 @@ impl AgentSession {
             _ = this.update(cx, |s, cx| s.brief_read(brief, cx));
         });
         self.handoff = Some(Handoff { source, brief: None, waiting: None, _reading });
-        if self.continues_natively() {
+        if changes_provider || self.continues_natively() {
             self.restart(cx);
         }
         cx.notify();

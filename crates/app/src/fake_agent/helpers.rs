@@ -89,6 +89,14 @@ pub fn fake_agent(name: &'static str) -> atelier_agents::registry::Agent {
     agent
 }
 
+/// An agent named `name` whose backend has that name too, so a handoff target can tell it from another.
+pub fn named_agent(name: &'static str) -> atelier_agents::registry::Agent {
+    let mut agent = atelier_agents::registry::agents().remove(0);
+    agent.backend = Arc::new(FakeBackend(Arc::new(Fake { named: Some(name), ..Fake::default() })));
+    agent.name = name;
+    agent
+}
+
 /// An agent named `name` on a fake backend that plays `turns`, one for each message, and that backend.
 pub fn scripted_agent(name: &'static str, turns: Vec<Vec<Event>>) -> (atelier_agents::registry::Agent, Arc<Fake>) {
     let fake = Arc::new(Fake { turns: Mutex::new(turns), ..Fake::default() });

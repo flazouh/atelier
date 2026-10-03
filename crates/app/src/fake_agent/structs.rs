@@ -29,6 +29,8 @@ pub struct Fake {
     pub sinks: Mutex<Vec<EventSink>>,
     /// What it reads back as any past session's history.
     pub history: Vec<Event>,
+    /// The backend's name, when a test needs it told from the others'; "fake" otherwise.
+    pub named: Option<&'static str>,
 }
 
 struct FakeSession {
@@ -56,7 +58,7 @@ pub(super) struct FakeBackend(pub(super) Arc<Fake>);
 
 impl Backend for FakeBackend {
     fn name(&self) -> &str {
-        "fake"
+        self.0.named.unwrap_or("fake")
     }
     fn capabilities(&self) -> Capabilities {
         Capabilities { providers: self.0.providers, forks: self.0.forks, ..Capabilities::default() }
