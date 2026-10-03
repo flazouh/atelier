@@ -1,7 +1,7 @@
 //! A turn: when it opens, which messages it still waits on, and how it ends.
 
 use crate::claude_code::wire::Finish;
-use crate::session::{ContextFill, Event, TurnEnd, TurnOutcome, Usage};
+use crate::session::{ContextFill, Event, LimitState, TurnEnd, TurnOutcome, Usage};
 
 use super::super::structs::ClaudeLineMapper;
 use super::claude_line_mapper_context::context_window;
@@ -27,6 +27,19 @@ impl ClaudeLineMapper {
     }
 
     pub(super) fn finished(&mut self, finish: Finish) -> Vec<Event> {
+        // A reached limit is told by the event already, with its reset time; its words here would be a repeat.
+        let told = self.limit.is_some_and(|limit| limit.state == LimitState::Reached);
+        let mut events = if told {
+            self.held.clear();
+            Vec::new()
+        } else {
+            self.flush_held()
+        };
+        events.extend(self.finished_turn(finish));
+        events
+    }
+
+    fn finished_turn(&mut self, finish: Finish) -> Vec<Event> {
         let interrupted = matches!(finish.terminal_reason.as_deref(), Some("aborted_tools" | "aborted_streaming"));
         let outcome = if interrupted {
             TurnOutcome::Interrupted

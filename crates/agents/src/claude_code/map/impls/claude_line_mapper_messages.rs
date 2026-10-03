@@ -6,7 +6,7 @@ use crate::claude_code::wire::{Block, Content, Message};
 use crate::session::{ContextFill, Event, ToolId};
 
 use super::{
-    super::structs::ClaudeLineMapper,
+    super::{consts::SYNTHETIC_MODEL, structs::ClaudeLineMapper},
     claude_line_mapper_context::{context_tokens, known_window},
 };
 
@@ -23,7 +23,17 @@ impl ClaudeLineMapper {
         }
         let parent = message.parent_tool_use_id.map(ToolId::new);
         let streamed = message.message.id.as_ref().is_some_and(|id| self.streamed.contains(id));
-        let mut events = Vec::new();
+        let synthetic = parent.is_none() && message.message.model.as_deref() == Some(SYNTHETIC_MODEL);
+        if synthetic {
+            if let Content::Blocks(blocks) = message.message.content {
+                self.held.extend(blocks.into_iter().filter_map(|block| match block {
+                    Block::Text { text } if !text.is_empty() => Some(text),
+                    _ => None,
+                }));
+            }
+            return Vec::new();
+        }
+        let mut events = self.flush_held();
         if parent.is_none() {
             if let Some(model) = message.message.model {
                 self.model = Some(model);
@@ -75,6 +85,11 @@ impl ClaudeLineMapper {
                 events
             }
         }
+    }
+
+    /// The held replies `claude` wrote itself, as text, in order.
+    pub(super) fn flush_held(&mut self) -> Vec<Event> {
+        std::mem::take(&mut self.held).into_iter().map(|text| Event::Text { block: self.new_block(), delta: text }).collect()
     }
 
     /// A user message that did not come from atelier: history. `claude` also writes a line for an
