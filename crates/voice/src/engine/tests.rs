@@ -109,3 +109,30 @@ fn speech_keeps_its_pauses_and_both_ends() {
 fn speech_with_no_quiet_in_it_is_whole() {
     assert_eq!(speech_only(&voice(3.)).len(), 3 * ONE_SECOND);
 }
+
+/// A room whose microphone bumps for a tenth of a second now and then, as a real one did: never a word.
+fn bumpy_room(seconds: f32) -> Vec<f32> {
+    let mut room = room(seconds, 0.001);
+    for at in [0.3, 1.1, 2.4] {
+        let from = (at * ONE_SECOND as f32) as usize;
+        for (i, s) in room.iter_mut().skip(from).take(ONE_SECOND / 10).enumerate() {
+            *s = 0.003 * if i % 2 == 0 { 1. } else { -1. };
+        }
+    }
+    room
+}
+
+#[test]
+fn a_bump_in_the_room_is_not_the_first_word() {
+    assert!(speech_only(&bumpy_room(4.)).is_empty());
+    assert_eq!(pause_end(&bumpy_room(4.)), None, "no speech yet, so no stretch to end");
+}
+
+#[test]
+fn the_bumps_before_and_after_speech_are_trimmed() {
+    let samples = [bumpy_room(3.), voice(1.5), bumpy_room(3.)].concat();
+    let heard = speech_only(&samples);
+    assert!(seconds(heard) < 2.4, "{}", seconds(heard));
+    let cut = pause_end(&samples).expect("a cut after the speech");
+    assert!(cut as f32 / ONE_SECOND as f32 > 4.5, "not in the room before it: {cut}");
+}

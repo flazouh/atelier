@@ -18,6 +18,10 @@ pub(super) fn verdict(samples: &[f32], words: String) -> Result<String, &'static
 
 const FRAME: usize = SAMPLE_RATE as usize / 50;
 
+/// A frame is speech only above this, whatever the room. The Mac's microphone in a quiet room reads 0.001 to 0.0025, with bumps
+/// that a line drawn from the room alone (three times the quiet) took for the first word; speech reads 0.03 and more.
+const SPEECH_ABOVE: f32 = 0.006;
+
 /// The loudness of each 20 ms frame, and the level below which a frame is the room's own quiet: three times the quietest tenth of
 /// the frames, kept between a dead-silent line and one a quiet voice stays above.
 fn levels(samples: &[f32]) -> Option<(Vec<f32>, f32)> {
@@ -42,7 +46,7 @@ pub(super) fn pause_end(samples: &[f32]) -> Option<usize> {
                 return Some((i + 1 - pause / 2) * FRAME);
             }
         } else {
-            spoke = true;
+            spoke |= *level >= SPEECH_ABOVE;
             quiet = 0;
         }
     }
@@ -82,7 +86,7 @@ pub(super) fn speech_only(samples: &[f32]) -> &[f32] {
     // Stretches of loud frames: (first, last, how many).
     let mut stretches: Vec<(usize, usize, usize)> = Vec::new();
     for (i, level) in rms.iter().enumerate() {
-        if *level < quiet_below {
+        if *level < quiet_below.max(SPEECH_ABOVE) {
             continue;
         }
         match stretches.last_mut() {
