@@ -26,7 +26,7 @@ use crate::{
     tool_density::{ToolDensity, tool_density},
 };
 use super::types::{ARRIVAL_KEPT, OVERDRAW, SAVE_AFTER, SessionEvent};
-use super::helpers::{completes_turn, is_activity, mode_from, mode_word, now, problem_words};
+use super::helpers::{is_activity, mode_from, mode_word, now, problem_words};
 
 impl EventEmitter<SessionEvent> for AgentSession {}
 
@@ -60,6 +60,7 @@ pub struct AgentSession {
     /// Asked the agent for a short title already, so it is asked once.
     titled: bool,
     _titling: Task<()>,
+    pub(super) limit_clock: Task<()>,
     /// The reader is looking at it: a turn that ends is seen.
     pub seen: bool,
     pub model: Option<String>,
@@ -88,6 +89,8 @@ pub struct AgentSession {
     beginning: Option<Vec<Command>>,
     /// Messages held for after the running turn, oldest first: the next goes when a turn completes.
     pub(super) queued: Vec<String>,
+    /// Whether the running turn is one the reader's message started.
+    pub(super) asked_turn: bool,
     pub list: ListState,
     /// The list's follow of the output and its glides.
     pub glide: crate::glide::Glide,
@@ -293,6 +296,7 @@ impl AgentSession {
             activity_known: resume.is_none(),
             titled: false,
             _titling: Task::ready(()),
+            limit_clock: Task::ready(()),
             seen: false,
             model: None,
             mode: None,
@@ -306,6 +310,7 @@ impl AgentSession {
             waiting_send: None,
             beginning: None,
             queued: Vec::new(),
+            asked_turn: false,
             resumed: resume.is_some(),
             // The list lays out this much past the view each frame: enough that a fast scroll never
             // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
@@ -567,6 +572,7 @@ impl AgentSession {
                         cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::Adopt));
                     }
                 }
+                Event::Limit(_) => self.watch_limit(cx),
                 Event::TurnEnded(end) => {
                     let ok = matches!(end.outcome, atelier_agents::session::TurnOutcome::Completed);
                     cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::TurnEnded { ok }));
@@ -604,9 +610,7 @@ impl AgentSession {
                 self.save_review(cx);
             }
         }
-        if events.iter().any(completes_turn) {
-            self.send_next_queued(cx);
-        }
+        self.after_turn(&events, cx);
         self.refresh_rows();
         let working = self.conversation.working();
         self.composer.update(cx, |c, cx| c.set_running(working, cx));
@@ -698,6 +702,9 @@ impl AgentSession {
             self.title = text.lines().next().unwrap_or("").chars().take(80).collect::<String>().into();
         }
         self.conversation.user_sent(text.clone());
+        self.asked_turn = true;
+        // Running from the moment it goes, not from the agent's first word: ⌘↵ before then queues.
+        self.composer.update(cx, |c, cx| c.set_running(true, cx));
         self.status = status::sent();
         self.problem = None;
         self.stderr = None;

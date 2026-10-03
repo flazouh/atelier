@@ -46,10 +46,17 @@ pub fn limit_words(agent: &str, limit: &Limit, now: u64) -> String {
     }
 }
 
+/// Whether the account is still at `limit` at `now`: past its reset it can work again, though `claude`
+/// tells so only with the next message.
+pub fn still_reached(limit: &Limit, now: u64) -> bool {
+    limit.state == LimitState::Reached && limit.resets_at.is_none_or(|at| now < at)
+}
+
 /// The box over the composer while the session's account is at its limit, or `None`.
 pub fn limit_notice(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> {
     let s = session.read(cx);
-    let limit = s.conversation.limit().filter(|limit| limit.state == LimitState::Reached)?;
+    let now = now();
+    let limit = s.conversation.limit().filter(|limit| still_reached(limit, now))?;
     let theme = cx.theme();
     let owner = session.clone();
     let go_on = Button::new(gpui_kit::ElementId::Name(format!("{}-limit-continue", s.key).into()))
@@ -71,7 +78,7 @@ pub fn limit_notice(session: &Entity<AgentSession>, cx: &App) -> Option<AnyEleme
             .gap(px(8.))
             .text_size(TextSize::Xs.font_size())
             .child(Icon::new(IconName::Schedule).size(px(14.)).color(theme.warning))
-            .child(div().flex_1().min_w_0().whitespace_normal().child(limit_words(s.agent.name, &limit, now())))
+            .child(div().flex_1().min_w_0().whitespace_normal().child(limit_words(s.agent.name, &limit, now)))
             .child(go_on)
             .into_any_element(),
     )

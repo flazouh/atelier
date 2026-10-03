@@ -1,9 +1,10 @@
 //! Messages held for after the running turn. Enter sends into a running turn; ⌘↵ queues instead, and
 //! the next queued message goes when a turn completes. A Stop or a failure keeps the queue as it is.
 
+use atelier_agents::session::Event;
 use gpui_kit::{Context, SharedString};
 
-use super::AgentSession;
+use super::{AgentSession, helpers::completes_turn};
 
 impl AgentSession {
     /// Holds `text` until the running turn completes, or sends it now when no turn runs.
@@ -31,8 +32,19 @@ impl AgentSession {
         }
     }
 
+    /// Once a turn the reader asked for completes, the next queued message goes. A turn the agent starts
+    /// itself, as when a background task it ran finishes, leaves alone the queue a Stop kept.
+    pub(super) fn after_turn(&mut self, events: &[Event], cx: &mut Context<Self>) {
+        if !events.iter().any(|event| matches!(event, Event::TurnEnded(_))) {
+            return;
+        }
+        if std::mem::take(&mut self.asked_turn) && events.iter().any(completes_turn) {
+            self.send_next_queued(cx);
+        }
+    }
+
     /// Sends the oldest queued message, once the turn it waited for is over.
-    pub(super) fn send_next_queued(&mut self, cx: &mut Context<Self>) {
+    fn send_next_queued(&mut self, cx: &mut Context<Self>) {
         if !self.conversation.working() && !self.queued.is_empty() {
             self.send_queued(0, cx);
         }

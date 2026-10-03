@@ -15,6 +15,7 @@ mod composer_lists;
 pub(crate) mod dictation;
 pub mod handoff;
 mod helpers;
+mod limit_clock;
 mod queue;
 mod structs;
 mod types;

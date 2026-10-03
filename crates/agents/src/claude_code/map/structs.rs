@@ -44,6 +44,8 @@ pub struct Mapper {
     creating: HashMap<ToolId, String>,
     asked: HashMap<RequestId, Asked>,
     turn_open: bool,
+    /// The ids of atelier's messages `claude` has not taken into a turn yet.
+    waiting: Vec<String>,
     ended: bool,
     context: ContextFill,
     limit: Option<Limit>,
@@ -56,9 +58,23 @@ impl Mapper {
         Self::default()
     }
 
-    /// atelier sent a user message: a turn is open until `claude` reports its result.
-    pub fn user_sent(&mut self) {
+    /// atelier sent a user message, by its id: a turn is open until `claude` reports the result that
+    /// takes it. A message sent while a turn runs either folds into that turn or runs after it, as a turn
+    /// of its own; atelier shows both as one turn.
+    pub fn user_sent(&mut self, id: String) {
         self.turn_open = true;
+        self.waiting.push(id);
+    }
+
+    /// Whether the turn goes on past a result that `took` these messages: one sent while it ran, and not
+    /// folded into it, runs next as a turn of its own. A result that names none took them all; a stop or
+    /// a failure ends the turn whatever waits.
+    fn goes_on(&mut self, outcome: &TurnOutcome, took: Option<&[String]>) -> bool {
+        match (outcome, took) {
+            (TurnOutcome::Completed, Some(ids)) => self.waiting.retain(|id| !ids.contains(id)),
+            _ => self.waiting.clear(),
+        }
+        !self.waiting.is_empty()
     }
 
     /// Reads one line of `claude`'s stdout. A line that is not JSON gives a warning; a line of a
@@ -312,7 +328,7 @@ impl Mapper {
     }
 
     fn user(&mut self, message: Message) -> Vec<Event> {
-        if message.sidechain || message.meta {
+        if message.sidechain || message.written_by_claude() {
             return Vec::new();
         }
         let mut result = message.tool_use_result;
@@ -353,7 +369,8 @@ impl Mapper {
             let why = if finish.errors.is_empty() { finish.result.clone().unwrap_or(finish.subtype) } else { finish.errors.join("; ") };
             TurnOutcome::Failed(why)
         };
-        self.turn_open = false;
+        let goes_on = self.goes_on(&outcome, finish.user_message_uuids.as_deref());
+        self.turn_open = goes_on;
         self.aborted = interrupted;
         let mut events = self.fail_open_tools("the turn ended before the tool finished", true);
         events.extend(self.asked.drain().map(|(id, _)| Event::PermissionCancelled(id)));
@@ -369,7 +386,9 @@ impl Mapper {
         if let Some(window) = context_window(&finish.model_usage, self.model.as_deref()) {
             events.extend(self.context_changed(ContextFill { window: Some(window), ..self.context }));
         }
-        events.push(Event::TurnEnded(TurnEnd { outcome, summary: finish.result.filter(|text| !text.is_empty()) }));
+        if !goes_on {
+            events.push(Event::TurnEnded(TurnEnd { outcome, summary: finish.result.filter(|text| !text.is_empty()) }));
+        }
         events
     }
 

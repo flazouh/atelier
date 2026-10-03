@@ -20,6 +20,7 @@ pub(in super::super) struct ClaudeSession {
     closing: Arc<AtomicBool>,
     sink: EventSink,
     next_request: AtomicU64,
+    message_ids: control::MessageIds,
 }
 
 impl ClaudeSession {
@@ -52,7 +53,7 @@ impl ClaudeSession {
             events.into_iter().for_each(|event| sink_in(event));
         });
 
-        Self { lines: Some(lines), mapper, control, closing, sink, next_request: AtomicU64::new(1) }
+        Self { lines: Some(lines), mapper, control, closing, sink, next_request: AtomicU64::new(1), message_ids: control::MessageIds::new() }
     }
 
     fn request_id(&self) -> String {
@@ -68,8 +69,9 @@ impl Session for ClaudeSession {
     fn send(&self, command: Command) -> Result<(), SessionError> {
         let line = match command {
             Command::Send { text, attachments } => {
-                lock(&self.mapper).user_sent();
-                control::user_message(&text, &attachments)
+                let id = self.message_ids.next();
+                lock(&self.mapper).user_sent(id.clone());
+                control::user_message(&id, &text, &attachments)
             }
             Command::Answer { request, choice } => {
                 let answer = lock(&self.mapper).answer(&request, &choice);

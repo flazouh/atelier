@@ -59,6 +59,25 @@ pub(in super::super) struct Message {
     pub sidechain: bool,
     #[serde(default, rename = "isMeta")]
     pub meta: bool,
+    /// The live stream's mark for a line `claude` wrote itself, such as its nudge after an empty reply.
+    #[serde(default, rename = "isSynthetic")]
+    pub synthetic: bool,
+    /// Who wrote a user line, in a transcript: the reader, or `claude` itself, as with a background
+    /// task's notice.
+    #[serde(default)]
+    pub origin: Option<Origin>,
+}
+
+#[derive(Deserialize)]
+pub(in super::super) struct Origin {
+    pub kind: String,
+}
+
+impl Message {
+    /// Whether `claude` wrote this user line itself, rather than the reader.
+    pub fn written_by_claude(&self) -> bool {
+        self.meta || self.synthetic || self.origin.as_ref().is_some_and(|origin| origin.kind != "human")
+    }
 }
 
 #[derive(Deserialize)]
@@ -72,6 +91,10 @@ pub(in super::super) struct Finish {
     pub usage: Option<RawUsage>,
     #[serde(default)]
     pub errors: Vec<String>,
+    /// The ids of the messages this turn took, from atelier's and any folded in between tool rounds.
+    /// An older `claude` leaves it out.
+    #[serde(default)]
+    pub user_message_uuids: Option<Vec<String>>,
     /// Each model the turn used, by name.
     #[serde(default, rename = "modelUsage")]
     pub model_usage: HashMap<String, ModelUsage>,
