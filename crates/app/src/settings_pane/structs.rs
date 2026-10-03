@@ -28,6 +28,8 @@ use super::helpers::{colour, font_size_words, rule_switch, save};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AgentRow {
     pub name: SharedString,
+    /// Its mark, or `None` for a monogram.
+    pub mark: Option<atelier_ui::BrandMark>,
     pub models: Vec<SharedString>,
 }
 
@@ -209,7 +211,18 @@ impl Render for SettingsPane {
                 .flex()
                 .gap(px(12.))
                 .py(px(8.))
-                .child(div().w(px(160.)).flex_none().text_size(TextSize::Sm.font_size()).text_color(theme.foreground).child(agent.name.clone()))
+                .child(
+                    div()
+                        .w(px(160.))
+                        .flex_none()
+                        .flex()
+                        .items_center()
+                        .gap(px(8.))
+                        .text_size(TextSize::Sm.font_size())
+                        .text_color(theme.foreground)
+                        .child(atelier_ui::menu::lead_icon(&agent.name, atelier_ui::menu::Lead::of(agent.mark.clone()), 14., &theme))
+                        .child(agent.name.clone()),
+                )
                 .child(div().flex_1().min_w_0().text_size(TextSize::Xs.font_size()).text_color(muted).child(if agent.models.is_empty() {
                     SharedString::from("No model to pick")
                 } else {

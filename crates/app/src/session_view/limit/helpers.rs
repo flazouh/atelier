@@ -1,6 +1,6 @@
 use atelier_agents::session::{Limit, LimitState, LimitWindow};
 use atelier_ui::{
-    menu::{self, Entry, Menu, MenuLook, Origin, Pick, entries_of},
+    menu::{self, Entry, Lead, Menu, MenuLook, Origin, Pick, entries_of, lead_icon},
     popover::{Hang, Popover},
     button::{Button, ButtonVariant},
     icon::{Icon, IconName},
@@ -111,8 +111,10 @@ pub fn limit_notice(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
     let now = now();
     let limit = s.conversation.limit().filter(|limit| still_reached(limit, now))?;
     let words = limit_words(s.agent.name, &limit, now);
+    let (name, mark) = (s.agent.name, s.agent.mark.clone());
     let go_on = handoff_button(session, window, cx);
     let theme = cx.theme();
+    let lead = lead_icon(&name.into(), Lead::of(mark), 14., theme);
     Some(
         div()
             .debug_selector(|| "limit-notice".into())
@@ -127,6 +129,7 @@ pub fn limit_notice(session: &Entity<AgentSession>, window: &mut Window, cx: &mu
             .gap(px(8.))
             .text_size(TextSize::Xs.font_size())
             .child(Icon::new(IconName::Schedule).size(px(14.)).color(theme.warning))
+            .child(lead)
             .child(div().flex_1().min_w_0().whitespace_normal().child(words))
             .child(go_on)
             .into_any_element(),

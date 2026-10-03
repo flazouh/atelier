@@ -32,7 +32,7 @@ fn open<'a>(saved: &atelier_settings::Settings, cx: &'a mut TestAppContext) -> (
     let closed = Rc::new(Cell::new(0));
     let counter = closed.clone();
     let saved = saved.clone();
-    let agents = vec![AgentRow { name: "Claude Code".into(), models: vec!["Opus".into(), "Sonnet".into()] }, AgentRow { name: "atelier".into(), models: Vec::new() }];
+    let agents = vec![AgentRow { name: "Claude Code".into(), mark: None, models: vec!["Opus".into(), "Sonnet".into()] }, AgentRow { name: "atelier".into(), mark: None, models: Vec::new() }];
     let (pane, cx) = cx.add_window_view(move |_, cx| SettingsPane::new(&saved, agents, cx));
     cx.update(|window, cx| {
         let sub = cx.subscribe(&pane, move |_, event: &SettingsEvent, _| {
@@ -180,6 +180,7 @@ fn a_press_on_a_section_shows_it_alone(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("mode-dark").is_some() && cx.debug_bounds("agent-row-0").is_none(), "Appearance first, with no agents");
     click(cx, "section-agents");
     assert!(cx.debug_bounds("agent-row-0").is_some() && cx.debug_bounds("mode-dark").is_none(), "Agents shows its rows and Appearance goes");
+    assert!(cx.debug_bounds("select-monogram-C").is_some(), "an agent with no mark leads with its first letter");
     click(cx, "section-tasks");
     assert!(cx.debug_bounds(super::rule_switch(atelier_tracker::Rule::MergeMovesToDone)).is_some(), "Tasks shows its switches");
     assert!(cx.debug_bounds("design-tabs-0").is_none() && cx.debug_bounds("design-elevation-0").is_none(), "no design preview anywhere");

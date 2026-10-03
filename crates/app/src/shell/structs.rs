@@ -654,6 +654,7 @@ impl Shell {
             .into_iter()
             .map(|agent| crate::settings_pane::AgentRow {
                 name: agent.name.into(),
+                mark: agent.mark.clone(),
                 models: agent.backend.capabilities().models.into_iter().map(|m| SharedString::from(m.label)).collect(),
             })
             .collect();
