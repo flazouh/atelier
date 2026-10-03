@@ -41,7 +41,7 @@ use atelier_ui::scale::px;
 use atelier_tracker::{Entry, Patch, Query, Task, TaskId, Tracker, TrackerResult};
 
 use super::super::map;
-use super::types::{BOARD_LEAST, Load, Mode, Source, TasksEvent};
+use super::types::{BOARD_LEAST, Load, Mode, Scope, Source, TasksEvent};
 
 pub struct TasksPane {
     pub(super) tracker: Result<Arc<dyn Tracker>, SharedString>,
@@ -54,6 +54,7 @@ pub struct TasksPane {
     pub(super) tasks: Vec<TaskData>,
     pub(super) load: Load,
     pub(super) mode: Mode,
+    scope: Scope,
     pub(super) open: Option<SharedString>,
     pub(super) creating: bool,
     said: Option<SharedString>,
@@ -134,6 +135,7 @@ impl TasksPane {
             tasks: Vec::new(),
             load: Load::Loading,
             mode: Mode::List,
+            scope: Scope::All,
             open: None,
             creating: false,
             said: None,
@@ -222,6 +224,40 @@ impl TasksPane {
     /// The board needs room; a narrow pane shows the list whatever was asked.
     pub fn shown_mode(&self) -> Mode {
         if self.width > 0. && self.width < BOARD_LEAST { Mode::List } else { self.mode }
+    }
+
+    pub fn scope(&self) -> &Scope {
+        &self.scope
+    }
+
+    /// Shows the issues of `scope`, in the list and on the board, and closes the issue shown in full.
+    pub fn set_scope(&mut self, scope: Scope, window: &mut Window, cx: &mut Context<Self>) {
+        self.list.update(cx, |list, cx| {
+            let f = scope.filters(list.filters());
+            list.set_filters(f, cx);
+        });
+        self.board.update(cx, |board, cx| {
+            let f = scope.filters(board.filters());
+            board.set_filters(f, cx);
+        });
+        self.scope = scope;
+        self.open = None;
+        self.focus_body(window, cx);
+        cx.notify();
+    }
+
+    /// How many issues `scope` holds.
+    pub fn count(&self, scope: &Scope) -> usize {
+        scope.count(&self.tasks, &self.me)
+    }
+
+    pub fn labels(&self) -> &[Label] {
+        &self.labels
+    }
+
+    /// The agents that hold at least one issue.
+    pub fn agents_at_work(&self) -> Vec<(SharedString, AgentLook)> {
+        self.agents.iter().filter(|(name, _)| self.count(&Scope::Agent(name.clone())) > 0).cloned().collect()
     }
 
     pub fn set_mode(&mut self, mode: Mode, window: &mut Window, cx: &mut Context<Self>) {
@@ -471,14 +507,14 @@ impl Render for TasksPane {
             .gap(px(8.))
             .h(px(44.))
             .px(px(12.))
-            .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child("Tasks"))
+            .child(div().text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child(self.scope.title()))
             .children(switch)
             .child(div().flex_1())
             .when(self.open.is_some(), |d| {
                 let pane = pane.clone();
                 d.child(
                     Button::new("tasks-back")
-                        .label("All tasks")
+                        .label("Back")
                         .variant(ButtonVariant::Ghost)
                         .size(ButtonSize::Sm)
                         .cap("Esc")
@@ -487,14 +523,14 @@ impl Render for TasksPane {
             })
             .child(
                 Button::new("tasks-new")
-                    .label("New task")
+                    .label("New issue")
                     .variant(ButtonVariant::Secondary)
                     .size(ButtonSize::Sm)
                     .cap("c")
                     .on_click(move |_, window, cx| pane.update(cx, |p, cx| p.new_task(window, cx))),
             );
         let body = match (&self.load, &self.open, mode) {
-            (Load::Loading, ..) => div().flex_1().flex().items_center().justify_center().text_color(muted).child("Reading the tasks…").into_any_element(),
+            (Load::Loading, ..) => div().flex_1().flex().items_center().justify_center().text_color(muted).child("Reading the issues…").into_any_element(),
             (Load::Failed(why), ..) => {
                 div().flex_1().flex().items_center().justify_center().px(px(24.)).text_color(muted).child(why.clone()).into_any_element()
             }

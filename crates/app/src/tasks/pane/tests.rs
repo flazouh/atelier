@@ -443,3 +443,31 @@ fn a_property_of_the_task_grows_into_its_picker_and_typing_filters(cx: &mut Test
     settle(&pane, cx);
     assert!(picker_rows(cx) < before, "typing filtered the status picker");
 }
+
+#[gpui_kit::test]
+fn a_scope_narrows_the_list_and_the_board_and_names_the_pane(cx: &mut TestAppContext) {
+    let (pane, _, cx) = open(900., cx);
+    let ids = pane.read_with(cx, |p, _| p.tasks().iter().map(|t| t.id.clone()).collect::<Vec<_>>());
+    pane.update(cx, |p, cx| {
+        p.changed(&ids[..1], &Change::Status(TaskStatus::Backlog), Source::None, cx);
+        p.changed(&ids[1..], &Change::Status(TaskStatus::InProgress), Source::None, cx);
+    });
+    settle(&pane, cx);
+    pane.read_with(cx, |p, _| {
+        assert_eq!([p.count(&Scope::Active), p.count(&Scope::Backlog), p.count(&Scope::All), p.count(&Scope::Mine)], [1, 1, 2, 0]);
+    });
+    pane.update_in(cx, |p, window, cx| p.set_scope(Scope::Backlog, window, cx));
+    settle(&pane, cx);
+    let shown = |pane: &Entity<TasksPane>, cx: &mut VisualTestContext| {
+        pane.read_with(cx, |p, cx| {
+            let list = p.list.read(cx).rows().iter().filter(|r| matches!(r, atelier_ui::task_list_model::Row::Task { .. })).count();
+            let board = p.board.read(cx).columns().iter().map(|c| c.tasks.len()).sum::<usize>();
+            (list, board)
+        })
+    };
+    assert_eq!(shown(&pane, cx), (1, 1), "only the backlog, in the list and on the board");
+    assert_eq!(pane.read_with(cx, |p, _| p.scope().title()), "Backlog");
+    pane.update_in(cx, |p, window, cx| p.set_scope(Scope::All, window, cx));
+    settle(&pane, cx);
+    assert_eq!(shown(&pane, cx), (2, 2));
+}

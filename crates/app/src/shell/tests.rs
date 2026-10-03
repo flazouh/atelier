@@ -878,6 +878,10 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
     press("rail-tasks", cx);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks);
     assert!(cx.debug_bounds("tasks-view").is_some() && cx.debug_bounds("panel-close").is_none(), "the board is in the main area");
+    assert!(cx.debug_bounds("issues-sidebar").is_some(), "the sidebar holds the views over the issues, not the sessions");
+    press("issues-backlog", cx);
+    let scope = shell.read_with(cx, |s, cx| s.active().and_then(|p| p.read(cx).tasks.as_ref()).map(|t| t.pane.read(cx).scope().clone()));
+    assert_eq!(scope, Some(crate::tasks::pane::Scope::Backlog), "a press on a view sets the pane's scope");
     press("rail-tasks", cx);
     assert!(!shell.read_with(cx, |s, _| s.sidebar), "a second press hides the sidebar");
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks, "and the view stays");

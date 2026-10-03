@@ -1660,6 +1660,11 @@ impl Shell {
         {
             return div().size_full().child(self.code_sidebar(&project, cx));
         }
+        if self.view == ShellView::Tasks
+            && let Some(project) = self.active().cloned()
+        {
+            return div().size_full().child(self.issues_sidebar(&project, cx));
+        }
         div()
             .flex()
             .flex_col()
@@ -1830,7 +1835,7 @@ impl Shell {
             let p = project.read(cx);
             match p.front() {
                 crate::open_project::front::Front::Pulls => Some("Pull requests"),
-                crate::open_project::front::Front::Tasks => Some("Tasks"),
+                crate::open_project::front::Front::Tasks => Some("Issues"),
                 crate::open_project::front::Front::Editor => None,
             }
         };

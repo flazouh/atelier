@@ -6,7 +6,7 @@ mod structs;
 mod types;
 
 pub use structs::TasksPane;
-pub use types::TasksEvent;
+pub use types::{Scope, TasksEvent};
 #[cfg(test)]
 pub use types::{BOARD_LEAST, Mode};
 
