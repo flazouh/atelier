@@ -126,3 +126,13 @@ pub fn panels(
         .collect();
     (panels, order)
 }
+
+/// `items` with the ones `order` has not seen first, in their given order, then the rest as `order` has them.
+/// `order` becomes the result's keys. A session opened now stands at the left and pushes the others right.
+pub fn newest_first<T>(items: Vec<T>, key: impl Fn(&T) -> &SharedString, order: &mut Vec<SharedString>) -> Vec<T> {
+    let (mut seen, new): (Vec<T>, Vec<T>) = items.into_iter().partition(|item| order.contains(key(item)));
+    seen.sort_by_key(|item| order.iter().position(|k| k == key(item)));
+    let all: Vec<T> = new.into_iter().chain(seen).collect();
+    *order = all.iter().map(|item| key(item).clone()).collect();
+    all
+}
