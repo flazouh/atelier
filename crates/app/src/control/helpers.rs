@@ -170,7 +170,12 @@ fn state(shell: &Shell, cx: &App) -> Value {
                 let s = s.read(cx);
                 session_json(s, front.as_deref() == Some(s.key.as_ref()))
             }).collect();
-            json!({ "name": project.name(), "sessions": sessions })
+            let listing = match &project.listing {
+                crate::open_project::Listing::Loading => json!("loading"),
+                crate::open_project::Listing::Ready(tree) => json!({ "entries": tree.len(), "ms": project.listed_in.map(|d| d.as_millis() as u64) }),
+                crate::open_project::Listing::Failed(why) => json!({ "failed": why.as_ref() }),
+            };
+            json!({ "name": project.name(), "listing": listing, "sessions": sessions })
         })
         .collect();
     json!({ "projects": projects })
