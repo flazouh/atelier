@@ -56,9 +56,18 @@ pub(super) fn parse_accounts(text: &str) -> Vec<Account> {
     let mut accounts = Vec::new();
     for block in text.split(MARK).filter(|block| !block.trim().is_empty()) {
         let (name, status) = block.split_once('\n').unwrap_or((block, ""));
-        accounts.push(account(name.trim(), serde_json::from_str(status.trim()).unwrap_or(Value::Null)));
+        let name = name.trim();
+        if is_account_name(name) {
+            accounts.push(account(name, serde_json::from_str(status.trim()).unwrap_or(Value::Null)));
+        }
     }
     accounts
+}
+
+/// Whether `name` could be an account's: letters, digits, `-` and `_`. Other folders `~/.claude-*` finds, such as
+/// the locks `claude` keeps beside an account's folder, are not accounts.
+pub fn is_account_name(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 fn account(name: &str, status: Value) -> Account {

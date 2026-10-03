@@ -1,6 +1,9 @@
 use serde_json::json;
 
-use crate::{claude_code::accounts::parse_accounts, session::Account};
+use crate::{
+    claude_code::accounts::{is_account_name, parse_accounts},
+    session::Account,
+};
 
 const MARK: &str = "@@ ";
 const USUAL: &str = "default";
@@ -8,6 +11,8 @@ const WORK: &str = "work";
 const TEAM: &str = "team";
 const MAX_PLAN: &str = "max";
 const WORK_EMAIL: &str = "work@example.com";
+/// A folder `claude` keeps beside `~/.claude-work` for its locks, which `~/.claude-*` also finds.
+const LOCK_FOLDER: &str = "work.lock";
 
 /// What the accounts script prints for one account: its name, then what `claude auth status --json` said.
 fn listed(name: &str, status: &str) -> String {
@@ -52,4 +57,23 @@ fn an_account_whose_status_cannot_be_read_is_signed_out() {
 #[test]
 fn nothing_listed_is_no_account() {
     assert!(parse_accounts("").is_empty());
+}
+
+#[test]
+fn a_folder_whose_name_no_account_could_have_is_left_out() {
+    let text = [listed(WORK, &signed_out()), listed(LOCK_FOLDER, &signed_out())].concat();
+
+    let names: Vec<String> = parse_accounts(&text).into_iter().map(|a| a.name).collect();
+
+    assert_eq!(names, vec![WORK.to_string()]);
+}
+
+#[test]
+fn an_account_name_is_letters_digits_dashes_and_underscores() {
+    for name in [USUAL, WORK, "team-2", "my_work"] {
+        assert!(is_account_name(name), "{name}");
+    }
+    for name in ["", LOCK_FOLDER, "a b", "../x"] {
+        assert!(!is_account_name(name), "{name}");
+    }
 }

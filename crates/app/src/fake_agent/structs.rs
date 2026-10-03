@@ -25,6 +25,8 @@ pub struct Fake {
     pub opened: Arc<Mutex<Vec<OpenRequest>>>,
     /// It can start a new session from a past one.
     pub forks: bool,
+    /// The sink of every session it opened, in order, for a test to speak as an agent that was replaced.
+    pub sinks: Mutex<Vec<EventSink>>,
     /// What it reads back as any past session's history.
     pub history: Vec<Event>,
 }
@@ -70,6 +72,7 @@ impl Backend for FakeBackend {
         if std::mem::take(&mut *self.0.fail_first.lock().unwrap()) {
             return Err(SessionError::Missing { program: "fake".into() });
         }
+        self.0.sinks.lock().unwrap().push(sink.clone());
         let id = request.resume.unwrap_or_else(|| SessionId::new("fake-1"));
         sink(Event::Started(Started { session: id, model: None, mode: None, commands: Vec::new() }));
         Ok(Box::new(FakeSession { backend: self.0.clone(), sink }))

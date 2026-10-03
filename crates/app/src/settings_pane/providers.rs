@@ -61,7 +61,7 @@ fn tail(key: &str) -> String {
 
 /// A name `~/.claude-<name>` can take: letters, digits, `-` and `_`.
 pub(crate) fn account_name_ok(name: &str) -> bool {
-    !name.is_empty() && name != atelier_agents::claude_code::accounts::DEFAULT_ACCOUNT && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    atelier_agents::claude_code::accounts::is_account_name(name) && name != atelier_agents::claude_code::accounts::DEFAULT_ACCOUNT
 }
 
 impl SettingsPane {

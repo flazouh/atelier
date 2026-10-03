@@ -357,7 +357,7 @@ fn a_density_of_lines_gives_each_call_its_own_row_and_follows_the_setting(cx: &m
 mod providers {
     use std::sync::Arc;
 
-    use atelier_agents::session::{Account, ApiKey, Provider};
+    use atelier_agents::session::{Account, ApiKey, EndReason, Event, Provider};
     use atelier_settings::secrets::{InMemory, OPENROUTER_KEY, Secrets};
     use gpui_kit::TestAppContext;
 
@@ -420,6 +420,22 @@ mod providers {
             vec![Choice::usual(), Choice::Account(WORK.into()), Choice::OpenRouter],
             "the team account is not signed in"
         );
+    }
+
+    #[gpui_kit::test]
+    fn the_agent_a_switch_stops_does_not_end_the_one_that_replaces_it(cx: &mut TestAppContext) {
+        let secrets = Arc::new(InMemory::default());
+        secrets.write(OPENROUTER_KEY, KEY).unwrap();
+        set_up(cx, &secrets, Choice::usual());
+        let (session, fake, cx) = start_on_providers(cx, accounts());
+        cx.update(|_, cx| session.update(cx, |s, cx| s.set_provider(Choice::OpenRouter, cx)));
+        cx.run_until_parked();
+
+        let replaced = fake.sinks.lock().unwrap()[0].clone();
+        replaced(Event::Ended(EndReason::Exited { code: None, stderr: String::new() }));
+        cx.run_until_parked();
+
+        assert!(cx.update(|_, cx| session.read(cx).running()), "the old agent's end belongs to the old agent");
     }
 
     #[gpui_kit::test]
