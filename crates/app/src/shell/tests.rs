@@ -333,6 +333,30 @@ fn open_files_from_the_menu(shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTest
     settle(shell, cx);
 }
 
+/// "Continue with…" in a session's menu opens a new session in its project that carries it on, in front.
+#[gpui_kit::test]
+fn continue_with_opens_a_new_session_that_carries_the_old_one_on(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    let (project, first) = shell.read_with(cx, |s, cx| {
+        let p = s.active().unwrap().read(cx);
+        (crate::agents_view::project_id(p), p.sessions[0].read(cx).key.clone())
+    });
+
+    shell.update_in(cx, |s, window, cx| {
+        let sidebar = s.agents_sidebar.clone();
+        s.sidebar_event(&sidebar, &atelier_ui::sidebar::SidebarEvent::ContinueWith { project, session: first.clone() }, window, cx);
+    });
+    settle(&shell, cx);
+
+    let (count, continues) = shell.read_with(cx, |s, cx| {
+        let p = s.active().unwrap().read(cx);
+        (p.sessions.len(), p.sessions[1].read(cx).continues().map(|source| source.id.clone()))
+    });
+    assert_eq!(count, 2);
+    assert!(continues.is_some(), "the new session continues the first");
+    assert!(cx.debug_bounds("session-heading").is_some());
+}
+
 /// Views and commands, part 2: the Sessions view and the Files view, one on screen at a time. The sidebar
 /// holds no tree; the Files view holds the tree and the editor, which shows nothing until a file is open.
 #[gpui_kit::test]

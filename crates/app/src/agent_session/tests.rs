@@ -447,3 +447,103 @@ mod providers {
         assert!(cx.update(|_, cx| session.read(cx).problem.clone()).is_some_and(|p| p.contains(NO_KEY)));
     }
 }
+
+mod handoff {
+    use atelier_agents::session::{BlockId, Command, Event, Item, SessionId};
+    use gpui_kit::{Entity, TestAppContext, VisualTestContext};
+
+    use crate::{
+        agent_session::{AgentSession, handoff::Source},
+        fake_agent::{backend_with_history, start},
+    };
+
+    const AGENT: &str = "Claude Code";
+    const TITLE: &str = "Add a subtract function";
+    const EARLIER_ASK: &str = "Add a subtract function to src/lib.rs";
+    const EARLIER_ANSWER: &str = "I added subtract and a test.";
+    const SOURCE_ID: &str = "source-1";
+    const NEXT_ASK: &str = "Now add multiply";
+    const LATER_ASK: &str = "And divide";
+
+    fn source() -> Source {
+        let history = vec![
+            Event::UserMessage { text: EARLIER_ASK.into() },
+            Event::Text { block: BlockId(1), delta: EARLIER_ANSWER.into() },
+        ];
+        Source { backend: backend_with_history(history), agent: AGENT.into(), id: SessionId::new(SOURCE_ID), title: TITLE.into() }
+    }
+
+    fn continue_from_source(session: &Entity<AgentSession>, cx: &mut VisualTestContext) {
+        cx.update(|_, cx| session.update(cx, |s, cx| s.continue_from(source(), cx)));
+    }
+
+    fn send(session: &Entity<AgentSession>, text: &str, cx: &mut VisualTestContext) {
+        cx.update(|_, cx| session.update(cx, |s, cx| s.send(text.into(), cx)));
+    }
+
+    fn sent_texts(received: &[Command]) -> Vec<String> {
+        received.iter().filter_map(|c| match c { Command::Send { text, .. } => Some(text.clone()), _ => None }).collect()
+    }
+
+    fn user_texts(session: &Entity<AgentSession>, cx: &mut VisualTestContext) -> Vec<String> {
+        cx.update(|_, cx| {
+            session.read(cx).conversation.items().iter().filter_map(|i| match i { Item::User { text } => Some(text.clone()), _ => None }).collect()
+        })
+    }
+
+    #[gpui_kit::test]
+    fn the_first_message_carries_the_brief_and_shows_as_typed(cx: &mut TestAppContext) {
+        let (session, fake, cx) = start(cx, Vec::new(), false);
+        continue_from_source(&session, cx);
+        cx.run_until_parked();
+
+        send(&session, NEXT_ASK, cx);
+        cx.run_until_parked();
+
+        let sent = sent_texts(&fake.received.lock().unwrap());
+        for part in [AGENT, TITLE, EARLIER_ASK, EARLIER_ANSWER, NEXT_ASK] {
+            assert!(sent[0].contains(part), "the first message holds {part:?}:\n{}", sent[0]);
+        }
+        assert_eq!(user_texts(&session, cx), vec![NEXT_ASK.to_string()]);
+    }
+
+    #[gpui_kit::test]
+    fn a_message_sent_before_the_brief_is_ready_waits_for_it(cx: &mut TestAppContext) {
+        let (session, fake, cx) = start(cx, Vec::new(), false);
+        continue_from_source(&session, cx);
+
+        send(&session, NEXT_ASK, cx);
+        cx.run_until_parked();
+
+        let sent = sent_texts(&fake.received.lock().unwrap());
+        assert_eq!(sent.len(), 1);
+        assert!(sent[0].contains(EARLIER_ANSWER) && sent[0].contains(NEXT_ASK), "{}", sent[0]);
+    }
+
+    #[gpui_kit::test]
+    fn only_the_first_message_carries_the_brief(cx: &mut TestAppContext) {
+        let (session, fake, cx) = start(cx, Vec::new(), false);
+        continue_from_source(&session, cx);
+        cx.run_until_parked();
+
+        send(&session, NEXT_ASK, cx);
+        cx.run_until_parked();
+        send(&session, LATER_ASK, cx);
+        cx.run_until_parked();
+
+        assert_eq!(sent_texts(&fake.received.lock().unwrap())[1], LATER_ASK);
+    }
+
+    #[gpui_kit::test]
+    fn the_whole_transcript_is_kept_in_the_data_folder_and_the_brief_names_it(cx: &mut TestAppContext) {
+        let (session, fake, cx) = start(cx, Vec::new(), false);
+        continue_from_source(&session, cx);
+        cx.run_until_parked();
+        send(&session, NEXT_ASK, cx);
+        cx.run_until_parked();
+
+        let kept = cx.update(|_, cx| session.read(cx).project.data_read(&format!("handoffs/{SOURCE_ID}.md"))).expect("the transcript is kept");
+        assert!(String::from_utf8_lossy(&kept).contains(EARLIER_ANSWER));
+        assert!(sent_texts(&fake.received.lock().unwrap())[0].contains(&format!("handoffs/{SOURCE_ID}.md")));
+    }
+}

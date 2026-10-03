@@ -343,6 +343,28 @@ fn a_new_session_takes_another_agent_until_its_first_message(cx: &mut TestAppCon
     assert_eq!(cx.update(|_, cx| project.read(cx).sessions[0].read(cx).agent.name), "second", "it has a conversation now");
 }
 
+/// A new session that continues another still continues it after it takes another agent.
+#[gpui_kit::test]
+fn a_session_that_continues_another_keeps_it_when_it_takes_another_agent(cx: &mut TestAppContext) {
+    const TITLE: &str = "Add a subtract function";
+    let (_dir, project, _, cx) = open(cx, &[]);
+    let source = crate::agent_session::handoff::Source {
+        backend: crate::fake_agent::backend_with_history(Vec::new()),
+        agent: "Claude Code".into(),
+        id: atelier_agents::session::SessionId::new("source-1"),
+        title: TITLE.into(),
+    };
+    let session = cx.update(|window, cx| project.update(cx, |p, cx| p.open_session(None, None, window, cx)));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.continue_from(source, cx)));
+    let key = cx.update(|_, cx| session.read(cx).key.clone());
+
+    cx.update(|window, cx| project.update(cx, |p, cx| p.choose_agent(&key, crate::fake_agent::fake_agent("second"), window, cx)));
+    cx.run_until_parked();
+
+    let continues = cx.update(|_, cx| project.read(cx).sessions[0].read(cx).continues().map(|source| source.title.clone()));
+    assert_eq!(continues.as_deref(), Some(TITLE));
+}
+
 /// A session opened again with the agent that ran it runs that agent, not the project's.
 #[gpui_kit::test]
 fn a_session_opened_again_runs_the_agent_that_ran_it(cx: &mut TestAppContext) {

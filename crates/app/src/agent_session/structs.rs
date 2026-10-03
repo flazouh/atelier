@@ -66,6 +66,8 @@ pub struct AgentSession {
     /// What its agent runs on, for an agent with a choice; `None` leaves the agent as the host has it, and a resume
     /// finds the account that holds the session.
     pub provider: Option<crate::providers::Choice>,
+    /// The session this one continues, until its first message goes.
+    pub(super) handoff: Option<super::handoff::Handoff>,
     /// The task the session began from, for the header's chip and the first signal.
     pub task: Option<crate::tasks::TaskRef>,
     /// The task heard that the session started.
@@ -286,6 +288,7 @@ impl AgentSession {
             model: None,
             mode: None,
             provider: (resume.is_none() && agent_has_providers).then(|| crate::providers::default_choice(cx)),
+            handoff: None,
             task: None,
             task_told: false,
             problem: None,
@@ -679,7 +682,14 @@ impl AgentSession {
         if !attachments.is_empty() {
             self.save_review(cx);
         }
-        let command = Command::Send { text, attachments };
+        if let Some(command) = self.with_brief(Command::Send { text, attachments }, cx) {
+            self.dispatch(command, cx);
+        }
+        cx.emit(SessionEvent::Changed);
+    }
+
+    /// Sends `command`, which starts a turn: now, or once the agent is running again.
+    pub(super) fn dispatch(&mut self, command: Command, cx: &mut Context<Self>) {
         match (&self.session, &self.id) {
             // The agent stopped (a crash, Stop): the session resumes, and the message goes then.
             (None, Some(id)) if !self.starting => {
@@ -697,7 +707,6 @@ impl AgentSession {
             }
             _ => self.start_turn(command, cx),
         }
-        cx.emit(SessionEvent::Changed);
     }
 
     /// Sends a message that starts a turn: the turn's tracker begins first, off the UI thread, so it

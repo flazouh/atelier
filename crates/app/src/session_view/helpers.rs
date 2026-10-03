@@ -533,6 +533,14 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
     let strip = SubagentStrip::new(gpui_kit::ElementId::Name(format!("{}-strip", s.key).into()), strip);
     let starting = s.starting;
     let agent_name = s.agent.name;
+    let (heading, words): (SharedString, SharedString) = match (s.continues(), starting) {
+        (Some(source), _) => (
+            format!("Continues “{}”", source.title).into(),
+            format!("Its conversation goes to {agent_name} with your first message.").into(),
+        ),
+        (None, true) => ("Starting…".into(), format!("Ask {agent_name} anything about this project.").into()),
+        (None, false) => ("A new session".into(), format!("Ask {agent_name} anything about this project.").into()),
+    };
     let body = if empty {
         div()
             .flex()
@@ -541,8 +549,8 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
             .items_center()
             .justify_center()
             .gap(px(4.))
-            .child(div().text_size(TextSize::Sm.font_size()).child(if starting { "Starting…" } else { "A new session" }))
-            .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(format!("Ask {agent_name} anything about this project.")))
+            .child(div().debug_selector(|| "session-heading".into()).text_size(TextSize::Sm.font_size()).child(heading))
+            .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(words))
             .children(s.can_choose_agent().then(|| agent_picker(session, cx)).flatten())
             .into_any_element()
     } else {
