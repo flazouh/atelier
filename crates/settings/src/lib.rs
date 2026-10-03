@@ -8,6 +8,7 @@
 //! know are kept, so the gallery setting the theme never drops the app's recent projects.
 
 mod helpers;
+pub mod secrets;
 mod structs;
 mod types;
 

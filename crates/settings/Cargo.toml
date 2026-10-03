@@ -11,5 +11,11 @@ dirs = "6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["async-secret-service", "async-io", "crypto-rust"] }
+
 [dev-dependencies]
 tempfile = "3"
