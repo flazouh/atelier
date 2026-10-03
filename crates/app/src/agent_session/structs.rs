@@ -26,7 +26,7 @@ use crate::{
     tool_density::{ToolDensity, tool_density},
 };
 use super::types::{ARRIVAL_KEPT, OVERDRAW, SAVE_AFTER, SessionEvent};
-use super::helpers::{is_activity, mode_from, mode_word, now, problem_words};
+use super::helpers::{completes_turn, is_activity, mode_from, mode_word, now, problem_words};
 
 impl EventEmitter<SessionEvent> for AgentSession {}
 
@@ -86,6 +86,8 @@ pub struct AgentSession {
     /// Messages sent while the turn's tracker begins: `Some` from the begin until it lands, and they go
     /// after the first, in the same turn.
     beginning: Option<Vec<Command>>,
+    /// Messages held for after the running turn, oldest first: the next goes when a turn completes.
+    pub(super) queued: Vec<String>,
     pub list: ListState,
     /// The list's follow of the output and its glides.
     pub glide: crate::glide::Glide,
@@ -243,6 +245,9 @@ impl AgentSession {
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
             PromptInputEvent::Submit(text) => this.send(text.to_string(), cx),
             PromptInputEvent::Stop => this.interrupt(cx),
+            PromptInputEvent::Queue(text) => this.queue(text.to_string(), cx),
+            PromptInputEvent::Unqueue(place) => this.unqueue(*place, cx),
+            PromptInputEvent::SendQueued(place) => this.send_queued(*place, cx),
             PromptInputEvent::ModelChanged(model) => this.set_model(model.to_string(), cx),
             PromptInputEvent::ModeChanged(mode) => {
                 if let Some(mode) = mode_from(mode) {
@@ -300,6 +305,7 @@ impl AgentSession {
             starting: true,
             waiting_send: None,
             beginning: None,
+            queued: Vec::new(),
             resumed: resume.is_some(),
             // The list lays out this much past the view each frame: enough that a fast scroll never
             // shows an empty edge, little enough to stay inside a 120 Hz frame (docs/performance.md).
@@ -597,6 +603,9 @@ impl AgentSession {
             if !ended_turns {
                 self.save_review(cx);
             }
+        }
+        if events.iter().any(completes_turn) {
+            self.send_next_queued(cx);
         }
         self.refresh_rows();
         let working = self.conversation.working();

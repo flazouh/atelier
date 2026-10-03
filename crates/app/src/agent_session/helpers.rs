@@ -1,10 +1,16 @@
 use std::time::SystemTime;
 
-use atelier_agents::session::{Event, PermissionMode, SessionError};
+use atelier_agents::session::{Event, PermissionMode, SessionError, TurnOutcome};
 
 /// Whether `event` is the agent at work, which stamps the session's row: its start on a resume is not.
 pub(super) fn is_activity(event: &Event) -> bool {
     !matches!(event, Event::Started(_))
+}
+
+/// Whether `event` ends a turn that went to its end. A queued message waits out a Stop or a failure, so
+/// the person decides what comes next.
+pub(super) fn completes_turn(event: &Event) -> bool {
+    matches!(event, Event::TurnEnded(end) if end.outcome == TurnOutcome::Completed)
 }
 
 /// Seconds since the Unix epoch, for "2m ago".
