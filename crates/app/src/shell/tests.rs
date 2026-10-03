@@ -633,6 +633,10 @@ fn the_panel_menu_holds_the_actions_for_a_session(cx: &mut TestAppContext) {
     for row in ["panel-rename", "panel-new-session", "panel-files", "panel-archive"] {
         assert!(cx.debug_bounds(row).is_some(), "the menu has {row}");
     }
+    for words in ["Rename", "New session in this project", "Open the project's files", "Archive"] {
+        let icon: &'static str = Box::leak(format!("menu-icon-{words}").into_boxed_str());
+        assert!(cx.debug_bounds(icon).is_some(), "{words} has an icon");
+    }
     let open = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).sessions.len());
     assert_eq!(open(&shell, cx), 1);
     let fresh = cx.debug_bounds("panel-new-session").unwrap();

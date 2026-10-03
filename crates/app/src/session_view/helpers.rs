@@ -821,9 +821,9 @@ fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Op
     };
     let menu = is_open.then(|| {
         // A choice shuts the menu, then does its work.
-        let item = |label: &'static str, name: &'static str, run: MenuAction| {
+        let item = |label: &'static str, icon: IconName, name: &'static str, run: MenuAction| {
             let open = open.clone();
-            Entry::from(MenuItem::new(label).debug_name(name).on_select(move |window, cx| {
+            Entry::from(MenuItem::new(label).icon(icon).debug_name(name).on_select(move |window, cx| {
                 open.update(cx, |o, cx| {
                     *o = false;
                     cx.notify();
@@ -833,14 +833,14 @@ fn panel_menu(session: &Entity<AgentSession>, key: &SharedString, session_id: Op
         };
         let (rename, fresh, files, archive) = (session.clone(), session.clone(), session.clone(), session.clone());
         let mut entries = vec![
-            item("Rename", "panel-rename", Rc::new(move |window, cx| rename.update(cx, |s, cx| s.start_rename(window, cx)))),
-            item("New session in this project", "panel-new-session", Rc::new(move |_, cx| fresh.update(cx, |_, cx| cx.emit(SessionEvent::NewSession)))),
-            item("Open the project's files", "panel-files", Rc::new(move |_, cx| files.update(cx, |_, cx| cx.emit(SessionEvent::ShowFiles)))),
+            item("Rename", IconName::Edit, "panel-rename", Rc::new(move |window, cx| rename.update(cx, |s, cx| s.start_rename(window, cx)))),
+            item("New session in this project", IconName::Add, "panel-new-session", Rc::new(move |_, cx| fresh.update(cx, |_, cx| cx.emit(SessionEvent::NewSession)))),
+            item("Open the project's files", IconName::Folder, "panel-files", Rc::new(move |_, cx| files.update(cx, |_, cx| cx.emit(SessionEvent::ShowFiles)))),
         ];
         if let Some(id) = session_id.clone() {
-            entries.push(item("Copy session id", "panel-copy-id", Rc::new(move |_, cx| cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(id.clone())))));
+            entries.push(item("Copy session id", IconName::Copy, "panel-copy-id", Rc::new(move |_, cx| cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(id.clone())))));
         }
-        entries.push(item("Archive", "panel-archive", Rc::new(move |_, cx| archive.update(cx, |_, cx| cx.emit(SessionEvent::Archive)))));
+        entries.push(item("Archive", IconName::Archive, "panel-archive", Rc::new(move |_, cx| archive.update(cx, |_, cx| cx.emit(SessionEvent::Archive)))));
         let rows = entries.len();
         let close = open.clone();
         Popover::new(gpui_kit::ElementId::Name(format!("{key}-more-popover").into()))
