@@ -84,6 +84,14 @@ pub(in super::super) struct ConfigOption {
     pub id: String,
     pub category: Option<String>,
     pub current_value: Option<Value>,
+    /// The values the option takes. A grouped option lists groups instead, which have no `value` and are left out.
+    #[serde(default)]
+    pub options: Vec<ConfigValue>,
+}
+
+#[derive(Clone, Deserialize)]
+pub(in super::super) struct ConfigValue {
+    pub value: Option<String>,
 }
 
 impl ConfigOption {

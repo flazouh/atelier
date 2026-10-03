@@ -244,7 +244,7 @@ over the protocol. The agent starts through `Project::spawn`, on the host.
 | `Command::Send` | `session/prompt`, one turn at a time. Messages sent during a turn wait. Its response carries the stop reason and ends the turn. |
 | `Command::Interrupt` | `session/cancel` (a notification). A waiting question is answered `cancelled`. The turn ends with stop reason `cancelled`. |
 | `SetPermissionMode` | `session/set_mode` with the agent's name for the mode. A mode it has no name for is `Unsupported`. |
-| `SetModel` | The agent's `model` config option when it has one, else `session/set_model` (unstable). A model given by its name is set by the full id the agent listed. |
+| `SetModel` | The agent's `model` config option when it has one, else `session/set_model` (unstable). A model given by its name is set by the value the option lists, else by the full id the agent listed. |
 | `Text`, `Thinking` | `agent_message_chunk`, `agent_thought_chunk`. |
 | `ToolStarted`, `ToolInput`, `ToolTarget`, `ToolFinished` | `tool_call` and `tool_call_update`, merged by id. The kind maps to `ToolKind` (read, edit, search, execute as shell, fetch; delete and move as edit; others as other). An edit whose diff has no old text is a write. Locations and diffs give `file`, and a diff gives `ToolEdit`. |
 | `Todos` | `plan` updates: the whole list each time. |
@@ -282,8 +282,29 @@ them back. `crates/agents/tests/cursor_live.rs` runs the real CLI end to end:
   in that folder reuses. Cursor's own `agent -p` leaves it too. After a turn, `agent acp` does not exit
   when its stdin closes. So atelier ties every local child to itself (see "Failure" above).
 
-Other agents that speak ACP (Gemini CLI, opencode, Codex through an adapter) are an `AcpAgent` each, with
-no change in `acp` or `session`. Their launch and modes are to be checked against the real agent first.
+### Codex
+
+`npx -y @agentclientprotocol/codex-acp` 2.1.1, the adapter that starts Codex's app server, checked on 2026-10-04 with
+Codex 0.160 and a ChatGPT login. The older `@zed-industries/codex-acp` is archived and fails to start on a
+`config.toml` the current Codex writes (an effort it does not know), so atelier does not use it.
+`crates/agents/tests/codex_live.rs` runs the real adapter end to end, and `codex_sign_in_live.rs` runs it with no login:
+`cargo test -p atelier-agents --test codex_live -- --ignored --nocapture`.
+
+- **Start:** `npx` finds the adapter or fetches it once, so Node is all a host needs. The adapter brings its own Codex.
+- **Sign-in:** `codex login`, which writes `~/.codex/auth.json` for the adapter too. `initialize` offers `api-key` first
+  (it reads `CODEX_API_KEY` or `OPENAI_API_KEY` from the environment) and `chat-gpt` second. With no login,
+  `session/new` answers `-32000` and `authenticate` with `api-key` answers `-32603` "CODEX_API_KEY or OPENAI_API_KEY is
+  not set": atelier takes any refused `authenticate` as signed out, so the notice shows and not that error.
+- **Modes:** `read-only` (asks before an edit: Ask), `workspace-write` (Accept edits), `agent` ("Auto review": Auto) and
+  `agent-full-access` (Bypass). Plan is `collaboration_mode`, a separate option, so atelier offers no Plan.
+- **Models:** `models.availableModels` names each model once for each effort (`gpt-6-luna[max]`), while the `model` option
+  takes the model alone (`gpt-6-luna`) and `reasoning_effort` is another option. atelier sets the option's own value.
+  The list atelier offers is in `codex.rs`.
+- **Questions:** a command that changes something asks first in `read-only`; a denied one does not run.
+- **Resume, list, history:** `session/load`, `session/list` and the replay work as in the table above.
+
+Other agents that speak ACP (Gemini CLI, opencode) are an `AcpAgent` each, with no change in `acp` or `session`.
+Their launch and modes are to be checked against the real agent first.
 
 ## Our own agent
 

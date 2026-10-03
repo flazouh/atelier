@@ -590,3 +590,47 @@ fn a_setting_the_agent_never_answers_stops_holding_the_turn() {
     assert_eq!(run.sent("session/prompt").len(), 1, "the held message goes out");
     assert_eq!(run.sent("session/prompt")[0]["params"]["prompt"][0]["text"], "go");
 }
+
+/// Codex's first method needs an API key in the environment; with none it answers "internal error". That is an agent
+/// that is not signed in, and the reader signs in with its own login: not a failure to show as the agent's words.
+#[test]
+fn an_authenticate_the_agent_refuses_is_a_sign_out_whatever_its_error_code() {
+    let mut run = Run::open();
+    run.command(Command::send("hello"));
+    run.initialized(json!({}));
+    run.agent(fail(1, -32000, "Authentication required"));
+    run.agent(fail(2, -32603, "Internal error: CODEX_API_KEY or OPENAI_API_KEY is not set"));
+    let events = run.events();
+    assert_eq!(events[0], Event::SignedOut);
+    assert!(run.done);
+}
+
+#[test]
+fn an_open_that_fails_after_the_sign_in_worked_is_not_a_sign_out() {
+    let mut run = Run::open();
+    run.command(Command::send("hello"));
+    run.initialized(json!({}));
+    run.agent(fail(1, -32000, "Authentication required"));
+    run.agent(respond(2, json!({})));
+    run.agent(fail(3, -32603, "disk full"));
+    assert!(!run.events().contains(&Event::SignedOut));
+}
+
+/// Codex lists a model once for each effort (`gpt-5.5[low]`), but its model option takes the model alone: the value sent
+/// is one of the option's, not the first of the list.
+#[test]
+fn a_model_is_set_by_the_value_its_option_takes_not_by_the_longer_ids_of_the_model_list() {
+    let mut run = Run::open();
+    run.initialized(json!({}));
+    run.agent(respond(1, json!({
+        "sessionId": "s1",
+        "models": { "currentModelId": "gpt-6[max]", "availableModels": [{ "modelId": "gpt-5.5[low]" }, { "modelId": "gpt-5.5[high]" }] },
+        "configOptions": [{
+            "id": "model", "name": "Model", "category": "model", "type": "select", "currentValue": "gpt-6",
+            "options": [{ "value": "gpt-6", "name": "6" }, { "value": "gpt-5.5", "name": "5.5" }],
+        }],
+    })));
+    run.command(Command::SetModel { model: "gpt-5.5".into() });
+    assert_eq!(run.last()["method"], "session/set_config_option");
+    assert_eq!(run.last()["params"], json!({ "sessionId": "s1", "configId": "model", "value": "gpt-5.5" }));
+}

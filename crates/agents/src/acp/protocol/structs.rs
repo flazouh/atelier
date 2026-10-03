@@ -47,6 +47,8 @@ pub(in super::super) struct Protocol {
     pub(super) mode: Option<String>,
     pub(super) model: Option<String>,
     model_option: Option<String>,
+    /// The values the model option takes, when it lists them.
+    model_values: Vec<String>,
     models: Vec<String>,
     commands: Vec<String>,
     /// The model and mode to set once the session is ready.
@@ -86,6 +88,7 @@ impl Protocol {
             mode: None,
             model: None,
             model_option: None,
+            model_values: Vec::new(),
             models: Vec::new(),
             commands: Vec::new(),
             want_model,
@@ -206,8 +209,13 @@ impl Protocol {
                 let method = self.auth_methods[0].clone();
                 step.lines.push(self.request(Asked::Authenticate, client::authenticate(&method)));
             }
-            (Asked::Initialize | Asked::Authenticate | Asked::Open, Err(error)) => {
-                self.tell_signed_out(&mut step, &error);
+            // The agent turned its own sign-in down, whatever it called the error: it is signed out.
+            (Asked::Authenticate, Err(error)) => {
+                self.tell_signed_out(&mut step, true);
+                self.fail(&mut step, error.to_string(), now)
+            }
+            (Asked::Initialize | Asked::Open, Err(error)) => {
+                self.tell_signed_out(&mut step, error.code == AUTH_REQUIRED);
                 self.fail(&mut step, error.to_string(), now)
             }
             (Asked::Open, Ok(result)) => self.opened(&mut step, parse(result).unwrap_or_default(), now),
@@ -221,7 +229,7 @@ impl Protocol {
                     Ok(Ok(prompted)) => (stop_outcome(&prompted.stop_reason), prompted.usage.map(usage)),
                     Ok(Err(error)) => (TurnOutcome::Failed(format!("the agent's answer did not parse: {error}")), None),
                     Err(error) => {
-                        self.tell_signed_out(&mut step, &error);
+                        self.tell_signed_out(&mut step, error.code == AUTH_REQUIRED);
                         (TurnOutcome::Failed(error.to_string()), None)
                     }
                 };
@@ -237,10 +245,10 @@ impl Protocol {
         step
     }
 
-    /// Tells a session that the agent wants a sign-in, before the failure that follows. A list or a history has no
+    /// Tells a session that the agent wants a sign-in (`wanted`), before the failure that follows. A list or a history has no
     /// session to tell.
-    fn tell_signed_out(&self, step: &mut Step, error: &RpcError) {
-        if error.code == AUTH_REQUIRED && matches!(self.goal, Goal::Open(_)) {
+    fn tell_signed_out(&self, step: &mut Step, wanted: bool) {
+        if wanted && matches!(self.goal, Goal::Open(_)) {
             step.events.push(Event::SignedOut);
         }
     }
@@ -280,6 +288,7 @@ impl Protocol {
         self.mode = opened.modes.map(|m| m.current_mode_id);
         let model_option = opened.config_options.iter().find(|o| o.is("model"));
         self.model_option = model_option.map(|o| o.id.clone());
+        self.model_values = model_option.map(|o| o.options.iter().filter_map(|v| v.value.clone()).collect()).unwrap_or_default();
         let listed = model_option.and_then(|o| o.current_value.as_ref()?.as_str().map(str::to_string));
         if let Some(models) = opened.models {
             self.models = models.available_models.into_iter().map(|m| m.model_id).collect();
@@ -453,7 +462,9 @@ impl Protocol {
     /// Sets `model`, by atelier's name or the agent's whole id. The request remembers atelier's name, which
     /// `Started` then says.
     fn set_model(&mut self, session: &SessionId, model: String) -> String {
-        let id = self.models.iter().find(|id| **id == model || model_name(id) == model).cloned().unwrap_or_else(|| model.clone());
+        // The option's own values when it lists them: the model list may name a model once for each effort.
+        let takes = if self.model_option.is_some() && !self.model_values.is_empty() { &self.model_values } else { &self.models };
+        let id = takes.iter().find(|id| **id == model || model_name(id) == model).cloned().unwrap_or_else(|| model.clone());
         let outgoing = match &self.model_option {
             Some(option) => client::set_config_option(session.as_str(), option, &id),
             None => client::set_model(session.as_str(), &id),
