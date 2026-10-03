@@ -1415,8 +1415,26 @@ impl Shell {
         }
         match self.active().and_then(|_| self.back_to_sessions(cx)) {
             Some(back) => back,
-            None => div().font_weight(gpui_kit::FontWeight::MEDIUM).child("atelier").into_any_element(),
+            None => self.sidebar_toggle(cx),
         }
+    }
+
+    /// The sidebar's toggle at the left of the title bar, lit while the sidebar shows.
+    fn sidebar_toggle(&self, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity();
+        let shown = self.sidebar_shown(Fit::of(self.width));
+        Button::new("sidebar-toggle")
+            .debug_name("sidebar-toggle")
+            .icon(atelier_ui::IconName::SidebarLeft)
+            .variant(ButtonVariant::Ghost)
+            .size(ButtonSize::IconSm)
+            .tooltip("Toggle the sidebar (⌘b)")
+            .open(shown)
+            .on_click(move |_, window, cx| {
+                let fit = Fit::of(atelier_ui::scale::design(window.viewport_size().width));
+                this.update(cx, |this, cx| this.flip_sidebar(fit, cx))
+            })
+            .into_any_element()
     }
 
     /// The Settings button at the top right, lit while the page is open.
@@ -1780,7 +1798,12 @@ impl Shell {
         let widths = super::fit::widths(total - rail, wants);
         self.session_right = Some(rail + widths.sidebar.unwrap_or(0.) + widths.agent);
         // The strip lays its columns out from this width in this frame; the strip keeps 8 px each side.
-        self.panels.update(cx, |p, cx| p.fit_to(widths.agent - 16., cx));
+        // The strip pads its sides by 8; next to the sidebar's card the left pad is the panels' own gap.
+        let inset = if widths.sidebar.is_some() { atelier_ui::panel_layout::GAP } else { 8. };
+        self.panels.update(cx, |p, cx| {
+            p.set_inset_left(inset, cx);
+            p.fit_to(widths.agent - inset - 8., cx)
+        });
         let wash = cx.theme().muted_hover();
         let handle = move |edge: Edge| {
             let d = div().id(match edge {
@@ -1866,7 +1889,10 @@ impl Shell {
             Pane::Projects => self.sidebar(cx).into_any_element(),
             Pane::Session => {
                 let total = atelier_ui::scale::design(window.viewport_size().width);
-                self.panels.update(cx, |p, cx| p.fit_to(total - 16., cx));
+                self.panels.update(cx, |p, cx| {
+                    p.set_inset_left(8., cx);
+                    p.fit_to(total - 16., cx)
+                });
                 self.center(project, window, cx)
             }
             Pane::Right => self.right_pane(project, cx),
