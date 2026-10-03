@@ -212,7 +212,11 @@ atelier reads it through a process the project spawns (`sh`), never from disk di
   the middle of a turn. The notice's button runs `Backend::sign_in(account)` (`claude auth login`, or `agent login`
   for Cursor) on this machine through `subprocess::run`; when it exits 0 the agent starts again on the same session
   and the message it refused goes once more. A project on another host cannot be signed in from here, and the
-  notice says where to. `/login` is atelier's own command and runs the same sign-in.
+  notice says where to. `/login` is atelier's own command and runs the same sign-in. While the browser waits the
+  notice has a Cancel button: it stops the command (`subprocess::run` takes a flag and kills the process, and a
+  dropped `Run` sets it) and the sign-in is offered again. A session resumed with no provider signs in to the
+  account that holds its file (`Backend::session_account`, from the folder of `<id>.jsonl`), which the notice names
+  when it is not the usual one. The account of a named provider is its own.
 - **atelier dies** (a crash, a kill): every process a local project starts has a watchdog (`sh`, detached)
   that stops it, and kills it two seconds later if it still runs, once atelier is gone. An agent that ignores
   the end of its stdin, as Cursor's does, ends too. On a remote project `atelier-remote` kills its processes
@@ -236,7 +240,7 @@ over the protocol. The agent starts through `Project::spawn`, on the host.
 
 | atelier | ACP |
 | --- | --- |
-| `open` | `initialize`, then `session/new`, or `session/load` to resume when the agent says it can. On error `-32000` (sign-in needed) atelier calls `authenticate` once with the agent's first method and asks again; an agent still signed out, or signed out in the middle of a turn, is told as `SignedOut`. |
+| `open` | `initialize`, then `session/new`, or `session/load` to resume when the agent says it can. On error `-32000` (sign-in needed) atelier calls `authenticate` once with the first method of the default `agent` type (a `terminal` method is for a client's own terminal and is never passed to `authenticate`) and asks again; an agent still signed out, or signed out in the middle of a turn, is told as `SignedOut`. |
 | `Command::Send` | `session/prompt`, one turn at a time. Messages sent during a turn wait. Its response carries the stop reason and ends the turn. |
 | `Command::Interrupt` | `session/cancel` (a notification). A waiting question is answered `cancelled`. The turn ends with stop reason `cancelled`. |
 | `SetPermissionMode` | `session/set_mode` with the agent's name for the mode. A mode it has no name for is `Unsupported`. |

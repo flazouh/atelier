@@ -43,6 +43,12 @@ pub trait Backend: Send + Sync {
         Ok(Vec::new())
     }
 
+    /// The named account that holds `session` on the project's host, for an agent with [`Capabilities::providers`]:
+    /// `None` for the usual account, and for a session none holds. May be slow.
+    fn session_account(&self, _project: &dyn Project, _session: &SessionId) -> Result<Option<String>, SessionError> {
+        Ok(None)
+    }
+
     /// The command that signs in to `account` on the host, making it when it is new. It opens a browser.
     fn sign_in(&self, _account: &str) -> Option<atelier_project::Command> {
         None

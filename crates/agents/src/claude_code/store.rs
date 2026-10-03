@@ -6,6 +6,6 @@ mod helpers;
 mod types;
 
 pub use helpers::history;
-pub(super) use helpers::{list, read_history};
+pub(super) use helpers::{holder, list, read_history};
 #[cfg(test)]
-pub(super) use helpers::{list_script, parse_listing, read_script, slug};
+pub(super) use helpers::{holder_account, holder_script, list_script, parse_listing, read_script, slug};

@@ -323,7 +323,7 @@ agent's past sessions (`Backend::sessions`, read off the UI thread); a session o
 - **Remote projects.** The agent starts through `Project::spawn`, so on an SSH project `claude` runs on
   the host, as a child of `atelier-remote`.
 - **Failures.** claude missing on the host: "claude is not installed on this host. Install it there,
-  then start a new session." Not logged in: a notice over the composer with a Sign in button (and Handoff), in place of claude's own "Not logged in · Please run /login"; `/login` does the same. A crash
+  then start a new session." Not logged in: a notice over the composer with a Sign in button (a Cancel button while the browser waits, and Handoff), in place of claude's own "Not logged in · Please run /login"; `/login` does the same. A crash
   mid-turn: "Stopped: the agent was stopped by a signal", or, when it left words on stderr, its last
   line, with the tail behind Show details. An interrupt during a question withdraws it; during a tool,
   the tool fails and the turn ends.

@@ -45,7 +45,8 @@ pub struct AcpAgent {
     pub todos: bool,
     /// Whether the agent loads a past session (ACP's optional `loadSession`), so a session can resume.
     pub resume: bool,
-    /// What the agent runs to sign in, after its program: `login` for Cursor. Empty when the agent has no command for it.
+    /// What signs the agent in, as a whole command: `agent login` for Cursor. An adapter's sign-in may be another program
+    /// than the adapter, as the program of the agent behind it. Empty when the agent has no command for it.
     pub login: Vec<String>,
 }
 
@@ -115,7 +116,8 @@ impl Backend for Acp {
     }
 
     fn sign_in(&self, _account: &str) -> Option<Command> {
-        (!self.agent.login.is_empty()).then(|| Command::new(&self.agent.program).args(self.agent.login.iter().cloned()))
+        let (program, args) = self.agent.login.split_first()?;
+        Some(Command::new(program).args(args.iter().cloned()))
     }
 }
 

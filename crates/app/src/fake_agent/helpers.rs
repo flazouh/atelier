@@ -38,6 +38,11 @@ pub fn start_signing_in(cx: &mut TestAppContext, turns: Vec<Vec<Event>>, command
     start_with(cx, crate::test_dirs::path(), Fake { turns: Mutex::new(turns), sign_in: command, ..Fake::default() }, true)
 }
 
+/// The same, for a session that was resumed from the named account `holder`.
+pub fn start_signing_in_held_by<'a>(cx: &'a mut TestAppContext, turns: Vec<Vec<Event>>, command: Option<atelier_project::Command>, holder: &str) -> (Entity<AgentSession>, Arc<Fake>, &'a mut VisualTestContext) {
+    start_with(cx, crate::test_dirs::path(), Fake { turns: Mutex::new(turns), sign_in: command, holder: Some(holder.into()), ..Fake::default() }, true)
+}
+
 /// The same, with the session's view drawn in the window.
 pub fn start_shown_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Event>>) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
     start_with(cx, dir, Fake { turns: Mutex::new(turns), ..Fake::default() }, true)

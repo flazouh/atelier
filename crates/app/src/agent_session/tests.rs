@@ -846,3 +846,63 @@ fn a_turn_that_works_takes_the_failed_sign_in_notice_away(cx: &mut TestAppContex
     cx.run_until_parked();
     assert_eq!(cx.update(|_, cx| session.read(cx).sign_in_state()), None);
 }
+
+/// The browser wait has a way out: cancelling stops the sign-in command, and the notice offers the button again. The
+/// agent does not start, for the sign-in did not finish.
+#[gpui_kit::test]
+fn cancelling_the_wait_for_the_browser_stops_the_sign_in_and_offers_it_again(cx: &mut TestAppContext) {
+    let waiting = atelier_project::Command::new("sleep").args(["30"]);
+    let (session, fake, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in()], Some(waiting));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    assert_eq!(cx.update(|_, cx| session.read(cx).sign_in_state()), Some(atelier_ui::SignInState::Waiting));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.cancel_sign_in(cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).sign_in_state()), Some(atelier_ui::SignInState::Ready), "no failure to read: the reader chose this");
+    assert_eq!(fake.opened.lock().unwrap().len(), 1, "the agent did not start again");
+}
+
+/// The notice's Cancel button is that way out. It shows only while the browser waits.
+#[gpui_kit::test]
+fn the_notice_shows_cancel_while_the_browser_waits(cx: &mut TestAppContext) {
+    let waiting = atelier_project::Command::new("sleep").args(["30"]);
+    let (session, _, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in()], Some(waiting));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("sign-in-cancel").is_none(), "nothing to cancel before the browser opens");
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    // Not parked: parking waits for the command, and the command waits for the reader.
+    cx.update(|window, _| window.refresh());
+    cx.executor().tick();
+    // The click is the component's own test: a click parks the test until the command ends, and it waits for the reader.
+    assert!(cx.debug_bounds("sign-in-cancel").is_some(), "while the browser waits");
+    cx.update(|_, cx| session.update(cx, |s, cx| s.cancel_sign_in(cx)));
+}
+
+/// A session resumed from a named account, with no provider of its own, signs in to the account that holds it: the
+/// default account would sign in a different one than the session can use.
+#[gpui_kit::test]
+fn a_session_with_no_provider_signs_in_to_the_account_that_holds_it(cx: &mut TestAppContext) {
+    let (session, fake, cx) = crate::fake_agent::start_signing_in_held_by(cx, vec![refused_for_sign_in(), answer("hello")], Some(atelier_project::Command::new("true")), "work");
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).sign_in_account()).as_deref(), Some("work"), "the notice names it");
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    cx.run_until_parked();
+    assert_eq!(fake.signed_in_as.lock().unwrap().as_slice(), ["work"]);
+}
+
+/// The usual account is not named, and is the one signed in to.
+#[gpui_kit::test]
+fn a_session_held_by_no_named_account_signs_in_to_the_usual_one(cx: &mut TestAppContext) {
+    let (session, fake, cx) = crate::fake_agent::start_signing_in(cx, vec![refused_for_sign_in(), answer("hello")], Some(atelier_project::Command::new("true")));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hi".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).sign_in_account()), None);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.sign_in(cx)));
+    cx.run_until_parked();
+    assert_eq!(fake.signed_in_as.lock().unwrap().as_slice(), ["default"]);
+}

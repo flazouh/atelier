@@ -89,6 +89,10 @@ impl Backend for ClaudeCode {
         accounts::accounts(project, &self.program)
     }
 
+    fn session_account(&self, project: &dyn Project, session: &SessionId) -> Result<Option<String>, SessionError> {
+        store::holder(project, session)
+    }
+
     fn sign_in(&self, account: &str) -> Option<atelier_project::Command> {
         Some(accounts::sign_in_command(&self.program, account))
     }

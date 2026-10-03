@@ -42,6 +42,32 @@ exit 1"#,
     )
 }
 
+/// Prints the path of the file that holds `session`, from whichever account does.
+pub(in super::super) fn holder_script(slug: &str, session: &SessionId) -> String {
+    format!(
+        r#"for f in {files}; do
+  if [ -f "$f" ]; then printf '%s\n' "$f"; exit 0; fi
+done"#,
+        files = session_files(slug, &format!("{}.jsonl", session.as_str())),
+    )
+}
+
+/// The named account that holds a session, from what [`holder_script`] printed: `None` for the usual account, and for
+/// a session no account holds.
+pub(in super::super) fn holder_account(printed: &str) -> Option<String> {
+    account_of(printed.trim())
+}
+
+/// The named account that holds `session` on the project's host, `None` for the usual one.
+pub(in super::super) fn holder(project: &dyn Project, session: &SessionId) -> Result<Option<String>, SessionError> {
+    if !session.as_str().chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err(SessionError::Read("the session id has characters a file name cannot".into()));
+    }
+    let script = holder_script(&slug(&project.root().to_string_lossy()), session);
+    let command = Command::new("sh").args(["-c", script.as_str()]);
+    Ok(holder_account(&subprocess::output(project, &command)?))
+}
+
 pub(in super::super) fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
     let script = list_script(&slug(&project.root().to_string_lossy()));
     let command = Command::new("sh").args(["-c", script.as_str()]);

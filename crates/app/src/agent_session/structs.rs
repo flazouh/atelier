@@ -61,9 +61,8 @@ pub struct AgentSession {
     titled: bool,
     _titling: Task<()>,
     pub(super) limit_clock: Task<()>,
-    /// Where the sign-in of its agent stands.
-    pub(super) signing_in: super::types::SignIn,
-    pub(super) _signing: Task<()>,
+    /// The sign-in of its agent, when it has none.
+    pub(super) signer: super::sign_in::Signer,
     /// The reader is looking at it: a turn that ends is seen.
     pub seen: bool,
     pub model: Option<String>,
@@ -302,8 +301,7 @@ impl AgentSession {
             titled: false,
             _titling: Task::ready(()),
             limit_clock: Task::ready(()),
-            signing_in: super::types::SignIn::Idle,
-            _signing: Task::ready(()),
+            signer: Default::default(),
             seen: false,
             model: None,
             mode: None,
@@ -584,7 +582,7 @@ impl AgentSession {
                 Event::Limit(_) => self.watch_limit(cx),
                 Event::TurnEnded(end) => {
                     let ok = matches!(end.outcome, atelier_agents::session::TurnOutcome::Completed);
-                    self.turn_ran(ok);
+                    self.turn_ran(ok, cx);
                     cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::TurnEnded { ok }));
                 }
                 Event::Ended(end) => {

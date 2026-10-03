@@ -33,6 +33,8 @@ pub struct Fake {
     pub named: Option<&'static str>,
     /// What signs in to an account, or `None` for an agent atelier cannot sign in.
     pub sign_in: Option<atelier_project::Command>,
+    /// The named account that holds any session, when a test needs one.
+    pub holder: Option<String>,
     /// The account of every sign-in asked for, in order.
     pub signed_in_as: Mutex<Vec<String>>,
 }
@@ -72,6 +74,9 @@ impl Backend for FakeBackend {
     }
     fn accounts(&self, _: &dyn Project) -> Result<Vec<Account>, SessionError> {
         Ok(self.0.accounts.clone())
+    }
+    fn session_account(&self, _: &dyn Project, _: &SessionId) -> Result<Option<String>, SessionError> {
+        Ok(self.0.holder.clone())
     }
     fn sign_in(&self, account: &str) -> Option<atelier_project::Command> {
         self.0.signed_in_as.lock().unwrap().push(account.into());
