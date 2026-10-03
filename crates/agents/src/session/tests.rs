@@ -262,6 +262,14 @@ mod conversation {
     }
 
     #[test]
+    fn a_notice_has_no_colour_codes() {
+        let mut conversation = Conversation::new();
+        conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("\u{1b}[31mboom\u{1b}[0m".into()), summary: None }));
+        conversation.apply(&Event::Warning("\u{1b}[33mcareful\u{1b}[0m".into()));
+        assert_eq!(conversation.items(), [Item::Notice("boom".into()), Item::Notice("careful".into())]);
+    }
+
+    #[test]
     fn a_turn_opens_when_the_user_sends_and_closes_with_its_outcome() {
         let mut conversation = Conversation::new();
         assert!(!conversation.working());

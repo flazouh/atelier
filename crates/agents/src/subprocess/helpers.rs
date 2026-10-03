@@ -30,9 +30,49 @@ pub fn lines(stream: impl Read) -> impl Iterator<Item = String> {
     })
 }
 
-/// The last `STDERR_LINES` lines of `stderr`, trailing blank lines dropped.
+/// `text` without the terminal's colour and cursor codes. A program that thinks it writes to a terminal paints its errors
+/// with them (`ESC [ 36 m`), and they are not words: a row that shows them shows `[36m`.
+pub fn strip_ansi(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '\u{1b}' {
+            out.push(c);
+            continue;
+        }
+        match chars.peek() {
+            // A control sequence: parameters, then one final byte from `@` to `~`.
+            Some('[') => {
+                chars.next();
+                for next in chars.by_ref() {
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+            }
+            // An operating-system command (a title, a link): up to the bell or `ESC \`.
+            Some(']') => {
+                chars.next();
+                while let Some(next) = chars.next() {
+                    if next == '\u{7}' || (next == '\u{1b}' && chars.next_if_eq(&'\\').is_some()) {
+                        break;
+                    }
+                }
+            }
+            // Any other escape is the escape and the one character after it.
+            Some(_) => {
+                chars.next();
+            }
+            None => {}
+        }
+    }
+    out
+}
+
+/// The last `STDERR_LINES` lines of `stderr`, trailing blank lines dropped, and with no colour codes.
 pub fn stderr_tail(stderr: &str) -> String {
-    let lines: Vec<&str> = stderr.trim_end().lines().collect();
+    let clean = strip_ansi(stderr);
+    let lines: Vec<&str> = clean.trim_end().lines().collect();
     lines[lines.len().saturating_sub(STDERR_LINES)..].join("\n")
 }
 
