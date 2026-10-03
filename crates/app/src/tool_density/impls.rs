@@ -1,3 +1,5 @@
+use crate::settings_pane::strings as words;
+
 use super::types::ToolDensity;
 
 impl ToolDensity {
@@ -5,9 +7,9 @@ impl ToolDensity {
 
     pub fn word(self) -> &'static str {
         match self {
-            ToolDensity::Grouped => "Grouped",
-            ToolDensity::Lines => "One line each",
-            ToolDensity::Detailed => "Full detail",
+            ToolDensity::Grouped => atelier_i18n::t(&words::TOOL_DENSITY_GROUPED),
+            ToolDensity::Lines => atelier_i18n::t(&words::TOOL_DENSITY_LINES),
+            ToolDensity::Detailed => atelier_i18n::t(&words::TOOL_DENSITY_DETAILED),
         }
     }
 

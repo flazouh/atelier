@@ -1,0 +1,43 @@
+//! No model to pick
+//!
+//! Muted small text beside an agent's name, shown when the agent offers no choice of AI model. About 25 characters.
+use atelier_i18n::Message;
+
+pub const NO_MODEL_TO_PICK: Message = Message {
+    ar: "لا يوجد نموذج للاختيار",
+    ca: "No hi ha cap model per triar",
+    cs: "Není z čeho vybírat",
+    da: "Ingen model at vælge",
+    de: "Kein Modell zur Auswahl",
+    el: "Δεν υπάρχει μοντέλο για επιλογή",
+    en: "No model to pick",
+    es: "No hay ningún modelo que elegir",
+    es_419: "No hay ningún modelo para elegir",
+    fi: "Ei valittavaa mallia",
+    fr: "Aucun modèle à choisir",
+    fr_ca: "Aucun modèle à choisir",
+    he: "אין מודל לבחירה",
+    hi: "चुनने के लिए कोई मॉडल नहीं",
+    hr: "Nema modela za odabir",
+    hu: "Nincs választható modell",
+    id: "Tidak ada model untuk dipilih",
+    it: "Nessun modello da scegliere",
+    ja: "選べるモデルはありません",
+    ko: "선택할 모델이 없습니다",
+    ms: "Tiada model untuk dipilih",
+    nl: "Geen model om te kiezen",
+    no: "Ingen modell å velge",
+    pl: "Brak modelu do wyboru",
+    pt_br: "Nenhum modelo para escolher",
+    pt_pt: "Nenhum modelo para escolher",
+    ro: "Niciun model de ales",
+    ru: "Нет модели на выбор",
+    sk: "Nie je z čoho vyberať",
+    sv: "Ingen modell att välja",
+    th: "ไม่มีโมเดลให้เลือก",
+    tr: "Seçilecek model yok",
+    uk: "Немає моделі для вибору",
+    vi: "Không có mô hình nào để chọn",
+    zh_cn: "没有可选模型",
+    zh_tw: "沒有可選模型",
+};

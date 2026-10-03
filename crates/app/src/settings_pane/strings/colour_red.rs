@@ -1,0 +1,43 @@
+//! Red
+//!
+//! Tooltip on a colour swatch. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_RED: Message = Message {
+    ar: "أحمر",
+    ca: "Vermell",
+    cs: "Červená",
+    da: "Rød",
+    de: "Rot",
+    el: "Κόκκινο",
+    en: "Red",
+    es: "Rojo",
+    es_419: "Rojo",
+    fi: "Punainen",
+    fr: "Rouge",
+    fr_ca: "Rouge",
+    he: "אדום",
+    hi: "लाल",
+    hr: "Crvena",
+    hu: "Piros",
+    id: "Merah",
+    it: "Rosso",
+    ja: "赤",
+    ko: "빨강",
+    ms: "Merah",
+    nl: "Rood",
+    no: "Rød",
+    pl: "Czerwony",
+    pt_br: "Vermelho",
+    pt_pt: "Vermelho",
+    ro: "Roșu",
+    ru: "Красный",
+    sk: "Červená",
+    sv: "Röd",
+    th: "สีแดง",
+    tr: "Kırmızı",
+    uk: "Червоний",
+    vi: "Đỏ",
+    zh_cn: "红色",
+    zh_tw: "紅色",
+};

@@ -1,0 +1,43 @@
+//! Green
+//!
+//! Tooltip on a colour swatch. One word.
+use atelier_i18n::Message;
+
+pub const COLOUR_GREEN: Message = Message {
+    ar: "أخضر",
+    ca: "Verd",
+    cs: "Zelená",
+    da: "Grøn",
+    de: "Grün",
+    el: "Πράσινο",
+    en: "Green",
+    es: "Verde",
+    es_419: "Verde",
+    fi: "Vihreä",
+    fr: "Vert",
+    fr_ca: "Vert",
+    he: "ירוק",
+    hi: "हरा",
+    hr: "Zelena",
+    hu: "Zöld",
+    id: "Hijau",
+    it: "Verde",
+    ja: "緑",
+    ko: "초록색",
+    ms: "Hijau",
+    nl: "Groen",
+    no: "Grønn",
+    pl: "Zielony",
+    pt_br: "Verde",
+    pt_pt: "Verde",
+    ro: "Verde",
+    ru: "Зелёный",
+    sk: "Zelená",
+    sv: "Grön",
+    th: "เขียว",
+    tr: "Yeşil",
+    uk: "Зелений",
+    vi: "Xanh lá",
+    zh_cn: "绿色",
+    zh_tw: "綠色",
+};

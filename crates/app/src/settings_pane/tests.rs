@@ -125,6 +125,18 @@ fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
     assert_eq!(density(cx), crate::tool_density::ToolDensity::Detailed);
     assert_eq!(wait_for(&file, |s| s.tool_density.as_deref() == Some("detailed")).tool_density.as_deref(), Some("detailed"));
 
+    // The language is a choice in Appearance: a language is kept by its tag, and the first entry hands the choice back to
+    // the system. English is the one picked here, so the words other tests read do not change under them.
+    click(cx, "section-appearance");
+    assert!(cx.debug_bounds("language").is_some(), "the language is offered");
+    let english = 1 + atelier_i18n::Locale::ALL.iter().position(|l| *l == atelier_i18n::Locale::En).unwrap();
+    _pane.update(cx, |pane, cx| pane.choose_language(english, cx));
+    cx.run_until_parked();
+    assert_eq!(wait_for(&file, |s| s.language.is_some()).language.as_deref(), Some("en"));
+    _pane.update(cx, |pane, cx| pane.choose_language(0, cx));
+    cx.run_until_parked();
+    assert_eq!(wait_for(&file, |s| s.language.is_none()).language, None, "the system's again");
+
     // Escape asks to close.
     cx.simulate_keystrokes("escape");
     assert_eq!(closed.get(), 1);

@@ -1,0 +1,43 @@
+//! Dark
+//!
+//! A choice between light, dark, or the system's appearance. A label on a segmented control: one or two words, so it must stay short.
+use atelier_i18n::Message;
+
+pub const MODE_DARK: Message = Message {
+    ar: "داكن",
+    ca: "Fosc",
+    cs: "Tmavý",
+    da: "Mørk",
+    de: "Dunkel",
+    el: "Σκούρο",
+    en: "Dark",
+    es: "Oscuro",
+    es_419: "Oscuro",
+    fi: "Tumma",
+    fr: "Sombre",
+    fr_ca: "Sombre",
+    he: "כהה",
+    hi: "गहरा",
+    hr: "Tamno",
+    hu: "Sötét",
+    id: "Gelap",
+    it: "Scuro",
+    ja: "ダーク",
+    ko: "어둡게",
+    ms: "Gelap",
+    nl: "Donker",
+    no: "Mørk",
+    pl: "Ciemny",
+    pt_br: "Escuro",
+    pt_pt: "Escuro",
+    ro: "Întunecat",
+    ru: "Тёмная",
+    sk: "Tmavý",
+    sv: "Mörk",
+    th: "มืด",
+    tr: "Koyu",
+    uk: "Темна",
+    vi: "Tối",
+    zh_cn: "深色",
+    zh_tw: "深色",
+};

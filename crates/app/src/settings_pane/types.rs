@@ -1,4 +1,7 @@
+use atelier_i18n::{Message, t};
 use atelier_ui::{sidebar_layout::SidebarLayout, theme::{Appearance, follow_system, set_appearance}};
+
+use super::strings as words;
 
 /// Light, dark, or whatever the system is set to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -13,9 +16,9 @@ impl Mode {
 
     pub fn word(self) -> &'static str {
         match self {
-            Mode::Light => "Light",
-            Mode::Dark => "Dark",
-            Mode::System => "System",
+            Mode::Light => t(&words::MODE_LIGHT),
+            Mode::Dark => t(&words::MODE_DARK),
+            Mode::System => t(&words::MODE_SYSTEM),
         }
     }
 
@@ -43,16 +46,16 @@ impl Mode {
 }
 
 /// The primary colours offered, besides the default (the theme's ink): name, colour as bytes, words. They are
-/// the reader's data, not the interface's colours.
-pub const PRIMARIES: [(&str, [u8; 3], &str); 8] = [
-    ("blue", [2, 133, 247], "Blue"),
-    ("purple", [146, 112, 232], "Purple"),
-    ("pink", [230, 106, 164], "Pink"),
-    ("red", [229, 86, 86], "Red"),
-    ("orange", [237, 145, 65], "Orange"),
-    ("amber", [229, 182, 60], "Amber"),
-    ("green", [101, 166, 90], "Green"),
-    ("teal", [22, 157, 131], "Teal"),
+/// the reader's data, not the interface's colours. The words are read in the current language, with [`t`].
+pub const PRIMARIES: [(&str, [u8; 3], &Message); 8] = [
+    ("blue", [2, 133, 247], &words::COLOUR_BLUE),
+    ("purple", [146, 112, 232], &words::COLOUR_PURPLE),
+    ("pink", [230, 106, 164], &words::COLOUR_PINK),
+    ("red", [229, 86, 86], &words::COLOUR_RED),
+    ("orange", [237, 145, 65], &words::COLOUR_ORANGE),
+    ("amber", [229, 182, 60], &words::COLOUR_AMBER),
+    ("green", [101, 166, 90], &words::COLOUR_GREEN),
+    ("teal", [22, 157, 131], &words::COLOUR_TEAL),
 ];
 
 pub enum SettingsEvent {
@@ -80,26 +83,26 @@ impl Section {
 
     pub fn words(self) -> &'static str {
         match self {
-            Section::Appearance => "Appearance",
-            Section::Sidebar => "Sidebar",
-            Section::Agents => "Agents",
+            Section::Appearance => t(&words::SECTION_APPEARANCE),
+            Section::Sidebar => t(&words::SECTION_SIDEBAR),
+            Section::Agents => t(&words::SECTION_AGENTS),
             Section::Providers => "Providers",
-            Section::Dictation => "Dictation",
-            Section::Tasks => "Tasks",
-            Section::Keys => "Keys",
+            Section::Dictation => t(&words::SECTION_DICTATION),
+            Section::Tasks => t(&words::SECTION_TASKS),
+            Section::Keys => t(&words::SECTION_KEYS),
         }
     }
 
     /// One line under the section's name.
     pub fn gist(self) -> &'static str {
         match self {
-            Section::Appearance => "The theme, light or dark, and the colour of the main button.",
-            Section::Sidebar => "What a session row shows, and how many sessions the sidebar shows before it folds the rest.",
-            Section::Agents => "How a picked skill runs, the agents this build can start, and the models each offers.",
+            Section::Appearance => t(&words::GIST_APPEARANCE),
+            Section::Sidebar => t(&words::GIST_SIDEBAR),
+            Section::Agents => t(&words::GIST_AGENTS),
             Section::Providers => "Where Claude Code gets its model. A session picks one beside its agent.",
-            Section::Dictation => "Speak instead of typing. The words are heard on this machine, and nothing leaves it.",
-            Section::Tasks => "What moves a task by itself. Every move shows in its activity, and you can move it back.",
-            Section::Keys => "The keys of the review. They cannot be changed yet.",
+            Section::Dictation => t(&words::GIST_DICTATION),
+            Section::Tasks => t(&words::GIST_TASKS),
+            Section::Keys => t(&words::GIST_KEYS),
         }
     }
 

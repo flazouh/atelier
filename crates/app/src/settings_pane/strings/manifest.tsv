@@ -1,0 +1,53 @@
+# key<TAB>English<TAB>note, for atelier-translate --batch (docs/i18n.md). Keys with a file here are skipped.
+settings	Settings	The title above the list of sections on the Settings page. About 14 characters of room.
+section_appearance	Appearance	An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section.
+section_sidebar	Sidebar	An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section.
+section_agents	Agents	An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section. Agents are the AI coding programs, like Claude Code and Cursor.
+section_dictation	Dictation	An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section. Dictation is speaking instead of typing.
+section_tasks	Tasks	An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section.
+section_keys	Keys	An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section. Keyboard shortcuts.
+gist_appearance	The theme, light or dark, and the colour of the main button.	One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines.
+gist_sidebar	What a session row shows, and how many sessions the sidebar shows before it folds the rest.	One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. A session is a conversation with an agent.
+gist_agents	How a picked skill runs, the agents this build can start, and the models each offers.	One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines.
+gist_dictation	Speak instead of typing. The words are heard on this machine, and nothing leaves it.	One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines.
+gist_tasks	What moves a task by itself. Every move shows in its activity, and you can move it back.	One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. A task is a card on a board that moves between columns.
+gist_keys	The keys of the review. They cannot be changed yet.	One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. The review is the screen where code changes are read and approved.
+mode_light	Light	A choice between light, dark, or the system's appearance. A label on a segmented control: one or two words, so it must stay short.
+mode_dark	Dark	A choice between light, dark, or the system's appearance. A label on a segmented control: one or two words, so it must stay short.
+mode_system	System	A choice between light, dark, or the system's appearance: it follows the operating system. A label on a segmented control: one or two words, so it must stay short.
+theme	Theme	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+mode	Mode	Row label for choosing light or dark appearance. Short.
+interface_font_size	Interface font size	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+primary_colour	Primary colour	Heading above a row of colour swatches on the Settings page. Short. Use the spelling the language's own region uses.
+primary_colour_gist	The main button's fill, and the highlight and the selection. A colour that no text reads on is not offered.	Explanation under the heading Primary colour, in muted small text. May wrap to three lines. The main button is the app's main call-to-action button; the selection is selected text.
+default_colour	Default: the theme's ink	Tooltip on the first colour swatch, which means: no custom colour, use the theme's own text colour. About 30 characters.
+colour_blue	Blue	Tooltip on a colour swatch. One word.
+colour_purple	Purple	Tooltip on a colour swatch. One word.
+colour_pink	Pink	Tooltip on a colour swatch. One word.
+colour_red	Red	Tooltip on a colour swatch. One word.
+colour_orange	Orange	Tooltip on a colour swatch. One word.
+colour_amber	Amber	Tooltip on a colour swatch: a yellow-orange. One word.
+colour_green	Green	Tooltip on a colour swatch. One word.
+colour_teal	Teal	Tooltip on a colour swatch: a blue-green. One word.
+language	Language	Row label for choosing the app's language on the Settings page. One word.
+language_system	System	The first choice in the list of languages: use the language the computer is set to. One word.
+language_gist	Some words, like the agents' status lines, change after you restart Atelier.	Muted small text under the language choice. It tells the reader that part of the interface changes language only after a restart. May wrap to two lines.
+project_badge_on_rows	Project badge on rows	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A badge is a small coloured mark with a project's initial.
+time_on_rows	Time on rows	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. Rows are the entries in the sidebar's session list.
+agent_icon_on_rows	Agent icon on rows	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+sessions_shown_for_each_project	Sessions shown for each project	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+earlier_sessions_shown_in_priority	Earlier sessions shown in Priority	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. Priority is the name of one way the sidebar lists sessions, and it is a name: translate it as a word, as it appears elsewhere.
+tool_calls	Tool calls	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A tool call is one action an agent takes, like reading a file or running a command.
+tool_density_grouped	Grouped	A choice for how much of the agent's tool calls to show: grouped into one summary line. A label on a segmented control: one or two words, so it must stay short.
+tool_density_lines	One line each	A choice for how much of the agent's tool calls to show: one line for each call. A label on a segmented control: one or two words, so it must stay short.
+tool_density_detailed	Full detail	A choice for how much of the agent's tool calls to show: everything, with the call's output. A label on a segmented control: one or two words, so it must stay short.
+run_a_skill_when_you_pick_it	Run a skill when you pick it	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A skill is a saved instruction for an agent, picked from a list in the message box; this switch says whether picking it sends it at once.
+no_model_to_pick	No model to pick	Muted small text beside an agent's name, shown when the agent offers no choice of AI model. About 25 characters.
+no_agent_is_available	No agent is available.	Muted small text shown when the app can start no agent. A full sentence with a full stop.
+dictation_key	Dictation key	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. The key on the keyboard that, when held, records speech.
+dictation_key_off	Off	A choice for the dictation key: none. A label on a segmented control: one or two words, so it must stay short.
+microphone	Microphone	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+hold_the_microphone_button_to_record	Hold the microphone button to record	The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A switch.
+dictation_gist_fn_mac	Hold it to talk; tap it to keep talking, and tap again to stop. In System Settings, Keyboard, set "Press 🌐 key to" to "Do nothing", or macOS takes the key for its own dictation.	Muted small text under the dictation key choice, on a Mac, when the key is the Fn key (the globe key). 'It' is that key. "System Settings", "Keyboard", "Press 🌐 key to" and "Do nothing" are names in macOS: write them as Apple writes them in the macOS of that language. May wrap to three lines.
+dictation_gist_shortcut_mac	Hold it to talk; tap it to keep talking, and tap again to stop. A shortcut with the key still works.	Muted small text under the dictation key choice, on a Mac, when the key is the Option key. 'It' is that key. May wrap to two lines.
+dictation_gist_none	The microphone button still dictates.	Muted small text under the dictation key choice when the key is Off: the microphone button in the message box still records speech.

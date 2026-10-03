@@ -1,0 +1,43 @@
+//! Tool calls
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A tool call is one action an agent takes, like reading a file or running a command.
+use atelier_i18n::Message;
+
+pub const TOOL_CALLS: Message = Message {
+    ar: "استدعاءات الأدوات",
+    ca: "Crides a eines",
+    cs: "Volání nástrojů",
+    da: "Værktøjskald",
+    de: "Tool-Aufrufe",
+    el: "Κλήσεις εργαλείων",
+    en: "Tool calls",
+    es: "Llamadas a herramientas",
+    es_419: "Llamadas a herramientas",
+    fi: "Työkalukutsut",
+    fr: "Appels d’outils",
+    fr_ca: "Appels d’outils",
+    he: "קריאות לכלים",
+    hi: "टूल कॉल",
+    hr: "Pozivi alata",
+    hu: "Eszközhívások",
+    id: "Pemanggilan alat",
+    it: "Chiamate agli strumenti",
+    ja: "ツール呼び出し",
+    ko: "도구 호출",
+    ms: "Panggilan alat",
+    nl: "Toolaanroepen",
+    no: "Verktøykall",
+    pl: "Wywołania narzędzi",
+    pt_br: "Chamadas de ferramentas",
+    pt_pt: "Chamadas de ferramentas",
+    ro: "Apeluri de instrumente",
+    ru: "Вызовы инструментов",
+    sk: "Volania nástrojov",
+    sv: "Verktygsanrop",
+    th: "การเรียกใช้เครื่องมือ",
+    tr: "Araç çağrıları",
+    uk: "Виклики інструментів",
+    vi: "Lời gọi công cụ",
+    zh_cn: "工具调用",
+    zh_tw: "工具呼叫",
+};
