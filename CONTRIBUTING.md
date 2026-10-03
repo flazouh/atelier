@@ -5,6 +5,12 @@
 Run `tools/check.sh` before you open a pull request. It runs the workspace tests, clippy with warnings as
 errors, the gallery build, and the tests of the patched copies in `vendor`.
 
+## Driving the app
+
+A debug build listens on a Unix socket (`ATELIER_CONTROL=off` turns it off), so a change can be checked without a pointer:
+`tools/dev-qa.sh start` runs a throwaway app on a scratch folder, `tools/atelier-ctl.sh state` lists the sessions and
+the rows they show, `new_session [agent]` and `send "text"` act, and `tools/dev-qa.sh stop` ends it.
+
 ## Design
 
 - The UI is built from [atelier-ui](https://github.com/flazouh/atelier-ui), a separate repo. A change to a

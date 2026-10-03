@@ -16,6 +16,7 @@ mod agents_view;
 mod file_glyphs;
 mod dirty;
 mod editor_pane;
+mod control;
 mod exit_log;
 #[cfg(test)]
 mod fake_agent;
@@ -104,6 +105,9 @@ fn main() {
         cx.open_window(options, move |window, cx| {
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
+            if let Some(path) = control::socket_path() {
+                control::serve(shell.downgrade(), window.window_handle(), path, cx);
+            }
             window.focus(&shell.read(cx).focus_handle(), cx);
             // The sessions open at the last quit open again with their projects: all of them when no
             // folder is named, else those of the named folders.

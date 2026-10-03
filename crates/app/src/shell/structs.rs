@@ -364,7 +364,7 @@ impl Shell {
     }
 
     /// Makes `session` the panel in front, and its project the one the tree and the editor show.
-    fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
         self.active = project;
         self.narrow = Pane::Session;
         self.sync(cx);
