@@ -92,3 +92,8 @@ pub fn scripted_agent(name: &'static str, turns: Vec<Vec<Event>>) -> (atelier_ag
     agent.name = name;
     (agent, fake)
 }
+
+/// A fake backend whose past sessions all read back as `history`.
+pub fn backend_with_history(history: Vec<Event>) -> Arc<dyn atelier_agents::session::Backend> {
+    Arc::new(FakeBackend(Arc::new(Fake { history, ..Fake::default() })))
+}

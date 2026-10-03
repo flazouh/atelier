@@ -23,6 +23,8 @@ pub struct Fake {
     pub accounts: Vec<Account>,
     /// Every request it was opened with, in order.
     pub opened: Arc<Mutex<Vec<OpenRequest>>>,
+    /// What it reads back as any past session's history.
+    pub history: Vec<Event>,
 }
 
 struct FakeSession {
@@ -54,6 +56,9 @@ impl Backend for FakeBackend {
     }
     fn capabilities(&self) -> Capabilities {
         Capabilities { providers: self.0.providers, ..Capabilities::default() }
+    }
+    fn history(&self, _: &dyn Project, _: &SessionId) -> Result<Vec<Event>, SessionError> {
+        Ok(self.0.history.clone())
     }
     fn accounts(&self, _: &dyn Project) -> Result<Vec<Account>, SessionError> {
         Ok(self.0.accounts.clone())

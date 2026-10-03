@@ -334,6 +334,35 @@ impl Shell {
         self.show_session(project, &session, window, cx);
     }
 
+    /// Opens a new session in the project at `project` that carries on the session on the sidebar's row `row`. It starts
+    /// on the project's agent and default provider; until its first message, the reader can pick others.
+    fn continue_with(&mut self, project: usize, row: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(source) = self.source_of(project, row, cx) else {
+            return self.say("This session has not started, so there is nothing to continue yet.".into(), cx);
+        };
+        let Some(p) = self.projects.get(project).cloned() else { return };
+        let session = p.update(cx, |p, cx| p.open_session(None, None, window, cx));
+        session.update(cx, |s, cx| s.continue_from(source, cx));
+        self.show_session(project, &session, window, cx);
+    }
+
+    /// The session on the sidebar's row `row`, as a new session continues it; `None` before its agent named it.
+    fn source_of(&self, project: usize, row: &str, cx: &App) -> Option<crate::agent_session::handoff::Source> {
+        use crate::agent_session::handoff::Source;
+        match agents_view::pick(row) {
+            agents_view::Pick::Open(key) => {
+                let (_, session) = self.session_by_key(&key, cx)?;
+                let s = session.read(cx);
+                Some(Source { backend: s.agent.backend.clone(), agent: s.agent.name.into(), id: s.id.clone()?, title: s.shown_title() })
+            }
+            agents_view::Pick::Past(id) => {
+                let p = self.projects.get(project)?.read(cx);
+                let title = self.names.get(&id.0).cloned().or_else(|| p.past.iter().find(|s| s.id == id).map(|s| s.title.clone())).unwrap_or_default();
+                Some(Source { backend: p.agent.backend.clone(), agent: p.agent.name.into(), id, title: title.into() })
+            }
+        }
+    }
+
     /// Makes `session` the panel in front, and its project the one the tree and the editor show.
     fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
         self.active = project;
@@ -390,6 +419,11 @@ impl Shell {
                 None => self.say("This session has not started, so it has no id yet.".into(), cx),
             },
             SidebarEvent::CloseSession { session, .. } => self.close_session(session.as_ref(), cx),
+            SidebarEvent::ContinueWith { project, session } => {
+                if let Some(at) = self.project_by_id(project, cx) {
+                    self.continue_with(at, session, window, cx);
+                }
+            }
             SidebarEvent::NewSession { project } => {
                 if let Some(at) = self.project_by_id(project, cx) {
                     self.new_session(at, window, cx);

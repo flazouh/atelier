@@ -13,6 +13,7 @@
 
 mod composer_lists;
 pub(crate) mod dictation;
+pub mod handoff;
 mod helpers;
 mod structs;
 mod types;

@@ -292,7 +292,11 @@ impl OpenProject {
         if !self.sessions[at].read(cx).can_choose_agent() {
             return;
         }
+        let continues = self.sessions[at].read(cx).continues().cloned();
         self.sessions[at] = self.start_session(key.to_string().into(), agent, None, window, cx);
+        if let Some(source) = continues {
+            self.sessions[at].update(cx, |s, cx| s.continue_from(source, cx));
+        }
         cx.emit(ProjectEvent::Sessions);
     }
 
