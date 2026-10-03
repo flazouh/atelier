@@ -1,0 +1,43 @@
+//! Waiting for Claude…
+//!
+//! Status line with a shimmering animation, shown after a message is sent to the Claude Code agent until it answers. About 24 characters of room. Claude is a name and stays as it is.
+use atelier_i18n::Message;
+
+pub const WAITING_FOR_CLAUDE: Message = Message {
+    ar: "بانتظار Claude…",
+    ca: "Esperant Claude…",
+    cs: "Čeká se na Claudea…",
+    da: "Venter på Claude…",
+    de: "Warte auf Claude…",
+    el: "Αναμονή για Claude…",
+    en: "Waiting for Claude…",
+    es: "Esperando a Claude…",
+    es_419: "Esperando a Claude…",
+    fi: "Odotetaan Claudea…",
+    fr: "En attente de Claude…",
+    fr_ca: "En attente de Claude…",
+    he: "ממתינים ל-Claude…",
+    hi: "Claude का इंतज़ार…",
+    hr: "Čekanje na Claudea…",
+    hu: "Várakozás Claude-ra…",
+    id: "Menunggu Claude…",
+    it: "In attesa di Claude…",
+    ja: "Claudeの応答待ち…",
+    ko: "Claude 응답 대기 중…",
+    ms: "Menunggu Claude…",
+    nl: "Wachten op Claude…",
+    no: "Venter på Claude…",
+    pl: "Oczekiwanie na Claude…",
+    pt_br: "Aguardando Claude…",
+    pt_pt: "À espera de Claude…",
+    ro: "Se așteaptă Claude…",
+    ru: "Ожидание Claude…",
+    sk: "Čaká sa na Claudea…",
+    sv: "Väntar på Claude…",
+    th: "กำลังรอ Claude…",
+    tr: "Claude bekleniyor…",
+    uk: "Очікування Claude…",
+    vi: "Đang chờ Claude…",
+    zh_cn: "正在等待 Claude…",
+    zh_tw: "正在等候 Claude…",
+};

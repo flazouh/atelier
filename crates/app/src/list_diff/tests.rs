@@ -123,3 +123,14 @@ fn a_tool_calls_fingerprint_follows_its_edit_as_it_streams() {
     assert_ne!(fingerprint(&edit("b")), fingerprint(&edit("b\nc")));
     assert_eq!(fingerprint(&edit("b")), fingerprint(&edit("b")));
 }
+
+#[test]
+fn a_sent_message_waits_until_the_agent_says_something() {
+    use atelier_agents::session::BlockId;
+    let user = Item::User { text: "hi".into() };
+    let text = Item::Text { block: BlockId(1), text: "hello".into() };
+    assert!(waits(std::slice::from_ref(&user), true), "a turn is open and nothing has answered");
+    assert!(!waits(std::slice::from_ref(&user), false), "no turn, nothing to wait for");
+    assert!(!waits(&[user, text], true), "the agent has answered");
+    assert!(!waits(&[], true));
+}

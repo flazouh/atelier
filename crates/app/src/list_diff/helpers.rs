@@ -104,6 +104,17 @@ pub fn changes_fingerprint(turn: usize) -> (u8, usize, usize) {
     (7, turn, 0)
 }
 
+/// The fingerprint of the waiting row: it draws the same until it goes.
+pub fn waiting_fingerprint() -> (u8, usize, usize) {
+    (9, 0, 0)
+}
+
+/// Whether the list ends in a waiting row: a turn is open and the agent has answered nothing since the
+/// reader's last message.
+pub fn waits(items: &[Item], working: bool) -> bool {
+    working && matches!(items.last(), Some(Item::User { .. }))
+}
+
 /// The rows of `after` that `before` did not have.
 pub fn arrivals(before: &[Row], after: &[Row]) -> Vec<Arrival> {
     let had: std::collections::HashSet<Arrival> = before.iter().map(|&r| Arrival::of(r)).collect();
