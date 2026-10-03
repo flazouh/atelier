@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use super::structs::{
-    BlockId, FileEdit, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
+    BlockId, ContextFill, FileEdit, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
     ToolOutput, TurnEnd, Usage,
 };
 
@@ -92,6 +92,8 @@ pub enum Event {
     /// The agent withdrew a request, or a turn ended before it was answered.
     PermissionCancelled(RequestId),
     Usage(Usage),
+    /// How full the context is, each time it changes.
+    Context(ContextFill),
     TurnEnded(TurnEnd),
     /// Something went wrong that did not end the session, such as a line that did not parse.
     Warning(String),

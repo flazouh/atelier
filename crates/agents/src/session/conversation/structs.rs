@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::super::event::{
-    ChoiceKind, EndReason, Event, FileEdit, RequestId, Started, Todo, ToolCall, ToolId, ToolOutput,
+    ChoiceKind, ContextFill, EndReason, Event, FileEdit, RequestId, Started, Todo, ToolCall, ToolId, ToolOutput,
     ToolStatus, TurnEnd, TurnOutcome, Usage,
 };
 use super::types::{Answer, Item, Slot, SubagentStatus};
@@ -20,6 +20,7 @@ pub struct Conversation {
     pub(super) items: Vec<Item>,
     todos: Vec<Todo>,
     pub(super) usage: Usage,
+    context: ContextFill,
     working: bool,
     started: Option<Started>,
     pub(super) ended: Option<EndReason>,
@@ -44,6 +45,11 @@ impl Conversation {
     /// The tokens and cost of every turn so far.
     pub fn usage(&self) -> Usage {
         self.usage
+    }
+
+    /// How full the agent's context window is, as it last told.
+    pub fn context(&self) -> ContextFill {
+        self.context
     }
 
     /// Whether a turn is open: the agent works, or waits for an answer.
@@ -181,6 +187,7 @@ impl Conversation {
                     (a, b) => Some(a.unwrap_or(0.) + b.unwrap_or(0.)),
                 };
             }
+            Event::Context(context) => self.context = *context,
             Event::TurnEnded(end) => {
                 self.working = false;
                 if let TurnOutcome::Failed(why) = &end.outcome {

@@ -14,7 +14,7 @@ use gpui_kit::{
 use atelier_ui::scale::px;
 use atelier_agents::{
     registry::Agent,
-    session::{Answer, ChoiceKind, Command, Conversation, Event, EventQueue, Item, OpenRequest, PermissionMode, Session, SessionId},
+    session::{Answer, ChoiceKind, Command, ContextFill, Conversation, Event, EventQueue, Item, OpenRequest, PermissionMode, Session, SessionId},
 };
 use atelier_project::Project;
 use atelier_review::{TurnReview, TurnTracker};
@@ -601,10 +601,17 @@ impl AgentSession {
         self.refresh_rows();
         let working = self.conversation.working();
         self.composer.update(cx, |c, cx| c.set_running(working, cx));
+        self.show_context(cx);
         if self.status != before {
             cx.emit(SessionEvent::Changed);
         }
         cx.notify();
+    }
+
+    /// Tells the composer how full the agent's context is, once the agent has told its window too.
+    fn show_context(&self, cx: &mut Context<Self>) {
+        let ContextFill { used, window: Some(window) } = self.conversation.context() else { return };
+        self.composer.update(cx, |c, cx| c.set_context(used, window, cx));
     }
 
     /// Whether the group of items `from..to` is the live one: the agent works and nothing comes after it.
