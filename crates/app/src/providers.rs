@@ -76,6 +76,19 @@ pub fn label(choice: &Choice, accounts: &[Account]) -> String {
     }
 }
 
+/// The account a session signs in to: the one it runs on, else the usual one.
+pub fn sign_in_account(provider: Option<&Choice>) -> String {
+    match provider {
+        Some(Choice::Account(name)) => name.clone(),
+        _ => USUAL_ACCOUNT.into(),
+    }
+}
+
+/// The account a notice names: only one the reader made, as the usual one needs no name.
+pub fn named_account(provider: Option<&Choice>) -> Option<String> {
+    Some(sign_in_account(provider)).filter(|name| name != USUAL_ACCOUNT)
+}
+
 /// What a session row says of its provider: nothing for the usual account, so most rows stay quiet.
 pub fn row_words(choice: &Choice) -> Option<SharedString> {
     match choice {

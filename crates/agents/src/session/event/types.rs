@@ -115,6 +115,9 @@ pub enum Event {
     Context(ContextFill),
     /// Where the account stands against its usage limit, each time it changes.
     Limit(Limit),
+    /// The agent has no sign-in to work with: the turn that asked for it did not run. Signing in again is the
+    /// way on; the failed turn that follows says nothing more.
+    SignedOut,
     TurnEnded(TurnEnd),
     /// Something went wrong that did not end the session, such as a line that did not parse.
     Warning(String),

@@ -7,7 +7,7 @@ pub fn atelier_commands() -> Vec<CommandInfo> {
     vec![
         CommandInfo::new("goal", Atelier, "Set what this session is for, or show it", Some("<the goal>")),
         CommandInfo::new("clear-goal", Atelier, "Clear this session's goal", None),
-        CommandInfo::new("login", Atelier, "Sign in to the agent, in a terminal", None),
+        CommandInfo::new("login", Atelier, "Sign in to the agent", None),
         CommandInfo::new("review", Atelier, "Review this session's changes", None),
         CommandInfo::new("tasks", Atelier, "Show the project's tasks", None),
         CommandInfo::new("files", Atelier, "Show the Files view", None),

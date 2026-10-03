@@ -149,3 +149,22 @@ fn a_real_session_end_to_end() {
     let sink: EventSink = Arc::new(move |event| drop(tx.lock().unwrap().send(event)));
     assert!(ClaudeCode::with_program("/no/such/claude").open(project, OpenRequest::default(), sink).is_err());
 }
+
+/// A run with no sign-in tells `SignedOut` and shows none of `claude`'s advice to run `/login`, which a headless run
+/// cannot. It needs the `claude` program, not a network or an account: nothing reaches the API.
+#[test]
+#[ignore = "runs the real claude"]
+fn a_run_with_no_sign_in_tells_it_and_fails_its_turn() {
+    let config = tempfile::tempdir().unwrap();
+    // SAFETY: this test is the only one that runs in its process.
+    unsafe { std::env::set_var("CLAUDE_CONFIG_DIR", config.path()) };
+    let dir = tempfile::tempdir().unwrap();
+    let project: Arc<dyn Project> = Arc::new(LocalProject::open(dir.path()).unwrap());
+    let (session, rx) = open(&project, OpenRequest::default());
+    session.send(Command::send("hi")).unwrap();
+    let mut seen = Vec::new();
+    until(&rx, &mut seen, turn_ended);
+    assert!(seen.contains(&Event::SignedOut), "{seen:#?}");
+    assert!(!seen.iter().any(|e| matches!(e, Event::Text { .. })), "the CLI's advice is not shown: {seen:#?}");
+    assert!(matches!(outcome(&seen), TurnOutcome::Failed(_)));
+}

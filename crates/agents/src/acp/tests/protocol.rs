@@ -74,10 +74,34 @@ fn an_agent_still_signed_out_after_the_sign_in_ends_the_session_with_its_own_wor
     run.agent(json!({ "jsonrpc": "2.0", "id": 3, "error": { "code": -32000, "message": "Authentication required", "data": { "message": "Run 'agent login' first." } } }));
     assert_eq!(run.sent("authenticate").len(), 1, "atelier signs in once");
     let events = run.events();
-    assert!(matches!(&events[0], Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("Run 'agent login' first.".into())), "the message sent fails");
+    assert_eq!(events[0], Event::SignedOut, "the sign-in comes first, so the failure that follows adds nothing");
+    assert!(matches!(&events[1], Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("Run 'agent login' first.".into())), "the message sent fails");
     assert_eq!(events.last(), Some(&Event::Ended(EndReason::Failed("Run 'agent login' first.".into()))));
     assert!(run.done, "the agent is stopped");
     assert!(matches!(run.protocol.command(Command::send("again"), std::time::Instant::now()), Err(SessionError::Closed)));
+}
+
+#[test]
+fn a_sign_in_that_runs_out_in_the_middle_of_a_session_fails_the_turn_as_signed_out() {
+    let mut run = Run::ready();
+    run.events();
+    run.command(Command::send("hello"));
+    let id = run.sent("session/prompt")[0]["id"].as_u64().expect("the prompt has an id");
+    run.agent(fail(id, -32000, "Authentication required"));
+    let events = run.events();
+    assert_eq!(events[0], Event::SignedOut);
+    assert!(matches!(&events[1], Event::TurnEnded(end) if matches!(end.outcome, TurnOutcome::Failed(_))), "{events:?}");
+    assert!(!run.done, "the agent still runs: signing in and asking again is all it needs");
+}
+
+#[test]
+fn another_error_of_a_turn_is_not_a_missing_sign_in() {
+    let mut run = Run::ready();
+    run.events();
+    run.command(Command::send("hello"));
+    let id = run.sent("session/prompt")[0]["id"].as_u64().expect("the prompt has an id");
+    run.agent(fail(id, -32603, "Internal error"));
+    assert!(!run.events().contains(&Event::SignedOut));
 }
 
 #[test]

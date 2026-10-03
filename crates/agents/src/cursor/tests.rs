@@ -44,3 +44,10 @@ fn cursors_mark_is_painted_a_grey_that_reads_on_light_and_dark_pages() {
 fn cursor_can_resume_because_it_loads_sessions() {
     assert!(agent().resume, "its `initialize` answer says `loadSession: true`");
 }
+
+#[test]
+fn cursor_signs_in_with_its_own_login_command() {
+    let backend = registry::by_backend(BACKEND).expect("Cursor is offered").backend;
+    let command = backend.sign_in("default").expect("atelier can sign Cursor in");
+    assert_eq!((command.program.to_str(), command.args.as_slice()), (Some("agent"), ["login".to_string()].as_slice()));
+}

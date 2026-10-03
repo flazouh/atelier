@@ -31,6 +31,10 @@ pub struct Fake {
     pub history: Vec<Event>,
     /// The backend's name, when a test needs it told from the others'; "fake" otherwise.
     pub named: Option<&'static str>,
+    /// What signs in to an account, or `None` for an agent atelier cannot sign in.
+    pub sign_in: Option<atelier_project::Command>,
+    /// The account of every sign-in asked for, in order.
+    pub signed_in_as: Mutex<Vec<String>>,
 }
 
 struct FakeSession {
@@ -68,6 +72,10 @@ impl Backend for FakeBackend {
     }
     fn accounts(&self, _: &dyn Project) -> Result<Vec<Account>, SessionError> {
         Ok(self.0.accounts.clone())
+    }
+    fn sign_in(&self, account: &str) -> Option<atelier_project::Command> {
+        self.0.signed_in_as.lock().unwrap().push(account.into());
+        self.0.sign_in.clone()
     }
     fn open(&self, _: Arc<dyn Project>, request: OpenRequest, sink: EventSink) -> Result<Box<dyn Session>, SessionError> {
         self.0.opened.lock().unwrap().push(request.clone());

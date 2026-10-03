@@ -45,6 +45,8 @@ pub struct AcpAgent {
     pub todos: bool,
     /// Whether the agent loads a past session (ACP's optional `loadSession`), so a session can resume.
     pub resume: bool,
+    /// What the agent runs to sign in, after its program: `login` for Cursor. Empty when the agent has no command for it.
+    pub login: Vec<String>,
 }
 
 impl AcpAgent {
@@ -110,6 +112,10 @@ impl Backend for Acp {
 
     fn history(&self, project: &dyn Project, session: &SessionId) -> Result<Vec<Event>, SessionError> {
         store::history(self.agent.clone(), project, session)
+    }
+
+    fn sign_in(&self, _account: &str) -> Option<Command> {
+        (!self.agent.login.is_empty()).then(|| Command::new(&self.agent.program).args(self.agent.login.iter().cloned()))
     }
 }
 
