@@ -610,3 +610,54 @@ mod handoff {
         assert!(sent_texts(&fake.received.lock().unwrap())[0].contains(EARLIER_ANSWER));
     }
 }
+
+fn sent_texts(fake: &crate::fake_agent::Fake) -> Vec<String> {
+    fake.received.lock().unwrap().iter().filter_map(|c| match c {
+        Command::Send { text, .. } => Some(text.clone()),
+        _ => None,
+    }).collect()
+}
+
+/// A message queued while a turn runs waits for it and goes when it completes, one per turn; a Stop
+/// keeps the rest waiting.
+#[gpui_kit::test]
+fn a_queued_message_waits_for_the_turn_to_complete(cx: &mut TestAppContext) {
+    let (session, fake, cx) = start(cx, vec![vec![], vec![], vec![]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("first".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| {
+        s.queue("second".into(), cx);
+        s.queue("third".into(), cx);
+    }));
+    assert_eq!(sent_texts(&fake), ["first"]);
+    assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["second", "third"]);
+
+    let agent = fake.sinks.lock().unwrap()[0].clone();
+    agent(ended());
+    cx.run_until_parked();
+    assert_eq!(sent_texts(&fake), ["first", "second"], "the oldest goes when the turn completes");
+    assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["third"]);
+
+    agent(Event::TurnEnded(atelier_agents::session::TurnEnd { outcome: atelier_agents::session::TurnOutcome::Interrupted, summary: None }));
+    cx.run_until_parked();
+    assert_eq!(sent_texts(&fake), ["first", "second"], "a Stop keeps the queue");
+    assert_eq!(cx.update(|_, cx| session.read(cx).queued.clone()), ["third"]);
+}
+
+/// With no turn running a queued message goes at once; a queued one can go now, or come out.
+#[gpui_kit::test]
+fn the_queue_sends_at_once_when_idle_and_rows_send_now_or_come_out(cx: &mut TestAppContext) {
+    let (session, fake, cx) = start(cx, vec![vec![], vec![], vec![]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.queue("now".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(sent_texts(&fake), ["now"], "nothing ran, so nothing to wait for");
+    cx.update(|_, cx| session.update(cx, |s, cx| {
+        s.queue("dropped".into(), cx);
+        s.queue("steered".into(), cx);
+        s.unqueue(0, cx);
+        s.send_queued(0, cx);
+    }));
+    cx.run_until_parked();
+    assert_eq!(sent_texts(&fake), ["now", "steered"]);
+    assert!(cx.update(|_, cx| session.read(cx).queued.is_empty()));
+}

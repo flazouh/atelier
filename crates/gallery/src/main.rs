@@ -284,6 +284,7 @@ impl Gallery {
                 .model("sonnet-5");
             input.set_running(true, cx);
             input.set_context(172_000, 200_000, cx);
+            input.set_queued(vec!["Then run the whole test suite".into(), "Open a PR when it is green".into()], cx);
             input
         });
         // The gallery only prints what the input asked for; the app will act on it.
