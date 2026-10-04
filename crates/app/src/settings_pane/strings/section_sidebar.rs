@@ -1,0 +1,43 @@
+//! Sidebar
+//!
+//! An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section.
+use atelier_i18n::Message;
+
+pub const SECTION_SIDEBAR: Message = Message {
+    ar: "الشريط الجانبي",
+    ca: "Barra lateral",
+    cs: "Postranní panel",
+    da: "Sidepanel",
+    de: "Seitenleiste",
+    el: "Πλευρική στήλη",
+    en: "Sidebar",
+    es: "Barra lateral",
+    es_419: "Barra lateral",
+    fi: "Sivupalkki",
+    fr: "Barre latérale",
+    fr_ca: "Barre latérale",
+    he: "סרגל צד",
+    hi: "साइडबार",
+    hr: "Bočna traka",
+    hu: "Oldalsáv",
+    id: "Bilah sisi",
+    it: "Barra laterale",
+    ja: "サイドバー",
+    ko: "사이드바",
+    ms: "Bar sisi",
+    nl: "Zijbalk",
+    no: "Sidepanel",
+    pl: "Pasek boczny",
+    pt_br: "Barra lateral",
+    pt_pt: "Barra lateral",
+    ro: "Bară laterală",
+    ru: "Боковая панель",
+    sk: "Bočný panel",
+    sv: "Sidofält",
+    th: "แถบด้านข้าง",
+    tr: "Kenar çubuğu",
+    uk: "Бічна панель",
+    vi: "Thanh bên",
+    zh_cn: "侧边栏",
+    zh_tw: "側邊欄",
+};

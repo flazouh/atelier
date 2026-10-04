@@ -1,0 +1,43 @@
+//! Earlier sessions shown in Priority
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. Priority is the name of one way the sidebar lists sessions, and it is a name: translate it as a word, as it appears elsewhere.
+use atelier_i18n::Message;
+
+pub const EARLIER_SESSIONS_SHOWN_IN_PRIORITY: Message = Message {
+    ar: "الجلسات السابقة المعروضة حسب الأولوية",
+    ca: "Sessions anteriors que es mostren a Prioritat",
+    cs: "Starší relace zobrazené v režimu Priorita",
+    da: "Tidligere sessioner vist i Prioritet",
+    de: "Frühere Sitzungen in „Priorität“ anzeigen",
+    el: "Παλαιότερες συνεδρίες στην Προτεραιότητα",
+    en: "Earlier sessions shown in Priority",
+    es: "Sesiones anteriores en Prioridad",
+    es_419: "Sesiones anteriores en Prioridad",
+    fi: "Aiemmat istunnot Prioriteetti-näkymässä",
+    fr: "Sessions précédentes affichées dans Priorité",
+    fr_ca: "Sessions précédentes affichées dans Priorité",
+    he: "הצגת הפעלות קודמות במצב עדיפות",
+    hi: "प्राथमिकता में पहले के सेशन दिखाएँ",
+    hr: "Starije sesije prikazane u Prioritetu",
+    hu: "Korábbi munkamenetek megjelenítése a Prioritás nézetben",
+    id: "Sesi sebelumnya ditampilkan di Prioritas",
+    it: "Sessioni precedenti mostrate in Priorità",
+    ja: "優先度に表示する過去のセッション",
+    ko: "우선순위에 표시되는 이전 세션",
+    ms: "Sesi terdahulu dipaparkan dalam Keutamaan",
+    nl: "Eerdere sessies in Prioriteit weergeven",
+    no: "Tidligere økter vist i Prioritet",
+    pl: "Wcześniejsze sesje wyświetlane w Priorytecie",
+    pt_br: "Sessões anteriores exibidas em Prioridade",
+    pt_pt: "Sessões anteriores apresentadas em Prioridade",
+    ro: "Sesiunile anterioare afișate în Prioritate",
+    ru: "Предыдущие сеансы в разделе «Приоритет»",
+    sk: "Staršie relácie zobrazené v režime Priorita",
+    sv: "Tidigare sessioner som visas i Prioritet",
+    th: "แสดงเซสชันก่อนหน้าในลำดับความสำคัญ",
+    tr: "Öncelik'te gösterilen önceki oturumlar",
+    uk: "Попередні сеанси в розділі «Пріоритет»",
+    vi: "Các phiên trước được hiển thị trong Ưu tiên",
+    zh_cn: "在“优先级”中显示较早的会话",
+    zh_tw: "在「優先順序」中顯示較早的工作階段",
+};

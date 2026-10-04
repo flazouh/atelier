@@ -1,0 +1,43 @@
+//! Keys
+//!
+//! An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section. Keyboard shortcuts.
+use atelier_i18n::Message;
+
+pub const SECTION_KEYS: Message = Message {
+    ar: "اختصارات لوحة المفاتيح",
+    ca: "Dreceres de teclat",
+    cs: "Klávesové zkratky",
+    da: "Tastaturgenveje",
+    de: "Tastenkürzel",
+    el: "Συντομεύσεις πληκτρολογίου",
+    en: "Keys",
+    es: "Atajos de teclado",
+    es_419: "Atajos de teclado",
+    fi: "Pikanäppäimet",
+    fr: "Raccourcis clavier",
+    fr_ca: "Raccourcis clavier",
+    he: "קיצורי מקלדת",
+    hi: "कीबोर्ड शॉर्टकट",
+    hr: "Tipkovni prečaci",
+    hu: "Billentyűparancsok",
+    id: "Pintasan keyboard",
+    it: "Scorciatoie da tastiera",
+    ja: "キーボードショートカット",
+    ko: "키보드 단축키",
+    ms: "Pintasan papan kekunci",
+    nl: "Sneltoetsen",
+    no: "Tastatursnarveier",
+    pl: "Skróty klawiszowe",
+    pt_br: "Atalhos de teclado",
+    pt_pt: "Atalhos de teclado",
+    ro: "Scurtături de tastatură",
+    ru: "Сочетания клавиш",
+    sk: "Klávesové skratky",
+    sv: "Kortkommandon",
+    th: "แป้นพิมพ์ลัด",
+    tr: "Klavye kısayolları",
+    uk: "Комбінації клавіш",
+    vi: "Phím tắt",
+    zh_cn: "键盘快捷键",
+    zh_tw: "鍵盤快速鍵",
+};

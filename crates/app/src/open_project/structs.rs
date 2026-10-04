@@ -94,7 +94,7 @@ pub struct OpenProject {
     pub(super) repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
-    list_rows: Vec<atelier_ui::PrChipData>,
+    pub(crate) list_rows: Vec<atelier_ui::PrChipData>,
     pub(super) pr_chips: std::rc::Rc<Vec<atelier_ui::PrChipData>>,
     /// Chips looked up for numbers the list lacks, by number; `None` for one that is no pull request.
     looked_up: HashMap<u64, Option<atelier_ui::PrChipData>>,
@@ -103,6 +103,7 @@ pub struct OpenProject {
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
     chip_forge: Option<std::sync::Arc<dyn atelier_forge::Forge>>,
     opening_pulls: Task<()>,
+    pulls_loading: bool,
     /// The tasks hearing of sessions, one at a time and in order.
     task_signals: Task<()>,
     /// The merged pull requests the tasks were told of in this run.
@@ -110,6 +111,16 @@ pub struct OpenProject {
     /// How many files differ from the last commit, from `git status`: the status line shows it.
     pub dirty: Option<usize>,
     reading_dirty: Task<()>,
+    /// The commits of the checked-out branch, newest first, for the History view; `None` until asked.
+    pub(crate) log: Option<crate::history::Read<Vec<crate::history::Commit>>>,
+    reading_log: Task<()>,
+    /// The commit the History view shows in full, by its sha, and what was read of it.
+    pub(crate) commit: Option<(SharedString, crate::history::Read<crate::history::Shown>)>,
+    reading_commit: Task<()>,
+    /// What the checkout holds that its last commit does not, file by file, for the Changes view; `None`
+    /// until asked.
+    pub(crate) uncommitted: Option<crate::history::Read<Vec<crate::history::CommitFile>>>,
+    reading_uncommitted: Task<()>,
     /// Files being read for a tab, so a second click does not read them twice.
     opening: HashSet<String>,
     /// Where the caret goes in a file still being read, after a jump to it.
@@ -162,10 +173,17 @@ impl OpenProject {
             asked: HashMap::new(),
             chip_forge: None,
             opening_pulls: Task::ready(()),
+            pulls_loading: false,
             task_signals: Task::ready(()),
             merged_told: HashSet::new(),
             dirty: None,
             reading_dirty: Task::ready(()),
+            log: None,
+            reading_log: Task::ready(()),
+            commit: None,
+            reading_commit: Task::ready(()),
+            uncommitted: None,
+            reading_uncommitted: Task::ready(()),
             opening: HashSet::new(),
             caret_at: HashMap::new(),
             _watch: None,
@@ -426,6 +444,120 @@ impl OpenProject {
         });
     }
 
+    /// Reads the newest commits of the checked-out branch, off the UI thread. The commits read before stay
+    /// shown while they are read again.
+    pub fn load_log(&mut self, cx: &mut Context<Self>) {
+        let project = self.project.clone();
+        let asked = cx.background_spawn(async move {
+            let args = crate::history::log_args("HEAD");
+            project.git(&args.iter().map(String::as_str).collect::<Vec<_>>())
+        });
+        if !matches!(self.log, Some(crate::history::Read::Ready(_))) {
+            self.log = Some(crate::history::Read::Reading);
+        }
+        self.reading_log = cx.spawn(async move |this, cx| {
+            let log = match asked.await {
+                Ok(out) if out.ok() => crate::history::Read::Ready(crate::history::parse_log(&out.stdout)),
+                // A repository with no commit yet has an empty history, not a broken one.
+                Ok(out) if out.stderr.contains("does not have any commits") => crate::history::Read::Ready(Vec::new()),
+                Ok(out) => crate::history::Read::Failed(out.stderr.trim().to_string().into()),
+                Err(error) => crate::history::Read::Failed(error.to_string().into()),
+            };
+            _ = this.update(cx, |this, cx| {
+                // The newest commit is the one shown until the reader picks another.
+                let newest = match &log {
+                    crate::history::Read::Ready(commits) if this.commit.is_none() => commits.first().map(|c| c.sha.clone()),
+                    _ => None,
+                };
+                if this.log.as_ref() != Some(&log) {
+                    this.log = Some(log);
+                    cx.notify();
+                }
+                if let Some(sha) = newest {
+                    this.show_commit(sha, cx);
+                }
+            });
+        });
+    }
+
+    /// Reads what the checkout holds uncommitted, staged or not, and the files git does not track, off the UI
+    /// thread. What was read before stays shown while it is read again; a new ask drops the one before it.
+    pub fn load_uncommitted(&mut self, cx: &mut Context<Self>) {
+        // An untracked file is read on its own, so a folder of new files stops at this many.
+        const UNTRACKED_SHOWN: usize = 50;
+        let project = self.project.clone();
+        let asked = cx.background_spawn(async move {
+            let run = |args: &[String]| project.git(&args.iter().map(String::as_str).collect::<Vec<_>>());
+            let born = project.git(&["rev-parse", "--verify", "-q", "HEAD"]).is_ok_and(|o| o.ok());
+            let base = if born { "HEAD" } else { crate::history::EMPTY_TREE };
+            let tracked = match run(&crate::history::diff_args(base)) {
+                Ok(out) if out.ok() => out.stdout,
+                Ok(out) => return crate::history::Read::Failed(out.stderr.trim().to_string().into()),
+                Err(error) => return crate::history::Read::Failed(error.to_string().into()),
+            };
+            let mut files = crate::history::split_patch(&tracked);
+            let untracked = project.git(&crate::history::UNTRACKED_ARGS).map(|o| o.stdout).unwrap_or_default();
+            for path in untracked.split('\0').filter(|p| !p.is_empty()).take(UNTRACKED_SHOWN) {
+                // `--no-index` exits 1 when the files differ, which a new file always does.
+                if let Ok(out) = run(&crate::history::new_file_args(path))
+                    && out.code.is_some_and(|c| c <= 1)
+                {
+                    files.extend(crate::history::split_patch(&out.stdout));
+                }
+            }
+            crate::history::Read::Ready(files)
+        });
+        if !matches!(self.uncommitted, Some(crate::history::Read::Ready(_))) {
+            self.uncommitted = Some(crate::history::Read::Reading);
+        }
+        self.reading_uncommitted = cx.spawn(async move |this, cx| {
+            let read = asked.await;
+            _ = this.update(cx, |this, cx| {
+                if this.uncommitted.as_ref() != Some(&read) {
+                    this.uncommitted = Some(read);
+                    cx.notify();
+                }
+            });
+        });
+    }
+
+    /// Closes a session's review, so the Changes view shows the checkout again.
+    pub fn close_review(&mut self, cx: &mut Context<Self>) {
+        if self.review.take().is_some() {
+            cx.emit(ProjectEvent::ReviewClosed);
+            cx.notify();
+        }
+    }
+
+    /// Reads the commit `sha` in full, off the UI thread, and makes it the one the History view shows.
+    pub fn show_commit(&mut self, sha: SharedString, cx: &mut Context<Self>) {
+        if self.commit.as_ref().is_some_and(|(at, _)| *at == sha) {
+            return;
+        }
+        let project = self.project.clone();
+        let asked_sha = sha.clone();
+        let asked = cx.background_spawn(async move {
+            let args = crate::history::show_args(&asked_sha);
+            let out = project.git(&args.iter().map(String::as_str).collect::<Vec<_>>());
+            match out {
+                Ok(out) if out.ok() => crate::history::Read::Ready(crate::history::split_show(&asked_sha, &out.stdout)),
+                Ok(out) => crate::history::Read::Failed(out.stderr.trim().to_string().into()),
+                Err(error) => crate::history::Read::Failed(error.to_string().into()),
+            }
+        });
+        self.commit = Some((sha.clone(), crate::history::Read::Reading));
+        cx.notify();
+        self.reading_commit = cx.spawn(async move |this, cx| {
+            let shown = asked.await;
+            _ = this.update(cx, |this, cx| {
+                if this.commit.as_ref().is_some_and(|(at, _)| *at == sha) {
+                    this.commit = Some((sha, shown));
+                    cx.notify();
+                }
+            });
+        });
+    }
+
     /// Shows the project's pull requests in place of the editor, or hides them. The first time, the
     /// reader's login and the view's services are read off the UI thread.
     pub fn toggle_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -441,20 +573,46 @@ impl OpenProject {
         let Some(repo) = self.repo.clone() else {
             return cx.emit(ProjectEvent::Said(NO_FORGE_REMOTE.into()));
         };
+        self.read_pulls(repo, true, window, cx);
+    }
+
+    /// Reads the project's pull requests once, for the Code view's list: nothing comes to the front of the
+    /// Sessions view.
+    pub fn load_pulls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.pulls.is_some() || self.pulls_loading {
+            return;
+        }
+        let Some(repo) = self.repo.clone() else { return };
+        self.read_pulls(repo, false, window, cx);
+    }
+
+    /// Whether the pull requests are being read now.
+    pub fn pulls_loading(&self) -> bool {
+        self.pulls_loading
+    }
+
+    /// Opens the pull request services off the UI thread, then the hub; `front` puts it in front of the right pane.
+    fn read_pulls(&mut self, repo: atelier_forge::RepoRef, front: bool, window: &mut Window, cx: &mut Context<Self>) {
         let (project, workers) = (self.project.clone(), self.workers.clone());
         let Some(local) = atelier_settings::path().and_then(|p| p.parent().map(std::path::Path::to_path_buf)) else {
             return cx.emit(ProjectEvent::Said("Pull requests need a data folder on this machine".into()));
         };
-        cx.emit(ProjectEvent::Said("Reading pull requests…".into()));
+        if front {
+            cx.emit(ProjectEvent::Said("Reading pull requests…".into()));
+        }
+        self.pulls_loading = true;
         let opening = cx.background_spawn(async move {
             let me = pulls::login(project.as_ref()).unwrap_or_default();
             pulls::open_services(project, me, local, workers, repo)
         });
         self.opening_pulls = cx.spawn_in(window, async move |this, cx| {
             let services = opening.await;
-            _ = this.update_in(cx, |p, window, cx| match services {
-                Ok(services) => p.mount_pulls(services, window, cx),
-                Err(error) => cx.emit(ProjectEvent::Said(format!("Pull requests: {error}").into())),
+            _ = this.update_in(cx, |p, window, cx| {
+                p.pulls_loading = false;
+                match services {
+                    Ok(services) => p.mount_pulls(services, front, window, cx),
+                    Err(error) => cx.emit(ProjectEvent::Said(format!("Pull requests: {error}").into())),
+                }
             });
         });
     }
@@ -744,7 +902,7 @@ impl OpenProject {
         self.toggle_pulls(window, cx);
     }
 
-    fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, window: &mut Window, cx: &mut Context<Self>) {
+    fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, front: bool, window: &mut Window, cx: &mut Context<Self>) {
         let hub = cx.new(|cx| PrHub::with_services(services, cx));
         let _events = cx.subscribe_in(&hub, window, |this, _, event: &PrEvent, window, cx| match event {
             // A file at the pull request's head opens in the editor, as it is in this project.
@@ -772,10 +930,12 @@ impl OpenProject {
         if let Some(reference) = self.pending_pull.take() {
             hub.update(cx, |hub, cx| hub.open(reference, window, cx));
         }
-        self.pulls = Some(Pulls { hub, shown: true, _events: [_events, _opens, _chips] });
-        // Mounted, they are in front: the shell moves the keys to them.
-        cx.emit(ProjectEvent::PullsShown);
-        cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
+        self.pulls = Some(Pulls { hub, shown: front, _events: [_events, _opens, _chips] });
+        // Mounted in front, they take the keys: the shell moves them there.
+        if front {
+            cx.emit(ProjectEvent::PullsShown);
+            cx.emit(ProjectEvent::Said("Pull requests are read-only here: nothing is sent to GitHub".into()));
+        }
         cx.notify();
     }
 
@@ -804,14 +964,24 @@ impl OpenProject {
             return;
         }
         let (tx, mut rx) = mpsc::unbounded::<Vec<Change>>();
-        match self.project.watch(Box::new(move |batch| drop(tx.unbounded_send(batch)))) {
-            Ok(watch) => self._watch = Some(watch),
-            Err(error) => {
-                cx.emit(ProjectEvent::Said(format!("Not watching for changes: {error}").into()));
+        let project = self.project.clone();
+        // Over SSH the call returns once the host watches every folder: seconds in a big tree.
+        let started = cx.background_spawn(async move { project.watch(Box::new(move |batch| drop(tx.unbounded_send(batch)))) });
+        self.watching = cx.spawn_in(window, async move |this, cx| {
+            let started = started.await;
+            let watching = this.update(cx, |this, cx| match started {
+                Ok(watch) => {
+                    this._watch = Some(watch);
+                    true
+                }
+                Err(error) => {
+                    cx.emit(ProjectEvent::Said(format!("Not watching for changes: {error}").into()));
+                    false
+                }
+            });
+            if !matches!(watching, Ok(true)) {
                 return;
             }
-        }
-        self.watching = cx.spawn_in(window, async move |this, cx| {
             while let Some(batch) = rx.next().await {
                 _ = this.update_in(cx, |this, window, cx| this.changed(batch, window, cx));
             }
@@ -860,6 +1030,9 @@ impl OpenProject {
             self.relist(cx);
         }
         self.read_dirty(cx);
+        if self.uncommitted.is_some() {
+            self.load_uncommitted(cx);
+        }
         if let Some((pane, _)) = &self.review {
             let paths = batch.iter().map(|c| c.path.clone()).collect();
             pane.update(cx, |p, cx| p.check_disk(paths, window, cx));

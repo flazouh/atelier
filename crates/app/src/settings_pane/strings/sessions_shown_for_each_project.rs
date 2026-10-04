@@ -1,0 +1,43 @@
+//! Sessions shown for each project
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+use atelier_i18n::Message;
+
+pub const SESSIONS_SHOWN_FOR_EACH_PROJECT: Message = Message {
+    ar: "الجلسات المعروضة لكل مشروع",
+    ca: "Sessions mostrades per projecte",
+    cs: "Počet zobrazených relací u každého projektu",
+    da: "Sessioner vist for hvert projekt",
+    de: "Angezeigte Sitzungen pro Projekt",
+    el: "Συνεδρίες που εμφανίζονται ανά έργο",
+    en: "Sessions shown for each project",
+    es: "Sesiones mostradas por proyecto",
+    es_419: "Sesiones que se muestran por proyecto",
+    fi: "Projektikohtaisesti näytettävät istunnot",
+    fr: "Sessions affichées pour chaque projet",
+    fr_ca: "Sessions affichées pour chaque projet",
+    he: "הפעלות שמוצגות לכל פרויקט",
+    hi: "हर प्रोजेक्ट के लिए दिखाई जाने वाली सेशन",
+    hr: "Sesije prikazane za svaki projekt",
+    hu: "Projektenként megjelenített munkamenetek",
+    id: "Sesi yang ditampilkan untuk setiap proyek",
+    it: "Sessioni mostrate per ogni progetto",
+    ja: "プロジェクトごとの表示セッション数",
+    ko: "프로젝트별 표시 세션",
+    ms: "Sesi yang dipaparkan bagi setiap projek",
+    nl: "Weergegeven sessies per project",
+    no: "Viste økter for hvert prosjekt",
+    pl: "Sesje wyświetlane dla każdego projektu",
+    pt_br: "Sessões exibidas para cada projeto",
+    pt_pt: "Sessões apresentadas para cada projeto",
+    ro: "Sesiuni afișate pentru fiecare proiect",
+    ru: "Сеансы, отображаемые для каждого проекта",
+    sk: "Počet zobrazených relácií pre každý projekt",
+    sv: "Visade sessioner per projekt",
+    th: "เซสชันที่แสดงสำหรับแต่ละโปรเจกต์",
+    tr: "Her proje için gösterilen oturumlar",
+    uk: "Сеанси, що відображаються для кожного проєкту",
+    vi: "Số phiên hiển thị cho mỗi dự án",
+    zh_cn: "每个项目显示的会话数",
+    zh_tw: "每個專案顯示的工作階段數",
+};

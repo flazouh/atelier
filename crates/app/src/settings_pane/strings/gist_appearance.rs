@@ -1,0 +1,43 @@
+//! The theme, light or dark, and the colour of the main button.
+//!
+//! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines.
+use atelier_i18n::Message;
+
+pub const GIST_APPEARANCE: Message = Message {
+    ar: "السمة، فاتحة أو داكنة، ولون الزر الرئيسي.",
+    ca: "El tema, clar o fosc, i el color del botó principal.",
+    cs: "Světlý nebo tmavý motiv a barva hlavního tlačítka.",
+    da: "Lyst eller mørkt tema og farven på hovedknappen.",
+    de: "Das helle oder dunkle Design und die Farbe der Hauptschaltfläche.",
+    el: "Το ανοιχτόχρωμο ή σκούρο θέμα και το χρώμα του κύριου κουμπιού.",
+    en: "The theme, light or dark, and the colour of the main button.",
+    es: "El tema, claro u oscuro, y el color del botón principal.",
+    es_419: "El tema, claro u oscuro, y el color del botón principal.",
+    fi: "Vaalea tai tumma teema ja pääpainikkeen väri.",
+    fr: "Le thème, clair ou sombre, et la couleur du bouton principal.",
+    fr_ca: "Le thème, clair ou sombre, et la couleur du bouton principal.",
+    he: "ערכת הנושא, בהירה או כהה, וצבע הכפתור הראשי.",
+    hi: "थीम—हल्की या गहरी—और मुख्य बटन का रंग।",
+    hr: "Svijetla ili tamna tema i boja glavnog gumba.",
+    hu: "A világos vagy sötét téma és a fő gomb színe.",
+    id: "Tema terang atau gelap, serta warna tombol utama.",
+    it: "Il tema, chiaro o scuro, e il colore del pulsante principale.",
+    ja: "ライトまたはダークのテーマと、メインボタンの色。",
+    ko: "라이트 또는 다크 테마와 기본 버튼 색상입니다.",
+    ms: "Tema cerah atau gelap, serta warna butang utama.",
+    nl: "Het lichte of donkere thema en de kleur van de hoofdknop.",
+    no: "Lyst eller mørkt tema og fargen på hovedknappen.",
+    pl: "Jasny lub ciemny motyw oraz kolor głównego przycisku.",
+    pt_br: "O tema, claro ou escuro, e a cor do botão principal.",
+    pt_pt: "O tema, claro ou escuro, e a cor do botão principal.",
+    ro: "Tema deschis sau închis și culoarea butonului principal.",
+    ru: "Светлая или тёмная тема и цвет главной кнопки.",
+    sk: "Svetlá alebo tmavá téma a farba hlavného tlačidla.",
+    sv: "Ljust eller mörkt tema och färgen på huvudknappen.",
+    th: "ธีมสว่างหรือมืด และสีของปุ่มหลัก",
+    tr: "Açık veya koyu tema ve ana düğmenin rengi.",
+    uk: "Світла або темна тема та колір головної кнопки.",
+    vi: "Giao diện sáng hoặc tối và màu của nút chính.",
+    zh_cn: "浅色或深色主题，以及主按钮的颜色。",
+    zh_tw: "淺色或深色主題，以及主要按鈕的顏色。",
+};

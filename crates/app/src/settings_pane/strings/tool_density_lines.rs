@@ -1,0 +1,43 @@
+//! One line each
+//!
+//! A choice for how much of the agent's tool calls to show: one line for each call. A label on a segmented control: one or two words, so it must stay short.
+use atelier_i18n::Message;
+
+pub const TOOL_DENSITY_LINES: Message = Message {
+    ar: "سطر لكل أداة",
+    ca: "Una línia per eina",
+    cs: "Každý zvlášť",
+    da: "Én pr. linje",
+    de: "Eine Zeile pro Aufruf",
+    el: "Μία γραμμή ανά κλήση",
+    en: "One line each",
+    es: "Una línea por llamada",
+    es_419: "Una línea por llamada",
+    fi: "Yksi per rivi",
+    fr: "Une ligne par appel",
+    fr_ca: "Une ligne par appel",
+    he: "שורה לכל קריאה",
+    hi: "हर कॉल की एक पंक्ति",
+    hr: "Svaki u svom retku",
+    hu: "Hívásonként egy sor",
+    id: "Satu baris per panggilan",
+    it: "Una riga per chiamata",
+    ja: "呼び出しごとに1行",
+    ko: "호출당 한 줄",
+    ms: "Satu baris setiap panggilan",
+    nl: "Eén regel per aanroep",
+    no: "Én per linje",
+    pl: "Każde wywołanie w osobnym wierszu",
+    pt_br: "Uma linha por chamada",
+    pt_pt: "Uma linha por chamada",
+    ro: "Câte un rând per apel",
+    ru: "Каждый вызов — отдельной строкой",
+    sk: "Každé zvlášť",
+    sv: "En rad per anrop",
+    th: "หนึ่งบรรทัดต่อการเรียก",
+    tr: "Her çağrı için bir satır",
+    uk: "Кожен виклик — окремим рядком",
+    vi: "Mỗi lệnh gọi một dòng",
+    zh_cn: "每次调用一行",
+    zh_tw: "每次呼叫一行",
+};

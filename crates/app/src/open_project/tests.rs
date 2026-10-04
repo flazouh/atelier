@@ -564,3 +564,25 @@ fn a_session_tells_its_task_while_the_tasks_pane_is_closed(cx: &mut TestAppConte
     cx.run_until_parked();
     assert_eq!(tracker.get(&task.id).unwrap().unwrap().status, Status::InProgress);
 }
+
+/// Watching a project over SSH waits for its host to watch every folder, which takes seconds in a big tree: the
+/// UI thread never makes that call, so the window answers while the host works.
+#[gpui_kit::test]
+fn a_project_starts_watching_off_the_ui_thread(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Dark, cx);
+    });
+    let dir = tempfile::tempdir().unwrap();
+    let sink = Arc::new(Mutex::new(None));
+    let quiet = Arc::new(Quiet { disk: LocalProject::open(dir.path()).unwrap().with_data_dir(&crate::test_dirs::path()), sink: sink.clone() });
+    let mut asked_while_opening = None;
+    let (_pane, cx) = cx.add_window_view(|window, cx| {
+        let p = cx.new(|cx| OpenProject::new(Location::Local { path: dir.path().to_path_buf() }, quiet, window, cx));
+        asked_while_opening = Some(sink.lock().unwrap().is_some());
+        Pane(p)
+    });
+    assert_eq!(asked_while_opening, Some(false), "opening did not wait for the watch");
+    cx.run_until_parked();
+    assert!(sink.lock().unwrap().is_some(), "and the project watches once the call has run");
+}

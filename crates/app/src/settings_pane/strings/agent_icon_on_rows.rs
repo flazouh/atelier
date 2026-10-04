@@ -1,0 +1,43 @@
+//! Agent icon on rows
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+use atelier_i18n::Message;
+
+pub const AGENT_ICON_ON_ROWS: Message = Message {
+    ar: "أيقونة الوكيل في الصفوف",
+    ca: "Icona de l’agent a les files",
+    cs: "Ikona agenta v řádcích",
+    da: "Agentikon på rækker",
+    de: "Agentensymbol in Zeilen",
+    el: "Εικονίδιο agent στις γραμμές",
+    en: "Agent icon on rows",
+    es: "Icono del agente en las filas",
+    es_419: "Ícono del agente en las filas",
+    fi: "Agentin kuvake riveillä",
+    fr: "Icône de l’agent dans les lignes",
+    fr_ca: "Icône de l’agent dans les lignes",
+    he: "סמל הסוכן בשורות",
+    hi: "पंक्तियों में एजेंट आइकन",
+    hr: "Ikona agenta u redovima",
+    hu: "Ügynök ikonja a sorokban",
+    id: "Ikon agen di baris",
+    it: "Icona dell’agente nelle righe",
+    ja: "行にエージェントアイコンを表示",
+    ko: "행에 에이전트 아이콘 표시",
+    ms: "Ikon ejen pada baris",
+    nl: "Agentpictogram op rijen",
+    no: "Agentikon på rader",
+    pl: "Ikona agenta w wierszach",
+    pt_br: "Ícone do agente nas linhas",
+    pt_pt: "Ícone do agente nas linhas",
+    ro: "Pictograma agentului pe rânduri",
+    ru: "Значок агента в строках",
+    sk: "Ikona agenta v riadkoch",
+    sv: "Agentikon på rader",
+    th: "ไอคอนเอเจนต์ในแถว",
+    tr: "Satırlarda ajan simgesi",
+    uk: "Піктограма агента в рядках",
+    vi: "Biểu tượng tác nhân trên các hàng",
+    zh_cn: "在行中显示代理图标",
+    zh_tw: "在列中顯示代理圖示",
+};

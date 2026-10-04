@@ -7,13 +7,16 @@
 
 mod fit;
 mod helpers;
+mod impls;
+mod changes;
+mod history;
+mod lens;
 mod rail;
 mod restore;
 mod structs;
 mod types;
 mod view;
 
-#[cfg(test)]
 pub use view::ShellView;
 
 pub use helpers::bind_keys;

@@ -223,15 +223,18 @@ impl Conversation {
                 self.working = false;
                 // A turn that ran shows the agent is signed in, whoever signed it in.
                 self.signed_out &= end.outcome != TurnOutcome::Completed;
-                // The notice for a missing sign-in says it; the agent's own failure text would say it twice.
+                // The notice for a missing sign-in says it, and a reached usage limit has its own box with the
+                // reset time: the agent's own failure text would say it twice.
+                let limit_told = self.limit.is_some_and(|limit| limit.state == LimitState::Reached);
                 if let TurnOutcome::Failed(why) = &end.outcome
                     && !self.signed_out
+                    && !limit_told
                 {
-                    self.items.push(Item::Notice(why.clone()));
+                    self.items.push(Item::Notice(crate::subprocess::strip_ansi(why)));
                 }
                 self.last_turn = Some(end.clone());
             }
-            Event::Warning(text) => self.items.push(Item::Notice(text.clone())),
+            Event::Warning(text) => self.items.push(Item::Notice(crate::subprocess::strip_ansi(text))),
             Event::Ended(reason) => {
                 self.working = false;
                 self.ended = Some(reason.clone());

@@ -429,7 +429,7 @@ fn the_project_menu_opens_files_and_a_key_or_button_goes_back(cx: &mut TestAppCo
     assert!(cx.debug_bounds("files-view").is_none(), "⌘2 does nothing: the project menu is the way in");
     open_files_from_the_menu(&shell, cx);
     assert!(cx.debug_bounds("files-view").is_some() && cx.debug_bounds("files-tree").is_some(), "the menu's Files shows the Files view");
-    assert!(cx.debug_bounds("back-to-sessions").is_some(), "with a way back");
+    assert!(cx.debug_bounds("code-sidebar").is_some() && cx.debug_bounds("rail-sessions").is_some(), "in the Code lens, with the rail the way back");
     assert!(cx.debug_bounds("sessions-view").is_none(), "and only it");
     assert!(cx.debug_bounds("editor-tab-0").is_none(), "no editor before a file is open");
     cx.simulate_keystrokes(sessions);
@@ -579,12 +579,14 @@ fn a_panel_names_its_project_and_a_press_on_its_close_button_closes_it(cx: &mut 
     assert!(cx.debug_bounds("panel-close").is_none());
 }
 
-/// The sidebar's head holds the two ways to add a project and, behind its ⋯, the filter: each a button with a menu.
+/// Projects are added from the button joined to the title bar's switcher; the sidebar's head keeps only the filter behind its ⋯.
 #[gpui_kit::test]
-fn the_sidebar_head_adds_projects_and_filters_sessions(cx: &mut TestAppContext) {
+fn the_switcher_adds_projects_and_the_sidebar_head_filters_sessions(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     assert!(cx.debug_bounds("session-filter").is_none(), "no box that narrows the sessions by title");
     let add = cx.debug_bounds("add-project").expect("the add button is drawn");
+    let switcher = cx.debug_bounds("project-switcher").unwrap();
+    assert!((add.left() - switcher.right()).abs() < gpui_kit::px(2.) && add.top() < switcher.bottom(), "joined to the switcher: {add:?} after {switcher:?}");
     cx.simulate_click(add.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("add-folder").is_some() && cx.debug_bounds("add-ssh").is_some(), "the add menu offers a folder and SSH");
@@ -818,7 +820,11 @@ fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
         cx.notify();
     });
     cx.run_until_parked();
-    let last = session.read_with(cx, |s, _| s.shown.len() - 1);
+    // The message is followed by the waiting line, which holds the agent's place until it answers.
+    let last = session.read_with(cx, |s, _| {
+        assert_eq!(s.shown.last(), Some(&crate::list_diff::Row::Waiting));
+        s.shown.len() - 2
+    });
     let row_selector: &'static str = format!("row-{last}").leak();
     for _ in 0..20 {
         if cx.debug_bounds(row_selector).is_some() {
@@ -832,7 +838,7 @@ fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
     assert!(rising.top() > row.top(), "it starts below its place: {rising:?} in {row:?}");
 }
 
-/// A review opens in the Git view: in place of the panels, with the session's changes in the sidebar, and
+/// A review opens in the Git view: in place of the panels, with the checkout's changes in the sidebar, and
 /// the right pane as it was; when it closes, Sessions comes back.
 #[gpui_kit::test]
 fn a_review_opens_in_the_git_view_and_closing_it_goes_back(cx: &mut TestAppContext) {
@@ -845,7 +851,7 @@ fn a_review_opens_in_the_git_view_and_closing_it_goes_back(cx: &mut TestAppConte
     assert!(cx.debug_bounds("review-in-place").is_some(), "the review is where the panels were");
     assert!(cx.debug_bounds("panel-close").is_none(), "the panels make way");
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
-    assert!(cx.debug_bounds("git-panel").is_some(), "the sidebar shows the session's changes");
+    assert!(cx.debug_bounds("changes-list").is_some(), "the sidebar lists the checkout's changes");
     assert_eq!(shell.read_with(cx, |s, _| (s.right, s.right_width)), right_before, "the right pane neither opens nor widens");
     let pane = shell.read_with(cx, |s, cx| s.active().cloned().unwrap().read(cx).review.as_ref().map(|(p, _)| p.clone()).unwrap());
     pane.update(cx, |_, cx| cx.emit(crate::review_pane::PaneEvent::Close));
@@ -869,11 +875,15 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
     assert!(rail.right() <= sidebar.left(), "the rail is left of the sidebar: {rail:?} {sidebar:?}");
     let tasks = cx.debug_bounds("rail-tasks").unwrap();
     let git = cx.debug_bounds("rail-git").unwrap();
-    assert!(tasks.top() < cx.debug_bounds("rail-sessions").unwrap().top() && cx.debug_bounds("rail-sessions").unwrap().top() < git.top());
+    assert!(cx.debug_bounds("rail-sessions").unwrap().top() < tasks.top() && tasks.top() < git.top(), "Sessions, Issues, Code");
 
     press("rail-tasks", cx);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks);
     assert!(cx.debug_bounds("tasks-view").is_some() && cx.debug_bounds("panel-close").is_none(), "the board is in the main area");
+    assert!(cx.debug_bounds("issues-sidebar").is_some(), "the sidebar holds the views over the issues, not the sessions");
+    press("issues-backlog", cx);
+    let scope = shell.read_with(cx, |s, cx| s.active().and_then(|p| p.read(cx).tasks.as_ref()).map(|t| t.pane.read(cx).scope().clone()));
+    assert_eq!(scope, Some(crate::tasks::pane::Scope::Backlog), "a press on a view sets the pane's scope");
     press("rail-tasks", cx);
     assert!(!shell.read_with(cx, |s, _| s.sidebar), "a second press hides the sidebar");
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Tasks, "and the view stays");
@@ -881,8 +891,13 @@ fn the_rail_switches_views_and_a_second_press_hides_the_sidebar(cx: &mut TestApp
     assert!(shell.read_with(cx, |s, _| s.sidebar), "a third shows it again");
 
     press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Files, "the Code lens opens on its files first");
+    press("code-nav-git", cx);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git);
-    assert!(cx.debug_bounds("git-panel").is_some() && cx.debug_bounds("git-empty").is_some(), "no change yet: nothing to review");
+    assert!(cx.debug_bounds("changes-list").is_some() && cx.debug_bounds("review-in-place").is_none(), "the checkout's changes, no review");
+    press("rail-sessions", cx);
+    press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Git, "the lens comes back on the view it was left on");
     press("rail-git", cx);
     press("rail-sessions", cx);
     assert!(shell.read_with(cx, |s, _| s.sidebar), "another view comes with the sidebar");
@@ -930,4 +945,162 @@ fn the_project_menu_opens_the_worktrees_in_the_git_view(cx: &mut TestAppContext)
     assert!(rows[1].notes.iter().any(|n| n.words == "1 uncommitted"), "{:?}", rows[1].notes);
     let main_row = std::fs::canonicalize(&main).unwrap().to_string_lossy().into_owned();
     assert!(cx.debug_bounds(format!("worktree-{main_row}").leak()).is_some());
+}
+
+#[test]
+fn a_project_that_needs_the_reader_outweighs_one_at_work() {
+    use atelier_ui::session_status::{Need, SessionStatus};
+    use super::helpers::{ProjectMark, project_mark};
+    assert_eq!(project_mark(&[]), ProjectMark::Quiet);
+    assert_eq!(project_mark(&[SessionStatus::Idle, SessionStatus::Working]), ProjectMark::Working);
+    assert_eq!(project_mark(&[SessionStatus::Working, SessionStatus::NeedsYou(Need::Question)]), ProjectMark::NeedsYou);
+}
+
+/// The switcher in the title bar: in Sessions it narrows the list and the panels to one project or shows all of
+/// them; in the Code lens it is the project the view is about.
+#[gpui_kit::test]
+fn the_project_switcher_narrows_sessions_and_names_the_project_of_code(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    assert!(cx.debug_bounds("project-switcher").is_some(), "the switcher is in the title bar");
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), None, "Sessions shows every project at first");
+    let press = |name: &'static str, cx: &mut gpui_kit::VisualTestContext| {
+        let at = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
+        cx.simulate_click(at.center(), gpui_kit::Modifiers::default());
+        settle(&shell, cx);
+    };
+    press("project-switcher", cx);
+    assert!(cx.debug_bounds("switcher-all").is_some(), "Sessions offers all projects");
+    let name = shell.read_with(cx, |s, cx| s.active().unwrap().read(cx).name());
+    let row_name: &'static str = Box::leak(format!("switcher-{name}").into_boxed_str());
+    let row = cx.debug_bounds(row_name).expect("each project has a row");
+    cx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), Some(0), "the list is narrowed to it");
+    assert!(cx.debug_bounds("panel-close").is_some(), "its panels stay");
+    press("project-switcher", cx);
+    press("switcher-all", cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), None, "and back to all of them");
+
+    press("rail-git", cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), Some(0), "Code is about one project");
+    press("project-switcher", cx);
+    assert!(cx.debug_bounds("switcher-all").is_none(), "with no All projects");
+}
+
+/// The History view lists the branch's commits, newest first, and shows the newest in full until another is
+/// picked.
+#[gpui_kit::test]
+fn history_lists_the_commits_and_shows_the_newest(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(["-c", "user.name=Ada", "-c", "user.email=ada@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "First"]);
+    std::fs::write(dir.path().join("a.txt"), "two\n").unwrap();
+    std::fs::write(dir.path().join("b.txt"), "bee\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "Second\n\nWhy it changed."]);
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::History, window, cx));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let (subjects, picked) = shell.read_with(cx, |s, cx| {
+        let p = s.active().unwrap().read(cx);
+        let subjects = match &p.log {
+            Some(crate::history::Read::Ready(commits)) => commits.iter().map(|c| c.subject.to_string()).collect::<Vec<_>>(),
+            other => panic!("the log is read: {other:?}"),
+        };
+        let picked = match &p.commit {
+            Some((_, crate::history::Read::Ready(shown))) => (shown.message.to_string(), shown.files.len()),
+            other => panic!("the newest commit is read: {other:?}"),
+        };
+        (subjects, picked)
+    });
+    assert_eq!(subjects, ["Second", "First"]);
+    assert_eq!(picked, ("Second\n\nWhy it changed.".to_string(), 2));
+    assert!(cx.debug_bounds("history-list").is_some() && cx.debug_bounds("history-commit").is_some(), "the list and the commit are drawn");
+    assert!(cx.debug_bounds("code-nav-history").is_some(), "the Code sidebar names the view");
+    assert!(cx.debug_bounds("history-tree").is_some(), "the commit's files are a tree");
+    assert!(cx.debug_bounds("file-diff-a.txt").is_some() && cx.debug_bounds("file-diff-b.txt").is_none(), "one file at a time, the tree's first");
+    shell.update(cx, |s, cx| s.pick_file(ShellView::History, "b.txt".into(), cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("file-diff-b.txt").is_some() && cx.debug_bounds("file-diff-a.txt").is_none(), "the file picked in the tree");
+}
+
+/// A project over SSH says where it lives in the switcher, on the face and on its row, as the sidebar does; a
+/// local one says nothing of the kind.
+#[gpui_kit::test]
+fn the_switcher_names_the_host_of_a_project_over_ssh(cx: &mut TestAppContext) {
+    let (shell, cx, dir) = with_a_session(cx, 1600.);
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Files, window, cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("switcher-host").is_none(), "a local project has no host");
+    let remote = tempfile::tempdir().unwrap();
+    let project = atelier_project::LocalProject::open(remote.path().to_path_buf()).unwrap();
+    let location = atelier_settings::Location::Ssh { host: "pro".into(), path: remote.path().to_path_buf() };
+    shell.update_in(cx, |s, window, cx| {
+        s.add(location, std::sync::Arc::new(project), window, cx);
+        s.active = s.projects.len() - 1;
+        cx.notify();
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("switcher-host").is_some(), "the face names the host");
+    let face = cx.debug_bounds("project-switcher").unwrap();
+    cx.simulate_click(face.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    let row = cx.debug_bounds("switcher-host").unwrap();
+    assert!(row.top() > face.bottom(), "and so does the project's row in the menu: {row:?} under {face:?}");
+    drop(dir);
+}
+
+/// Changes is about the project's checkout, not a session: it lists the files the checkout holds uncommitted,
+/// tracked or new, and shows each one's diff.
+#[gpui_kit::test]
+fn changes_lists_what_the_checkout_holds_uncommitted(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(["-c", "user.name=Ada", "-c", "user.email=ada@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join("a.txt"), "one\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "First"]);
+    std::fs::write(dir.path().join("a.txt"), "two\n").unwrap();
+    std::fs::write(dir.path().join("new.txt"), "fresh\n").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Git, window, cx));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let paths = shell.read_with(cx, |s, cx| match &s.active().unwrap().read(cx).uncommitted {
+        Some(crate::history::Read::Ready(files)) => files.iter().map(|f| f.path.to_string()).collect::<Vec<_>>(),
+        other => panic!("the changes are read: {other:?}"),
+    });
+    assert_eq!(paths, ["a.txt", "new.txt"], "the changed file, then the new one");
+    assert!(cx.debug_bounds("changes-list").is_some() && cx.debug_bounds("changes-diffs").is_some(), "the list and the diffs are drawn");
+    assert!(cx.debug_bounds("changes-tree").is_some(), "the sidebar's files are a tree");
+    assert!(cx.debug_bounds("file-diff-a.txt").is_some() && cx.debug_bounds("file-diff-new.txt").is_none(), "one file at a time, the tree's first");
+    shell.update(cx, |s, cx| s.pick_file(ShellView::Git, "new.txt".into(), cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("file-diff-new.txt").is_some() && cx.debug_bounds("file-diff-a.txt").is_none(), "the file picked in the tree");
 }

@@ -262,6 +262,14 @@ mod conversation {
     }
 
     #[test]
+    fn a_notice_has_no_colour_codes() {
+        let mut conversation = Conversation::new();
+        conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("\u{1b}[31mboom\u{1b}[0m".into()), summary: None }));
+        conversation.apply(&Event::Warning("\u{1b}[33mcareful\u{1b}[0m".into()));
+        assert_eq!(conversation.items(), [Item::Notice("boom".into()), Item::Notice("careful".into())]);
+    }
+
+    #[test]
     fn a_turn_opens_when_the_user_sends_and_closes_with_its_outcome() {
         let mut conversation = Conversation::new();
         assert!(!conversation.working());
@@ -332,6 +340,16 @@ mod conversation {
         conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("boom".into()), summary: None }));
         assert!(!conversation.signed_out());
         assert_eq!(conversation.items().len(), 2);
+    }
+
+    #[test]
+    fn a_turn_that_failed_on_a_reached_limit_adds_no_notice() {
+        let limit = Event::Limit(Limit { state: LimitState::Reached, resets_at: Some(10), window: Some(LimitWindow::Weekly) });
+        let failed = Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("You've hit your weekly limit".into()), summary: None });
+        let conversation = fold(vec![Event::UserMessage { text: "hi".into() }, limit, failed.clone()]);
+        assert_eq!(conversation.items(), [Item::User { text: "hi".into() }], "the box over the composer tells it");
+        let other = fold(vec![Event::UserMessage { text: "hi".into() }, failed]);
+        assert_eq!(other.items().len(), 2, "any other failure still says so");
     }
 
     #[test]

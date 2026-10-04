@@ -1,0 +1,43 @@
+//! What a session row shows, and how many sessions the sidebar shows before it folds the rest.
+//!
+//! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. A session is a conversation with an agent.
+use atelier_i18n::Message;
+
+pub const GIST_SIDEBAR: Message = Message {
+    ar: "ما يظهر في صف الجلسة، وعدد الجلسات التي يعرضها الشريط الجانبي قبل طيّ البقية.",
+    ca: "Què mostra cada fila de sessió i quantes sessions es mostren a la barra lateral abans de plegar la resta.",
+    cs: "Co zobrazuje řádek relace a kolik relací se zobrazí v postranním panelu, než se zbytek sbalí.",
+    da: "Hvad en sessionsrække viser, og hvor mange sessioner sidepanelet viser, før resten foldes sammen.",
+    de: "Was eine Sitzungszeile anzeigt und wie viele Sitzungen in der Seitenleiste erscheinen, bevor der Rest eingeklappt wird.",
+    el: "Τι εμφανίζει κάθε γραμμή συνεδρίας και πόσες συνεδρίες εμφανίζονται στην πλαϊνή γραμμή πριν συμπτυχθούν οι υπόλοιπες.",
+    en: "What each session row shows and how many sessions appear in the sidebar before the rest are collapsed.",
+    es: "Qué muestra cada fila de sesión y cuántas sesiones aparecen en la barra lateral antes de contraer el resto.",
+    es_419: "Qué muestra cada fila de sesión y cuántas sesiones aparecen en la barra lateral antes de contraer las demás.",
+    fi: "Mitä istuntorivi näyttää ja kuinka monta istuntoa sivupalkissa näytetään ennen kuin loput kutistetaan.",
+    fr: "Ce qu’affiche chaque ligne de session et le nombre de sessions visibles dans la barre latérale avant de réduire les autres.",
+    fr_ca: "Ce qu’affiche chaque ligne de session et le nombre de sessions visibles dans la barre latérale avant de réduire les autres.",
+    he: "מה מוצגת בכל שורת שיחה, וכמה שיחות מוצגות בסרגל הצד לפני ששאר השיחות מצטמצמות.",
+    hi: "सेशन की हर पंक्ति में क्या दिखता है और बाकी सेशन समेटने से पहले साइडबार में कितने सेशन दिखते हैं।",
+    hr: "Što prikazuje redak sesije i koliko se sesija prikazuje na bočnoj traci prije nego što se ostale sažmu.",
+    hu: "Mit jelenít meg egy munkamenetsor, és hány munkamenet látható az oldalsávon, mielőtt a többi összecsukódik.",
+    id: "Yang ditampilkan di setiap baris sesi dan jumlah sesi yang ditampilkan di sidebar sebelum sisanya diciutkan.",
+    it: "Cosa mostra ogni riga di sessione e quante sessioni compaiono nella barra laterale prima che le altre vengano compresse.",
+    ja: "セッション行に表示する内容と、残りを折りたたむ前にサイドバーに表示するセッション数。",
+    ko: "세션 행에 표시할 내용과 나머지를 접기 전에 사이드바에 표시할 세션 수입니다.",
+    ms: "Perkara yang dipaparkan pada setiap baris sesi dan bilangan sesi yang dipaparkan dalam bar sisi sebelum selebihnya diruntuhkan.",
+    nl: "Wat een sessierij toont en hoeveel sessies in de zijbalk worden weergegeven voordat de rest wordt ingeklapt.",
+    no: "Hva en øktrad viser, og hvor mange økter som vises i sidepanelet før resten skjules.",
+    pl: "Co wyświetla wiersz sesji i ile sesji widać na pasku bocznym, zanim pozostałe zostaną zwinięte.",
+    pt_br: "O que cada linha de sessão mostra e quantas sessões aparecem na barra lateral antes que as demais sejam recolhidas.",
+    pt_pt: "O que mostra cada linha de sessão e quantas sessões aparecem na barra lateral antes de as restantes serem recolhidas.",
+    ro: "Ce afișează un rând de sesiune și câte sesiuni apar în bara laterală înainte ca restul să fie restrânse.",
+    ru: "Что отображается в строке сеанса и сколько сеансов показывать на боковой панели, прежде чем свернуть остальные.",
+    sk: "Čo zobrazuje riadok relácie a koľko relácií sa zobrazí na bočnom paneli, kým sa ostatné zbalia.",
+    sv: "Vad en sessionsrad visar och hur många sessioner som visas i sidofältet innan resten fälls ihop.",
+    th: "แสดงอะไรในแถวเซสชัน และแสดงเซสชันกี่รายการในแถบด้านข้างก่อนยุบรายการที่เหลือ",
+    tr: "Oturum satırında ne gösterileceği ve geri kalanı daraltmadan önce kenar çubuğunda kaç oturum gösterileceği.",
+    uk: "Що показує рядок сеансу та скільки сеансів відображати на бічній панелі, перш ніж згорнути решту.",
+    vi: "Thông tin hiển thị trên mỗi dòng phiên và số phiên xuất hiện trong thanh bên trước khi thu gọn phần còn lại.",
+    zh_cn: "设置会话行的显示内容，以及侧边栏在折叠其余会话前显示的数量。",
+    zh_tw: "設定工作階段列的顯示內容，以及側邊欄在摺疊其餘工作階段前顯示的數量。",
+};

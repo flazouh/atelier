@@ -53,16 +53,32 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 
 - The window draws its own title bar area. On macOS the traffic lights sit inset in the page, as in
   Zed and Cursor. On Linux the layout is the same, without them.
-- Far left: the view rail, in the order a change lives: Tasks, Sessions and Git
-  (`crates/app/src/shell/rail.rs`). A press on another view shows it with the sidebar; a press on the
-  view in front hides the sidebar, and the next press shows it again. The view in front has a wash, or
-  an edge bar while its sidebar is hidden.
-  - **Tasks:** the sidebar, and the task board in the main area.
+- Top left: the sidebar's toggle (⌘B), drawn as a rail icon, then the project switcher: each open project's badge, with a dot
+  while one of its sessions works (accent) or needs the reader (warning), and how many need them. Sessions
+  are every project's, so in Sessions the switcher narrows the list and the panels to one project or shows
+  "All projects"; in Issues and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
+  A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O).
+  The sidebar's head does not repeat it.
+- Far left: the view rail, three lenses: Sessions, Issues and Code (`crates/app/src/shell/rail.rs`).
+  Sessions carries a count of the sessions that need the reader, in every project. A press on another lens
+  shows it with the sidebar; a press on the lens in front hides the sidebar, and the next press shows it
+  again. The lens in front has a wash, or an edge bar while its sidebar is hidden.
   - **Sessions:** the sidebar with the projects open in this window and each project's sessions, the
-    agent panels, and the right pane.
-  - **Git:** the focused session's repository, branch and changed files in the sidebar, and the
-    review in the main area. A press on a file opens the review at it; a review opened anywhere opens
-    here, and closing it goes back to Sessions.
+    agent panels, and the right pane. A new session opens at the left of the strip.
+  - **Issues:** a sidebar of views over the project's issues (My issues, Active, Backlog, All issues), its
+    labels, and the agents that hold issues, each with a count; the list or the board in the main area
+    shows the one picked.
+  - **Code:** a sidebar that lists its four views, then what the one in front lists:
+    - **Pull requests:** the project's pull requests, read on the first look, and the one open.
+    - **Files:** the tree in the sidebar and the editor in the main area.
+    - **History:** the checked-out branch's newest 300 commits in the sidebar, read again on each look;
+      the picked one (the newest at first) in the main area: its message, then each file's diff.
+    - **Changes:** what the project's checkout holds uncommitted, tracked or new: the branch and each file
+      in the sidebar, then the repository's other worktrees; every file's diff in the main area, read again as
+      files change. A press on a file scrolls to its diff. A session's review opens here, in the main area;
+      a press on a file gives the area back to the checkout.
+    The lens comes back on the view it was left on; it opens on Files the first time.
+- The sidebar and the main areas are cards 2 px apart, like the agent panels.
 - Right: the pull requests, or a task opened from a session.
 - A pane's edge is a handle that shows only as a wash on hover; a drag sizes the pane beside it.
 - Foot: the status line: the project, its branch, and the language server's state.
@@ -82,7 +98,7 @@ them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
 - **From 1100 px:** the sidebar, the session column and the right pane, side by side.
 - **From 900 to 1099 px:** the session column and the right pane. The sidebar shows on ⌘B.
 - **Below 900 px:** one pane at a time, with tabs: Projects (⌘B), Session, and Editor (⌘⇧B). The
-  third tab says Tasks or Pull requests while one of them is in the right pane. Opening a session
+  third tab says Issues or Pull requests while one of them is in the right pane. Opening a session
   or a review shows the Session tab, which holds the view's main area.
 - **Least widths:** the session column 320 px, the right pane 320 px, and the sidebar 180 px.
 - **Who gives way:** the session column keeps its least width. The right pane gives way first, down

@@ -1,0 +1,43 @@
+//! Run a skill when you pick it
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. A skill is a saved instruction for an agent, picked from a list in the message box; this switch says whether picking it sends it at once.
+use atelier_i18n::Message;
+
+pub const RUN_A_SKILL_WHEN_YOU_PICK_IT: Message = Message {
+    ar: "شغّل المهارة عند اختيارها",
+    ca: "Executa l’habilitat en seleccionar-la",
+    cs: "Spustit dovednost po výběru",
+    da: "Kør en færdighed, når du vælger den",
+    de: "Fähigkeit beim Auswählen ausführen",
+    el: "Εκτέλεση δεξιότητας κατά την επιλογή",
+    en: "Run a skill when you pick it",
+    es: "Ejecutar una habilidad al seleccionarla",
+    es_419: "Ejecutar una habilidad al seleccionarla",
+    fi: "Suorita taito, kun valitset sen",
+    fr: "Exécuter une compétence quand vous la choisissez",
+    fr_ca: "Exécuter une compétence quand vous la choisissez",
+    he: "הפעלת מיומנות כשבוחרים בה",
+    hi: "कौशल चुनते ही चलाएँ",
+    hr: "Pokreni vještinu kad je odabereš",
+    hu: "Készség futtatása kiválasztáskor",
+    id: "Jalankan keahlian saat dipilih",
+    it: "Esegui una competenza quando la selezioni",
+    ja: "スキルを選択したら実行",
+    ko: "스킬을 선택하면 실행",
+    ms: "Jalankan kemahiran apabila dipilih",
+    nl: "Voer een vaardigheid uit bij selectie",
+    no: "Kjør en ferdighet når du velger den",
+    pl: "Uruchamiaj umiejętność po wybraniu",
+    pt_br: "Executar uma habilidade ao selecioná-la",
+    pt_pt: "Executar uma competência ao selecioná-la",
+    ro: "Rulează o abilitate când o selectezi",
+    ru: "Запускать навык при выборе",
+    sk: "Spustiť zručnosť po výbere",
+    sv: "Kör en färdighet när du väljer den",
+    th: "เรียกใช้ทักษะเมื่อเลือก",
+    tr: "Seçince beceriyi çalıştır",
+    uk: "Запускати навичку під час вибору",
+    vi: "Chạy kỹ năng khi bạn chọn",
+    zh_cn: "选中技能时立即运行",
+    zh_tw: "選取技能時立即執行",
+};

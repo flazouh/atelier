@@ -6,7 +6,7 @@ use super::structs::Change;
 pub const TRACKER_FILE: &str = "tracker.sqlite";
 
 /// What happened to a path, as a watch reports it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ChangeKind {
     Created,
     Changed,

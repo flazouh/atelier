@@ -136,8 +136,18 @@ pub(super) fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyEle
         Some(Row::Item(item)) => item_row(session, item, ix, cx),
         Some(Row::Changes { turn }) => changes_row(session, turn, cx),
         Some(Row::Activity { from, to }) => activity_row(session, from, to, cx),
+        Some(Row::Waiting) => waiting_row(session, cx),
         None => div().into_any_element(),
     }
+}
+
+/// The status line between a sent message and the agent's first word: the agent's own words for waiting, shimmering.
+fn waiting_row(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
+    let s = session.read(cx);
+    let look = s.agent.look.clone();
+    let loading = if look.mark.working == atelier_agents::claude::mark().working { atelier_agents::claude::loading_strips() } else { Vec::new() };
+    let id = gpui_kit::ElementId::Name(format!("{}-waiting", s.key).into());
+    div().px(px(16.)).pb(px(14.)).child(Thinking::new(id, look, ThinkingPhase::Waiting).loading(loading)).into_any_element()
 }
 
 /// The files turn `turn` changed, with its `+a −r`: Review opens the review at a file, and a file's
@@ -629,6 +639,9 @@ fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> 
     let agents = atelier_agents::registry::agents();
     let s = session.read(cx);
     let provider = provider_picker(session, cx);
+    let fill = cx.theme().card_strong;
+    // One control in two parts: the agent, and where it runs, joined as a button group is.
+    let agent_corners = if provider.is_some() { atelier_ui::button_group::segment_corners(0, 2, gpui_kit::Axis::Horizontal) } else { segment_corners_all() };
     if agents.len() < 2 && provider.is_none() {
         return None;
     }
@@ -650,10 +663,12 @@ fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> 
             .mt(px(12.))
             .flex()
             .items_center()
-            .gap(px(6.))
+            .gap(px(atelier_ui::button_group::SEAM))
             .child(
                 div().w(px(200.)).child(
                     Select::new(gpui_kit::ElementId::Name(format!("{}-agent", s.key).into()), options)
+                        .corners(agent_corners)
+                        .fill(fill)
                         .selected(current)
                         .on_change(move |ix, _, cx| {
                             let Some(backend) = backends.get(ix).cloned() else { return };
@@ -664,6 +679,10 @@ fn agent_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElement> 
             .children(provider)
             .into_any_element(),
     )
+}
+
+fn segment_corners_all() -> gpui_kit::Corners<bool> {
+    gpui_kit::Corners { top_left: true, top_right: true, bottom_left: true, bottom_right: true }
 }
 
 /// Where the agent runs, for an agent with a choice of provider: the session's accounts and OpenRouter.
@@ -688,6 +707,8 @@ fn provider_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElemen
             .debug_selector(|| "provider-picker".into())
             .child(
                 Select::new(gpui_kit::ElementId::Name(format!("{}-provider", s.key).into()), words)
+                    .corners(atelier_ui::button_group::segment_corners(1, 2, gpui_kit::Axis::Horizontal))
+                    .fill(cx.theme().card_strong)
                     .selected(choices.iter().position(|c| *c == current))
                     .on_change(move |ix, _, cx| {
                         let Some(choice) = choices.get(ix).cloned() else { return };

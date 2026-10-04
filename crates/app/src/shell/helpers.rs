@@ -52,3 +52,24 @@ pub(super) fn folder_error(error: &std::io::Error) -> atelier_ui::FolderError {
         _ => atelier_ui::FolderError::Other(error.to_string().into()),
     }
 }
+
+/// How a project's sessions stand, for the dot on its badge in the switcher.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ProjectMark {
+    /// A session waits on the reader: an approval or a question.
+    NeedsYou,
+    /// A session is at work.
+    Working,
+    Quiet,
+}
+
+/// The mark of a project whose sessions stand at `statuses`: one that needs the reader outweighs one at work.
+pub(super) fn project_mark(statuses: &[atelier_ui::session_status::SessionStatus]) -> ProjectMark {
+    if statuses.iter().any(|s| s.needs_you()) {
+        ProjectMark::NeedsYou
+    } else if statuses.iter().any(|s| matches!(s, atelier_ui::session_status::SessionStatus::Working)) {
+        ProjectMark::Working
+    } else {
+        ProjectMark::Quiet
+    }
+}

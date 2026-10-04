@@ -1,0 +1,43 @@
+//! Dictation
+//!
+//! An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section. Dictation is speaking instead of typing.
+use atelier_i18n::Message;
+
+pub const SECTION_DICTATION: Message = Message {
+    ar: "الإملاء",
+    ca: "Dictat",
+    cs: "Diktování",
+    da: "Diktering",
+    de: "Diktat",
+    el: "Υπαγόρευση",
+    en: "Dictation",
+    es: "Dictado",
+    es_419: "Dictado",
+    fi: "Sanelu",
+    fr: "Dictée",
+    fr_ca: "Dictée",
+    he: "הכתבה",
+    hi: "डिक्टेशन",
+    hr: "Diktiranje",
+    hu: "Diktálás",
+    id: "Dikte",
+    it: "Dettatura",
+    ja: "音声入力",
+    ko: "음성 입력",
+    ms: "Dikte",
+    nl: "Dicteren",
+    no: "Diktering",
+    pl: "Dyktowanie",
+    pt_br: "Ditado",
+    pt_pt: "Ditado",
+    ro: "Dictare",
+    ru: "Диктовка",
+    sk: "Diktovanie",
+    sv: "Diktering",
+    th: "ป้อนตามคำบอก",
+    tr: "Dikte",
+    uk: "Диктування",
+    vi: "Đọc chính tả",
+    zh_cn: "听写",
+    zh_tw: "聽寫",
+};

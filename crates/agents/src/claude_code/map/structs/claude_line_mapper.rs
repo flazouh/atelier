@@ -31,6 +31,9 @@ pub struct ClaudeLineMapper {
     pub(in super::super) ended: bool,
     pub(in super::super) context: ContextFill,
     pub(in super::super) limit: Option<Limit>,
+    /// What `claude` wrote itself as a reply (its model is `<synthetic>`: "You've hit your weekly limit"),
+    /// held until the turn's result says whether a reached usage limit tells it already.
+    pub(in super::super) held: Vec<String>,
     /// The model of the latest main-thread reply, whose window the context fills.
     pub(in super::super) model: Option<String>,
 }

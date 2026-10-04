@@ -1,0 +1,43 @@
+//! Theme
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+use atelier_i18n::Message;
+
+pub const THEME: Message = Message {
+    ar: "المظهر",
+    ca: "Tema",
+    cs: "Motiv",
+    da: "Tema",
+    de: "Design",
+    el: "Θέμα",
+    en: "Theme",
+    es: "Tema",
+    es_419: "Tema",
+    fi: "Teema",
+    fr: "Thème",
+    fr_ca: "Thème",
+    he: "ערכת נושא",
+    hi: "थीम",
+    hr: "Tema",
+    hu: "Téma",
+    id: "Tema",
+    it: "Tema",
+    ja: "テーマ",
+    ko: "테마",
+    ms: "Tema",
+    nl: "Thema",
+    no: "Tema",
+    pl: "Motyw",
+    pt_br: "Tema",
+    pt_pt: "Tema",
+    ro: "Temă",
+    ru: "Тема",
+    sk: "Motív",
+    sv: "Tema",
+    th: "ธีม",
+    tr: "Tema",
+    uk: "Тема",
+    vi: "Giao diện",
+    zh_cn: "主题",
+    zh_tw: "主題",
+};

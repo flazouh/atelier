@@ -9,6 +9,7 @@
 mod helpers;
 mod providers;
 mod structs;
+pub(crate) mod strings;
 mod types;
 
 pub use helpers::colour;

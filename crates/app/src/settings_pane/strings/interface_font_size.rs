@@ -1,0 +1,43 @@
+//! Interface font size
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+use atelier_i18n::Message;
+
+pub const INTERFACE_FONT_SIZE: Message = Message {
+    ar: "حجم خط الواجهة",
+    ca: "Mida de la lletra de la interfície",
+    cs: "Velikost písma rozhraní",
+    da: "Skriftstørrelse i grænsefladen",
+    de: "Schriftgröße der Benutzeroberfläche",
+    el: "Μέγεθος γραμματοσειράς περιβάλλοντος εργασίας",
+    en: "Interface font size",
+    es: "Tamaño de fuente de la interfaz",
+    es_419: "Tamaño de letra de la interfaz",
+    fi: "Käyttöliittymän fonttikoko",
+    fr: "Taille de police de l’interface",
+    fr_ca: "Taille de police de l’interface",
+    he: "גודל גופן הממשק",
+    hi: "इंटरफ़ेस फ़ॉन्ट आकार",
+    hr: "Veličina fonta sučelja",
+    hu: "A felület betűmérete",
+    id: "Ukuran font antarmuka",
+    it: "Dimensione carattere interfaccia",
+    ja: "インターフェースのフォントサイズ",
+    ko: "인터페이스 글꼴 크기",
+    ms: "Saiz fon antara muka",
+    nl: "Lettergrootte van de interface",
+    no: "Skriftstørrelse i grensesnittet",
+    pl: "Rozmiar czcionki interfejsu",
+    pt_br: "Tamanho da fonte da interface",
+    pt_pt: "Tamanho do tipo de letra da interface",
+    ro: "Dimensiunea fontului interfeței",
+    ru: "Размер шрифта интерфейса",
+    sk: "Veľkosť písma rozhrania",
+    sv: "Gränssnittets teckenstorlek",
+    th: "ขนาดแบบอักษรของอินเทอร์เฟซ",
+    tr: "Arayüz yazı tipi boyutu",
+    uk: "Розмір шрифту інтерфейсу",
+    vi: "Cỡ chữ giao diện",
+    zh_cn: "界面字体大小",
+    zh_tw: "介面字體大小",
+};

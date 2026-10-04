@@ -466,6 +466,7 @@ dependencies = [
 name = "atelier-agents"
 version = "0.1.0"
 dependencies = [
+ "atelier-i18n",
  "atelier-project",
  "atelier-ui",
  "gpui-kit",
@@ -483,6 +484,7 @@ dependencies = [
  "atelier-agents",
  "atelier-editor",
  "atelier-forge",
+ "atelier-i18n",
  "atelier-lsp",
  "atelier-pr-view",
  "atelier-project",
@@ -546,6 +548,14 @@ dependencies = [
  "gpui-kit",
  "ignore",
  "lsp-types",
+]
+
+[[package]]
+name = "atelier-i18n"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "ureq",
 ]
 
 [[package]]
@@ -642,7 +652,7 @@ dependencies = [
 [[package]]
 name = "atelier-ui"
 version = "0.1.0"
-source = "git+https://github.com/flazouh/atelier-ui#7a18eb00edd282c098275bb37b99c3d9d6e30682"
+source = "git+https://github.com/flazouh/atelier-ui#b20fbf6ca3f2117cb6f31c54710fd08a1fc95769"
 dependencies = [
  "core-foundation 0.9.4",
  "core-foundation-sys",

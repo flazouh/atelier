@@ -71,10 +71,12 @@ pub struct Shell {
     pub(super) agents_sidebar: Entity<Sidebar>,
     /// The open sessions' panels.
     pub(super) panels: Entity<AgentPanels>,
+    /// The open sessions' keys from the left of the strip: a new session stands first.
+    pub(super) order: Vec<SharedString>,
     /// Names the reader gave sessions, by the agent's id.
     pub(super) names: BTreeMap<String, String>,
     /// The colours and images the reader gave projects' badges.
-    badges: agents_view::Badges,
+    pub(super) badges: agents_view::Badges,
     /// "Choose an icon…", while it is open: the chooser, the project's place, and its events.
     icon: Option<(Entity<atelier_ui::icon_picker::IconPicker>, SharedString, Subscription)>,
     /// With `ATELIER_FRAMES=1`, times every frame.
@@ -100,6 +102,20 @@ pub struct Shell {
     panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
     /// Which view shows: Sessions or Files.
     pub(super) view: ShellView,
+    /// The view of the Code lens the rail goes back to.
+    pub(super) code_view: ShellView,
+    /// In Sessions, the project the list and the panels are narrowed to; all of them with `None`.
+    pub(super) session_filter: Option<SharedString>,
+    /// The project switcher's menu is open.
+    pub(super) switcher_open: bool,
+    /// The add button's menu next to the switcher.
+    pub(super) add_open: bool,
+    /// The file the History view shows of the picked commit, and the one Changes shows of the checkout: the tree's
+    /// first while none is picked, or the picked one is not there.
+    pub(super) history_file: Option<SharedString>,
+    pub(super) change_file: Option<SharedString>,
+    /// The height a file's diff had on the last frame, which its rows fill.
+    pub(super) diff_height: f32,
     /// In a narrow window, the Files view's tree or editor.
     files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
@@ -118,7 +134,12 @@ impl Shell {
     pub fn new(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Self {
         // The zoom the reader left it at.
         atelier_ui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
-        let agents_sidebar = cx.new(Sidebar::new);
+        // Projects are added from the title bar, beside the switcher.
+        let agents_sidebar = cx.new(|cx| {
+            let mut sidebar = Sidebar::new(cx);
+            sidebar.set_add_button(false, cx);
+            sidebar
+        });
         agents_sidebar.update(cx, |s, cx| s.set_layout(crate::sidebar_layout::from_settings(saved), cx));
         let panels = cx.new(|cx| {
             let mut panels = AgentPanels::new(cx);
@@ -142,6 +163,7 @@ impl Shell {
             focus: cx.focus_handle(),
             agents_sidebar,
             panels,
+            order: Vec::new(),
             names: saved.session_names.clone(),
             badges: agents_view::Badges::saved(saved),
             icon: None,
@@ -159,6 +181,13 @@ impl Shell {
             view: ShellView::from_words(saved.view.as_deref()),
             files_narrow: FilesPane::default(),
             layout_menu: false,
+            code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
+            session_filter: None,
+            switcher_open: false,
+            add_open: false,
+            history_file: None,
+            change_file: None,
+            diff_height: 600.,
             archived: saved.archived_sessions.iter().cloned().collect(),
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
@@ -193,6 +222,10 @@ impl Shell {
             }
         }
         let now = agent_session::now();
+        let all = match &self.session_filter {
+            Some(place) => all.into_iter().filter(|p| p.id == *place).collect(),
+            None => all,
+        };
         let handoff: Vec<_> = self.projects.iter().map(|p| (agents_view::project_id(p.read(cx)), p.read(cx).handoff_branches())).collect();
         self.agents_sidebar.update(cx, |s, cx| {
             for (project, targets) in handoff {
@@ -221,9 +254,14 @@ impl Shell {
                 .or_insert_with(|| cx.new(|cx| crate::session_panel::SessionPanel::new(session.clone(), cx)));
         }
         let views = &self.panel_views;
-        let (panels, order) = agents_view::panels(&self.projects, &|s| views[&s.entity_id()].clone().into(), cx);
+        let (panels, project_order) = agents_view::panels(&self.projects, &|s| views[&s.entity_id()].clone().into(), cx);
+        let panels = agents_view::newest_first(panels, |p| &p.id, &mut self.order);
+        let panels = match &self.session_filter {
+            Some(place) => panels.into_iter().filter(|p| p.project.id == *place).collect(),
+            None => panels,
+        };
         self.push_sidebar(cx);
-        self.panels.update(cx, |p, cx| p.set_panels(panels, order, cx));
+        self.panels.update(cx, |p, cx| p.set_panels(panels, project_order, cx));
         self.mark_open_session(cx);
         self.save_open(cx);
         cx.notify();
@@ -241,15 +279,18 @@ impl Shell {
             for session in &p.sessions {
                 let s = session.read(cx);
                 if let Some(id) = &s.id {
-                    open.push(atelier_settings::OpenSession {
+                    open.push((s.key.clone(), atelier_settings::OpenSession {
                         location: p.location.clone(),
                         id: id.as_str().to_string(),
                         title: s.shown_title().to_string(),
                         agent: Some(s.agent.backend.name().to_string()),
-                    });
+                    }));
                 }
             }
         }
+        // From the left of the strip, so the next launch opens them in the same order.
+        open.sort_by_key(|(key, _)| self.order.iter().position(|k| k == key));
+        let open: Vec<_> = open.into_iter().map(|(_, session)| session).collect();
         let front = self.panels.read(cx).active().and_then(|key| self.session_by_key(key, cx)).and_then(|(_, s)| s.read(cx).id.clone()).map(|id| id.as_str().to_string());
         let now = (open, front);
         if now == self.saved_open {
@@ -303,6 +344,8 @@ impl Shell {
             let title = self.names.get(&saved.id).cloned().unwrap_or(saved.title.clone());
             let agent = saved.agent.as_deref().and_then(atelier_agents::registry::by_backend);
             let session = project.update(cx, |p, cx| p.open_session(Some((id, title.into())), agent, window, cx));
+            // A session from the last run keeps its place; only one opened now stands first.
+            self.order.push(session.read(cx).key.clone());
             if let Some(name) = self.names.get(&saved.id) {
                 session.update(cx, |s, _| s.name = Some(name.clone().into()));
             }
@@ -374,7 +417,7 @@ impl Shell {
     }
 
     /// Makes `session` the panel in front, and its project the one the tree and the editor show.
-    fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn show_session(&mut self, project: usize, session: &Entity<AgentSession>, window: &mut Window, cx: &mut Context<Self>) {
         self.active = project;
         self.narrow = Pane::Session;
         self.sync(cx);
@@ -677,7 +720,7 @@ impl Shell {
         cx.notify();
     }
 
-    fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
         let form = cx.new(|cx| SshForm::new(Vec::new(), window, cx));
         // ~/.ssh/config is read off the UI thread; the form fills its hosts in when it has them.
         let reading = cx.background_spawn(async { atelier_remote::ssh::known_hosts() });
@@ -840,6 +883,9 @@ impl Shell {
     /// Shows `view`. The way into Files is a project's menu; ⌘1 (⌃ elsewhere) goes back to Sessions. The focus comes to the shell: what had it (a
     /// composer, the editor) is not drawn in the other view, and a key from it would reach nothing.
     pub fn show_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
+        if view.in_code() {
+            self.code_view = view;
+        }
         if self.view != view {
             self.view = view;
             self.save_view(cx);
@@ -998,7 +1044,7 @@ impl Shell {
         cx.notify();
     }
 
-    fn open_folder(&mut self, _: &OpenFolder, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn open_folder(&mut self, _: &OpenFolder, window: &mut Window, cx: &mut Context<Self>) {
         let picked = cx.prompt_for_paths(PathPromptOptions { files: false, directories: true, multiple: false, prompt: Some("Open".into()) });
         cx.spawn_in(window, async move |this, cx| {
             let path = match picked.await {
@@ -1404,10 +1450,19 @@ impl Shell {
                 .on_click(move |_, window, cx| this.update(cx, |this, cx| this.close_settings(window, cx)))
                 .into_any_element();
         }
-        match self.active().and_then(|_| self.back_to_sessions(cx)) {
-            Some(back) => back,
-            None => div().font_weight(gpui_kit::FontWeight::MEDIUM).child("atelier").into_any_element(),
-        }
+        div().flex().items_center().gap(px(4.)).child(self.sidebar_toggle(cx)).children(self.project_switcher(cx)).into_any_element()
+    }
+
+    /// The sidebar's toggle at the left of the title bar, lit while the sidebar shows.
+    fn sidebar_toggle(&self, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity();
+        atelier_ui::view_rail::RailButton::new("sidebar-toggle", atelier_ui::IconName::SidebarLeft, "Toggle the sidebar (⌘b)")
+            .debug_name("sidebar-toggle")
+            .on_click(move |window, cx| {
+                let fit = Fit::of(atelier_ui::scale::design(window.viewport_size().width));
+                this.update(cx, |this, cx| this.flip_sidebar(fit, cx))
+            })
+            .into_any_element()
     }
 
     /// The Settings button at the top right, lit while the page is open.
@@ -1429,24 +1484,6 @@ impl Shell {
             window.focus(&self.focus, cx);
             cx.notify();
         }
-    }
-
-    /// In the Files view, the way back: "Sessions" with its key. Nothing in the Sessions view: Files is entered
-    /// from a project's menu, so there is no switch to draw.
-    fn back_to_sessions(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.view != ShellView::Files {
-            return None;
-        }
-        let this = cx.entity();
-        Some(
-            Button::new("back-to-sessions")
-                .debug_name("back-to-sessions")
-                .label("Sessions")
-                .cap(keys::cap("⌘1"))
-                .variant(ButtonVariant::Ghost)
-                .on_click(move |_, window, cx| this.update(cx, |this, cx| this.show_view(ShellView::Sessions, window, cx)))
-                .into_any_element(),
-        )
     }
 
     /// The ⋯ at the top right of the session area, and its layout menu: side by side or single, grouped by
@@ -1629,8 +1666,15 @@ impl Shell {
     pub(super) fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         // The projects and their sessions, or in the Git view the focused session's changes; the files
         // are the Files view's.
-        if self.view == ShellView::Git {
-            return div().size_full().child(self.git_sidebar(cx));
+        if self.view.in_code()
+            && let Some(project) = self.active().cloned()
+        {
+            return div().size_full().child(self.code_sidebar(&project, cx));
+        }
+        if self.view == ShellView::Tasks
+            && let Some(project) = self.active().cloned()
+        {
+            return div().size_full().child(self.issues_sidebar(&project, cx));
         }
         div()
             .flex()
@@ -1640,7 +1684,7 @@ impl Shell {
     }
 
     /// The Files view's tree: the front project's files, under their heading.
-    fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         div()
             .debug_selector(|| "files-tree".into())
@@ -1662,27 +1706,7 @@ impl Shell {
 
     /// The Files view's editor, on its card; it says "No file open" until a file is.
     fn files_editor(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        div()
-            .size_full()
-            .pr(px(8.))
-            .pb(px(4.))
-            .child(div().size_full().pt(px(8.)).rounded(radius::lg()).bg(theme.card).child(crate::editor_pane::editor_pane(project, cx)))
-            .into_any_element()
-    }
-
-    /// The Files view in a wide window: the tree, then the editor.
-    fn files_panes(&mut self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        self.session_right = None;
-        div()
-            .debug_selector(|| "files-view".into())
-            .flex()
-            .size_full()
-            .min_h_0()
-            .child(self.view_rail(true, cx))
-            .child(div().flex_none().w(px(self.sidebar_width)).h_full().child(self.files_tree(project, cx)))
-            .child(div().flex_1().min_w_0().h_full().child(self.files_editor(project, cx)))
-            .into_any_element()
+        self.code_card(div().size_full().pt(px(8.)).child(crate::editor_pane::editor_pane(project, cx)).into_any_element(), cx)
     }
 
     /// The Files view in a narrow window: the tree or the editor, with a tab for each.
@@ -1757,9 +1781,6 @@ impl Shell {
                 _ => self.narrow_panes(project, window, cx),
             };
         }
-        if self.view == ShellView::Files {
-            return self.files_panes(project, cx);
-        }
         // In the Sessions view the right pane holds the pull requests or the tasks; the editor is the
         // Files view's.
         let asked = self.view == ShellView::Sessions && project.read(cx).front() != crate::open_project::front::Front::Editor;
@@ -1771,7 +1792,12 @@ impl Shell {
         let widths = super::fit::widths(total - rail, wants);
         self.session_right = Some(rail + widths.sidebar.unwrap_or(0.) + widths.agent);
         // The strip lays its columns out from this width in this frame; the strip keeps 8 px each side.
-        self.panels.update(cx, |p, cx| p.fit_to(widths.agent - 16., cx));
+        // The strip pads its sides by 8; next to the sidebar's card the left pad is the panels' own gap.
+        let inset = if widths.sidebar.is_some() { atelier_ui::panel_layout::GAP } else { 8. };
+        self.panels.update(cx, |p, cx| {
+            p.set_inset_left(inset, cx);
+            p.fit_to(widths.agent - inset - 8., cx)
+        });
         let wash = cx.theme().muted_hover();
         let handle = move |edge: Edge| {
             let d = div().id(match edge {
@@ -1792,7 +1818,7 @@ impl Shell {
         };
         div()
             .id("shell-panes")
-            .debug_selector(|| "sessions-view".into())
+            .debug_selector(if self.view == ShellView::Files { || "files-view".into() } else { || "sessions-view".into() })
             .flex()
             .size_full()
             .min_h_0()
@@ -1805,7 +1831,7 @@ impl Shell {
                 cx.notify();
             }))
             .child(self.view_rail(widths.sidebar.is_some(), cx))
-            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("sidebar", self.sidebar(cx).into_any_element())).child(handle(Edge::Sidebar))))
+            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pb(px(8.)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
             .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, window, cx))))
             .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
@@ -1820,7 +1846,7 @@ impl Shell {
             let p = project.read(cx);
             match p.front() {
                 crate::open_project::front::Front::Pulls => Some("Pull requests"),
-                crate::open_project::front::Front::Tasks => Some("Tasks"),
+                crate::open_project::front::Front::Tasks => Some("Issues"),
                 crate::open_project::front::Front::Editor => None,
             }
         };
@@ -1857,7 +1883,10 @@ impl Shell {
             Pane::Projects => self.sidebar(cx).into_any_element(),
             Pane::Session => {
                 let total = atelier_ui::scale::design(window.viewport_size().width);
-                self.panels.update(cx, |p, cx| p.fit_to(total - 16., cx));
+                self.panels.update(cx, |p, cx| {
+                    p.set_inset_left(8., cx);
+                    p.fit_to(total - 16., cx)
+                });
                 self.center(project, window, cx)
             }
             Pane::Right => self.right_pane(project, cx),
@@ -1877,7 +1906,10 @@ impl Shell {
     fn center(&self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         match self.view {
             ShellView::Tasks => self.tasks_main(project, window, cx),
-            ShellView::Git => self.git_main(project, cx),
+            ShellView::Git => self.changes_main(project, cx),
+            ShellView::Files => self.files_editor(project, cx),
+            ShellView::Pulls => self.pulls_main(project, cx),
+            ShellView::History => self.history_main(project, cx),
             _ => self.agent_panel(cx),
         }
     }

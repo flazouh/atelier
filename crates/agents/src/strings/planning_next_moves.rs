@@ -1,0 +1,43 @@
+//! Planning next moves…
+//!
+//! Status line with a shimmering animation, shown after a message is sent to the Cursor agent until it answers. About 24 characters of room.
+use atelier_i18n::Message;
+
+pub const PLANNING_NEXT_MOVES: Message = Message {
+    ar: "يخطط للخطوات التالية…",
+    ca: "Preparant els propers passos…",
+    cs: "Plánování dalších kroků…",
+    da: "Planlægger næste skridt…",
+    de: "Nächste Schritte planen…",
+    el: "Σχεδιάζει τα επόμενα βήματα…",
+    en: "Planning next moves…",
+    es: "Planificando los siguientes pasos…",
+    es_419: "Planeando los siguientes pasos…",
+    fi: "Suunnittelee seuraavia siirtoja…",
+    fr: "Préparation des prochaines étapes…",
+    fr_ca: "Préparation des prochaines étapes…",
+    he: "מתכנן את הצעדים הבאים…",
+    hi: "अगले कदम तय कर रहा है…",
+    hr: "Planiranje sljedećih koraka…",
+    hu: "Következő lépések tervezése…",
+    id: "Merencanakan langkah berikutnya…",
+    it: "Pianificazione dei prossimi passi…",
+    ja: "次の手を考えています…",
+    ko: "다음 단계 계획 중…",
+    ms: "Merancang langkah seterusnya…",
+    nl: "Volgende stappen plannen…",
+    no: "Planlegger neste steg…",
+    pl: "Planowanie kolejnych kroków…",
+    pt_br: "Planejando os próximos passos…",
+    pt_pt: "A planear os próximos passos…",
+    ro: "Planifică următorii pași…",
+    ru: "Планирует следующие шаги…",
+    sk: "Plánovanie ďalších krokov…",
+    sv: "Planerar nästa steg…",
+    th: "กำลังวางแผนขั้นตอนถัดไป…",
+    tr: "Sonraki adımları planlıyor…",
+    uk: "Планує наступні кроки…",
+    vi: "Đang lên kế hoạch bước tiếp theo…",
+    zh_cn: "正在规划下一步…",
+    zh_tw: "正在規劃下一步…",
+};

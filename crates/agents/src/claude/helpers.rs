@@ -25,7 +25,7 @@ pub fn loading_strips() -> Vec<atelier_ui::Strip> {
 /// Claude's words. The thinking labels are the desktop app's `Wne`, which are also beui's neutral ones;
 /// only waiting names Claude.
 pub fn labels() -> PhaseLabels {
-    PhaseLabels { waiting: "Waiting for Claude…".into(), ..PhaseLabels::default() }
+    PhaseLabels { waiting: atelier_i18n::t(&crate::strings::WAITING_FOR_CLAUDE).into(), ..PhaseLabels::default() }
 }
 
 /// Claude's whole look, for [`atelier_ui::Thinking`] and [`atelier_ui::SubagentRow`].

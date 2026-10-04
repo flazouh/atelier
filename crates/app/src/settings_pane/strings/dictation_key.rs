@@ -1,0 +1,43 @@
+//! Dictation key
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps. The key on the keyboard that, when held, records speech.
+use atelier_i18n::Message;
+
+pub const DICTATION_KEY: Message = Message {
+    ar: "مفتاح الإملاء",
+    ca: "Tecla de dictat",
+    cs: "Klávesa diktování",
+    da: "Dikteringsknap",
+    de: "Diktiertaste",
+    el: "Πλήκτρο υπαγόρευσης",
+    en: "Dictation key",
+    es: "Tecla de dictado",
+    es_419: "Tecla de dictado",
+    fi: "Sanelunäppäin",
+    fr: "Touche de dictée",
+    fr_ca: "Touche de dictée",
+    he: "מקש הכתבה",
+    hi: "डिक्टेशन कुंजी",
+    hr: "Tipka za diktiranje",
+    hu: "Diktálás billentyűje",
+    id: "Tombol dikte",
+    it: "Tasto dettatura",
+    ja: "音声入力キー",
+    ko: "받아쓰기 키",
+    ms: "Kekunci imlak",
+    nl: "Dicteertoets",
+    no: "Dikteringsknapp",
+    pl: "Klawisz dyktowania",
+    pt_br: "Tecla de ditado",
+    pt_pt: "Tecla de ditado",
+    ro: "Tastă de dictare",
+    ru: "Клавиша диктовки",
+    sk: "Kláves na diktovanie",
+    sv: "Dikteringsknapp",
+    th: "ปุ่มเขียนตามคำบอก",
+    tr: "Dikte tuşu",
+    uk: "Клавіша диктування",
+    vi: "Phím đọc chính tả",
+    zh_cn: "听写键",
+    zh_tw: "聽寫鍵",
+};

@@ -1,0 +1,43 @@
+//! Microphone
+//!
+//! The label of a row on the Settings page, at the left of its control. Room for about 40 characters; a long one wraps.
+use atelier_i18n::Message;
+
+pub const MICROPHONE: Message = Message {
+    ar: "ميكروفون",
+    ca: "Micròfon",
+    cs: "Mikrofon",
+    da: "Mikrofon",
+    de: "Mikrofon",
+    el: "Μικρόφωνο",
+    en: "Microphone",
+    es: "Micrófono",
+    es_419: "Micrófono",
+    fi: "Mikrofoni",
+    fr: "Microphone",
+    fr_ca: "Microphone",
+    he: "מיקרופון",
+    hi: "माइक्रोफ़ोन",
+    hr: "Mikrofon",
+    hu: "Mikrofon",
+    id: "Mikrofon",
+    it: "Microfono",
+    ja: "マイク",
+    ko: "마이크",
+    ms: "Mikrofon",
+    nl: "Microfoon",
+    no: "Mikrofon",
+    pl: "Mikrofon",
+    pt_br: "Microfone",
+    pt_pt: "Microfone",
+    ro: "Microfon",
+    ru: "Микрофон",
+    sk: "Mikrofón",
+    sv: "Mikrofon",
+    th: "ไมโครโฟน",
+    tr: "Mikrofon",
+    uk: "Мікрофон",
+    vi: "Micrô",
+    zh_cn: "麦克风",
+    zh_tw: "麥克風",
+};

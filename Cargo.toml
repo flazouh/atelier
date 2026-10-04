@@ -16,6 +16,7 @@ atelier-ui = { git = "https://github.com/flazouh/atelier-ui" }
 atelier-agents = { path = "crates/agents" }
 atelier-editor = { path = "crates/editor" }
 atelier-forge = { path = "crates/forge" }
+atelier-i18n = { path = "crates/i18n" }
 atelier-lsp = { path = "crates/lsp" }
 atelier-pr-view = { path = "crates/pr-view" }
 atelier-project = { path = "crates/project" }

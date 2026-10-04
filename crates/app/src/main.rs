@@ -16,6 +16,7 @@ mod agents_view;
 mod file_glyphs;
 mod dirty;
 mod editor_pane;
+mod control;
 mod exit_log;
 #[cfg(test)]
 mod fake_agent;
@@ -24,6 +25,7 @@ mod fake_forge;
 mod frame_meter;
 mod glide;
 mod handoff_targets;
+mod history;
 mod key_table;
 mod list_diff;
 mod look_rules;
@@ -63,6 +65,8 @@ fn main() {
     }
     // Read before the event loop starts, so the UI thread never waits on the disk.
     let saved = atelier_settings::path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
+    // The reader's pick, else the system's; before any window draws a word.
+    atelier_i18n::set_current(saved.language.as_deref().and_then(atelier_i18n::Locale::from_tag).unwrap_or_else(atelier_i18n::system_locale));
     let folders: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let folders: Vec<Opening> = folders.into_iter().map(Opening::from).collect();
     gpui_kit::application().with_assets(atelier_agents::Assets).run(move |cx| {
@@ -103,6 +107,9 @@ fn main() {
         cx.open_window(options, move |window, cx| {
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
+            if let Some(path) = control::socket_path() {
+                control::serve(shell.downgrade(), window.window_handle(), path, cx);
+            }
             window.focus(&shell.read(cx).focus_handle(), cx);
             // The sessions open at the last quit open again with their projects: all of them when no
             // folder is named, else those of the named folders.

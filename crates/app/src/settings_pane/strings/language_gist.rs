@@ -1,0 +1,43 @@
+//! Some words, like the agents' status lines, change after you restart Atelier.
+//!
+//! Muted small text under the language choice. It tells the reader that part of the interface changes language only after a restart. May wrap to two lines.
+use atelier_i18n::Message;
+
+pub const LANGUAGE_GIST: Message = Message {
+    ar: "تتغير بعض النصوص، مثل حالات الوكلاء، بعد إعادة تشغيل Atelier.",
+    ca: "Alguns textos, com els estats dels agents, canvien quan reinicies Atelier.",
+    cs: "Některé texty, například stavové řádky agentů, se změní až po restartování Atelier.",
+    da: "Nogle tekster, f.eks. agenternes statuslinjer, ændres først, når du genstarter Atelier.",
+    de: "Einige Texte, etwa die Statuszeilen der Agents, ändern sich erst nach einem Neustart von Atelier.",
+    el: "Ορισμένα κείμενα, όπως οι γραμμές κατάστασης των agent, αλλάζουν μετά την επανεκκίνηση του Atelier.",
+    en: "Some words, like the agents' status lines, change after you restart Atelier.",
+    es: "Algunas palabras, como las líneas de estado de los agentes, cambian al reiniciar Atelier.",
+    es_419: "Algunas palabras, como las líneas de estado de los agentes, cambian después de reiniciar Atelier.",
+    fi: "Jotkin tekstit, kuten agenttien tilarivit, muuttuvat vasta, kun käynnistät Atelierin uudelleen.",
+    fr: "Certains textes, comme les lignes d’état des agents, changent après le redémarrage d’Atelier.",
+    fr_ca: "Certains textes, comme les lignes d’état des agents, changent après le redémarrage d’Atelier.",
+    he: "חלק מהטקסטים, כמו שורות הסטטוס של הסוכנים, משתנים אחרי שמפעילים מחדש את Atelier.",
+    hi: "कुछ टेक्स्ट, जैसे एजेंट की स्थिति वाली पंक्तियाँ, Atelier को रीस्टार्ट करने के बाद बदलते हैं।",
+    hr: "Neki se tekstovi, poput redaka sa statusom agenata, mijenjaju nakon ponovnog pokretanja Atelier.",
+    hu: "Egyes szövegek, például az ügynökök állapotsorai, csak az Atelier újraindítása után változnak meg.",
+    id: "Beberapa teks, seperti baris status agen, berubah setelah Anda memulai ulang Atelier.",
+    it: "Alcuni testi, come le righe di stato degli agenti, cambiano dopo il riavvio di Atelier.",
+    ja: "エージェントのステータス行など、一部のテキストは Atelier を再起動すると切り替わります。",
+    ko: "에이전트 상태 표시줄과 같은 일부 텍스트는 Atelier를 다시 시작한 후에 바뀝니다.",
+    ms: "Sesetengah teks, seperti baris status ejen, berubah selepas anda memulakan semula Atelier.",
+    nl: "Sommige teksten, zoals de statusregels van agents, veranderen nadat je Atelier opnieuw hebt gestart.",
+    no: "Noen tekster, som agentenes statuslinjer, endres når du starter Atelier på nytt.",
+    pl: "Niektóre teksty, takie jak wiersze stanu agentów, zmieniają się po ponownym uruchomieniu Atelier.",
+    pt_br: "Alguns textos, como as linhas de status dos agentes, mudam depois que você reinicia o Atelier.",
+    pt_pt: "Alguns textos, como as linhas de estado dos agentes, mudam depois de reiniciares o Atelier.",
+    ro: "Unele texte, precum rândurile de stare ale agenților, se schimbă după ce repornești Atelier.",
+    ru: "Некоторые тексты, например строки состояния агентов, изменятся после перезапуска Atelier.",
+    sk: "Niektoré texty, napríklad stavové riadky agentov, sa zmenia až po reštartovaní Atelier.",
+    sv: "Viss text, som agenternas statusrader, ändras när du startar om Atelier.",
+    th: "ข้อความบางส่วน เช่น บรรทัดสถานะของเอเจนต์ จะเปลี่ยนหลังจากรีสตาร์ท Atelier",
+    tr: "Aracıların durum satırları gibi bazı metinler, Atelier yeniden başlatıldıktan sonra değişir.",
+    uk: "Деякі тексти, наприклад рядки стану агентів, зміняться після перезапуску Atelier.",
+    vi: "Một số nội dung, như dòng trạng thái của các agent, sẽ thay đổi sau khi bạn khởi động lại Atelier.",
+    zh_cn: "部分文字（如代理状态行）会在重启 Atelier 后更改。",
+    zh_tw: "部分文字（例如代理狀態列）會在重新啟動 Atelier 後變更。",
+};
