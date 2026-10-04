@@ -232,3 +232,11 @@ pub(in super::super) struct ListedSession {
     pub title: Option<String>,
     pub updated_at: Option<String>,
 }
+
+/// The tokens the context holds and the size of its window, as an agent tells them after a turn. An agent that
+/// cannot say its window leaves `size` out, and the update then tells nothing.
+#[derive(Deserialize)]
+pub(in super::super) struct ContextUsage {
+    pub used: u64,
+    pub size: Option<u64>,
+}

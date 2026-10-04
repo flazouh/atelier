@@ -662,6 +662,7 @@ fn a_reply_claude_wrote_without_a_limit_shows_before_the_turn_ends() {
     events.extend(mapper.line(&failed_result("Prompt is too long"), now));
     let [Event::Text { delta, .. }, Event::TurnEnded(_)] = events.as_slice() else { panic!("{events:?}") };
     assert_eq!(delta, "Prompt is too long");
+}
 
 fn context_answer(id: &str) -> String {
     json!({"type": "control_response", "response": {"subtype": "success", "request_id": id, "response": {
