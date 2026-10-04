@@ -4,4 +4,4 @@ mod helpers;
 mod types;
 
 pub use helpers::message_text;
-pub use types::{Attachment, Command, PermissionMode};
+pub use types::{Attachment, Command, ImageFormat, PermissionMode};

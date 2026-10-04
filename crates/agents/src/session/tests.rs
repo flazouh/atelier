@@ -413,6 +413,20 @@ mod attachments {
     }
 
     #[test]
+    fn pasted_text_is_fenced_with_more_backticks_than_it_holds() {
+        let plain = Attachment::Text { text: "a\nb".into() };
+        assert_eq!(plain.render(), "Pasted text:\n```\na\nb\n```");
+        let fenced = Attachment::Text { text: "```rust\nfn main() {}\n```".into() };
+        assert_eq!(fenced.render(), "Pasted text:\n````\n```rust\nfn main() {}\n```\n````");
+    }
+
+    #[test]
+    fn a_picture_is_said_in_words_for_a_backend_that_carries_only_text() {
+        let image = Attachment::Image { format: ImageFormat::Jpeg, bytes: vec![0; 2048].into() };
+        assert_eq!(image.render(), "An image was attached (image/jpeg, 2 KB), which this agent cannot read.");
+    }
+
+    #[test]
     fn a_message_with_no_attachment_is_its_text_alone() {
         assert_eq!(message_text("hi", &[]), "hi");
         assert_eq!(Command::send("hi"), Command::Send { text: "hi".into(), attachments: vec![] });

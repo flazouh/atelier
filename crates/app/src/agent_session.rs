@@ -11,6 +11,7 @@
 //! agent's own thread, as it arrives, so a file is read before the tool that names it writes it; and the
 //! turn's end `finish`es it there too. The panel shows the turn's changed files after its last row.
 
+mod chips;
 mod composer_lists;
 pub(crate) mod dictation;
 pub mod handoff;

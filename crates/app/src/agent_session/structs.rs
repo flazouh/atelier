@@ -90,7 +90,7 @@ pub struct AgentSession {
     /// after the first, in the same turn.
     beginning: Option<Vec<Command>>,
     /// Messages held for after the running turn, oldest first: the next goes when a turn completes.
-    pub(super) queued: Vec<String>,
+    pub(super) queued: Vec<super::chips::Draft>,
     /// Whether the running turn is one the reader's message started.
     pub(super) asked_turn: bool,
     pub list: ListState,
@@ -121,6 +121,8 @@ pub struct AgentSession {
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
+    /// What the composer's chips stand for.
+    pub(super) payloads: super::chips::Payloads,
     /// Dictation: the cues, and the clearing of a failed press's words.
     pub(super) dictation: super::dictation::Dictation,
     /// The project's badge, as the sidebar draws it.
@@ -228,6 +230,8 @@ impl AgentSession {
         let composer = cx.new(|cx| {
             let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
             input.set_dictation(true, cx);
+            // A paste or a drop is a chip: the session keeps what it stands for.
+            input.set_paste_chips(true);
             super::dictation::start_up(&mut input, cx);
             input.set_run_picked_skills(runs_picked_skills(cx));
             input
@@ -250,9 +254,16 @@ impl AgentSession {
             cx.notify();
         });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
-            PromptInputEvent::Submit(text) => this.send(text.to_string(), cx),
+            PromptInputEvent::Submit(message) => {
+                let draft = this.draft_of(message.clone());
+                this.send_draft(draft, cx)
+            }
+            PromptInputEvent::Paste(pasted) => this.pasted(pasted.clone(), cx),
             PromptInputEvent::Stop => this.interrupt(cx),
-            PromptInputEvent::Queue(text) => this.queue(text.to_string(), cx),
+            PromptInputEvent::Queue(message) => {
+                let draft = this.draft_of(message.clone());
+                this.queue(draft, cx)
+            }
             PromptInputEvent::Unqueue(place) => this.unqueue(*place, cx),
             PromptInputEvent::SendQueued(place) => this.send_queued(*place, cx),
             PromptInputEvent::ModelChanged(model) => this.set_model(model.to_string(), cx),
@@ -315,6 +326,7 @@ impl AgentSession {
             waiting_send: None,
             beginning: None,
             queued: Vec::new(),
+            payloads: Default::default(),
             asked_turn: false,
             resumed: resume.is_some(),
             // The list lays out this much past the view each frame: enough that a fast scroll never
@@ -718,17 +730,25 @@ impl AgentSession {
     }
 
     pub fn send(&mut self, text: String, cx: &mut Context<Self>) {
-        if text.trim().is_empty() {
+        self.send_draft(super::chips::Draft { text, attachments: Vec::new() }, cx)
+    }
+
+    /// Sends a message with what came with it: pasted text, pictures.
+    pub fn send_draft(&mut self, draft: super::chips::Draft, cx: &mut Context<Self>) {
+        let super::chips::Draft { text, mut attachments } = draft;
+        if text.trim().is_empty() && attachments.is_empty() {
             return;
         }
+        // The conversation shows the words, and a line for each thing that came with them.
+        let shown = super::chips::shown(&text, &attachments);
         if !self.conversation.items().is_empty() && self.id.is_some() {
             cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::Replied));
         }
         // The first message of an empty conversation names it; a resumed one keeps its title.
         if self.conversation.items().is_empty() {
-            self.title = text.lines().next().unwrap_or("").chars().take(80).collect::<String>().into();
+            self.title = shown.lines().next().unwrap_or("").chars().take(80).collect::<String>().into();
         }
-        self.conversation.user_sent(text.clone());
+        self.conversation.user_sent(shown);
         self.asked_turn = true;
         // Running from the moment it goes, not from the agent's first word: ⌘↵ before then queues.
         self.composer.update(cx, |c, cx| c.set_running(true, cx));
@@ -739,10 +759,11 @@ impl AgentSession {
         // A message sent goes to the end and the follow takes hold again.
         self.glide.follow();
         // The review comments go with the message, and show resolved once the agent's turn ends.
-        let attachments = self.reviews.send_comments();
-        if !attachments.is_empty() {
+        let comments = self.reviews.send_comments();
+        if !comments.is_empty() {
             self.save_review(cx);
         }
+        attachments.extend(comments);
         if let Some(command) = self.with_brief(Command::Send { text, attachments }, cx) {
             self.dispatch(command, cx);
         }
