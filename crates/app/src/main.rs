@@ -104,6 +104,8 @@ fn main() {
             ..Default::default()
         };
         cx.open_window(options, move |window, cx| {
+            // The app's appearance before a window opens can be stale on macOS; the window's is the system's.
+            settings_pane::Mode::system_changed(window.appearance(), cx);
             window.observe_window_appearance(|window, cx| settings_pane::Mode::system_changed(window.appearance(), cx)).detach();
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
