@@ -581,6 +581,10 @@ impl AgentSession {
                     self.ask_context();
                     self.model = started.model.clone().or(self.model.take());
                     self.mode = started.mode.or(self.mode);
+                    // The label says what the agent runs in, which is not always what the composer began with.
+                    if let Some(mode) = self.mode {
+                        self.composer.update(cx, |c, cx| c.set_mode(mode_word(mode), cx));
+                    }
                     if self.agent_commands != started.commands {
                         self.agent_commands = started.commands.clone();
                         self.offer_commands(cx);
