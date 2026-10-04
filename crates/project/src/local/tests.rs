@@ -107,6 +107,59 @@ fn a_watch_reports_a_write_and_a_removal_in_batches() {
     drop(watch);
 }
 
+/// Writes `path` under the project, then waits for the watch to report `wanted`; every change seen on the way.
+fn seen_until(p: &LocalProject, rx: &mpsc::Receiver<Vec<Change>>, writes: &[&str], wanted: &str) -> Vec<Change> {
+    for path in writes {
+        let at = p.root().join(path);
+        fs::create_dir_all(at.parent().unwrap()).unwrap();
+        fs::write(at, "x").unwrap();
+    }
+    let mut seen = Vec::new();
+    while let Ok(batch) = rx.recv_timeout(Duration::from_secs(3)) {
+        seen.extend(batch);
+        if seen.iter().any(|c: &Change| c.path == wanted) {
+            break;
+        }
+    }
+    seen
+}
+
+/// A folder of several checkouts: each one's own .gitignore keeps its build output and packages out, as the listing does.
+#[test]
+fn a_watch_keeps_out_what_a_nested_gitignore_ignores() {
+    let (_dir, p) = project(&[("app/.gitignore", "target/\nnode_modules/\n"), ("app/src/main.rs", "a"), ("app/target/debug/a.o", "o"), ("app/node_modules/x/i.js", "j")]);
+    let (tx, rx) = mpsc::channel();
+    let watch = p.watch(Box::new(move |batch| tx.send(batch).unwrap())).unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    let seen = seen_until(&p, &rx, &["app/target/debug/b.o", "app/node_modules/x/j.js", "app/src/main.rs"], "app/src/main.rs");
+    assert!(seen.iter().any(|c| c.path == "app/src/main.rs"), "the source is watched: {seen:?}");
+    assert!(seen.iter().all(|c| !c.path.starts_with("app/target") && !c.path.starts_with("app/node_modules")), "the ignored folders are not: {seen:?}");
+    drop(watch);
+}
+
+/// A folder made after the watch started is watched too, with what is made in it at once.
+#[test]
+fn a_watch_follows_a_folder_made_after_it_started() {
+    let (_dir, p) = project(&[("a.txt", "a")]);
+    let (tx, rx) = mpsc::channel();
+    let watch = p.watch(Box::new(move |batch| tx.send(batch).unwrap())).unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    fs::create_dir_all(p.root().join("new/deep")).unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    let seen = seen_until(&p, &rx, &["new/deep/b.txt"], "new/deep/b.txt");
+    assert!(seen.iter().any(|c| c.path == "new/deep/b.txt"), "{seen:?}");
+    drop(watch);
+}
+
+/// On Linux each watched folder costs the host one of its few inotify watches: only the folders the listing shows are watched.
+#[test]
+fn the_folders_watched_are_the_ones_listed() {
+    let (_dir, p) = project(&[(".gitignore", "build/\n"), ("src/a.rs", "a"), ("build/x/y/z.o", "o"), ("app/.gitignore", "dist/\n"), ("app/dist/m.js", "m"), ("app/lib/b.rs", "b")]);
+    let mut dirs: Vec<String> = super::helpers::watched_dirs(p.root()).iter().map(|d| d.strip_prefix(p.root()).unwrap().to_string_lossy().into_owned()).collect();
+    dirs.sort();
+    assert_eq!(dirs, ["", "app", "app/lib", "src"]);
+}
+
 #[test]
 fn a_spawned_process_talks_over_its_pipes() {
     let (_dir, p) = project(&[]);

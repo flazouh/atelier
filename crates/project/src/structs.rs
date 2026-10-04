@@ -18,7 +18,7 @@ pub struct DirEntry {
     pub dir: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Change {
     pub path: String,
     pub kind: ChangeKind,

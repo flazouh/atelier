@@ -3,11 +3,12 @@ use std::{
     io::{self, BufRead, BufReader, Read},
     path::{Path, PathBuf},
     process::Stdio,
-    sync::{Arc, mpsc},
+    collections::HashSet,
+    sync::{Arc, Mutex, mpsc},
     thread,
 };
 
-use ignore::{WalkBuilder, gitignore::Gitignore};
+use ignore::WalkBuilder;
 use notify::{EventKind, RecursiveMode, Watcher};
 use regex::RegexBuilder;
 use atelier_tracker::{LocalTracker, Tracker, TrackerError, TrackerResult, prefix_for};
@@ -31,7 +32,8 @@ use crate::{
     process::{Control as _, LocalChild},
 };
 use super::types::{SEARCH_MAX_BYTES, WATCH_BATCH};
-use super::helpers::write_whole;
+use super::helpers::{Ignores, follow, write_whole};
+use super::types::EACH_FOLDER;
 
 pub struct LocalProject {
     pub(super) root: PathBuf,
@@ -90,11 +92,7 @@ impl LocalProject {
     }
 
     fn walker(&self) -> WalkBuilder {
-        let mut walk = WalkBuilder::new(&self.root);
-        // Dotfiles show, as editors show them; `.git` itself never does. A .gitignore counts even
-        // before the folder is a git repository.
-        walk.hidden(false).require_git(false).filter_entry(|e| e.file_name() != ".git");
-        walk
+        super::helpers::walker(&self.root)
     }
 
     fn relative(&self, path: &Path) -> Option<String> {
@@ -173,13 +171,21 @@ impl Project for LocalProject {
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch> {
         let (tx, rx) = mpsc::channel::<notify::Result<notify::Event>>();
         let mut watcher = notify::recommended_watcher(tx).map_err(io::Error::other)?;
-        watcher.watch(&self.root, RecursiveMode::Recursive).map_err(io::Error::other)?;
-        let (ignore, _) = Gitignore::new(self.root.join(".gitignore"));
-        let root = self.root.clone();
+        let mode = if EACH_FOLDER { RecursiveMode::NonRecursive } else { RecursiveMode::Recursive };
+        watcher.watch(&self.root, mode).map_err(io::Error::other)?;
+        let watcher = Arc::new(Mutex::new(watcher));
+        let mut ignores = Ignores::new(self.root.clone());
+        let (root, held) = (self.root.clone(), Arc::downgrade(&watcher));
+        if EACH_FOLDER {
+            // Tens of thousands of folders take seconds: the watch is ready once its root is, and the rest follow on one
+            // thread, which leaves the other cores to the listing walking the same tree.
+            let (root, held) = (root.clone(), held.clone());
+            thread::Builder::new().name("atelier-watch-folders".into()).spawn(move || follow(&held, &root))?;
+        }
         thread::Builder::new().name("atelier-watch".into()).spawn(move || {
             // Ends when the watcher drops with the Watch, which closes the channel.
             while let Ok(first) = rx.recv() {
-                let mut batch = Vec::new();
+                let (mut batch, mut told) = (Vec::new(), HashSet::new());
                 let mut take = |event: notify::Result<notify::Event>| {
                     let Ok(event) = event else { return };
                     let kind = match event.kind {
@@ -191,14 +197,20 @@ impl Project for LocalProject {
                     for path in event.paths {
                         let Ok(rel) = path.strip_prefix(&root) else { continue };
                         let parts: Vec<&str> = rel.iter().filter_map(|p| p.to_str()).collect();
-                        let ignored = ignore.matched_path_or_any_parents(rel, path.is_dir()).is_ignore();
-                        if parts.is_empty() || parts[0] == ".git" || ignored || parts.last().is_some_and(|n| n.ends_with(".atelier-save")) {
+                        let dir = path.is_dir();
+                        if parts.is_empty() || ignores.ignored(&path, dir) || parts.last().is_some_and(|n| n.ends_with(".atelier-save")) {
                             continue;
+                        }
+                        if parts.last() == Some(&".gitignore") {
+                            ignores.forget(path.parent().unwrap_or(&root));
+                        }
+                        if kind == ChangeKind::Created && dir && EACH_FOLDER {
+                            follow(&held, &path);
                         }
                         // A rename or a save that replaces the file reads as a change of it.
                         let kind = if kind != ChangeKind::Removed && !path.exists() { ChangeKind::Removed } else { kind };
                         let change = Change { path: parts.join("/"), kind };
-                        if !batch.contains(&change) {
+                        if told.insert(change.clone()) {
                             batch.push(change);
                         }
                     }
