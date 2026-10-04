@@ -94,7 +94,7 @@ fn the_reads_run_at_once_not_one_after_another() {
         slow!(self, job_log(j: &atelier_forge::JobRef) -> atelier_forge::ForgeResult<String>);
         slow!(self, last_review_point(r: &atelier_forge::PullRef) -> atelier_forge::ForgeResult<Option<String>>);
         slow!(self, involved() -> atelier_forge::ForgeResult<Vec<atelier_forge::Involved>>);
-        slow!(self, briefs(r: &atelier_forge::RepoRef, n: &[u64]) -> atelier_forge::ForgeResult<Vec<Option<atelier_forge::PullBrief>>>);
+        slow!(self, briefs(r: &atelier_forge::RepoRef, n: &[u64]) -> atelier_forge::ForgeResult<Vec<Option<atelier_forge::PullSummary>>>);
         slow!(self, create_pull(r: &atelier_forge::RepoRef, n: &atelier_forge::NewPull) -> atelier_forge::ForgeResult<atelier_forge::PullRef>);
         slow!(self, update_pull(r: &atelier_forge::PullRef, u: &atelier_forge::PullUpdate) -> atelier_forge::ForgeResult<()>);
         slow!(self, merge(r: &atelier_forge::PullRef, m: &atelier_forge::MergeRequest) -> atelier_forge::ForgeResult<atelier_forge::MergeOutcome>);

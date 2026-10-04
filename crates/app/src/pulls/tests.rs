@@ -3,7 +3,7 @@ use atelier_ui::pr::PrState;
 use super::*;
 
 fn chip(repo: &str, number: u64) -> PrChipData {
-    PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: PrState::Open, url: "u".into() }
+    PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: PrState::Open, url: "u".into(), facts: None }
 }
 
 #[test]

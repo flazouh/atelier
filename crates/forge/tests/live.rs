@@ -71,7 +71,7 @@ fn reads_a_public_pull_end_to_end() {
 
     let briefs = forge.briefs(&reference.repo, &[44169, 1, 44032]).unwrap();
     assert_eq!(briefs.len(), 3);
-    assert_eq!(briefs[0].as_ref().unwrap().state, PullState::Merged);
+    assert_eq!(briefs[0].as_ref().unwrap().brief.state, PullState::Merged);
     assert!(briefs[1].is_none(), "#1 is not a pull request");
 
     // Fifty numbers, one request: how long GitHub takes to answer it.

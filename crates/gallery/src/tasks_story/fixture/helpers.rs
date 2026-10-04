@@ -32,6 +32,7 @@ fn pr(number: u64, state: PrState, title: &str) -> PrChipData {
         title: title.to_string().into(),
         state,
         url: format!("https://github.com/flazouh/atelier/pull/{number}").into(),
+        facts: None,
     }
 }
 

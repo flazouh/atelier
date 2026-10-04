@@ -6,13 +6,13 @@ use atelier_ui::{
         MergeFacts, MergeMethod as UiMethod, PullState as UiPullState, Queue, ReviewNeed, Rights as UiRights,
         UpdateWay,
     },
-    pr::{Checks, PrChipData, PrState, ReviewState},
+    pr::{Checks, PrChipData, PrFacts, PrState, ReviewState},
 };
 use gpui_kit::SharedString;
 
 use crate::{
     Check, CheckCounts, Conclusion, Court, Filed, MergeMethod, MergeState, Pull, PullBrief, PullState,
-    ReviewDecision, Rights, Shelf, Verdict, time,
+    PullSummary, ReviewDecision, Rights, Shelf, Verdict, time,
 };
 
 pub fn pr_state(state: PullState) -> PrState {
@@ -31,7 +31,22 @@ pub fn chip(brief: &PullBrief) -> PrChipData {
         title: brief.title.clone().into(),
         state: pr_state(brief.state),
         url: brief.url.clone().into(),
+        facts: None,
     }
+}
+
+/// A chip whose card says who wrote it, how big it is and how it stands.
+pub fn chip_of(summary: &PullSummary) -> PrChipData {
+    let facts = PrFacts {
+        author: summary.author.clone().into(),
+        added: summary.additions,
+        removed: summary.deletions,
+        comments: summary.comments,
+        review: review_state(summary.review),
+        checks: summary.checks.map(checks),
+        updated_at: summary.updated_at,
+    };
+    PrChipData { facts: Some(facts), ..chip(&summary.brief) }
 }
 
 pub fn checks(counts: CheckCounts) -> Checks {
@@ -84,7 +99,7 @@ fn why(filed: &Filed) -> &'static str {
 pub fn court_item(filed: &Filed, now: u64) -> CourtItem {
     let summary = &filed.involved.summary;
     CourtItem {
-        pr: chip(&summary.brief),
+        pr: chip_of(summary),
         author: SharedString::from(summary.author.clone()),
         court: ui_court(filed.court),
         why: why(filed).into(),

@@ -709,7 +709,7 @@ impl OpenProject {
             let Ok(found) = found else { return };
             _ = this.update(cx, |this, cx| {
                 for (number, brief) in numbers.into_iter().zip(found) {
-                    this.looked_up.insert(number, brief.as_ref().map(atelier_forge::present::chip));
+                    this.looked_up.insert(number, brief.as_ref().map(atelier_forge::present::chip_of));
                 }
                 this.refresh_chips(cx);
             });

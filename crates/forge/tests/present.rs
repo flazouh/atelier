@@ -159,7 +159,7 @@ fn a_queue_and_auto_merge_and_rights_reach_the_model() {
 #[test]
 fn a_brief_becomes_a_chip_and_a_state_keeps_its_meaning() {
     let briefs = github(&recorded()).briefs(&support::bun(), &[44169]).unwrap();
-    let chip = present::chip(briefs[0].as_ref().unwrap());
+    let chip = present::chip(&briefs[0].as_ref().unwrap().brief);
     assert_eq!((chip.number, chip.state), (44169, PrState::Merged));
     assert_eq!(chip.repo.as_ref(), "oven-sh/bun");
     assert_eq!(chip.label().as_ref(), "#44169");

@@ -22,6 +22,20 @@ fn brief(repo: &RepoRef, number: u64) -> PullBrief {
     }
 }
 
+fn summary(repo: &RepoRef, number: u64) -> PullSummary {
+    PullSummary {
+        brief: brief(repo, number),
+        author: "a".into(),
+        created_at: 0,
+        updated_at: 0,
+        additions: 0,
+        deletions: 0,
+        comments: 0,
+        review: ReviewDecision::NotRequired,
+        checks: None,
+    }
+}
+
 /// A forge that knows some pull numbers of the current repository and some the reader is involved in,
 /// and counts what it is asked.
 #[derive(Default)]
@@ -34,12 +48,12 @@ struct Counting {
 }
 
 impl Forge for Counting {
-    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullSummary>>> {
         if self.fail {
             return Err(ForgeError::Offline);
         }
         self.briefs_calls.lock().unwrap().push(numbers.to_vec());
-        Ok(numbers.iter().map(|n| self.here.contains(n).then(|| brief(repo, *n))).collect())
+        Ok(numbers.iter().map(|n| self.here.contains(n).then(|| summary(repo, *n))).collect())
     }
 
     fn involved(&self) -> ForgeResult<Vec<Involved>> {
@@ -47,20 +61,7 @@ impl Forge for Counting {
         Ok(self
             .involved
             .iter()
-            .map(|(repo, n)| Involved {
-                summary: PullSummary {
-                    brief: brief(repo, *n),
-                    author: "a".into(),
-                    created_at: 0,
-                    updated_at: 0,
-                    additions: 0,
-                    deletions: 0,
-                    comments: 0,
-                    review: ReviewDecision::NotRequired,
-                    checks: None,
-                },
-                shelf: None,
-            })
+            .map(|(repo, n)| Involved { summary: summary(repo, *n), shelf: None })
             .collect())
     }
 
@@ -95,7 +96,7 @@ fn many_numbers_of_the_current_repository_are_one_request_in_order() {
     let forge = Arc::new(Counting { here: vec![1, 2, 3, 4], ..Counting::default() });
     let clock = Arc::new(AtomicU64::new(0));
     let found = lookup(&forge, &clock).resolve(&[3, 1, 4, 3]).unwrap();
-    let numbers: Vec<_> = found.iter().map(|b| b.as_ref().unwrap().reference.number).collect();
+    let numbers: Vec<_> = found.iter().map(|b| b.as_ref().unwrap().brief.reference.number).collect();
     assert_eq!(numbers, [3, 1, 4, 3]);
     assert_eq!(*forge.briefs_calls.lock().unwrap(), [vec![1, 3, 4]], "one request, each number once");
     assert_eq!(forge.involved_calls.load(Ordering::SeqCst), 0, "everything was found at home");
@@ -141,8 +142,8 @@ fn a_number_not_at_home_is_found_among_the_pulls_the_reader_is_involved_in() {
     let forge = Arc::new(Counting { here: vec![1], involved: vec![(other.clone(), 50)], ..Counting::default() });
     let clock = Arc::new(AtomicU64::new(0));
     let found = lookup(&forge, &clock).resolve(&[1, 50, 77]).unwrap();
-    assert_eq!(found[0].as_ref().unwrap().reference.repo, current());
-    assert_eq!(found[1].as_ref().unwrap().reference.repo, other);
+    assert_eq!(found[0].as_ref().unwrap().brief.reference.repo, current());
+    assert_eq!(found[1].as_ref().unwrap().brief.reference.repo, other);
     assert!(found[2].is_none());
 }
 
@@ -152,7 +153,7 @@ fn the_current_repository_wins_over_an_involved_one_with_the_same_number() {
     let forge = Arc::new(Counting { here: vec![5], involved: vec![(other, 5)], ..Counting::default() });
     let clock = Arc::new(AtomicU64::new(0));
     let found = lookup(&forge, &clock).resolve(&[5]).unwrap();
-    assert_eq!(found[0].as_ref().unwrap().reference.repo, current());
+    assert_eq!(found[0].as_ref().unwrap().brief.reference.repo, current());
     assert_eq!(forge.involved_calls.load(Ordering::SeqCst), 0);
 }
 

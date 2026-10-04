@@ -365,13 +365,19 @@ pub(in super::super) fn job(repo: &RepoRef, node: &RestJob) -> Job {
 /// A search hit that is a pull request, as a chip and as a list row. `None` for a hit that is not one.
 pub(in super::super) fn summary(hit: &SearchHit) -> Option<PullSummary> {
     let reference = PullRef { repo: repo_ref(&hit.repository.as_ref()?.name_with_owner).ok()?, number: hit.number? };
-    Some(PullSummary {
-        brief: PullBrief {
-            reference,
-            title: hit.title.clone()?,
-            state: pull_state(hit.state.as_deref()?, hit.is_draft, hit.merged),
-            url: hit.url.clone()?,
-        },
+    let brief = PullBrief {
+        reference,
+        title: hit.title.clone()?,
+        state: pull_state(hit.state.as_deref()?, hit.is_draft, hit.merged),
+        url: hit.url.clone()?,
+    };
+    Some(summary_of(brief, hit))
+}
+
+/// `brief` with what else `hit` says of it.
+pub(in super::super) fn summary_of(brief: PullBrief, hit: &SearchHit) -> PullSummary {
+    PullSummary {
+        brief,
         author: login(&hit.author),
         created_at: hit.created_at.as_deref().and_then(time::parse).unwrap_or(0),
         updated_at: hit.updated_at.as_deref().and_then(time::parse).unwrap_or(0),
@@ -380,5 +386,5 @@ pub(in super::super) fn summary(hit: &SearchHit) -> Option<PullSummary> {
         comments: hit.comments.as_ref().map_or(0, |c| c.total),
         review: decision(hit.review_decision.as_deref()),
         checks: rollup_counts(hit.commits.as_ref()),
-    })
+    }
 }

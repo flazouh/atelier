@@ -181,6 +181,7 @@ impl Render for PullCard {
             title: pull.title.clone().into(),
             state: present::pr_state(pull.state),
             url: pull.url.clone().into(),
+            facts: None,
         };
         let this = cx.entity().downgrade();
         let (presses, chooses, opens) = (this.clone(), this.clone(), this.clone());

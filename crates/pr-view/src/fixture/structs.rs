@@ -6,7 +6,7 @@ use std::{
 use atelier_forge::{
     Author, ChangedFile, Check, Comment, Forge, ForgeError, ForgeResult, HeldComment, Involved,
     Job, JobRef, MergeOutcome, MergeRequest, MergeState, NewLine, NewPull, Opinion, Pull,
-    PullBrief, PullRef, PullState, PullUpdate, Remark, RepoRef, Repository, ReviewDecision,
+    PullBrief, PullRef, PullState, PullSummary, PullUpdate, Remark, RepoRef, Repository, ReviewDecision,
     Reviewer, Thread, ThreadId, UpdateMethod, Verdict,
 };
 
@@ -152,14 +152,24 @@ impl Forge for FixtureForge {
         Ok(state.involved.clone())
     }
 
-    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullSummary>>> {
         let state = self.enter("briefs")?;
         Ok(numbers
             .iter()
             .map(|n| {
                 let reference = PullRef { repo: repo.clone(), number: *n };
                 let pull = state.pulls.get(&reference)?.pull.as_ref()?;
-                Some(PullBrief { reference, title: pull.title.clone(), state: pull.state, url: pull.url.clone() })
+                Some(PullSummary {
+                    brief: PullBrief { reference, title: pull.title.clone(), state: pull.state, url: pull.url.clone() },
+                    author: pull.author.clone(),
+                    created_at: pull.created_at,
+                    updated_at: pull.updated_at,
+                    additions: pull.additions,
+                    deletions: pull.deletions,
+                    comments: pull.remarks,
+                    review: pull.review,
+                    checks: Some(pull.checks),
+                })
             })
             .collect())
     }
