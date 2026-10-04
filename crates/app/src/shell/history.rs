@@ -73,14 +73,16 @@ impl Shell {
     }
 
     /// The tree of `files` for `view`, with `current` washed; a press on a file shows it. It grows with its rows, for
-    /// a column that scrolls.
-    pub(super) fn file_tree(this: &WeakEntity<Self>, id: &'static str, view: ShellView, files: &[CommitFile], current: &SharedString) -> AnyElement {
+    /// a column that scrolls, or with `fill` it fills the height it is given and draws only the rows in view.
+    pub(super) fn file_tree(this: &WeakEntity<Self>, id: &'static str, view: ShellView, files: &[CommitFile], current: &SharedString, fill: bool) -> AnyElement {
         let this = this.clone();
+        let tree = ChangedFileTree::new(id, changed(files)).current(current.clone()).on_open(move |path, _, cx| {
+            _ = this.update(cx, |s, cx| s.pick_file(view, path.clone(), cx));
+        });
         div()
             .debug_selector(move || id.into())
-            .child(ChangedFileTree::new(id, changed(files)).current(current.clone()).on_open(move |path, _, cx| {
-                _ = this.update(cx, |s, cx| s.pick_file(view, path.clone(), cx));
-            }))
+            .when(fill, |d| d.size_full())
+            .child(if fill { tree.virtualised() } else { tree })
             .into_any_element()
     }
 
@@ -216,8 +218,7 @@ impl Shell {
                                 .flex_none()
                                 .w(px(TREE_WIDTH))
                                 .h_full()
-                                .overflow_y_scroll()
-                                .child(Self::file_tree(&this, "history-tree", ShellView::History, &shown.files, &file.path)),
+                                .child(Self::file_tree(&this, "history-tree", ShellView::History, &shown.files, &file.path, true)),
                         )
                         .child(self.one_diff(&this, file))
                         .into_any_element(),

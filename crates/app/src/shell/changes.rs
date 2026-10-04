@@ -45,7 +45,7 @@ impl Shell {
             (_, Some([])) => div().px(px(8.)).py(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Nothing uncommitted.").into_any_element(),
             (_, Some(files)) => {
                 let current = shown_file(files, self.change_file.as_ref()).map(|f| f.path.clone()).unwrap_or_default();
-                Self::file_tree(&cx.entity().downgrade(), "changes-tree", ShellView::Git, files, &current)
+                Self::file_tree(&cx.entity().downgrade(), "changes-tree", ShellView::Git, files, &current, false)
             }
             (Some(Read::Failed(why)), _) => div().px(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(why.clone()).into_any_element(),
             _ => div().px(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Reading the changes…").into_any_element(),
