@@ -1311,10 +1311,12 @@ impl Shell {
             atelier_settings::Location::Local { path } => Some(path.clone()),
             atelier_settings::Location::Ssh { .. } => None,
         };
-        let picker = cx.new(|cx| atelier_ui::icon_picker::IconPicker::new(paths, root, window, cx));
+        let current = atelier_ui::project_badge::color_of(self.badges.colors.get(place.as_ref()).map(|c| usize::from(*c)), place.as_ref());
+        let picker = cx.new(|cx| atelier_ui::icon_picker::IconPicker::new(paths, root, window, cx).with_color(current));
         let key = place.clone();
         let events = cx.subscribe_in(&picker, window, move |this, _, event: &atelier_ui::icon_picker::IconPickerEvent, window, cx| match event {
             atelier_ui::icon_picker::IconPickerEvent::Choose(path) => this.save_icon(key.clone(), Some(path.to_string()), window, cx),
+            atelier_ui::icon_picker::IconPickerEvent::Color(index) => this.save_color(key.clone(), *index, cx),
             atelier_ui::icon_picker::IconPickerEvent::Clear => this.save_icon(key.clone(), None, window, cx),
             atelier_ui::icon_picker::IconPickerEvent::Cancel => this.close_icon_picker(window, cx),
         });
@@ -1328,6 +1330,25 @@ impl Shell {
             self.focus.focus(window, cx);
         }
         cx.notify();
+    }
+
+    /// Keeps the colour the reader chose for the project's letter badge, a place in the palette. The chooser stays open:
+    /// the colour is there to see on the badge behind it, and the image is still to choose.
+    pub(super) fn save_color(&mut self, place: SharedString, index: usize, cx: &mut Context<Self>) {
+        let key = place.to_string();
+        let Ok(index) = u8::try_from(index) else { return };
+        self.badges.colors.insert(key.clone(), index);
+        if let Some(settings) = settings_path() {
+            cx.background_spawn(async move {
+                if let Err(error) = atelier_settings::update(&settings, |s| {
+                    s.project_colors.insert(key, index);
+                }) {
+                    eprintln!("could not save the colour: {error}");
+                }
+            })
+            .detach();
+        }
+        self.sync(cx);
     }
 
     /// Keeps the chosen image for the project's badge: its bytes are copied into the data folder, since the file may be
@@ -1671,7 +1692,7 @@ impl Shell {
     /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
     pub(super) fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         // The project switcher heads every sidebar: which project the lens is about.
-        let head = self.project_switcher(cx).map(|switcher| div().flex().flex_none().items_center().px(px(8.)).pt(px(8.)).pb(px(4.)).child(switcher));
+        let head = self.project_switcher(cx).map(|switcher| div().flex().flex_none().items_center().min_w_0().px(px(8.)).pt(px(8.)).pb(px(4.)).child(switcher));
         div().flex().flex_col().size_full().children(head).child(div().flex_1().min_h_0().child(self.sidebar_body(cx)))
     }
 

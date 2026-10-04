@@ -61,6 +61,9 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
   A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O). The
   "+" is as wide as it is tall: a button with only an icon pads to a square in every size. With the sidebar
   hidden the switcher is hidden with it.
+  A project's badge is its letter on a colour of the palette (acepe's twelve), or an image. "Choose an icon…" in the
+  project's ⋯ menu offers both: a disc for each colour, and the project's image files. A colour picked applies at once,
+  stays open for the image, and is kept in the settings (`project_colors`).
 - Far left: the view rail, three lenses: Sessions, Issues and Code (`crates/app/src/shell/rail.rs`).
   Sessions carries a count of the sessions that need the reader, in every project. A press on another lens
   shows it with the sidebar; a press on the lens in front hides the sidebar, and the next press shows it

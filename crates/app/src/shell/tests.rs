@@ -1143,3 +1143,39 @@ fn work_counts_the_sessions_at_work_and_the_ones_that_wait(cx: &mut TestAppConte
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     assert_eq!(shell.read_with(cx, |s, cx| s.work(cx)), atelier_ui::Work::new(0, 0), "an idle session is neither");
 }
+
+/// A colour the reader picks for a project's letter badge is the one its badge wears from then on.
+#[gpui_kit::test]
+fn a_colour_picked_for_a_project_is_kept_for_its_badge(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let place = shell.read_with(cx, |s, cx| crate::agents_view::project_id(s.projects[0].read(cx)));
+    shell.update(cx, |s, cx| s.save_color(place.clone(), 9, cx));
+    settle(&shell, cx);
+    let kept = shell.read_with(cx, |s, _| s.badges.colors.get(place.as_ref()).copied());
+    assert_eq!(kept, Some(9));
+    let worn = shell.read_with(cx, |s, cx| s.project_badges(cx)[0].color);
+    assert_eq!(worn, 9, "the sidebar's badge wears it");
+}
+
+/// A long project name on a long host name stays inside the sidebar: the name is cut, the add button stays whole.
+#[gpui_kit::test]
+fn a_long_project_name_on_a_long_host_stays_inside_the_sidebar_head(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let parent = tempfile::tempdir().unwrap();
+    let root = parent.path().join("fluentai-pro-with-a-name-that-is-long-indeed");
+    std::fs::create_dir(&root).unwrap();
+    let project = atelier_project::LocalProject::open(root.clone()).unwrap();
+    let location = atelier_settings::Location::Ssh { host: "hp-agent-on-the-other-side".into(), path: root };
+    shell.update_in(cx, |s, window, cx| {
+        s.add(location, std::sync::Arc::new(project), window, cx);
+        s.active = s.projects.len() - 1;
+        cx.notify();
+    });
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Files, window, cx));
+    settle(&shell, cx);
+    let add = cx.debug_bounds("add-project").expect("the add button is drawn");
+    let face = cx.debug_bounds("project-switcher").expect("the face is drawn");
+    let sidebar = px(super::fit::SIDEBAR_DEFAULT * atelier_ui::scale::zoom());
+    assert!(add.right() <= sidebar + px(48.), "the add button is inside the sidebar: {add:?} in {sidebar:?}");
+    assert!(face.right() <= add.left() + px(2.), "the face leaves the add button its place: {face:?} {add:?}");
+}
