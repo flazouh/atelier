@@ -1006,7 +1006,9 @@ fn history_lists_the_commits_and_shows_the_newest(cx: &mut TestAppContext) {
     git(&["add", "-A"]);
     git(&["commit", "-qm", "First"]);
     std::fs::write(dir.path().join("a.txt"), "two\n").unwrap();
-    git(&["commit", "-qam", "Second\n\nWhy it changed."]);
+    std::fs::write(dir.path().join("b.txt"), "bee\n").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "Second\n\nWhy it changed."]);
     let (shell, cx) = open_shell(cx);
     cx.simulate_resize(size(px(1400.), px(900.)));
     shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
@@ -1027,9 +1029,14 @@ fn history_lists_the_commits_and_shows_the_newest(cx: &mut TestAppContext) {
         (subjects, picked)
     });
     assert_eq!(subjects, ["Second", "First"]);
-    assert_eq!(picked, ("Second\n\nWhy it changed.".to_string(), 1));
+    assert_eq!(picked, ("Second\n\nWhy it changed.".to_string(), 2));
     assert!(cx.debug_bounds("history-list").is_some() && cx.debug_bounds("history-commit").is_some(), "the list and the commit are drawn");
     assert!(cx.debug_bounds("code-nav-history").is_some(), "the Code sidebar names the view");
+    assert!(cx.debug_bounds("history-tree").is_some(), "the commit's files are a tree");
+    assert!(cx.debug_bounds("file-diff-a.txt").is_some() && cx.debug_bounds("file-diff-b.txt").is_none(), "one file at a time, the tree's first");
+    shell.update(cx, |s, cx| s.pick_file(ShellView::History, "b.txt".into(), cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("file-diff-b.txt").is_some() && cx.debug_bounds("file-diff-a.txt").is_none(), "the file picked in the tree");
 }
 
 /// A project over SSH says where it lives in the switcher, on the face and on its row, as the sidebar does; a
@@ -1091,4 +1098,9 @@ fn changes_lists_what_the_checkout_holds_uncommitted(cx: &mut TestAppContext) {
     });
     assert_eq!(paths, ["a.txt", "new.txt"], "the changed file, then the new one");
     assert!(cx.debug_bounds("changes-list").is_some() && cx.debug_bounds("changes-diffs").is_some(), "the list and the diffs are drawn");
+    assert!(cx.debug_bounds("changes-tree").is_some(), "the sidebar's files are a tree");
+    assert!(cx.debug_bounds("file-diff-a.txt").is_some() && cx.debug_bounds("file-diff-new.txt").is_none(), "one file at a time, the tree's first");
+    shell.update(cx, |s, cx| s.pick_file(ShellView::Git, "new.txt".into(), cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("file-diff-new.txt").is_some() && cx.debug_bounds("file-diff-a.txt").is_none(), "the file picked in the tree");
 }

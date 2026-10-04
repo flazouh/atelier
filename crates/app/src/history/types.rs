@@ -1,4 +1,4 @@
-use atelier_ui::DiffLine;
+use atelier_ui::{DiffLine, FileChange};
 use gpui_kit::SharedString;
 
 /// One commit of the log.
@@ -16,6 +16,8 @@ pub struct Commit {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitFile {
     pub path: SharedString,
+    /// Whether the file is new, gone, or changed in place.
+    pub change: FileChange,
     pub lines: Vec<DiffLine>,
 }
 

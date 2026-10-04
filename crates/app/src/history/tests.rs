@@ -1,4 +1,4 @@
-use atelier_ui::DiffLineKind;
+use atelier_ui::{DiffLineKind, FileChange};
 
 use super::*;
 
@@ -64,4 +64,14 @@ fn an_untracked_file_reads_as_all_new_under_its_own_path() {
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].path, "notes.txt");
     assert_eq!(files[0].lines.iter().filter(|l| l.kind == DiffLineKind::Added).count(), 2);
+}
+
+#[test]
+fn a_patch_says_which_files_are_new_and_which_went() {
+    let patch = "diff --git a/new.rs b/new.rs\nnew file mode 100644\n--- /dev/null\n+++ b/new.rs\n@@ -0,0 +1 @@\n+fresh\n\
+diff --git a/old.rs b/old.rs\ndeleted file mode 100644\n--- a/old.rs\n+++ /dev/null\n@@ -1 +0,0 @@\n-gone\n\
+diff --git a/kept.rs b/kept.rs\n--- a/kept.rs\n+++ b/kept.rs\n@@ -1 +1 @@\n-a\n+b\n";
+    let files = split_patch(patch);
+    let kinds: Vec<_> = files.iter().map(|f| (f.path.as_ref(), f.change.clone())).collect();
+    assert_eq!(kinds, [("new.rs", FileChange::Added), ("old.rs", FileChange::Deleted), ("kept.rs", FileChange::Modified)]);
 }

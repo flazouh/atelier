@@ -110,8 +110,12 @@ pub struct Shell {
     pub(super) switcher_open: bool,
     /// The add button's menu next to the switcher.
     pub(super) add_open: bool,
-    /// The Changes view's column of diffs, so a press on a file in the sidebar scrolls to it.
-    pub(super) changes_scroll: gpui_kit::ScrollHandle,
+    /// The file the History view shows of the picked commit, and the one Changes shows of the checkout: the tree's
+    /// first while none is picked, or the picked one is not there.
+    pub(super) history_file: Option<SharedString>,
+    pub(super) change_file: Option<SharedString>,
+    /// The height a file's diff had on the last frame, which its rows fill.
+    pub(super) diff_height: f32,
     /// In a narrow window, the Files view's tree or editor.
     files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
@@ -181,7 +185,9 @@ impl Shell {
             session_filter: None,
             switcher_open: false,
             add_open: false,
-            changes_scroll: gpui_kit::ScrollHandle::new(),
+            history_file: None,
+            change_file: None,
+            diff_height: 600.,
             archived: saved.archived_sessions.iter().cloned().collect(),
             session_right: None,
             right_view: cx.new(|_| crate::right_pane::RightPane::default()),
