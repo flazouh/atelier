@@ -85,7 +85,7 @@ fn pr_3311() -> PrChipData {
                 PrReviewer { who: "ana".into(), verdict: PrVerdict::Commented },
                 PrReviewer { who: "core".into(), verdict: PrVerdict::Waiting },
             ],
-            standing: Some(PrStanding { tone: StandingTone::Held, word: "Blocked".into(), detail: "a required check fails".into() }),
+            standing: Some(PrStanding { tone: StandingTone::Held, word: "Blocked".into(), detail: "a check fails".into() }),
         }),
     }
 }

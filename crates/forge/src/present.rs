@@ -103,7 +103,7 @@ pub fn standing(summary: &PullSummary) -> Option<PrStanding> {
             let why = match summary.review {
                 ReviewDecision::ChangesRequested => "changes asked",
                 ReviewDecision::Required => "needs a review",
-                _ if failing => "a required check fails",
+                _ if failing => "a check fails",
                 _ => "a rule holds it",
             };
             say(StandingTone::Held, "Blocked", why.into())
