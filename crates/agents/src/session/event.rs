@@ -22,7 +22,7 @@ mod structs;
 mod types;
 
 pub use structs::{
-    BlockId, Choice, ChoiceId, ContextFill, FileEdit, Limit, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo,
+    BlockId, Choice, ChoiceId, ContextFill, ContextPart, FileEdit, Limit, PermissionRequest, RequestId, SessionId, Started, Subagent, Todo,
     ToolCall, ToolId, ToolOutput, TurnEnd, Usage,
 };
 pub use types::{ChoiceKind, EndReason, Event, LimitState, LimitWindow, TodoStatus, ToolKind, ToolStatus, TurnOutcome};

@@ -168,3 +168,20 @@ fn a_run_with_no_sign_in_tells_it_and_fails_its_turn() {
     assert!(!seen.iter().any(|e| matches!(e, Event::Text { .. })), "the CLI's advice is not shown: {seen:#?}");
     assert!(matches!(outcome(&seen), TurnOutcome::Failed(_)));
 }
+
+/// `get_context_usage` is a control request of the SDK that the CLI answers on stdio (seen in 2.1.288). It makes no
+/// model call, so it costs nothing and answers before any turn. If a newer CLI renames it, this test says so.
+#[test]
+#[ignore = "runs the real claude"]
+fn the_cli_still_tells_what_fills_the_context() {
+    let dir = tempfile::tempdir().unwrap();
+    let project: Arc<dyn Project> = Arc::new(LocalProject::open(dir.path()).unwrap());
+    let (session, rx) = open(&project, OpenRequest::default());
+    session.send(Command::RefreshContext).unwrap();
+    let mut seen = Vec::new();
+    until(&rx, &mut seen, |event| matches!(event, Event::ContextParts(_)));
+    let parts = seen.iter().find_map(|e| if let Event::ContextParts(parts) = e { Some(parts.clone()) } else { None }).unwrap();
+    assert!(parts.iter().any(|part| part.label == "System prompt" && part.tokens > 0), "{parts:?}");
+    let fill = seen.iter().find_map(|e| if let Event::Context(fill) = e { Some(*fill) } else { None }).expect("the same answer tells the reading");
+    assert!(fill.used > 0 && fill.window.is_some_and(|window| window >= fill.used), "{fill:?}");
+}

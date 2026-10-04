@@ -56,3 +56,10 @@ fn a_message_carries_its_attachments_as_text_after_its_own() {
         "Please look\n\nReview comment on src/a.rs, lines 10-12:\n> let a = 1;\n> let b = 2;\nWhy not a struct?\n\nFile: src/b.rs"
     );
 }
+
+#[test]
+fn the_request_for_the_context_carries_the_prefix_its_answer_is_told_by() {
+    let line = parse(&control::context_usage(&format!("{}1", control::CONTEXT_REQUEST)));
+    assert_eq!(line["request"], json!({"subtype": "get_context_usage"}));
+    assert!(line["request_id"].as_str().unwrap().starts_with(control::CONTEXT_REQUEST));
+}

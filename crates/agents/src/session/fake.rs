@@ -79,7 +79,7 @@ impl Session for FakeSession {
             Command::Interrupt => {
                 (self.sink)(Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Interrupted, summary: None }));
             }
-            Command::Answer { .. } | Command::SetModel { .. } | Command::SetPermissionMode { .. } => {}
+            Command::Answer { .. } | Command::SetModel { .. } | Command::SetPermissionMode { .. } | Command::RefreshContext => {}
         }
         Ok(())
     }

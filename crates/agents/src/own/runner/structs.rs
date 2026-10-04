@@ -52,6 +52,7 @@ impl Session for Handle {
                 *self.shared.mode.lock().unwrap_or_else(|p| p.into_inner()) = mode;
                 Ok(())
             }
+            Command::RefreshContext => Err(SessionError::Unsupported("a breakdown of the context")),
         }
     }
 }

@@ -12,6 +12,7 @@ use atelier_ui::{
     CodeEditor, Decision, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
 };
 use atelier_agents::claude::{self, SparkState};
+use atelier_ui::context_usage::ContextPart;
 use std::time::{Duration, Instant};
 
 
@@ -177,6 +178,22 @@ impl Story {
 
 /// beui's preview models: a provider mark per model. The real favicons preview.tsx fetches over the
 /// network have no equivalent here, so every model shows the generic `Bot` mark instead.
+/// What fills the preview's context, as an agent that can break it down would tell it.
+fn preview_context_parts() -> Vec<ContextPart> {
+    [
+        ("System prompt", 4_100),
+        ("Tool definitions", 7_500),
+        ("Skills", 11_100),
+        ("MCP & dynamic tools", 5_900),
+        ("Subagent definitions", 2_500),
+        ("Summarized conversation", 5_500),
+        ("Conversation", 69_700),
+    ]
+    .into_iter()
+    .map(|(label, tokens)| ContextPart::new(label, tokens))
+    .collect()
+}
+
 fn preview_models() -> Vec<PromptModel> {
     vec![
         PromptModel::new("gpt-5.2", "GPT-5.2").icon(IconName::Bot),
@@ -279,7 +296,9 @@ impl Gallery {
             .models(preview_models())
             .model("gpt-5.2")
             .actions(preview_actions());
-            input.set_context(84_000, 200_000, cx);
+            input.set_context(106_300, 300_000, cx);
+            input.set_context_parts(preview_context_parts(), cx);
+            input.set_context_open(std::env::var("GALLERY_OPEN").is_ok(), cx);
             input
         });
         let panel_prompt = cx.new(|cx| {

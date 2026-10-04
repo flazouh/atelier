@@ -46,6 +46,18 @@ fn a_turn_asks_is_answered_and_ends_finished(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), SessionStatus::Idle, "opening clears it");
 }
 
+/// A turn that ends asks the agent what fills its context, and what it tells reaches the conversation. An agent that
+/// refuses is no problem for the reader to see.
+#[gpui_kit::test]
+fn a_turn_that_ends_asks_what_fills_the_context(cx: &mut TestAppContext) {
+    let (session, fake, cx) = start(cx, vec![vec![Event::ContextParts(vec![atelier_agents::session::ContextPart { label: "Skills".into(), tokens: 9_950 }]), ended()]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hello".into(), cx)));
+    cx.run_until_parked();
+    assert!(fake.received.lock().unwrap().iter().any(|c| matches!(c, Command::RefreshContext)), "it asked");
+    assert_eq!(cx.update(|_, cx| session.read(cx).conversation.context_parts().len()), 1, "and what it told is kept");
+    assert!(cx.update(|_, cx| session.read(cx).problem.clone()).is_none());
+}
+
 /// A session whose agent could not start tries again when the reader writes, and the message goes.
 #[gpui_kit::test]
 fn a_failed_start_is_retried_by_the_next_message(cx: &mut TestAppContext) {
