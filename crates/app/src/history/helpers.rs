@@ -1,4 +1,4 @@
-use atelier_ui::DiffLine;
+use atelier_ui::{DiffLine, FileChange};
 
 use super::types::{Commit, CommitFile, Shown};
 
@@ -67,23 +67,28 @@ pub fn split_patch(patch: &str) -> Vec<CommitFile> {
     let mut files: Vec<CommitFile> = Vec::new();
     let mut chunk = String::new();
     let mut path: Option<String> = None;
-    let mut flush = |path: &mut Option<String>, chunk: &mut String| {
+    let mut change = FileChange::Modified;
+    let mut flush = |path: &mut Option<String>, change: &mut FileChange, chunk: &mut String| {
         if let Some(p) = path.take() {
-            files.push(CommitFile { path: p.into(), lines: DiffLine::parse(chunk) });
+            files.push(CommitFile { path: p.into(), change: std::mem::take(change), lines: DiffLine::parse(chunk) });
         }
         chunk.clear();
     };
     for line in patch.lines() {
         if let Some(rest) = line.strip_prefix("diff --git ") {
-            flush(&mut path, &mut chunk);
+            flush(&mut path, &mut change, &mut chunk);
             path = Some(header_path(rest));
         } else if let Some(new) = line.strip_prefix("+++ b/") {
             path = Some(new.to_string());
+        } else if line.starts_with("new file mode ") {
+            change = FileChange::Added;
+        } else if line.starts_with("deleted file mode ") {
+            change = FileChange::Deleted;
         }
         chunk.push_str(line);
         chunk.push('\n');
     }
-    flush(&mut path, &mut chunk);
+    flush(&mut path, &mut change, &mut chunk);
     files
 }
 

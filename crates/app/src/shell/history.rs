@@ -4,11 +4,14 @@
 use atelier_ui::scale::px;
 use atelier_ui::theme::{ActiveTheme, radius};
 use atelier_ui::typography::TextSize;
-use atelier_ui::{FileDiff, FileDiffStatus};
+use atelier_ui::file_diff::diff_stats;
+use atelier_ui::file_tree::FileTree;
+use atelier_ui::{ChangedFile, ChangedFileTree, FileDiff, FileDiffStatus};
 use gpui_kit::prelude::*;
-use gpui_kit::{AnyElement, Context, Entity, FontWeight, SharedString, div};
+use gpui_kit::{AnyElement, Context, Entity, FontWeight, SharedString, WeakEntity, canvas, div};
 
 use super::structs::Shell;
+use super::view::ShellView;
 use crate::history::{CommitFile, Read};
 use crate::open_project::OpenProject;
 
@@ -26,27 +29,87 @@ pub(super) fn note(words: impl Into<SharedString>, muted: gpui_kit::Hsla) -> Any
         .into_any_element()
 }
 
-/// The rows of a file a commit shows before the rest waits for a press.
-const SHOWN_ROWS: usize = 200;
-
 fn now() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
-/// A card for each file's diff, for a column that scrolls. Its rows are plain, all of a file up to a long one:
-/// a list that scrolls inside the card would scroll inside the column.
-pub(super) fn diff_cards<'a>(prefix: &'a str, files: &'a [CommitFile]) -> impl Iterator<Item = AnyElement> + 'a {
-    files.iter().enumerate().map(move |(i, f)| {
-        let diff = FileDiff::new(SharedString::from(format!("{prefix}-{i}")), f.path.clone(), f.lines.clone())
-            .preview_rows(f.lines.len().min(SHOWN_ROWS))
-            .status(FileDiffStatus::Complete)
-            .collapse_on_complete(false);
-        // In a column of a fixed height, a card would shrink to fit; each keeps its own and the column scrolls.
-        div().flex_none().child(diff).into_any_element()
-    })
+/// How wide a tree of files sits beside the diff, as in a pull request and a review.
+const TREE_WIDTH: f32 = 220.;
+
+/// The row a file diff's own head takes over its rows.
+const DIFF_HEAD: f32 = 48.;
+
+/// What a tree lists of `files`: each one's path, counts and kind.
+pub(super) fn changed(files: &[CommitFile]) -> Vec<ChangedFile> {
+    files
+        .iter()
+        .map(|f| {
+            let (added, removed) = diff_stats(&f.lines);
+            ChangedFile::new(f.path.clone(), added, removed).change(f.change.clone())
+        })
+        .collect()
+}
+
+/// The file of `files` to show: the one picked while it is there, else the first the tree lists.
+pub(super) fn shown_file<'a>(files: &'a [CommitFile], picked: Option<&SharedString>) -> Option<&'a CommitFile> {
+    let find = |path: &SharedString| files.iter().find(|f| f.path == *path);
+    picked.and_then(find).or_else(|| FileTree::new(&changed(files)).file_order().first().and_then(find))
 }
 
 impl Shell {
+    /// Shows `path` in `view`'s diff, as a press on its row in the tree does.
+    pub(crate) fn pick_file(&mut self, view: ShellView, path: SharedString, cx: &mut Context<Self>) {
+        match view {
+            ShellView::History => self.history_file = Some(path),
+            _ => {
+                // A session's review gives the card back to the checkout's changes first.
+                if let Some(project) = self.active().cloned() {
+                    project.update(cx, |p, cx| p.close_review(cx));
+                }
+                self.change_file = Some(path);
+            }
+        }
+        cx.notify();
+    }
+
+    /// The tree of `files` for `view`, with `current` washed; a press on a file shows it. It grows with its rows, for
+    /// a column that scrolls.
+    pub(super) fn file_tree(this: &WeakEntity<Self>, id: &'static str, view: ShellView, files: &[CommitFile], current: &SharedString) -> AnyElement {
+        let this = this.clone();
+        div()
+            .debug_selector(move || id.into())
+            .child(ChangedFileTree::new(id, changed(files)).current(current.clone()).on_open(move |path, _, cx| {
+                _ = this.update(cx, |s, cx| s.pick_file(view, path.clone(), cx));
+            }))
+            .into_any_element()
+    }
+
+    /// One file's diff, filling the space left to it: its rows scroll inside it, so a long file costs only the rows
+    /// in sight.
+    pub(super) fn one_diff(&self, this: &WeakEntity<Self>, file: &CommitFile) -> AnyElement {
+        let this = this.clone();
+        let measure = canvas(
+            move |bounds, _, cx| {
+                let height = f32::from(bounds.size.height);
+                _ = this.update(cx, |s, cx| {
+                    if (s.diff_height - height).abs() > 0.5 {
+                        s.diff_height = height;
+                        cx.notify();
+                    }
+                });
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .inset_0();
+        let selector = format!("file-diff-{}", file.path);
+        let diff = FileDiff::new(SharedString::from(selector.clone()), file.path.clone(), file.lines.clone())
+            .status(FileDiffStatus::Complete)
+            .collapse_on_complete(false)
+            .max_height((self.diff_height - DIFF_HEAD).max(120.));
+        div().debug_selector(move || selector.clone()).relative().flex_1().min_w_0().min_h_0().child(measure).child(diff).into_any_element()
+    }
+
     /// The History view's sidebar part: one row a commit, its subject over its short sha, author and age.
     pub(super) fn history_list(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
@@ -108,6 +171,7 @@ impl Shell {
     pub(super) fn history_main(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        let this = cx.entity().downgrade();
         let body = match project.read(cx).commit.as_ref() {
             None => note("Pick a commit on the left.", muted),
             Some((_, Read::Reading)) => note("Reading the commit…", muted),
@@ -128,21 +192,45 @@ impl Shell {
                     .child(div().text_size(TextSize::Base.font_size()).font_weight(FontWeight::MEDIUM).child(subject.to_string()))
                     .children(byline.map(|b| div().text_size(TextSize::Xs.font_size()).text_color(muted).child(b)))
                     .when(!rest.trim().is_empty(), |d| {
-                        d.child(div().pt(px(4.)).text_size(TextSize::Sm.font_size()).text_color(muted).child(rest.trim().to_string()))
+                        d.child(
+                            div()
+                                .id("commit-body")
+                                .max_h(px(120.))
+                                .overflow_y_scroll()
+                                .pt(px(4.))
+                                .text_size(TextSize::Sm.font_size())
+                                .text_color(muted)
+                                .child(rest.trim().to_string()),
+                        )
                     });
-                let files = diff_cards("commit-file", &shown.files);
+                let files = match shown_file(&shown.files, self.history_file.as_ref()) {
+                    None => div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No file changed.").into_any_element(),
+                    Some(file) => div()
+                        .flex()
+                        .flex_1()
+                        .min_h_0()
+                        .gap(px(12.))
+                        .child(
+                            div()
+                                .id("history-tree-column")
+                                .flex_none()
+                                .w(px(TREE_WIDTH))
+                                .h_full()
+                                .overflow_y_scroll()
+                                .child(Self::file_tree(&this, "history-tree", ShellView::History, &shown.files, &file.path)),
+                        )
+                        .child(self.one_diff(&this, file))
+                        .into_any_element(),
+                };
                 div()
-                    .id("history-commit")
                     .debug_selector(|| "history-commit".into())
                     .flex()
                     .flex_col()
                     .gap(px(8.))
                     .size_full()
-                    .overflow_y_scroll()
                     .p(px(16.))
                     .child(head)
-                    .when(shown.files.is_empty(), |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("No file changed.")))
-                    .children(files)
+                    .child(files)
                     .into_any_element()
             }
         };
