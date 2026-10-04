@@ -91,7 +91,7 @@ pub struct OpenProject {
     /// A pull request to show once the pull request view has mounted.
     pending_pull: Option<atelier_forge::PullRef>,
     /// The project's own repository on its forge, from the origin remote; `None` when it has none.
-    pub(super) repo: Option<atelier_forge::RepoRef>,
+    pub(crate) repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
     pub(crate) list_rows: Vec<atelier_ui::PrChipData>,
@@ -102,6 +102,8 @@ pub struct OpenProject {
     pub(super) asked: HashMap<u64, std::time::Instant>,
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
     chip_forge: Option<std::sync::Arc<dyn atelier_forge::Forge>>,
+    /// What the open chip cards read, and their reads while open.
+    pub(crate) glance: crate::pr_glance::Reading,
     opening_pulls: Task<()>,
     pulls_loading: bool,
     /// The tasks hearing of sessions, one at a time and in order.
@@ -145,6 +147,7 @@ impl OpenProject {
             None => Workers::new(project.clone(), Store::from_env(), READY, ASK),
         };
         let workers = Arc::new(workers);
+        crate::pr_glance::register(cx.weak_entity(), cx);
         let mut this = Self {
             location,
             project,
@@ -172,6 +175,7 @@ impl OpenProject {
             looked_up: HashMap::new(),
             asked: HashMap::new(),
             chip_forge: None,
+            glance: Default::default(),
             opening_pulls: Task::ready(()),
             pulls_loading: false,
             task_signals: Task::ready(()),
@@ -670,6 +674,24 @@ impl OpenProject {
         self.chip_forge = Some(forge);
     }
 
+    /// The forge the chips read: GitHub through gh unless a test gave another.
+    pub(crate) fn chip_forge(&mut self) -> std::sync::Arc<dyn atelier_forge::Forge> {
+        let project = self.project.clone();
+        self.chip_forge
+            .get_or_insert_with(|| {
+                // Tests never reach a forge: their lookups ask an empty one.
+                #[cfg(test)]
+                let forge: std::sync::Arc<dyn atelier_forge::Forge> = {
+                    drop(project);
+                    std::sync::Arc::new(atelier_pr_view::fixture::FixtureForge::new())
+                };
+                #[cfg(not(test))]
+                let forge: std::sync::Arc<dyn atelier_forge::Forge> = std::sync::Arc::new(atelier_forge::github::GitHub::new(project));
+                forge
+            })
+            .clone()
+    }
+
     /// Looks up the `#N` in `texts` that the list lacks, in the project's own repository: one request
     /// for all the new numbers, off the UI thread. A number asked in the last five minutes waits; a
     /// failed request gives no chip and says nothing, since the text reads as well without one.
@@ -684,21 +706,7 @@ impl OpenProject {
             return;
         }
         self.asked.extend(numbers.iter().map(|n| (*n, now)));
-        let project = self.project.clone();
-        let forge = self
-            .chip_forge
-            .get_or_insert_with(|| {
-                // Tests never reach a forge: their lookups ask an empty one.
-                #[cfg(test)]
-                let forge: std::sync::Arc<dyn atelier_forge::Forge> = {
-                    drop(project);
-                    std::sync::Arc::new(atelier_pr_view::fixture::FixtureForge::new())
-                };
-                #[cfg(not(test))]
-                let forge: std::sync::Arc<dyn atelier_forge::Forge> = std::sync::Arc::new(atelier_forge::github::GitHub::new(project));
-                forge
-            })
-            .clone();
+        let forge = self.chip_forge();
         let asking = cx.background_spawn(async move {
             let found = forge.briefs(&repo, &numbers);
             (numbers, found)

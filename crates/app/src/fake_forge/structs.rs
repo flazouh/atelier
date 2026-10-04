@@ -64,6 +64,7 @@ impl Forge for FakeForge {
             comments: 0,
             review: atelier_forge::ReviewDecision::NotRequired,
             checks: None,
+            standing: Default::default(),
         };
         Ok(numbers.iter().map(|n| known.iter().find(|b| b.reference.number == *n).map(summary)).collect())
     }

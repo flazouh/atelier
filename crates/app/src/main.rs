@@ -31,6 +31,7 @@ mod list_diff;
 mod look_rules;
 mod memory;
 mod open_project;
+mod pr_glance;
 mod pull_card;
 mod pulls;
 mod review_pane;
@@ -74,6 +75,7 @@ fn main() {
         file_glyphs::install(cx);
         cx.set_global(agent_session::RunPickedSkills(saved.run_picked_skills.unwrap_or(false)));
         cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));
+        pr_glance::install(&saved.pr_card_off, cx);
         cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));
         cx.set_global(providers::ProviderServices::system());
         shell::bind_keys(cx);

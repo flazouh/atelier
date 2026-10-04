@@ -5,6 +5,6 @@ mod types;
 
 pub use structs::{
     ChangedFile, CheckCounts, Involved, NewPull, Opinion, Pull, PullBrief, PullId, PullRef,
-    PullSummary, PullUpdate,
+    PullSummary, PullUpdate, Standing,
 };
 pub use types::{Change, CheckState, MergeState, PullState, ReviewDecision, Reviewer, Shelf};

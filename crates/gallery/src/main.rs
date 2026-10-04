@@ -56,6 +56,7 @@ enum Story {
     SubagentStrip,
     PrCard,
     PrChip,
+    PrChipCards,
     ModelBadge,
     Review,
     PullRequest,
@@ -88,7 +89,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 39] = [
+    const ALL: [Story; 40] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::Worktrees,
@@ -99,6 +100,7 @@ impl Story {
         Story::SubagentStrip,
         Story::PrCard,
         Story::PrChip,
+        Story::PrChipCards,
         Story::ModelBadge,
         Story::Review,
         Story::PullRequest,
@@ -142,6 +144,7 @@ impl Story {
             Story::SubagentStrip => "Subagent strip",
             Story::PrCard => "PR card",
             Story::PrChip => "PR chip",
+            Story::PrChipCards => "PR chip cards",
             Story::ModelBadge => "Model badge",
             Story::Review => "Review",
             Story::PullRequest => "Pull request",
@@ -509,6 +512,7 @@ impl Gallery {
             Story::SubagentStrip => agent_parts::subagent_strip_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::PrCard => agent_parts::pr_card_story().into_any_element(),
             Story::PrChip => agent_parts::pr_chip_story().into_any_element(),
+            Story::PrChipCards => agent_parts::PrCardsStory.into_any_element(),
             Story::ModelBadge => agent_parts::model_badge_story().into_any_element(),
             Story::Review => review_story::element(&self.review),
             Story::PullRequest => pr_story::element(&self.pull_request),

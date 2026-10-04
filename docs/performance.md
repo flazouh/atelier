@@ -577,3 +577,22 @@ restored, `ATELIER_FRAMES=each`, which now names each part of a frame. Median/p9
   that observe their session (tests: the header and the rows follow the session), drawn uncached; caching
   them is one line each once the cause is known.
 - Step 2 is dropped: the status line costs 0.05 ms and reads five sources.
+
+## A chip's card (2026-10-04)
+
+On the HP, against oven-sh/bun through the real gh (`crates/forge/tests/live.rs`
+`a_chip_card_reads_in_one_round_trip`), and atelier-ui's `pr_glance::tests::one_draw_of_a_full_card` (release).
+
+| What | Time |
+| --- | --- |
+| `briefs` of 20 numbers, before the card's fields | 1.0 s min, 1.1 s median |
+| `briefs` of 20 numbers, with branches, conflicts, queue and auto-merge | 1.1 s min, 1.4 s median |
+| `briefs` of 20 numbers, with `mergeStateStatus` and the reviews too (not kept) | 2.3 s min, 2.5 s median |
+| Card open: `pull`, `checks`, `files` in parallel | 0.83 to 1.03 s (the slowest of the three) |
+| One draw of a card with every part showing | 0.81 ms median, 0.87 ms p95 |
+| One draw of a card with every part hidden | 0.25 ms |
+
+- The card opens with the chip's facts at once, after 120 ms of hover (none while another card is warm);
+  the read fills in the rest about a second later.
+- The card is a view that observes one store, so a read redraws the open card alone. It is not cached
+  (`Entity::cached` needs a definite height), so it draws with the text around it while open.

@@ -6,5 +6,5 @@ mod structs;
 
 pub(super) use structs::{
     CommentNode, CommitInfo, CommitNode, ContextNode, Contexts, FileNode, Login, Nodes, Page,
-    PullNode, Repo, RestJob, Root, SearchHit, StateCount, ThreadNode,
+    PullNode, Repo, RequestNode, RestJob, ReviewNode, Root, SearchHit, StateCount, ThreadNode,
 };

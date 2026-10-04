@@ -1,0 +1,43 @@
+//! Branches
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. This part shows the pull request's branch and the branch it merges into.
+use atelier_i18n::Message;
+
+pub const PR_CARD_BRANCHES: Message = Message {
+    ar: "الفروع",
+    ca: "Branques",
+    cs: "Větve",
+    da: "Brancher",
+    de: "Branches",
+    el: "Κλάδοι",
+    en: "Branches",
+    es: "Ramas",
+    es_419: "Ramas",
+    fi: "Haarat",
+    fr: "Branches",
+    fr_ca: "Branches",
+    he: "ענפים",
+    hi: "शाखाएँ",
+    hr: "Grane",
+    hu: "Ágak",
+    id: "Cabang",
+    it: "Branch",
+    ja: "ブランチ",
+    ko: "브랜치",
+    ms: "Cabang",
+    nl: "Branches",
+    no: "Grener",
+    pl: "Gałęzie",
+    pt_br: "Branches",
+    pt_pt: "Ramos",
+    ro: "Ramuri",
+    ru: "Ветки",
+    sk: "Vetvy",
+    sv: "Grenar",
+    th: "สาขา",
+    tr: "Dallar",
+    uk: "Гілки",
+    vi: "Nhánh",
+    zh_cn: "分支",
+    zh_tw: "分支",
+};

@@ -13,12 +13,13 @@ pub(crate) mod strings;
 mod types;
 
 pub use helpers::colour;
+pub(crate) use helpers::save;
 #[cfg(test)]
 pub(crate) use helpers::rule_switch;
 pub use structs::{AgentRow, SettingsPane};
-pub use types::{Mode, SettingsEvent};
+pub use types::{Mode, Section, SettingsEvent};
 #[cfg(test)]
-pub use types::{PRIMARIES, Section};
+pub use types::PRIMARIES;
 
 #[cfg(test)]
 use atelier_ui::scale::px;

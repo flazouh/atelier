@@ -33,6 +33,7 @@ fn summary(repo: &RepoRef, number: u64) -> PullSummary {
         comments: 0,
         review: ReviewDecision::NotRequired,
         checks: None,
+        standing: Default::default(),
     }
 }
 

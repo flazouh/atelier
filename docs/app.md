@@ -487,6 +487,15 @@ off the UI thread, through the project, so it works on a remote project the same
   ask first ("Squash and merge #7 into main, and delete qa/…?").
 - **Chips.** A `#N` of the project's repository becomes a chip: from the pull request list when it holds
   it, else from one `Forge::briefs` request when the session's text settles.
+- **A chip's card** (`crates/app/src/pr_glance`). Hovering a chip opens its card after 120 ms with what the
+  chip knows: the title, the branches, the author, the age, the checks, the review and the size. The
+  project then reads the pull request, its checks and its files in parallel, off the UI thread (about 1 s on
+  GitHub), and fills in the merge standing, the reviewers, the three biggest files, the first failing check
+  with the first line of its log that says why, and the session that made the pull request. While the card
+  is open it reads again every 10 s; closing it stops the reads. Its buttons: Merge (a second press within
+  4 s merges, with the repository's default method and the head the card read), Approve, and Ask the agent to
+  fix (to the session that made the pull request, else a new one). The three dots hide or show each part;
+  Settings > Pull requests has the same switches, kept as `pr_card_off`.
 
 ## Pull requests in the app (M5)
 

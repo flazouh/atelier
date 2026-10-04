@@ -45,7 +45,7 @@ use super::types::{
 };
 use super::helpers::{folder_error, settings_path};
 
-actions!(atelier, [ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(atelier, [ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, OpenPrCardSettings, Quit]);
 
 pub struct Shell {
     pub(super) projects: Vec<Entity<OpenProject>>,
@@ -718,6 +718,16 @@ impl Shell {
         pane.read(cx).focus_handle(cx).focus(window, cx);
         self.settings = Some((pane, events));
         cx.notify();
+    }
+
+    /// The Settings pane at its Pull requests section, from a chip card's menu.
+    pub(super) fn open_pr_card_settings(&mut self, _: &OpenPrCardSettings, window: &mut Window, cx: &mut Context<Self>) {
+        if self.settings.is_none() {
+            self.open_settings(&OpenSettings, window, cx);
+        }
+        if let Some((pane, _)) = &self.settings {
+            pane.update(cx, |pane, cx| pane.show(crate::settings_pane::Section::PullRequests, cx));
+        }
     }
 
     pub(super) fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
@@ -1978,6 +1988,7 @@ impl Shell {
             .on_action(cx.listener(Self::quit))
             .on_action(cx.listener(Self::open_ssh_form))
             .on_action(cx.listener(Self::open_settings))
+            .on_action(cx.listener(Self::open_pr_card_settings))
             .on_action(cx.listener(Self::new_session_key))
             .on_action(cx.listener(Self::save))
             .on_action(cx.listener(Self::close_tab))

@@ -284,3 +284,20 @@ fn the_dictation_section_sets_the_key_and_hold_at_once(cx: &mut TestAppContext) 
     click(cx, "dictation-hold");
     assert!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).hold));
 }
+
+/// Pull requests lists a switch for each part of a chip's card; a switch hides the part on every card, as
+/// the card's own menu does, and the page shows what the menu changed.
+#[gpui_kit::test]
+fn the_card_parts_show_as_switches_that_hide_them_on_every_card(cx: &mut TestAppContext) {
+    let (pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
+    pane.update(cx, |p, cx| p.show(Section::PullRequests, cx));
+    cx.run_until_parked();
+    for part in atelier_ui::PrPart::ALL {
+        assert!(cx.debug_bounds(super::helpers::card_part_switch(part)).is_some(), "{} has its switch", part.key());
+    }
+    let shows = |cx: &mut VisualTestContext, part| cx.update(|_, cx| atelier_ui::pr_cards(cx).read(cx).parts().shows(part));
+    assert!(shows(cx, atelier_ui::PrPart::Files));
+    click(cx, super::helpers::card_part_switch(atelier_ui::PrPart::Files));
+    assert!(!shows(cx, atelier_ui::PrPart::Files), "the switch hid the files");
+    assert!(shows(cx, atelier_ui::PrPart::Reviewers), "and nothing else");
+}

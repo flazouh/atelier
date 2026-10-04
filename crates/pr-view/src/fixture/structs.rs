@@ -6,7 +6,7 @@ use std::{
 use atelier_forge::{
     Author, ChangedFile, Check, Comment, Forge, ForgeError, ForgeResult, HeldComment, Involved,
     Job, JobRef, MergeOutcome, MergeRequest, MergeState, NewLine, NewPull, Opinion, Pull,
-    PullBrief, PullRef, PullState, PullSummary, PullUpdate, Remark, RepoRef, Repository, ReviewDecision,
+    PullRef, PullState, PullSummary, PullUpdate, Remark, RepoRef, Repository, ReviewDecision,
     Reviewer, Thread, ThreadId, UpdateMethod, Verdict,
 };
 
@@ -159,17 +159,7 @@ impl Forge for FixtureForge {
             .map(|n| {
                 let reference = PullRef { repo: repo.clone(), number: *n };
                 let pull = state.pulls.get(&reference)?.pull.as_ref()?;
-                Some(PullSummary {
-                    brief: PullBrief { reference, title: pull.title.clone(), state: pull.state, url: pull.url.clone() },
-                    author: pull.author.clone(),
-                    created_at: pull.created_at,
-                    updated_at: pull.updated_at,
-                    additions: pull.additions,
-                    deletions: pull.deletions,
-                    comments: pull.remarks,
-                    review: pull.review,
-                    checks: Some(pull.checks),
-                })
+                Some(pull.summary())
             })
             .collect())
     }

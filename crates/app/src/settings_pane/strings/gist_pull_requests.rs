@@ -1,0 +1,43 @@
+//! What the card shows when you hover a pull request's chip. The three dots on the card change it too.
+//!
+//! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. A chip is a small pill in the agent's text that names a pull request, like #3344; hovering it opens a card about the pull request.
+use atelier_i18n::Message;
+
+pub const GIST_PULL_REQUESTS: Message = Message {
+    ar: "اختر ما يظهر في بطاقات طلبات السحب.",
+    ca: "Tria què es mostra a les targetes de les sol·licituds d’integració.",
+    cs: "Vyberte, co se zobrazuje na kartách žádostí o začlenění.",
+    da: "Vælg, hvad der vises på kort med pull requests.",
+    de: "Wähle aus, was auf Pull-Request-Karten angezeigt wird.",
+    el: "Επιλέξτε τι εμφανίζεται στις κάρτες των pull request.",
+    en: "Choose what to show in pull request cards.",
+    es: "Elige qué se muestra en las tarjetas de solicitudes de incorporación.",
+    es_419: "Elige qué mostrar en las tarjetas de solicitudes de incorporación.",
+    fi: "Valitse, mitä pull request -korteissa näytetään.",
+    fr: "Choisissez les informations affichées sur les cartes de pull request.",
+    fr_ca: "Choisissez les informations affichées sur les cartes de pull request.",
+    he: "בחרו מה להציג בכרטיסים של בקשות משיכה.",
+    hi: "चुनें कि पुल रिक्वेस्ट कार्ड पर क्या दिखे.",
+    hr: "Odaberite što se prikazuje na karticama zahtjeva za povlačenje.",
+    hu: "Válaszd ki, mi jelenjen meg a pull requestek kártyáin.",
+    id: "Pilih yang ditampilkan di kartu pull request.",
+    it: "Scegli cosa mostrare nelle schede delle pull request.",
+    ja: "プルリクエストのカードに表示する内容を選択します。",
+    ko: "풀 리퀘스트 카드에 표시할 항목을 선택하세요.",
+    ms: "Pilih perkara yang dipaparkan pada kad pull request.",
+    nl: "Kies wat er op pullrequestkaarten wordt weergegeven.",
+    no: "Velg hva som vises på pull request-kort.",
+    pl: "Wybierz, co wyświetlać na kartach pull requestów.",
+    pt_br: "Escolha o que mostrar nos cartões de pull request.",
+    pt_pt: "Escolha o que mostrar nos cartões de pull request.",
+    ro: "Alege ce se afișează pe cardurile de pull request.",
+    ru: "Выберите, что показывать на карточках пул-реквестов.",
+    sk: "Vyberte, čo sa zobrazuje na kartách pull requestov.",
+    sv: "Välj vad som visas på pull request-kort.",
+    th: "เลือกสิ่งที่จะแสดงบนการ์ด pull request",
+    tr: "Pull request kartlarında ne gösterileceğini seçin.",
+    uk: "Виберіть, що показувати на картках пул-реквестів.",
+    vi: "Chọn nội dung hiển thị trên thẻ pull request.",
+    zh_cn: "选择在拉取请求卡片上显示的内容。",
+    zh_tw: "選擇要在提取要求卡片上顯示的內容。",
+};

@@ -41,6 +41,7 @@ pub fn involved() -> Vec<Involved> {
                 comments,
                 review,
                 checks: Some(CheckCounts { passed: checks.0, failed: checks.1, running: checks.2 }),
+                standing: Default::default(),
             },
             shelf,
         }

@@ -588,3 +588,40 @@ fn a_project_starts_watching_off_the_ui_thread(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(sink.lock().unwrap().is_some(), "and the project watches once the call has run");
 }
+
+/// An open chip card reads the pull request, its checks and its files, then the first failing job's log for
+/// the line that says why; closing the card stops its reads.
+#[gpui_kit::test]
+fn an_open_chip_card_reads_its_pull_request_and_the_failing_line(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
+    let relay = atelier_pr_view::fixture::relay::Relay::build();
+    let pr = atelier_ui::PrChipData {
+        number: relay.reference.number,
+        repo: relay.reference.repo.slug().into(),
+        title: "t".into(),
+        state: atelier_ui::PrState::Open,
+        url: "u".into(),
+        facts: None,
+    };
+    cx.update(|_, cx| {
+        crate::pr_glance::install(&[], cx);
+        project.update(cx, |p, cx| {
+            p.set_chip_forge(relay.forge.clone());
+            p.set_repo(Some(relay.reference.repo.clone()), cx);
+        });
+        crate::pr_glance::opened(&pr, true, cx);
+    });
+    cx.run_until_parked();
+    let glance = cx.update(|_, cx| atelier_ui::pr_cards(cx).read(cx).glance(&atelier_ui::pr_glance::key_of(&pr)).cloned()).unwrap();
+    let failing = glance.failing.unwrap();
+    assert_eq!(failing.name.as_ref(), "linux-x64");
+    assert_eq!(failing.line.as_deref(), Some("error[E0308]: mismatched types"));
+    assert_eq!(glance.files.map(|f| f.len()), Some(3), "the three biggest files");
+    let facts = glance.facts.unwrap();
+    assert_eq!((facts.head.as_ref(), facts.base.as_ref()), ("rui/detach-stream", "main"));
+    assert_eq!(facts.standing.map(|s| s.word.to_string()).as_deref(), Some("Blocked"));
+    assert_eq!(facts.reviewers.iter().map(|r| r.who.to_string()).collect::<Vec<_>>(), ["Ada"]);
+    assert!(cx.update(|_, cx| project.read(cx).glance.open.contains_key(&pr.number)), "it reads again while open");
+    cx.update(|_, cx| crate::pr_glance::opened(&pr, false, cx));
+    assert!(cx.update(|_, cx| project.read(cx).glance.open.is_empty()), "closing stops the reads");
+}

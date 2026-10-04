@@ -131,6 +131,7 @@ fn involved(n: u64) -> Involved {
             comments: 3,
             review: if n.is_multiple_of(3) { ReviewDecision::NotRequired } else { ReviewDecision::Required },
             checks: Some(atelier_forge::CheckCounts { passed: 5, failed: n.is_multiple_of(5) as u32, running: n.is_multiple_of(7) as u32 }),
+            standing: Default::default(),
         },
         shelf: Some(shelf),
     }
