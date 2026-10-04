@@ -80,6 +80,7 @@ impl Session for ClaudeSession {
             Command::Interrupt => control::interrupt(&self.request_id()),
             Command::SetModel { model } => control::set_model(&self.request_id(), &model),
             Command::SetPermissionMode { mode } => control::set_permission_mode(&self.request_id(), mode),
+            Command::RefreshContext => control::context_usage(&format!("{}{}", control::CONTEXT_REQUEST, self.request_id())),
         };
         self.write(line)
     }

@@ -48,6 +48,9 @@ pub enum Command {
     Interrupt,
     SetModel { model: String },
     SetPermissionMode { mode: PermissionMode },
+    /// Asks what fills the context window. The answer comes as [`Event::ContextParts`](crate::session::Event::ContextParts);
+    /// an agent that cannot break the window down refuses.
+    RefreshContext,
 }
 
 impl Command {

@@ -41,6 +41,17 @@ fn a_text_reply_streams_and_the_turn_completes() {
     assert_eq!(turn_ends(&events)[0].summary.as_deref(), Some("Hello there"));
 }
 
+/// The context holds what the latest request carried and the reply that joins it, against the budget past which old tool
+/// results are shortened: the window the reader should watch.
+#[test]
+fn a_reply_tells_how_full_the_context_is_against_the_budget() {
+    let rig = rig(vec![Step::Sse(says("Hello there"))], PermissionMode::Ask);
+    rig.send("Say hello");
+    let events = rig.turns(1);
+    let told: Vec<_> = events.iter().filter_map(|e| if let Event::Context(c) = e { Some((c.used, c.window)) } else { None }).collect();
+    assert_eq!(told, [(100 + 42 + 5 + 7, Some(120_000))]);
+}
+
 #[test]
 fn the_request_carries_the_model_tools_thinking_and_cache_breakpoints_and_the_key_only_in_its_header() {
     let rig = rig(vec![Step::Sse(says("ok"))], PermissionMode::Ask);

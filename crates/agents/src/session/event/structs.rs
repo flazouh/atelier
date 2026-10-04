@@ -125,6 +125,14 @@ pub struct ContextFill {
     pub window: Option<u64>,
 }
 
+/// One part of what fills the context window, as the agent could tell it: the system prompt, the tool definitions, the
+/// conversation. Only agents that can break the window down tell it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContextPart {
+    pub label: String,
+    pub tokens: u64,
+}
+
 /// Where the account stands against its plan's usage limit, as the agent last told it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limit {

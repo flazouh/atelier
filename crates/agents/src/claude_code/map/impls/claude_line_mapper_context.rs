@@ -3,8 +3,9 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use crate::claude_code::wire::{ModelUsage, RawUsage};
-use crate::session::{ContextFill, Event};
+use crate::claude_code::control::CONTEXT_REQUEST;
+use crate::claude_code::wire::{ContextUsage, ControlResponse, ModelUsage, RawUsage};
+use crate::session::{ContextFill, ContextPart, Event};
 
 use super::super::structs::ClaudeLineMapper;
 
@@ -12,6 +13,28 @@ impl ClaudeLineMapper {
     /// The event for a new reading of the context, or nothing when it is the same as the last.
     pub(super) fn context_changed(&mut self, context: ContextFill) -> Option<Event> {
         (std::mem::replace(&mut self.context, context) != context).then_some(Event::Context(context))
+    }
+
+    /// The answer to a request atelier wrote. Only the one for the context's breakdown says anything: the parts that
+    /// are in the window, and the reading the same call gives, which the rest of the context then follows.
+    pub(super) fn control_answered(&mut self, answer: ControlResponse) -> Vec<Event> {
+        let answer = answer.response;
+        if !answer.request_id.starts_with(CONTEXT_REQUEST) {
+            return Vec::new();
+        }
+        let Ok(usage) = serde_json::from_value::<ContextUsage>(answer.response) else {
+            return vec![Event::Warning("the agent's answer about its context did not parse".into())];
+        };
+        let window = usage.raw_max_tokens.or(usage.max_tokens).or(self.context.window);
+        let parts = usage
+            .categories
+            .into_iter()
+            .filter(|category| category.kind == "used" && category.tokens > 0)
+            .map(|category| ContextPart { label: category.name, tokens: category.tokens })
+            .collect();
+        let mut events = self.context_changed(ContextFill { used: usage.total_tokens, window }).into_iter().collect::<Vec<_>>();
+        events.push(Event::ContextParts(parts));
+        events
     }
 }
 

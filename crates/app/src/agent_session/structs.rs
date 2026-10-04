@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
 use futures_util::StreamExt;
-use atelier_ui::{PromptInput, PromptInputEvent, PromptModel};
+use atelier_ui::{PromptInput, PromptInputEvent, PromptModel, context_usage::ContextPart};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString,
     Subscription, Task, Window,
@@ -566,6 +566,7 @@ impl AgentSession {
             match event {
                 Event::Started(started) => {
                     self.id = Some(started.session.clone());
+                    self.ask_context();
                     self.model = started.model.clone().or(self.model.take());
                     self.mode = started.mode.or(self.mode);
                     if self.agent_commands != started.commands {
@@ -583,6 +584,7 @@ impl AgentSession {
                 Event::TurnEnded(end) => {
                     let ok = matches!(end.outcome, atelier_agents::session::TurnOutcome::Completed);
                     self.turn_ran(ok, cx);
+                    self.ask_context();
                     cx.emit(SessionEvent::Task(crate::tasks::signal::TaskEvent::TurnEnded { ok }));
                 }
                 Event::Ended(end) => {
@@ -629,10 +631,22 @@ impl AgentSession {
         cx.notify();
     }
 
-    /// Tells the composer how full the agent's context is, once the agent has told its window too.
+    /// Asks the agent what fills its context, for the panel the composer's ring opens. An agent that cannot
+    /// say refuses, and that is no problem to show: the panel then lists only what is in use.
+    fn ask_context(&self) {
+        if let Some(session) = &self.session {
+            let _ = session.send(Command::RefreshContext);
+        }
+    }
+
+    /// Tells the composer how full the agent's context is, once the agent has told its window too, and what fills it.
     fn show_context(&self, cx: &mut Context<Self>) {
         let ContextFill { used, window: Some(window) } = self.conversation.context() else { return };
-        self.composer.update(cx, |c, cx| c.set_context(used, window, cx));
+        let parts = self.conversation.context_parts().iter().map(|part| ContextPart::new(part.label.clone(), part.tokens)).collect();
+        self.composer.update(cx, |c, cx| {
+            c.set_context(used, window, cx);
+            c.set_context_parts(parts, cx);
+        });
     }
 
     /// Whether the group of items `from..to` is the live one: the agent works and nothing comes after it.

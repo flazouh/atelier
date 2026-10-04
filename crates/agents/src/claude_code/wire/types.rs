@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::structs::{CanUseTool, ControlRequest, Finish, Message, RateLimit, Started, Stream, System};
+use super::structs::{CanUseTool, ControlRequest, ControlResponse, Finish, Message, RateLimit, Started, Stream, System};
 
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -13,6 +13,7 @@ pub(in super::super) enum Line {
     #[serde(rename = "result")]
     Finished(Finish),
     ControlRequest(ControlRequest),
+    ControlResponse(ControlResponse),
     ControlCancelRequest {
         request_id: String,
     },

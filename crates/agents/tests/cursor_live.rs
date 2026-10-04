@@ -131,3 +131,19 @@ fn a_real_cursor_session_end_to_end() {
     let sink: EventSink = Arc::new(move |event| drop(tx.lock().unwrap().send(event)));
     assert!(Acp::new(cursor::agent().with_program("/no/such/agent")).open(project, OpenRequest::default(), sink).is_err());
 }
+
+/// Cursor tells nothing of its context (no `usage_update`, and no usage in the result of a turn, seen in 2026.10.01), so
+/// the ring stays away and a request for the parts is refused. If a newer agent starts to tell, this test says so and the
+/// ring can follow.
+#[test]
+#[ignore = "runs the real agent acp"]
+fn cursor_tells_nothing_of_its_context() {
+    let dir = tempfile::tempdir().unwrap();
+    let project: Arc<dyn Project> = Arc::new(LocalProject::open(dir.path()).unwrap());
+    let (session, rx) = open(&project, OpenRequest::default());
+    let mut seen = Vec::new();
+    session.send(Command::send("Reply with the single word pong.")).unwrap();
+    until(&rx, &mut seen, turn_ended);
+    assert!(!seen.iter().any(|e| matches!(e, Event::Context(_) | Event::ContextParts(_))), "{seen:#?}");
+    assert!(session.send(Command::RefreshContext).is_err());
+}

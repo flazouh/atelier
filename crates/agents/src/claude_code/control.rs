@@ -41,6 +41,13 @@ pub(super) fn interrupt(request_id: &str) -> String {
     control(request_id, json!({"subtype": "interrupt"}))
 }
 
+/// The prefix of the id of a request for the context's breakdown, so its answer is told from the answers to other requests.
+pub(super) const CONTEXT_REQUEST: &str = "atelier-context-";
+
+pub(super) fn context_usage(request_id: &str) -> String {
+    control(request_id, json!({"subtype": "get_context_usage"}))
+}
+
 pub(super) fn set_model(request_id: &str, model: &str) -> String {
     control(request_id, json!({"subtype": "set_model", "model": model}))
 }

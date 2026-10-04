@@ -111,3 +111,19 @@ fn a_real_codex_session_end_to_end() {
     assert!(history.iter().any(|e| matches!(e, Event::UserMessage { text } if text.contains("pong"))), "{history:#?}");
     println!("list: {} session(s); history: {} events", sessions.len(), history.len());
 }
+
+/// Codex tells how full the context is after a turn (`usage_update`, with the tokens and the window), and cannot break
+/// it down: a request for the parts is refused.
+#[test]
+#[ignore = "runs the real Codex adapter"]
+fn codex_tells_how_full_the_context_is_and_refuses_the_breakdown() {
+    let dir = tempfile::tempdir().unwrap();
+    let project: Arc<dyn Project> = Arc::new(LocalProject::open(dir.path()).unwrap());
+    let (session, rx) = open(&project, OpenRequest::default());
+    let mut seen = Vec::new();
+    session.send(Command::send("Reply with the single word pong.")).unwrap();
+    until(&rx, &mut seen, turn_ended);
+    let fill = seen.iter().rev().find_map(|e| if let Event::Context(fill) = e { Some(*fill) } else { None }).expect("a reading of the context");
+    assert!(fill.used > 0 && fill.window.is_some_and(|window| window > fill.used), "{fill:?}");
+    assert!(session.send(Command::RefreshContext).is_err(), "there is no breakdown to ask for");
+}

@@ -162,3 +162,41 @@ pub(in super::super) struct CanUseTool {
     pub description: Option<String>,
     pub permission_suggestions: Option<Value>,
 }
+
+/// The answer to a request atelier wrote. Only the id and the body are read here; what the body means depends on the
+/// request that has the id.
+#[derive(Deserialize)]
+pub(in super::super) struct ControlResponse {
+    pub response: ControlAnswer,
+}
+
+#[derive(Deserialize)]
+pub(in super::super) struct ControlAnswer {
+    #[serde(default)]
+    pub request_id: String,
+    #[serde(default)]
+    pub response: Value,
+}
+
+/// What `claude` tells of its context window: each part with its tokens, the total and the window.
+#[derive(Deserialize)]
+pub(in super::super) struct ContextUsage {
+    #[serde(default)]
+    pub categories: Vec<ContextCategory>,
+    #[serde(rename = "totalTokens")]
+    pub total_tokens: u64,
+    #[serde(rename = "maxTokens")]
+    pub max_tokens: Option<u64>,
+    #[serde(rename = "rawMaxTokens")]
+    pub raw_max_tokens: Option<u64>,
+}
+
+/// `kind` is `used` for what is in the window; the free space, the autocompact buffer and the tools that load on
+/// demand have other kinds and are not in it.
+#[derive(Deserialize)]
+pub(in super::super) struct ContextCategory {
+    pub name: String,
+    pub tokens: u64,
+    #[serde(default)]
+    pub kind: String,
+}
