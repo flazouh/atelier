@@ -178,7 +178,8 @@ fn state(shell: &Shell, cx: &App) -> Value {
             json!({ "name": project.name(), "listing": listing, "sessions": sessions })
         })
         .collect();
-    json!({ "projects": projects })
+    let theme = atelier_ui::theme::ActiveTheme::theme(cx);
+    json!({ "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
 }
 
 /// One session: who the agent is, how it stands, and the rows its list shows.

@@ -37,13 +37,26 @@ impl Mode {
 
     /// Puts the mode in force: the current family's light or dark theme, or the system's.
     pub fn apply(self, cx: &mut gpui_kit::App) {
+        cx.set_global(InForce(self));
         match self {
             Mode::Light => set_appearance(Appearance::Light, cx),
             Mode::Dark => set_appearance(Appearance::Dark, cx),
             Mode::System => follow_system(cx),
         }
     }
+
+    /// The system turned light or dark: the app turns with it while the mode is System.
+    pub fn system_changed(appearance: gpui_kit::WindowAppearance, cx: &mut gpui_kit::App) {
+        if cx.try_global::<InForce>().is_none_or(|m| m.0 == Mode::System) {
+            set_appearance(Appearance::of_system(appearance), cx);
+        }
+    }
 }
+
+/// The mode last put in force, which a change of the system's appearance reads.
+struct InForce(Mode);
+
+impl gpui_kit::Global for InForce {}
 
 /// The primary colours offered, besides the default (the theme's ink): name, colour as bytes, words. They are
 /// the reader's data, not the interface's colours. The words are read in the current language, with [`t`].
