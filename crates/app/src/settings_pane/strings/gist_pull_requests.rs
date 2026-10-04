@@ -1,4 +1,4 @@
-//! What the card shows when you hover a pull request's chip. The three dots on the card change it too.
+//! What the card shows when you hover a pull request's chip.
 //!
 //! One line of explanation under a section's title on the Settings page, in muted small text. It may wrap to two lines. A chip is a small pill in the agent's text that names a pull request, like #3344; hovering it opens a card about the pull request.
 use atelier_i18n::Message;

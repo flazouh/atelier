@@ -43,7 +43,6 @@ pub fn font_size_words(zoom: f32) -> String {
 pub(crate) fn card_part_words(part: atelier_ui::PrPart) -> &'static str {
     use atelier_ui::PrPart;
     match part {
-        PrPart::Branches => t(&words::PR_CARD_BRANCHES),
         PrPart::Failing => t(&words::PR_CARD_FAILING_CHECK),
         PrPart::Reviewers => t(&words::PR_CARD_REVIEWERS),
         PrPart::Merge => t(&words::PR_CARD_MERGE),
@@ -58,7 +57,6 @@ pub(crate) fn card_part_words(part: atelier_ui::PrPart) -> &'static str {
 pub(crate) fn card_part_switch(part: atelier_ui::PrPart) -> &'static str {
     use atelier_ui::PrPart;
     match part {
-        PrPart::Branches => "pr-card-branches",
         PrPart::Failing => "pr-card-failing-check",
         PrPart::Reviewers => "pr-card-reviewers",
         PrPart::Merge => "pr-card-merge",

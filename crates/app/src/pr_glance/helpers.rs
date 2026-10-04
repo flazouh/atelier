@@ -219,16 +219,12 @@ fn got(p: &mut OpenProject, pr: &PrChipData, (pull, checks, files): Read, cx: &m
 }
 
 fn act(action: PrAction, pr: &PrChipData, window: &mut Window, cx: &mut App) {
-    match action {
-        PrAction::Settings => return window.dispatch_action(Box::new(crate::shell::OpenPrCardSettings), cx),
-        PrAction::OpenLog => {
-            let url = pr_cards(cx).read(cx).glance(&key_of(pr)).and_then(|g| g.failing.as_ref()?.url.clone());
-            if let Some(url) = url {
-                cx.open_url(&url);
-            }
-            return;
+    if action == PrAction::OpenLog {
+        let url = pr_cards(cx).read(cx).glance(&key_of(pr)).and_then(|g| g.failing.as_ref()?.url.clone());
+        if let Some(url) = url {
+            cx.open_url(&url);
         }
-        _ => {}
+        return;
     }
     let Some(project) = project_for(&pr.repo, cx) else { return };
     let pr = pr.clone();
@@ -246,7 +242,7 @@ fn act(action: PrAction, pr: &PrChipData, window: &mut Window, cx: &mut App) {
                     cx.emit(ProjectEvent::ShowSession(session));
                 }
             }
-            PrAction::OpenLog | PrAction::Settings => {}
+            PrAction::OpenLog => {}
         }
     });
 }

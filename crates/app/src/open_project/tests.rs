@@ -403,6 +403,20 @@ fn the_chips_follow_the_repository_and_stay_quiet_when_the_list_does(cx: &mut Te
     assert_eq!(numbers(cx), [4], "the repository landed: only its own");
 }
 
+/// Pressing a chip of the project's repository opens its pull request even before the pane ever showed and
+/// when the list does not hold it; a chip of another repository opens nothing.
+#[gpui_kit::test]
+fn a_chip_opens_its_pull_request_before_the_pane_ever_showed(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[]);
+    let repo = atelier_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "atelier".into() };
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some(repo.clone()), cx)));
+    let chip = |repo: &str| atelier_ui::PrChipData { number: 7, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::PrState::Open, url: "u".into(), facts: None };
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_pull(&chip("someone/else"), window, cx)));
+    assert_eq!(cx.update(|_, cx| project.read(cx).pending_pull.clone()), None, "another repository's chip");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_pull(&chip("flazouh/atelier"), window, cx)));
+    assert_eq!(cx.update(|_, cx| project.read(cx).pending_pull.clone()), Some(atelier_forge::PullRef { repo, number: 7 }), "it opens once the pane mounts");
+}
+
 /// A project with no GitHub remote opens no pull requests: the pane does nothing, and says why.
 #[gpui_kit::test]
 fn a_project_with_no_forge_remote_opens_no_pull_requests(cx: &mut TestAppContext) {

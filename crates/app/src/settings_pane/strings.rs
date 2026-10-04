@@ -55,7 +55,6 @@ mod dictation_gist_none;
 
 mod section_pull_requests;
 mod gist_pull_requests;
-mod pr_card_branches;
 mod pr_card_failing_check;
 mod pr_card_reviewers;
 mod pr_card_merge;
@@ -117,7 +116,6 @@ pub use dictation_gist_shortcut_mac::DICTATION_GIST_SHORTCUT_MAC;
 pub use dictation_gist_none::DICTATION_GIST_NONE;
 pub use section_pull_requests::SECTION_PULL_REQUESTS;
 pub use gist_pull_requests::GIST_PULL_REQUESTS;
-pub use pr_card_branches::PR_CARD_BRANCHES;
 pub use pr_card_failing_check::PR_CARD_FAILING_CHECK;
 pub use pr_card_reviewers::PR_CARD_REVIEWERS;
 pub use pr_card_merge::PR_CARD_MERGE;

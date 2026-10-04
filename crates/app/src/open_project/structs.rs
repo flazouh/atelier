@@ -89,7 +89,7 @@ pub struct OpenProject {
     /// What the reader asked the right pane for last.
     right_asked: super::front::Front,
     /// A pull request to show once the pull request view has mounted.
-    pending_pull: Option<atelier_forge::PullRef>,
+    pub(super) pending_pull: Option<atelier_forge::PullRef>,
     /// The project's own repository on its forge, from the origin remote; `None` when it has none.
     pub(crate) repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
@@ -725,16 +725,13 @@ impl OpenProject {
         .detach();
     }
 
-    /// Opens the pull request a chip names, in the pull request pane.
-    fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(pulls) = &mut self.pulls else { return };
-        let hub = pulls.hub.clone();
-        let Some(reference) = hub.read(cx).list().read(cx).model().reference_of(chip) else { return };
-        pulls.shown = true;
-        self.right_asked = super::front::Front::Pulls;
-        hub.update(cx, |hub, cx| hub.open(reference, window, cx));
-        cx.emit(ProjectEvent::PullsShown);
-        cx.notify();
+    /// Opens the pull request a chip names, in the pull request pane, which mounts if it never showed. A chip
+    /// the list does not hold opens when it names this project's repository.
+    pub(super) fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
+        let listed = self.pulls.as_ref().and_then(|pulls| pulls.hub.read(cx).list().read(cx).model().reference_of(chip));
+        let ours = || self.repo.clone().filter(|r| r.slug() == chip.repo.as_ref()).map(|repo| atelier_forge::PullRef { repo, number: chip.number });
+        let Some(reference) = listed.or_else(ours) else { return };
+        self.show_pull(reference, window, cx);
     }
 
 

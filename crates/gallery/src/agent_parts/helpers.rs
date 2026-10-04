@@ -100,6 +100,12 @@ impl RenderOnce for PrCardsStory {
         let reading = PrChipData { number: 3312, title: "Retry the socket once before it times out".into(), ..pr_3311() };
         let merging = PrChipData { number: 3344, ..pr_3344() };
         let merged = PrChipData { number: 3298, state: PrState::Merged, title: "Keep the tab's scroll on a reload".into(), facts: pr_3344().facts.map(|f| PrFacts { standing: None, ..f }), ..pr_3344() };
+        let running = PrChipData {
+            number: 3350,
+            title: "Read the theme file once per window".into(),
+            facts: pr_3344().facts.map(|f| PrFacts { checks: Some(Checks { passed: 12, failed: 0, running: 8 }), review: ReviewState::None, reviewers: Vec::new(), comments: 0, standing: None, ..f }),
+            ..pr_3344()
+        };
         let store = pr_cards(cx);
         store.update(cx, |s, cx| {
             s.update_glance(key_of(&failing), |g| {
@@ -117,11 +123,9 @@ impl RenderOnce for PrCardsStory {
             }, cx);
             s.update_glance(key_of(&merging), |g| g.doing = Some(PrDoing::Working("Merging…".into())), cx);
         });
-        let card = |id: &'static str, pr: PrChipData, menu: bool, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
+        let card = |id: &'static str, pr: PrChipData, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
             let card = window.use_keyed_state(id, cx, |_, cx| {
-                let mut card = PrGlanceCard::new(id, pr, Some(std::sync::Arc::new(|pr: &PrChipData, _: &mut gpui_kit::Window, _: &mut gpui_kit::App| println!("open #{}", pr.number))), cx);
-                card.set_menu(menu, cx);
-                card
+                PrGlanceCard::new(id, pr, Some(std::sync::Arc::new(|pr: &PrChipData, _: &mut gpui_kit::Window, _: &mut gpui_kit::App| println!("open #{}", pr.number))), cx)
             });
             div().flex_none().child(card)
         };
@@ -129,16 +133,16 @@ impl RenderOnce for PrCardsStory {
         div()
             .child(section("Hover a chip", row().child(chip("cards-chip-3311", pr_3311())).child(chip("cards-chip-3344", pr_3344()))))
             .child(section(
-                "Open: a failing check, a review asked, its session; reading a log; merging; merged; the parts menu",
+                "Open: a failing check, a review asked, its session; reading a log; merging; merged; checks running",
                 div()
                     .flex()
                     .flex_wrap()
                     .gap(px(16.))
-                    .child(card("glance-failing", failing, false, window, cx))
-                    .child(card("glance-reading", reading, false, window, cx))
-                    .child(card("glance-merging", merging, false, window, cx))
-                    .child(card("glance-merged", merged, false, window, cx))
-                    .child(card("glance-menu", pr_3311(), true, window, cx)),
+                    .child(card("glance-failing", failing, window, cx))
+                    .child(card("glance-reading", reading, window, cx))
+                    .child(card("glance-merging", merging, window, cx))
+                    .child(card("glance-merged", merged, window, cx))
+                    .child(card("glance-running", running, window, cx)),
             ))
     }
 }

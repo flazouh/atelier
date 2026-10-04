@@ -17,9 +17,9 @@ pub(crate) use helpers::save;
 #[cfg(test)]
 pub(crate) use helpers::rule_switch;
 pub use structs::{AgentRow, SettingsPane};
-pub use types::{Mode, Section, SettingsEvent};
+pub use types::{Mode, SettingsEvent};
 #[cfg(test)]
-pub use types::PRIMARIES;
+pub use types::{PRIMARIES, Section};
 
 #[cfg(test)]
 use atelier_ui::scale::px;

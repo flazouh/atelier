@@ -20,7 +20,7 @@ mod view;
 pub use view::ShellView;
 
 pub use helpers::bind_keys;
-pub use structs::{OpenPrCardSettings, Quit, Shell};
+pub use structs::{Quit, Shell};
 #[cfg(test)]
 pub use structs::{NewSession, OpenSettings};
 
