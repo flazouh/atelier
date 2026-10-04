@@ -104,7 +104,7 @@ pub fn fit(width: f32, rail: bool, tree: Option<bool>) -> Fit {
 /// The working set, as GitQuiet's screen lists it.
 pub fn pull_requests() -> impl IntoElement {
     let item = |n: u64, repo: &str, title: &str, court: Court, why: &str, review: ReviewState, checks: Checks, comments: usize, size: (usize, usize), age: &str, at: u64, unread: bool| CourtItem {
-        pr: PrChipData { number: n, repo: repo.to_string().into(), title: title.to_string().into(), state: PrState::Open, url: format!("https://github.com/{repo}/pull/{n}").into() },
+        pr: PrChipData { number: n, repo: repo.to_string().into(), title: title.to_string().into(), state: PrState::Open, url: format!("https://github.com/{repo}/pull/{n}").into(), facts: None },
         author: ["Kai", "Rui", "Tess", "Mia", "Sam", "Jo"][n as usize % 6].into(),
         court,
         why: why.to_string().into(),

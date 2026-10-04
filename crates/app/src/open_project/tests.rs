@@ -378,7 +378,7 @@ fn a_session_opened_again_runs_the_agent_that_ran_it(cx: &mut TestAppContext) {
 }
 
 fn chip(repo: &str, number: u64) -> atelier_ui::PrChipData {
-    atelier_ui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::pr::PrState::Open, url: "u".into() }
+    atelier_ui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::pr::PrState::Open, url: "u".into(), facts: None }
 }
 
 /// The chips follow the project's repository when it lands after the list, and a list change that
@@ -435,6 +435,8 @@ fn a_number_the_list_lacks_is_looked_up_once(cx: &mut TestAppContext) {
     assert_eq!(*forge.briefs_asked.lock().unwrap(), [vec![12, 13]], "one request for the new numbers");
     let chips: Vec<u64> = cx.update(|_, cx| project.read(cx).chips().iter().map(|c| c.number).collect());
     assert_eq!(chips, [12], "13 is not a pull request, so it has no chip");
+    let author = cx.update(|_, cx| project.read(cx).chips()[0].facts.as_ref().map(|f| f.author.to_string()));
+    assert_eq!(author.as_deref(), Some("a"), "the chip's card has what the forge said beyond the title");
     cx.update(|_, cx| project.update(cx, |p, cx| p.look_up_chips(vec!["#12 and #13 again".into()], cx)));
     cx.run_until_parked();
     assert_eq!(forge.briefs_asked.lock().unwrap().len(), 1, "asked once");

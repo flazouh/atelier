@@ -4,14 +4,14 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{Forge, ForgeResult, PullBrief, RepoRef};
+use crate::{Forge, ForgeResult, PullSummary, RepoRef};
 use super::types::{BRIEF_TTL, INVOLVED_TTL};
 
 #[derive(Default)]
 pub(super) struct Kept {
     /// `None` is an answer too: the number is not a pull request there.
-    pub(super) briefs: HashMap<(RepoRef, u64), (u64, Option<PullBrief>)>,
-    pub(super) involved: Option<(u64, Vec<PullBrief>)>,
+    pub(super) briefs: HashMap<(RepoRef, u64), (u64, Option<PullSummary>)>,
+    pub(super) involved: Option<(u64, Vec<PullSummary>)>,
 }
 
 pub struct Lookup {
@@ -36,7 +36,7 @@ impl Lookup {
 
     /// One entry per number, in order. A number is a pull request of the current repository, or else of
     /// one the reader is involved in, or `None`. Asks the forge only for what is not kept.
-    pub fn resolve(&self, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+    pub fn resolve(&self, numbers: &[u64]) -> ForgeResult<Vec<Option<PullSummary>>> {
         let now = (self.clock)();
         let stale: Vec<u64> = {
             let kept = self.kept();
@@ -56,7 +56,7 @@ impl Lookup {
                 kept.briefs.insert((self.current.clone(), number), (now, brief));
             }
         }
-        let here: Vec<Option<PullBrief>> = {
+        let here: Vec<Option<PullSummary>> = {
             let kept = self.kept();
             numbers.iter().map(|n| kept.briefs.get(&(self.current.clone(), *n)).and_then(|(_, b)| b.clone())).collect()
         };
@@ -67,17 +67,17 @@ impl Lookup {
         Ok(numbers
             .iter()
             .zip(here)
-            .map(|(number, brief)| brief.or_else(|| involved.iter().find(|b| b.reference.number == *number).cloned()))
+            .map(|(number, brief)| brief.or_else(|| involved.iter().find(|s| s.brief.reference.number == *number).cloned()))
             .collect())
     }
 
-    pub(super) fn involved(&self, now: u64) -> ForgeResult<Vec<PullBrief>> {
+    pub(super) fn involved(&self, now: u64) -> ForgeResult<Vec<PullSummary>> {
         if let Some((at, list)) = &self.kept().involved
             && now.saturating_sub(*at) < INVOLVED_TTL
         {
             return Ok(list.clone());
         }
-        let list: Vec<PullBrief> = self.forge.involved()?.into_iter().map(|i| i.summary.brief).collect();
+        let list: Vec<PullSummary> = self.forge.involved()?.into_iter().map(|i| i.summary).collect();
         self.kept().involved = Some((now, list.clone()));
         Ok(list)
     }

@@ -240,15 +240,36 @@ fn briefs_come_back_in_order_from_one_request_and_a_non_pull_is_none() {
     let briefs = github(&fixtures).briefs(&bun(), &[44169, 1, 44032, 44169]).unwrap();
     assert_eq!(briefs.len(), 4);
     let first = briefs[0].as_ref().unwrap();
-    assert_eq!((first.reference.number, first.state), (44169, PullState::Merged));
-    assert_eq!(first.url, "https://github.com/oven-sh/bun/pull/44169");
+    assert_eq!((first.brief.reference.number, first.brief.state), (44169, PullState::Merged));
+    assert_eq!(first.brief.url, "https://github.com/oven-sh/bun/pull/44169");
     assert!(briefs[1].is_none());
-    assert_eq!(briefs[2].as_ref().unwrap().title, "node:http: second listen() throws, close() reaps pre-request sockets");
+    assert_eq!(briefs[2].as_ref().unwrap().brief.title, "node:http: second listen() throws, close() reaps pre-request sockets");
     assert_eq!(briefs[3], briefs[0], "a number asked twice is answered twice");
     let sent = fixtures.sent_for("Briefs");
     assert_eq!(sent.len(), 1);
     let query = sent[0].body.as_deref().unwrap();
     assert_eq!(query.matches("pullRequest(number:").count(), 3, "each number once");
+}
+
+#[test]
+fn a_brief_says_who_wrote_it_how_big_it_is_and_how_it_stands() {
+    let node = json!({"number": 7, "title": "chore(ui): Faster chips", "state": "OPEN", "isDraft": false, "merged": false,
+        "url": "https://github.com/oven-sh/bun/pull/7", "updatedAt": "2026-10-04T00:00:00Z", "author": {"login": "alex"},
+        "reviewDecision": "APPROVED", "additions": 120, "deletions": 34, "comments": {"totalCount": 4},
+        "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": "SUCCESS", "contexts": {
+            "checkRunCountsByState": [{"state": "SUCCESS", "count": 12}], "statusContextCountsByState": []}}}}]}});
+    let answer = json!({"data": {"repository": {"nameWithOwner": "oven-sh/bun", "p7": node}}});
+    let fixtures = Fixtures::new().ok("Briefs", answer.to_string());
+    let found = github(&fixtures).briefs(&bun(), &[7]).unwrap();
+    let pull = found[0].as_ref().unwrap();
+    assert_eq!((pull.author.as_str(), pull.additions, pull.deletions, pull.comments), ("alex", 120, 34, 4));
+    assert_eq!(pull.review, ReviewDecision::Approved);
+    assert_eq!(pull.checks.map(|c| c.passed), Some(12));
+    assert!(pull.updated_at > 0);
+    let query = fixtures.sent_for("Briefs")[0].body.clone().unwrap();
+    for field in ["additions", "deletions", "author", "reviewDecision", "statusCheckRollup", "updatedAt"] {
+        assert!(query.contains(field), "the lookup asks for {field}");
+    }
 }
 
 #[test]

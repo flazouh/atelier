@@ -5,6 +5,6 @@ mod helpers;
 mod types;
 
 pub(super) use helpers::{
-    check, comment, file, job, last_review_point, pull, repo_ref, repository, summary, thread,
+    check, comment, file, job, last_review_point, pull, repo_ref, repository, summary, summary_of, thread,
 };
 pub(super) use types::HOST;

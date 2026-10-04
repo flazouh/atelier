@@ -1,6 +1,6 @@
 use atelier_ui::{
     AgentText, AgentTextStatus, Button, ButtonVariant, ChangedFile, ChangedFiles, Checks,
-    FileChange, ModelBadge, PrCard, PrChip, PrChipData, PrState, ReviewState, SubagentCard,
+    FileChange, ModelBadge, PrCard, PrChip, PrChipData, PrFacts, PrState, ReviewState, SubagentCard,
     SubagentRow, SubagentStrip, ToolCall, ToolStatus,
 };
 use gpui_kit::{Context, IntoElement, ParentElement, Styled, div, px};
@@ -40,6 +40,15 @@ pub fn pr_3344() -> PrChipData {
         title: "Fix the off-by-one in the diff view's line numbers".into(),
         state: PrState::Open,
         url: "https://github.com/flazouh/atelier/pull/3344".into(),
+        facts: Some(PrFacts {
+            author: "flazouh".into(),
+            added: 128,
+            removed: 41,
+            comments: 3,
+            review: ReviewState::Approved,
+            checks: Some(Checks { passed: 12, failed: 0, running: 0 }),
+            updated_at: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()) - 3 * 3600,
+        }),
     }
 }
 
