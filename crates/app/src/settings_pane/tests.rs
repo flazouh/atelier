@@ -284,3 +284,21 @@ fn the_dictation_section_sets_the_key_and_hold_at_once(cx: &mut TestAppContext) 
     click(cx, "dictation-hold");
     assert!(cx.update(|_, cx| crate::agent_session::dictation::prefs(cx).hold));
 }
+
+/// While the mode is System, the app turns light or dark as the system does; a mode the reader picked stays.
+#[gpui_kit::test]
+fn the_system_mode_follows_a_change_of_the_systems_appearance(cx: &mut gpui_kit::TestAppContext) {
+    use atelier_ui::theme::{ActiveTheme, Appearance};
+    use gpui_kit::WindowAppearance;
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        Mode::System.apply(cx);
+        Mode::system_changed(WindowAppearance::Dark, cx);
+        assert_eq!(cx.theme().appearance, Appearance::Dark, "System follows the system to dark");
+        Mode::system_changed(WindowAppearance::Light, cx);
+        assert_eq!(cx.theme().appearance, Appearance::Light, "and back to light");
+        Mode::Dark.apply(cx);
+        Mode::system_changed(WindowAppearance::Light, cx);
+        assert_eq!(cx.theme().appearance, Appearance::Dark, "Dark stays dark");
+    });
+}
