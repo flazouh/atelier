@@ -1007,3 +1007,19 @@ fn a_picture_the_agent_cannot_read_is_refused_with_a_reason(cx: &mut TestAppCont
     assert_eq!(chips, 0);
     assert!(problem.is_some());
 }
+
+/// The composer's mode label says what the agent runs in. Codex starts in Auto review, not in the first mode the
+/// composer lists, and a mode set in the session tells the label too.
+#[gpui_kit::test]
+fn the_composer_shows_the_mode_the_agent_reports(cx: &mut TestAppContext) {
+    use atelier_agents::session::{PermissionMode, Started};
+    let (session, fake, cx) = crate::fake_agent::start_with_modes(cx);
+    let word = |cx: &mut gpui_kit::VisualTestContext| cx.update(|_, cx| session.read(cx).composer.read(cx).mode().map(|m| m.to_string()));
+    let agent = fake.sinks.lock().unwrap()[0].clone();
+    agent(Event::Started(Started { session: atelier_agents::session::SessionId::new("s"), model: None, mode: Some(PermissionMode::Auto), commands: Vec::new() }));
+    cx.run_until_parked();
+    assert_eq!(word(cx), Some(crate::agent_session::helpers::mode_word(PermissionMode::Auto).to_string()), "the label follows the agent");
+    agent(Event::Started(Started { session: atelier_agents::session::SessionId::new("s"), model: None, mode: Some(PermissionMode::Ask), commands: Vec::new() }));
+    cx.run_until_parked();
+    assert_eq!(word(cx), Some(crate::agent_session::helpers::mode_word(PermissionMode::Ask).to_string()), "and follows it back");
+}

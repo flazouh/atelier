@@ -816,6 +816,9 @@ fn a_jump_glides_and_a_new_message_rises_in(cx: &mut TestAppContext) {
     session.update(cx, |s, cx| {
         s.conversation.user_sent("one more");
         s.refresh_rows();
+        // The rise runs on the wall clock; a machine busy with other tests can draw the first frame after it ended. An arrival
+        // dated ahead is still at its start, whenever that frame is drawn.
+        s.arrived.values_mut().for_each(|at| *at += std::time::Duration::from_secs(30));
         s.glide.follow();
         cx.notify();
     });
