@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
 use futures_util::StreamExt;
-use atelier_ui::{PromptInput, PromptInputEvent, PromptModel, context_usage::ContextPart};
+use atelier_ui::{PromptInput, PromptInputEvent, PromptModel, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString,
     Subscription, Task, Window,
@@ -121,6 +121,9 @@ pub struct AgentSession {
     /// Writes the review to the data folder a moment after it last changed.
     _saving: Task<()>,
     pub composer: Entity<PromptInput>,
+    /// The reply to words selected in the conversation: its button and box, which the conversation's view draws.
+    pub reply: Entity<SelectionReply>,
+    _reply: Subscription,
     /// What the composer's chips stand for.
     pub(super) payloads: super::chips::Payloads,
     /// Dictation: the cues, and the clearing of a failed press's words.
@@ -253,12 +256,17 @@ impl AgentSession {
             this.arrived.clear();
             cx.notify();
         });
+        let reply = cx.new(|cx| SelectionReply::new(window, cx).add_label("Add"));
+        let _reply = cx.subscribe(&reply, |this, _, event: &SelectionReplyEvent, cx| match event {
+            SelectionReplyEvent::Reply { quote, note, key } => this.quoted(quote, note, key.clone(), cx),
+        });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
             PromptInputEvent::Submit(message) => {
                 let draft = this.draft_of(message.clone());
                 this.send_draft(draft, cx)
             }
             PromptInputEvent::Paste(pasted) => this.pasted(pasted.clone(), cx),
+            PromptInputEvent::ChipPressed(id) => this.chip_pressed(id, window, cx),
             PromptInputEvent::Stop => this.interrupt(cx),
             PromptInputEvent::Queue(message) => {
                 let draft = this.draft_of(message.clone());
@@ -327,6 +335,8 @@ impl AgentSession {
             beginning: None,
             queued: Vec::new(),
             payloads: Default::default(),
+            reply,
+            _reply,
             asked_turn: false,
             resumed: resume.is_some(),
             // The list lays out this much past the view each frame: enough that a fast scroll never
