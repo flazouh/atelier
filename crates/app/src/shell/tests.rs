@@ -579,7 +579,7 @@ fn a_panel_names_its_project_and_a_press_on_its_close_button_closes_it(cx: &mut 
     assert!(cx.debug_bounds("panel-close").is_none());
 }
 
-/// Projects are added from the button joined to the title bar's switcher; the sidebar's head keeps only the filter behind its ⋯.
+/// Projects are added from the button joined to the sidebar head's switcher; the sidebar's head keeps only the filter behind its ⋯.
 #[gpui_kit::test]
 fn the_switcher_adds_projects_and_the_sidebar_head_filters_sessions(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
@@ -956,12 +956,12 @@ fn a_project_that_needs_the_reader_outweighs_one_at_work() {
     assert_eq!(project_mark(&[SessionStatus::Working, SessionStatus::NeedsYou(Need::Question)]), ProjectMark::NeedsYou);
 }
 
-/// The switcher in the title bar: in Sessions it narrows the list and the panels to one project or shows all of
+/// The switcher at the head of the sidebar: in Sessions it narrows the list and the panels to one project or shows all of
 /// them; in the Code lens it is the project the view is about.
 #[gpui_kit::test]
 fn the_project_switcher_narrows_sessions_and_names_the_project_of_code(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1600.);
-    assert!(cx.debug_bounds("project-switcher").is_some(), "the switcher is in the title bar");
+    assert!(cx.debug_bounds("project-switcher").is_some(), "the switcher is drawn");
     assert_eq!(shell.read_with(cx, |s, cx| s.switched(cx)), None, "Sessions shows every project at first");
     let press = |name: &'static str, cx: &mut gpui_kit::VisualTestContext| {
         let at = cx.debug_bounds(name).unwrap_or_else(|| panic!("{name} is drawn"));
@@ -1103,4 +1103,79 @@ fn changes_lists_what_the_checkout_holds_uncommitted(cx: &mut TestAppContext) {
     shell.update(cx, |s, cx| s.pick_file(ShellView::Git, "new.txt".into(), cx));
     settle(&shell, cx);
     assert!(cx.debug_bounds("file-diff-new.txt").is_some() && cx.debug_bounds("file-diff-a.txt").is_none(), "the file picked in the tree");
+}
+
+/// The switcher heads the sidebar, under the title bar and above the sessions, and the title bar keeps the sidebar's
+/// toggle. The add button is as wide as it is tall: an icon alone has no words to part from.
+#[gpui_kit::test]
+fn the_switcher_heads_the_sidebar_and_its_add_button_is_square(cx: &mut TestAppContext) {
+    let (_shell, cx, _dir) = with_a_session(cx, 1400.);
+    let switcher = cx.debug_bounds("project-switcher").expect("the switcher is drawn");
+    let toggle = cx.debug_bounds("sidebar-toggle").expect("the toggle is drawn");
+    assert!(switcher.top() >= gpui_kit::px(super::types::TITLE_BAR * atelier_ui::scale::zoom()), "under the title bar: {switcher:?}");
+    assert!(toggle.bottom() <= switcher.top(), "the toggle stays in the title bar: {toggle:?}");
+    let add = cx.debug_bounds("add-project").expect("the add button is drawn");
+    assert_eq!(add.size.width, add.size.height, "a square: {add:?}");
+}
+
+/// The bar at the foot of the window shows once a project is open: the machine, and the sessions' work.
+#[gpui_kit::test]
+fn the_foot_of_the_window_has_the_status_bar_once_a_project_is_open(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    shell.update(cx, |shell, cx| shell.sample_vitals(cx));
+    settle(&shell, cx);
+    let bar = cx.debug_bounds("status-bar").expect("the bar is drawn");
+    assert!(cx.debug_bounds("status-cpu").is_some() && cx.debug_bounds("status-memory").is_some(), "the machine shows after a sample");
+    let height = cx.update(|window, _| window.viewport_size().height);
+    assert_eq!(bar.bottom(), height, "at the foot: {bar:?} in a window {height:?} tall");
+}
+
+#[gpui_kit::test]
+fn the_start_screen_has_no_status_bar(cx: &mut TestAppContext) {
+    let (shell, cx) = open_shell(cx);
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("status-bar").is_none());
+}
+
+/// Sessions at work and sessions that wait on the reader are counted over every project.
+#[gpui_kit::test]
+fn work_counts_the_sessions_at_work_and_the_ones_that_wait(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    assert_eq!(shell.read_with(cx, |s, cx| s.work(cx)), atelier_ui::Work::new(0, 0), "an idle session is neither");
+}
+
+/// A colour the reader picks for a project's letter badge is the one its badge wears from then on.
+#[gpui_kit::test]
+fn a_colour_picked_for_a_project_is_kept_for_its_badge(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let place = shell.read_with(cx, |s, cx| crate::agents_view::project_id(s.projects[0].read(cx)));
+    shell.update(cx, |s, cx| s.save_color(place.clone(), 9, cx));
+    settle(&shell, cx);
+    let kept = shell.read_with(cx, |s, _| s.badges.colors.get(place.as_ref()).copied());
+    assert_eq!(kept, Some(9));
+    let worn = shell.read_with(cx, |s, cx| s.project_badges(cx)[0].color);
+    assert_eq!(worn, 9, "the sidebar's badge wears it");
+}
+
+/// A long project name on a long host name stays inside the sidebar: the name is cut, the add button stays whole.
+#[gpui_kit::test]
+fn a_long_project_name_on_a_long_host_stays_inside_the_sidebar_head(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let parent = tempfile::tempdir().unwrap();
+    let root = parent.path().join("fluentai-pro-with-a-name-that-is-long-indeed");
+    std::fs::create_dir(&root).unwrap();
+    let project = atelier_project::LocalProject::open(root.clone()).unwrap();
+    let location = atelier_settings::Location::Ssh { host: "hp-agent-on-the-other-side".into(), path: root };
+    shell.update_in(cx, |s, window, cx| {
+        s.add(location, std::sync::Arc::new(project), window, cx);
+        s.active = s.projects.len() - 1;
+        cx.notify();
+    });
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Files, window, cx));
+    settle(&shell, cx);
+    let add = cx.debug_bounds("add-project").expect("the add button is drawn");
+    let face = cx.debug_bounds("project-switcher").expect("the face is drawn");
+    let sidebar = px(super::fit::SIDEBAR_DEFAULT * atelier_ui::scale::zoom());
+    assert!(add.right() <= sidebar + px(48.), "the add button is inside the sidebar: {add:?} in {sidebar:?}");
+    assert!(face.right() <= add.left() + px(2.), "the face leaves the add button its place: {face:?} {add:?}");
 }

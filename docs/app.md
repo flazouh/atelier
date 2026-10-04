@@ -53,12 +53,17 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 
 - The window draws its own title bar area. On macOS the traffic lights sit inset in the page, as in
   Zed and Cursor. On Linux the layout is the same, without them.
-- Top left: the sidebar's toggle (⌘B), drawn as a rail icon, then the project switcher: each open project's badge, with a dot
+- Top left: the sidebar's toggle (⌘B), drawn as a rail icon.
+- Head of the sidebar, in every lens: the project switcher: each open project's badge, with a dot
   while one of its sessions works (accent) or needs the reader (warning), and how many need them. Sessions
   are every project's, so in Sessions the switcher narrows the list and the panels to one project or shows
   "All projects"; in Issues and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
-  A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O).
-  The sidebar's head does not repeat it.
+  A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O). The
+  "+" is as wide as it is tall: a button with only an icon pads to a square in every size. With the sidebar
+  hidden the switcher is hidden with it.
+  A project's badge is its letter on a colour of the palette (acepe's twelve), or an image. "Choose an icon…" in the
+  project's ⋯ menu offers both: a disc for each colour, and the project's image files. A colour picked applies at once,
+  stays open for the image, and is kept in the settings (`project_colors`).
 - Far left: the view rail, three lenses: Sessions, Issues and Code (`crates/app/src/shell/rail.rs`).
   Sessions carries a count of the sessions that need the reader, in every project. A press on another lens
   shows it with the sidebar; a press on the lens in front hides the sidebar, and the next press shows it
@@ -81,7 +86,15 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 - The sidebar and the main areas are cards 2 px apart, like the agent panels.
 - Right: the pull requests, or a task opened from a session.
 - A pane's edge is a handle that shows only as a wash on hover; a drag sizes the pane beside it.
-- Foot: the status line: the project, its branch, and the language server's state.
+- Foot: the status bar (`crates/app/src/vitals/`, drawn by atelier-ui's `StatusBar`), once a project is open. At
+  the left: the processor (the last 24 seconds as bars, and the percent now), memory (used of all, and what atelier
+  itself holds on hover), and the sessions at work and the sessions that wait on the reader, in every project. At
+  the right: each provider's tightest window of its allowance with a bar and a percent; a hover lists the rest and
+  when each resets. Colour is by how much is used: muted, amber from 60%, red from 85%. The machine is sampled each
+  second, the providers each minute (the first after 2 s). A provider that fails keeps its last numbers, dimmed and
+  marked old on hover; one that has never answered (no Codex on this machine) does not show. Where the numbers come
+  from is in `docs/agents.md`, "Usage".
+- The project's status line: the project, its branch, and the language server's state.
 - Keys: GitQuiet's table where a command applies (⌘B the left pane, ⌘⇧B the right pane), ⌘O open
   folder, ⌘S save, ⌘W close tab, ⌘J the bottom panel once there is one. The side panes keep their
   width when one hides; the agent panel takes what is left, within the width rules below.
@@ -146,7 +159,7 @@ setup (see `crates/remote/src/ssh.rs`, `candidates`).
    signs the app ad hoc (`codesign -s -`). It needs no network beyond what cargo needs.
 3. Run it with `open target/bundle/atelier.app`, or copy it to `/Applications`.
 
-The icon is `tools/mac/atelier.icon`, compiled by Xcode's `actool`: atelier-ui's "A" on a square that follows the light and dark appearance on macOS 26. A Mac without Xcode gets `tools/mac/atelier-1024.png`, the dark look, drawn by `tools/mac/make-icon.sh`
+The icon is `tools/mac/atelier.icon`, compiled by Xcode's `actool`: atelier-ui's white "A" on a rounded terracotta square, the same in light and dark. A Mac without Xcode gets `tools/mac/atelier-1024.png`, the same mark drawn by `tools/mac/make-icon.sh`. The mark in the app is atelier-ui's `AtelierMark`, the same white "A" on terracotta in every theme; `.accent(..)` colours the tile with another colour.
 (ImageMagick, run only when the mark changes). Ad hoc signing opens the app on the Mac that built it.
 Another Mac shows the Gatekeeper warning until you allow the app.
 

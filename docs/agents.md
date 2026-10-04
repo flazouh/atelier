@@ -435,6 +435,28 @@ real API. `crates/agents/tests/own_live.rs` has two tests that do, ignored:
 `ANTHROPIC_API_KEY=... cargo test -p atelier-agents --test own_live -- --ignored --nocapture --test-threads=1`.
 They use Haiku 4.5 and cost a few cents. `crates/agents/tests/own_perf.rs` measures the numbers in
 `docs/performance.md`.
+## Usage
+
+`atelier_agents::usage` reads how much of a provider's allowance is used, for the status bar. A `UsageSource` returns a
+`Reading`: windows (a label, the part used, seconds until reset) and a note for the hover. Each source reads the sign-in the
+agent already holds, so there is nothing to set up. Claude and Codex are read on the project's host, so a remote project
+shows its own host's account; OpenRouter is read from this machine.
+
+- **Claude:** `GET https://api.anthropic.com/api/oauth/usage` with the header `anthropic-beta: oauth-2025-04-20` and the
+  access token of Claude Code's sign-in (`~/.claude/.credentials.json`, or on a Mac the Keychain item
+  "Claude Code-credentials"). The token is read through the project into memory, sent with that one request and not kept or
+  logged. It runs out when Claude Code has not renewed it: the reason is then "open Claude once to renew it". The answer has
+  `five_hour` and `seven_day` (`utilization` in percent, `resets_at`), per-model weeks when they apply, and `extra_usage`
+  (spend beyond the plan), which is the note. Only the usual account is read.
+- **Codex:** `codex app-server` over standard input: `initialize`, `initialized`, then `account/rateLimits/read`. The answer's
+  `rateLimits.primary` and `secondary` have `usedPercent`, `windowDurationMins` and `resetsAt`; a window is labelled by its
+  length (`5h`, `7d`, `30d`). The server leaves when its input ends, and the script waits 4 s in all.
+- **OpenRouter:** `GET /api/v1/key` with the key from the keychain. With a limit on the key, one window of credit; without,
+  only the spend, as a note. It is asked only when OpenRouter is the default provider, so the keychain is not read for
+  nothing.
+
+`crates/agents/tests/usage_live.rs` reads the real ones (ignored): `cargo test -p atelier-agents --test usage_live -- --ignored --nocapture`.
+
 ## Performance
 
 Targets and numbers are in `docs/performance.md` ("Agent sessions"). The measurements are
