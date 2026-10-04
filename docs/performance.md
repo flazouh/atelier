@@ -330,6 +330,27 @@ samples each. The LAN row is alex-9c's run from Alex's Mac to the HP over Wi-Fi,
 | LAN: file open, 212 KB | < 150 ms | 19 to 49 ms median | Yes |
 | LAN: listing 1,150 files | < 500 ms | about 20 ms | Yes |
 
+### Opening a big folder over SSH (2026-10-04)
+
+Alex's Mac, release build, opening `~/code/fluentai-pro` on the HP: several checkouts, 5.1M files in 434k folders, of
+which the listing shows 357k entries in 51k folders. Load average 15 to 20 on the HP from other builds. The UI thread
+is the main thread in `sample` over 25 s from the open.
+
+| Case | Before | After |
+| --- | --- | --- |
+| UI thread, from the open | blocked about 19 s in `watch`, no frame for 28.7 s | busy 0.4 to 0.5 s in 20 s, slowest frame 9.6 ms |
+| Host: inotify watches | 434,456 (every folder, ignored ones too) | 51,290 (the listed folders) |
+| Host: helper memory | 278 MB | 118 to 158 MB |
+| Host: helper CPU, open to settled | 38 s | 6 to 9 s, with the listing |
+| Host: watch ready | after the whole tree | at once; every folder by about 4 s, on one thread |
+
+- The watch started on the UI thread, and over SSH it returns only when the host is done. It runs in the background
+  now.
+- Inotify takes one watch per folder, and `notify`'s recursive mode registers every one, `target/` and `node_modules/`
+  included. The host walks what the listing walks and watches those folders, and a folder made later on its own.
+- A parallel walk for the watch made the listing walking beside it 2.3 s instead of 1.3 s. One thread leaves it the
+  other cores.
+
 ## Agent sessions in the app
 
 A 2,000-message session (a synthetic transcript in claude's own format, 1,000 questions and 1,000
