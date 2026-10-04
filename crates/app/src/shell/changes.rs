@@ -45,7 +45,7 @@ impl Shell {
             (_, Some([])) => div().px(px(8.)).py(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Nothing uncommitted.").into_any_element(),
             (_, Some(files)) => {
                 let current = shown_file(files, self.change_file.as_ref()).map(|f| f.path.clone()).unwrap_or_default();
-                Self::file_tree(&cx.entity().downgrade(), "changes-tree", ShellView::Git, files, &current, false)
+                Self::file_tree(&cx.entity().downgrade(), "changes-tree", ShellView::Git, files, &current, true)
             }
             (Some(Read::Failed(why)), _) => div().px(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child(why.clone()).into_any_element(),
             _ => div().px(px(8.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Reading the changes…").into_any_element(),
@@ -71,21 +71,31 @@ impl Shell {
                     .into_any_element()
             })
             .collect();
+        let tree = files.is_some_and(|f| !f.is_empty());
+        // The tree draws only its rows in view, so it takes the height left and scrolls itself; the worktrees keep
+        // their own scroll below it, so a long list of them never pushes the files out.
         div()
             .id("changes-list")
             .debug_selector(|| "changes-list".into())
             .flex()
             .flex_col()
             .size_full()
-            .overflow_y_scroll()
             .p(px(6.))
             .child(heading)
             .when(reviewing, |d| {
                 d.child(div().px(px(8.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Showing a session's review. Press a file to see the checkout."))
             })
-            .child(list)
+            .child(div().when(tree, |d| d.flex_1().min_h_0()).when(!tree, |d| d.flex_none()).child(list))
             .when(!others.is_empty(), |d| {
-                d.child(div().debug_selector(|| "worktrees".into()).px(px(8.)).pt(px(14.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Worktrees")).children(others)
+                d.child(
+                    div()
+                        .id("worktrees-list")
+                        .flex_none()
+                        .max_h(px(180.))
+                        .overflow_y_scroll()
+                        .child(div().debug_selector(|| "worktrees".into()).px(px(8.)).pt(px(14.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(muted).child("Worktrees"))
+                        .children(others),
+                )
             })
             .into_any_element()
     }
