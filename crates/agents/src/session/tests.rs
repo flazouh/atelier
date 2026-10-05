@@ -421,6 +421,14 @@ mod attachments {
     }
 
     #[test]
+    fn a_quote_is_a_blockquote_then_the_note() {
+        let quote = Attachment::Quote { quote: "it fails\non run two".into(), note: "why?".into() };
+        assert_eq!(quote.render(), "Quoting:\n> it fails\n> on run two\n\nwhy?");
+        let alone = Attachment::Quote { quote: "it fails".into(), note: " ".into() };
+        assert_eq!(alone.render(), "Quoting:\n> it fails\n");
+    }
+
+    #[test]
     fn a_picture_is_said_in_words_for_a_backend_that_carries_only_text() {
         let image = Attachment::Image { format: ImageFormat::Jpeg, bytes: vec![0; 2048].into() };
         assert_eq!(image.render(), "An image was attached (image/jpeg, 2 KB), which this agent cannot read.");

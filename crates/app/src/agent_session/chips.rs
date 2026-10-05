@@ -5,12 +5,15 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 
 use atelier_agents::session::{Attachment, ImageFormat};
 use atelier_ui::{Chip, ChipLook, IconName, Message, Pasted};
-use gpui_kit::{Context, SharedString};
+use gpui_kit::{Context, SharedString, Window};
 
 use super::AgentSession;
 
 /// The most a picture read from a file may weigh: the agent's API refuses much more.
 const MOST_IMAGE_BYTES: u64 = 20 * 1024 * 1024;
+
+/// The most characters of a quote the conversation's line for it shows.
+const QUOTE_BUBBLE_CHARS: usize = 80;
 
 /// How many characters of pasted text a chip shows on hover.
 const PREVIEW_CHARS: usize = 600;
@@ -72,6 +75,24 @@ pub(super) fn text_chip(id: SharedString, text: &str) -> (Chip, Attachment) {
     (Chip::new(id, label).look(ChipLook::Icon(IconName::Draft)).detail(preview), Attachment::Text { text: text.to_string() })
 }
 
+/// The most characters of a quote a chip's label shows.
+const QUOTE_LABEL_CHARS: usize = 28;
+
+/// `text` on one line, cut at `most` characters with an ellipsis.
+fn one_line(text: &str, most: usize) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.chars().count() <= most { flat } else { format!("{}…", flat.chars().take(most).collect::<String>().trim_end()) }
+}
+
+/// The chip and the attachment for words the reader quoted, with the note they wrote on them.
+pub(super) fn quote_chip(id: SharedString, quote: &str, note: &str) -> (Chip, Attachment) {
+    let preview: String = quote.chars().take(PREVIEW_CHARS).collect();
+    let preview = if quote.chars().count() > PREVIEW_CHARS { format!("{preview}…") } else { preview };
+    let detail = if note.trim().is_empty() { preview } else { format!("{preview}\n\n{note}") };
+    let chip = Chip::new(id, format!("“{}”", one_line(quote, QUOTE_LABEL_CHARS))).look(ChipLook::Icon(IconName::FormatQuote)).detail(detail);
+    (chip, Attachment::Quote { quote: quote.to_string(), note: note.trim().to_string() })
+}
+
 /// The chip and the attachment for a picture, if it is in a format the agent takes.
 pub(super) fn image_chip(id: SharedString, format: ImageFormat, bytes: Vec<u8>) -> (Chip, Attachment) {
     let kb = bytes.len().div_ceil(1024);
@@ -108,6 +129,10 @@ pub fn summary(attachment: &Attachment) -> Option<String> {
             Some(if lines == 1 { "Pasted text".to_string() } else { format!("Pasted text · {lines} lines") })
         }
         Attachment::Image { bytes, .. } => Some(format!("Image · {} KB", bytes.len().div_ceil(1024))),
+        Attachment::Quote { quote, note } => {
+            let quoted = format!("Quoted “{}”", one_line(quote, QUOTE_BUBBLE_CHARS));
+            Some(if note.trim().is_empty() { quoted } else { format!("{quoted}\n{note}") })
+        }
         Attachment::LineComment { .. } | Attachment::File { .. } => None,
     }
 }
@@ -162,6 +187,23 @@ impl AgentSession {
         }
         let shown = path.strip_prefix(self.project.root()).unwrap_or(path);
         self.add_chip(Chip::file(shown.to_string_lossy().into_owned()), None, cx);
+    }
+
+    /// Words from the conversation were replied to: they become a quote chip. `key` is the chip being changed, if the reader
+    /// opened one to edit it; it then keeps its place.
+    pub(super) fn quoted(&mut self, quote: &str, note: &str, key: Option<SharedString>, cx: &mut Context<Self>) {
+        let id = key.unwrap_or_else(|| self.payloads.id("quote"));
+        let (chip, attachment) = quote_chip(id.clone(), quote, note);
+        self.payloads.held.insert(id, attachment);
+        self.composer.update(cx, |c, cx| c.replace_chip(chip, cx));
+        cx.notify();
+    }
+
+    /// A chip was pressed: a quote opens again where the pointer is, with its note to change.
+    pub(super) fn chip_pressed(&mut self, id: &SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(Attachment::Quote { quote, note }) = self.payloads.held.get(id).cloned() else { return };
+        let at = window.mouse_position();
+        self.reply.update(cx, |r, cx| r.edit(at, quote, &note, id.clone(), window, cx));
     }
 
     fn add_chip(&mut self, chip: Chip, attachment: Option<Attachment>, cx: &mut Context<Self>) {

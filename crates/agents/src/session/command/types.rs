@@ -57,6 +57,8 @@ pub enum Attachment {
     File { path: String },
     /// Text that was pasted, kept apart from what was written.
     Text { text: String },
+    /// Words from the conversation the reader replied to, and what they wrote about them (which may be nothing).
+    Quote { quote: String, note: String },
     /// A picture.
     Image { format: ImageFormat, bytes: std::sync::Arc<[u8]> },
 }
@@ -77,6 +79,10 @@ impl Attachment {
                 let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
                 let fence = "`".repeat((longest + 1).max(3));
                 format!("Pasted text:\n{fence}\n{text}\n{fence}")
+            }
+            Self::Quote { quote, note } => {
+                let quoted: String = quote.lines().map(|line| format!("> {line}\n")).collect();
+                if note.trim().is_empty() { format!("Quoting:\n{quoted}") } else { format!("Quoting:\n{quoted}\n{note}") }
             }
             Self::Image { format, bytes } => {
                 format!("An image was attached ({}, {} KB), which this agent cannot read.", format.media_type(), bytes.len() / 1024)

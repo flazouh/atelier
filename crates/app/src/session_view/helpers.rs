@@ -387,6 +387,7 @@ pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
     let list_state = s.list.clone();
     let glide = s.glide.clone();
     let key = s.key.clone();
+    let reply = s.reply.clone();
     let overflowing = f32::from(list_state.max_offset_for_scrollbar().y) > 1.;
     let following = glide.following();
     let entries = super::rail::entries(s.conversation.items(), &s.shown);
@@ -429,7 +430,8 @@ pub fn rows(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
     });
     // Runs after the list has laid out, so the glide sees this frame's heights.
     let tick = gpui_kit::canvas(move |_, window, cx| glide.tick(&list_state, cx.reduce_motion(), window), |_, _, _, _| {}).absolute().size_0();
-    div().relative().size_full().child(list).child(tick).children(rail).children(latest).into_any_element()
+    // The reply to selected words is over the list: a selection that ends in the conversation offers it.
+    div().relative().size_full().child(list).child(tick).children(rail).children(latest).child(reply).into_any_element()
 }
 
 /// Row `ix`, rising and fading in as beui's messages do when it came in live a moment ago.

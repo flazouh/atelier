@@ -982,6 +982,61 @@ fn a_paste_is_a_chip_that_goes_with_the_message(cx: &mut TestAppContext) {
     assert!(matches!(shown.first(), Some(atelier_agents::session::Item::User { text }) if text.contains("Pasted text · 2 lines") && text.contains("Image · 1 KB")), "the bubble says what came with the words: {shown:?}");
 }
 
+/// Words replied to become a quote chip. Pressing the chip opens the reply on it again, and adding there changes the chip
+/// where it stands. The quote and the note go with the message, and the bubble says what was quoted.
+#[gpui_kit::test]
+fn a_reply_is_a_quote_chip_that_can_be_changed_and_goes_with_the_message(cx: &mut TestAppContext) {
+    use atelier_agents::session::Attachment;
+    use atelier_ui::SelectionReplyEvent;
+    let (session, fake, cx) = start(cx, vec![vec![ended()]], false);
+    let reply = |cx: &mut gpui_kit::VisualTestContext, quote: &str, note: &str, key: Option<&str>| {
+        let event = SelectionReplyEvent::Reply { quote: quote.to_string().into(), note: note.to_string().into(), key: key.map(|k| k.to_string().into()) };
+        cx.update(|_, cx| session.read(cx).reply.clone().update(cx, |_, cx| cx.emit(event)));
+        cx.run_until_parked();
+    };
+    let chips = |cx: &mut gpui_kit::VisualTestContext| {
+        cx.update(|_, cx| session.read(cx).composer.read(cx).chips().iter().map(|c| (c.id.to_string(), c.label.to_string())).collect::<Vec<_>>())
+    };
+    reply(cx, "The build fails\non the second run", "why?", None);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.pasted(atelier_ui::Pasted::Text("log".into()), cx)));
+    let held = chips(cx);
+    assert_eq!(held.len(), 2, "a quote and a paste: {held:?}");
+    let (id, label) = held[0].clone();
+    assert_eq!(label, "“The build fails on the secon…”");
+
+    // Pressing the chip opens the box on it; adding there changes it and keeps its place before the paste.
+    let pressed: gpui_kit::SharedString = id.clone().into();
+    cx.update(|window, cx| session.update(cx, |s, cx| s.chip_pressed(&pressed, window, cx)));
+    assert!(cx.update(|_, cx| session.read(cx).reply.read(cx).showing()), "the box is open on the chip");
+    reply(cx, "The build fails\non the second run", "why? it is the cache", Some(&id));
+    let after = chips(cx);
+    assert_eq!(after.iter().map(|c| c.0.as_str()).collect::<Vec<_>>()[0], id, "{after:?}");
+    assert_eq!(after.len(), 2);
+
+    cx.update(|_, cx| {
+        let composer = session.read(cx).composer.clone();
+        let chips = composer.read(cx).chips().to_vec();
+        composer.update(cx, |_, cx| cx.emit(atelier_ui::PromptInputEvent::Submit(atelier_ui::Message { text: "look".into(), chips })));
+    });
+    cx.run_until_parked();
+    let sent = fake.received.lock().unwrap().iter().find_map(|c| match c {
+        Command::Send { attachments, .. } => Some(attachments.clone()),
+        _ => None,
+    });
+    assert_eq!(
+        sent.expect("the message went"),
+        [
+            Attachment::Quote { quote: "The build fails\non the second run".into(), note: "why? it is the cache".into() },
+            Attachment::Text { text: "log".into() },
+        ]
+    );
+    let shown = cx.update(|_, cx| session.read(cx).conversation.items().to_vec());
+    assert!(
+        matches!(shown.first(), Some(atelier_agents::session::Item::User { text }) if text.contains("Quoted “The build fails on the second run”") && text.contains("why? it is the cache")),
+        "{shown:?}"
+    );
+}
+
 /// A chip alone is a message; one queued while a turn runs keeps its attachments until it goes.
 #[gpui_kit::test]
 fn a_queued_message_keeps_what_came_with_it(cx: &mut TestAppContext) {
