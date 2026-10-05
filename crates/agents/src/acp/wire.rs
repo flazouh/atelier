@@ -6,7 +6,7 @@ mod structs;
 mod types;
 
 pub(super) use structs::{
-    Initialized, Listed, Notification, Opened, PermissionAsked, PlanEntry, PromptUsage,
+    ContextUsage, Initialized, Listed, Notification, Opened, PermissionAsked, PlanEntry, PromptUsage,
     Prompted, ToolCall,
 };
 pub(super) use types::{SessionUpdate, ToolContent};

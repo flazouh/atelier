@@ -12,6 +12,7 @@ mod activity;
 mod agent_session;
 mod project_icons;
 mod providers;
+mod vitals;
 mod agents_view;
 mod file_glyphs;
 mod dirty;
@@ -88,9 +89,8 @@ fn main() {
         if let Some(theme) = saved.theme.as_deref().and_then(atelier_ui::themes::named) {
             atelier_ui::theme::set_theme(theme.clone(), cx);
         }
-        if let Some(mode) = saved.mode.as_deref().and_then(settings_pane::Mode::from_key) {
-            mode.apply(cx);
-        }
+        // No mode saved is System, as the Settings pane shows it.
+        saved.mode.as_deref().and_then(settings_pane::Mode::from_key).unwrap_or(settings_pane::Mode::System).apply(cx);
         let (w, h) = std::env::var("ATELIER_SIZE")
             .ok()
             .and_then(|v| v.split_once('x').and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?))))
@@ -107,6 +107,9 @@ fn main() {
             ..Default::default()
         };
         cx.open_window(options, move |window, cx| {
+            // The app's appearance before a window opens can be stale on macOS; the window's is the system's.
+            settings_pane::Mode::system_changed(window.appearance(), cx);
+            window.observe_window_appearance(|window, cx| settings_pane::Mode::system_changed(window.appearance(), cx)).detach();
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
             if let Some(path) = control::socket_path() {

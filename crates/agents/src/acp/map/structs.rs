@@ -5,9 +5,9 @@ use std::{
 
 use serde_json::Value;
 
-use super::super::wire::{self, PermissionAsked, SessionUpdate, ToolContent};
+use super::super::wire::{self, ContextUsage, PermissionAsked, SessionUpdate, ToolContent};
 use crate::session::{
-    BlockId, Choice, ChoiceId, Event, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind,
+    BlockId, Choice, ChoiceId, ContextFill, Event, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind,
     ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage,
 };
 use super::types::Open;
@@ -61,7 +61,8 @@ impl Mapper {
                 events.push(Event::Todos(plan.entries.into_iter().enumerate().map(|(i, entry)| todo(i, entry)).collect()));
                 events
             }
-            SessionUpdate::AvailableCommandsUpdate(_) | SessionUpdate::CurrentModeUpdate(_) | SessionUpdate::ConfigOptionUpdate(_) | SessionUpdate::Other => {
+            SessionUpdate::UsageUpdate(ContextUsage { used, size: Some(size) }) => vec![Event::Context(ContextFill { used, window: Some(size) })],
+            SessionUpdate::UsageUpdate(_) | SessionUpdate::AvailableCommandsUpdate(_) | SessionUpdate::CurrentModeUpdate(_) | SessionUpdate::ConfigOptionUpdate(_) | SessionUpdate::Other => {
                 Vec::new()
             }
         }

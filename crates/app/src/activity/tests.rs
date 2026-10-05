@@ -47,6 +47,12 @@ fn thinking_time_and_the_calls_of_each_kind_are_counted() {
 }
 
 #[test]
+fn a_thought_with_no_time_to_tell_says_only_that_it_thought() {
+    let items = [think(0), kind_of("r", ToolKind::Read)];
+    assert_eq!(summary(&items, 0, items.len(), &|_| true), "Thought · Read 1");
+}
+
+#[test]
 fn every_kind_has_its_word_in_a_set_order() {
     let items = [
         kind_of("a", ToolKind::Fetch),

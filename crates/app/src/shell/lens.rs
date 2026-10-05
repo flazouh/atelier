@@ -125,7 +125,7 @@ fn marked_badge(badge: &Badge, mark: ProjectMark, cx: &App) -> AnyElement {
 
 impl Shell {
     /// The projects' badges, in the order of `self.projects`.
-    fn project_badges(&self, cx: &App) -> Vec<Badge> {
+    pub(super) fn project_badges(&self, cx: &App) -> Vec<Badge> {
         agents_view::badges(&self.projects, &self.badges, cx)
     }
 
@@ -162,10 +162,11 @@ impl Shell {
             Some(at) => div()
                 .flex()
                 .items_center()
+                .min_w_0()
                 .gap(px(7.))
                 .child(marked_badge(&badges[at], Self::mark_of(&self.projects[at], cx), cx))
-                .child(self.projects[at].read(cx).name())
-                .children(host_mark(self.projects[at].read(cx), cx)),
+                .child(div().min_w_0().truncate().child(self.projects[at].read(cx).name()))
+                .children(host_mark(self.projects[at].read(cx), cx).map(|mark| div().flex_none().child(mark))),
             None => div().child("All projects"),
         };
         let this = cx.entity().downgrade();
@@ -221,6 +222,7 @@ impl Shell {
         let button = Button::new("project-switcher")
             .debug_name("project-switcher")
             .content(face)
+            .shrink(true)
             .trailing_icon(IconName::ChevronDown)
             .open(self.switcher_open)
             .on_click(move |_, _, cx| {
@@ -245,10 +247,11 @@ impl Shell {
                     cx.notify();
                 }))
             });
-        let group = ButtonGroup::new("project-switcher-group").variant(ButtonVariant::Secondary).size(ButtonSize::Sm).child(button).child(add);
+        let group = ButtonGroup::new("project-switcher-group").fit(true).variant(ButtonVariant::Secondary).size(ButtonSize::Sm).child(button).child(add);
         Some(
             div()
                 .relative()
+                .min_w_0()
                 .child(crate::control::marked("project-switcher", group))
                 .children(menu)
                 .children(self.add_open.then(|| self.add_menu(cx)))

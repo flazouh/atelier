@@ -16,7 +16,7 @@ use super::super::{
     tools::{self, Tool, ToolContext, ToolResult},
 };
 use crate::session::{
-    BlockId, Choice, ChoiceId, ChoiceKind, Command, EndReason, Event, EventSink, FileEdit, PermissionMode,
+    BlockId, Choice, ChoiceId, ChoiceKind, Command, ContextFill, EndReason, Event, EventSink, FileEdit, PermissionMode,
     PermissionRequest, RequestId, Session, SessionError, SessionId, Started, ToolCall, ToolId,
     ToolOutput, ToolStatus, TurnEnd, TurnOutcome, Usage, message_text,
 };
@@ -52,6 +52,7 @@ impl Session for Handle {
                 *self.shared.mode.lock().unwrap_or_else(|p| p.into_inner()) = mode;
                 Ok(())
             }
+            Command::RefreshContext => Err(SessionError::Unsupported("a breakdown of the context")),
         }
     }
 }
@@ -168,6 +169,10 @@ impl Runner {
                 }
                 Err((error, _)) => return Ending::Failed(error.to_string()),
             };
+            // What the request carried and the reply joins is what the context holds; the budget is where old tool results
+            // start to be shortened, so it is the window to watch.
+            let held = reply.usage.input + reply.usage.cache_read + reply.usage.cache_write + reply.usage.output;
+            self.emit(Event::Context(ContextFill { used: held, window: Some(self.options.context.limit_tokens as u64) }));
             self.emit(Event::Usage(Usage {
                 input_tokens: reply.usage.input,
                 output_tokens: reply.usage.output,

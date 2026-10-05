@@ -46,6 +46,18 @@ fn a_turn_asks_is_answered_and_ends_finished(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), SessionStatus::Idle, "opening clears it");
 }
 
+/// A turn that ends asks the agent what fills its context, and what it tells reaches the conversation. An agent that
+/// refuses is no problem for the reader to see.
+#[gpui_kit::test]
+fn a_turn_that_ends_asks_what_fills_the_context(cx: &mut TestAppContext) {
+    let (session, fake, cx) = start(cx, vec![vec![Event::ContextParts(vec![atelier_agents::session::ContextPart { label: "Skills".into(), tokens: 9_950 }]), ended()]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hello".into(), cx)));
+    cx.run_until_parked();
+    assert!(fake.received.lock().unwrap().iter().any(|c| matches!(c, Command::RefreshContext)), "it asked");
+    assert_eq!(cx.update(|_, cx| session.read(cx).conversation.context_parts().len()), 1, "and what it told is kept");
+    assert!(cx.update(|_, cx| session.read(cx).problem.clone()).is_none());
+}
+
 /// A session whose agent could not start tries again when the reader writes, and the message goes.
 #[gpui_kit::test]
 fn a_failed_start_is_retried_by_the_next_message(cx: &mut TestAppContext) {
@@ -927,4 +939,87 @@ fn a_message_shows_the_waiting_line_while_the_agent_connects(cx: &mut TestAppCon
     assert_eq!(last(cx), Some(crate::list_diff::Row::Waiting), "while it connects");
     cx.run_until_parked();
     assert_eq!(last(cx), Some(crate::list_diff::Row::Waiting), "once it has connected");
+}
+
+fn picture() -> gpui_kit::Image {
+    gpui_kit::Image::from_bytes(gpui_kit::ImageFormat::Png, vec![0x89, b'P', b'N', b'G', 1, 2, 3])
+}
+
+/// What is pasted on the composer becomes a chip, and goes with the message that carries it: the text as a fenced block,
+/// the picture as a picture.
+#[gpui_kit::test]
+fn a_paste_is_a_chip_that_goes_with_the_message(cx: &mut TestAppContext) {
+    use atelier_agents::session::{Attachment, ImageFormat};
+    let (session, fake, cx) = start(cx, vec![vec![ended()]], false);
+    cx.update(|_, cx| {
+        session.update(cx, |s, cx| {
+            s.pasted(atelier_ui::Pasted::Text("let x = 1;\nlet y = 2;".into()), cx);
+            s.pasted(atelier_ui::Pasted::Image(std::sync::Arc::new(picture())), cx);
+        });
+    });
+    let labels = cx.update(|_, cx| session.read(cx).composer.read(cx).chips().iter().map(|c| c.label.to_string()).collect::<Vec<_>>());
+    assert_eq!(labels, ["Pasted text · 2 lines", "Image"]);
+
+    // The composer's own Enter is tested in atelier-ui; here the message it emits.
+    cx.update(|_, cx| {
+        let composer = session.read(cx).composer.clone();
+        let chips = composer.read(cx).chips().to_vec();
+        composer.update(cx, |_, cx| cx.emit(atelier_ui::PromptInputEvent::Submit(atelier_ui::Message { text: "what is wrong here?".into(), chips })));
+    });
+    cx.run_until_parked();
+
+    let sent = fake.received.lock().unwrap().iter().find_map(|c| match c {
+        Command::Send { text, attachments } => Some((text.clone(), attachments.clone())),
+        _ => None,
+    });
+    let (text, attachments) = sent.expect("the message went");
+    assert_eq!(text, "what is wrong here?");
+    assert_eq!(attachments, [
+        Attachment::Text { text: "let x = 1;\nlet y = 2;".into() },
+        Attachment::Image { format: ImageFormat::Png, bytes: vec![0x89, b'P', b'N', b'G', 1, 2, 3].into() },
+    ]);
+    let shown = cx.update(|_, cx| session.read(cx).conversation.items().to_vec());
+    assert!(matches!(shown.first(), Some(atelier_agents::session::Item::User { text }) if text.contains("Pasted text · 2 lines") && text.contains("Image · 1 KB")), "the bubble says what came with the words: {shown:?}");
+}
+
+/// A chip alone is a message; one queued while a turn runs keeps its attachments until it goes.
+#[gpui_kit::test]
+fn a_queued_message_keeps_what_came_with_it(cx: &mut TestAppContext) {
+    use atelier_agents::session::Attachment;
+    let (session, fake, cx) = start(cx, vec![vec![], vec![]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("first".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.queue(super::chips::Draft { text: String::new(), attachments: vec![Attachment::Text { text: "log".into() }] }, cx)));
+    let agent = fake.sinks.lock().unwrap()[0].clone();
+    agent(ended());
+    cx.run_until_parked();
+    let last = fake.received.lock().unwrap().last().cloned();
+    assert!(matches!(last, Some(Command::Send { text, attachments }) if text.is_empty() && attachments == [Attachment::Text { text: "log".into() }]));
+}
+
+/// A picture of a kind the agent cannot read is refused with a reason, not dropped silently.
+#[gpui_kit::test]
+fn a_picture_the_agent_cannot_read_is_refused_with_a_reason(cx: &mut TestAppContext) {
+    let (session, _, cx) = start(cx, vec![], false);
+    let tiff = gpui_kit::Image::from_bytes(gpui_kit::ImageFormat::Tiff, vec![1, 2, 3]);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.pasted(atelier_ui::Pasted::Image(std::sync::Arc::new(tiff)), cx)));
+    let (chips, problem) = cx.update(|_, cx| (session.read(cx).composer.read(cx).chips().len(), session.read(cx).problem.clone()));
+    assert_eq!(chips, 0);
+    assert!(problem.is_some());
+}
+
+/// The composer's mode label says what the agent runs in. Codex starts in Auto review, not in the first mode the
+/// composer lists, and a mode set in the session tells the label too.
+#[gpui_kit::test]
+fn the_composer_shows_the_mode_the_agent_reports(cx: &mut TestAppContext) {
+    use atelier_agents::session::{PermissionMode, Started};
+    let (session, fake, cx) = crate::fake_agent::start_with_modes(cx);
+    let word = |cx: &mut gpui_kit::VisualTestContext| cx.update(|_, cx| session.read(cx).composer.read(cx).mode().map(|m| m.to_string()));
+    let agent = fake.sinks.lock().unwrap()[0].clone();
+    agent(Event::Started(Started { session: atelier_agents::session::SessionId::new("s"), model: None, mode: Some(PermissionMode::Auto), commands: Vec::new() }));
+    cx.run_until_parked();
+    assert_eq!(word(cx), Some(crate::agent_session::helpers::mode_word(PermissionMode::Auto).to_string()), "the label follows the agent");
+    agent(Event::Started(Started { session: atelier_agents::session::SessionId::new("s"), model: None, mode: Some(PermissionMode::Ask), commands: Vec::new() }));
+    cx.run_until_parked();
+    assert_eq!(word(cx), Some(crate::agent_session::helpers::mode_word(PermissionMode::Ask).to_string()), "and follows it back");
 }

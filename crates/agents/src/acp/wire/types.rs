@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::structs::{Chunk, Commands, ConfigOptions, Diff, Modes, Plan, ToolCall};
+use super::structs::{Chunk, Commands, ConfigOptions, ContextUsage, Diff, Modes, Plan, ToolCall};
 
 #[derive(Deserialize)]
 #[serde(tag = "sessionUpdate", rename_all = "snake_case")]
@@ -14,6 +14,7 @@ pub(in super::super) enum SessionUpdate {
     AvailableCommandsUpdate(Commands),
     CurrentModeUpdate(Modes),
     ConfigOptionUpdate(ConfigOptions),
+    UsageUpdate(ContextUsage),
     #[serde(other)]
     Other,
 }

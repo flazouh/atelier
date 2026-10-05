@@ -236,7 +236,21 @@ fn the_end_of_a_turn_fails_a_call_still_open_and_carries_the_closing_text() {
 #[test]
 fn an_update_of_a_kind_atelier_does_not_know_gives_nothing() {
     let mut run = turn();
-    run.agent(update(json!({ "sessionUpdate": "usage_update", "used": 10, "size": 100 })));
     run.agent(update(json!({ "sessionUpdate": "brand_new_thing", "x": 1 })));
+    assert_eq!(run.events(), vec![]);
+}
+
+/// Codex tells how full the context is after each turn: the tokens in it and the size of its window.
+#[test]
+fn a_usage_update_tells_how_full_the_context_is() {
+    let mut run = turn();
+    run.agent(update(json!({ "sessionUpdate": "usage_update", "used": 21150, "size": 258400 })));
+    assert_eq!(run.events(), vec![Event::Context(crate::session::ContextFill { used: 21_150, window: Some(258_400) })]);
+}
+
+#[test]
+fn a_usage_update_without_a_size_tells_nothing() {
+    let mut run = turn();
+    run.agent(update(json!({ "sessionUpdate": "usage_update", "used": 10 })));
     assert_eq!(run.events(), vec![]);
 }

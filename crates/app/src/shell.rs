@@ -6,6 +6,7 @@
 //! file (while nothing is being typed) and ⌘B and ⌘⇧B hide and show the left and the right pane.
 
 mod fit;
+mod footer;
 mod helpers;
 mod impls;
 mod changes;

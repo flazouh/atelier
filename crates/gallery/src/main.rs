@@ -5,13 +5,14 @@
 
 use atelier_ui::{
     ActiveTheme, AgentText, AgentTextSource, AgentTextStatus, Appearance, Badge, Button, ButtonSize, ButtonVariant,
-    CodeBlock, CodeBlockStatus, DiffLine, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
+    CodeBlock, CodeBlockStatus, DiffLine, preview_clamp::PREVIEW_ROWS, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
     PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spinner, TextSize, Thinking,
     ThinkingPhase, ThinkingStyle, Todo, TodoList,
     CodeEditor, Decision, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
 };
 use atelier_agents::claude::{self, SparkState};
+use atelier_ui::context_usage::ContextPart;
 use std::time::{Duration, Instant};
 
 
@@ -180,6 +181,22 @@ impl Story {
 
 /// beui's preview models: a provider mark per model. The real favicons preview.tsx fetches over the
 /// network have no equivalent here, so every model shows the generic `Bot` mark instead.
+/// What fills the preview's context, as an agent that can break it down would tell it.
+fn preview_context_parts() -> Vec<ContextPart> {
+    [
+        ("System prompt", 4_100),
+        ("Tool definitions", 7_500),
+        ("Skills", 11_100),
+        ("MCP & dynamic tools", 5_900),
+        ("Subagent definitions", 2_500),
+        ("Summarized conversation", 5_500),
+        ("Conversation", 69_700),
+    ]
+    .into_iter()
+    .map(|(label, tokens)| ContextPart::new(label, tokens))
+    .collect()
+}
+
 fn preview_models() -> Vec<PromptModel> {
     vec![
         PromptModel::new("gpt-5.2", "GPT-5.2").icon(IconName::Bot),
@@ -282,7 +299,9 @@ impl Gallery {
             .models(preview_models())
             .model("gpt-5.2")
             .actions(preview_actions());
-            input.set_context(84_000, 200_000, cx);
+            input.set_context(106_300, 300_000, cx);
+            input.set_context_parts(preview_context_parts(), cx);
+            input.set_context_open(std::env::var("GALLERY_OPEN").is_ok(), cx);
             input
         });
         let panel_prompt = cx.new(|cx| {
@@ -291,6 +310,7 @@ impl Gallery {
                 .model("sonnet-5");
             input.set_running(true, cx);
             input.set_context(172_000, 200_000, cx);
+            input.set_context_open(std::env::var("GALLERY_OPEN").is_ok(), cx);
             input.set_queued(vec!["Then run the whole test suite".into(), "Open a PR when it is green".into()], cx);
             input
         });
@@ -903,6 +923,15 @@ fn messages(started: Instant) -> impl IntoElement {
     )
 }
 
+/// Forty lines of a log, for the clipped tool call.
+const LONG_LOG: &str = "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\ntest result: ok. 412 passed; 0 failed";
+
+/// A forty-line addition, for the clipped diff.
+fn long_diff() -> String {
+    let body: String = (1..=40).map(|n| format!("+    let row_{n} = {n};\n")).collect();
+    format!("@@ -1,0 +1,40 @@\n{body}")
+}
+
 const TEST_OUTPUT: &str = "running 23 tests\ntest file_diff::tests::stats_count_added_and_removed_lines ... ok\n\
 test file_diff::tests::lines_are_numbered_from_the_hunk_start ... ok\ntest todo_list::tests::progress_counts_only_done_steps ... ok\n\
 test tool_call::tests::short_output_is_kept_whole ... ok\ntest tool_call::tests::long_output_keeps_the_first_lines ... ok\n\
@@ -925,6 +954,7 @@ fn tools() -> impl IntoElement {
                     .child(ToolCall::new("t-read", "Read file").file("crates/ui/src/file_diff.rs").meta("214 lines").status(ToolStatus::Done).flat())
                     .child(ToolCall::new("t-grep", "Searched code").tool("fn hunk_starts").status(ToolStatus::Done).flat().output("crates/ui/src/file_diff.rs:69: fn hunk_starts(header: &str) -> (u32, u32) {"))
                     .child(ToolCall::new("t-test", "Ran tests").tool("cargo test -p ui").meta("3.1s").status(ToolStatus::Done).output(TEST_OUTPUT))
+                    .child(ToolCall::new("t-long", "Ran tests").tool("cargo test --workspace").meta("41s").status(ToolStatus::Done).default_open(true).preview_rows(PREVIEW_ROWS).output(LONG_LOG))
                     .child(ToolCall::new("t-run", "Running clippy").tool("cargo clippy --workspace").status(ToolStatus::Running).output("Checking ui v0.1.0\n    Checking atelier-gallery v0.1.0"))
                     .child(ToolCall::new("t-fail", "Fetched theme").tool("https://beui.dev/docs/theme").status(ToolStatus::Failed).output("error: request timed out after 30s"))
                     .child(ToolCall::new("t-wait", "Push to main").tool("git push origin main").status(ToolStatus::Cancelled)),
@@ -1032,6 +1062,12 @@ fn diffs() -> impl IntoElement {
                             .default_open(true)
                             .status(FileDiffStatus::Complete)
                             .copy_text(diff_a_copy),
+                    )
+                    .child(
+                        FileDiff::new("diff-clipped", "crates/ui/src/long_file.rs", DiffLine::parse(&long_diff()))
+                            .default_open(true)
+                            .status(FileDiffStatus::Complete)
+                            .preview_rows(PREVIEW_ROWS),
                     )
                     .child(
                         FileDiff::new(

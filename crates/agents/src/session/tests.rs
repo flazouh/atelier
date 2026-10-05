@@ -360,6 +360,14 @@ mod conversation {
     }
 
     #[test]
+    fn the_parts_of_the_context_are_the_last_told() {
+        let part = |label: &str, tokens| ContextPart { label: label.into(), tokens };
+        let conversation = fold(vec![Event::ContextParts(vec![part("a", 1)]), Event::ContextParts(vec![part("b", 2), part("c", 3)])]);
+        assert_eq!(conversation.context_parts(), [part("b", 2), part("c", 3)]);
+        assert!(Conversation::new().context_parts().is_empty());
+    }
+
+    #[test]
     fn usage_adds_up_across_turns_and_cost_stays_unknown_until_reported() {
         let usage = |cost| Event::Usage(Usage { input_tokens: 10, output_tokens: 5, cost_usd: cost, ..Usage::default() });
         let mut conversation = fold(vec![usage(None), usage(None)]);
@@ -402,6 +410,20 @@ mod attachments {
     fn one_line_is_said_in_the_singular_and_a_range_in_the_plural() {
         let one = Attachment::LineComment { path: "a".into(), first_line: 3, last_line: 3, removed: false, quote: "x".into(), body: "b".into() };
         assert_eq!(one.render(), "Review comment on a, line 3:\n> x\nb");
+    }
+
+    #[test]
+    fn pasted_text_is_fenced_with_more_backticks_than_it_holds() {
+        let plain = Attachment::Text { text: "a\nb".into() };
+        assert_eq!(plain.render(), "Pasted text:\n```\na\nb\n```");
+        let fenced = Attachment::Text { text: "```rust\nfn main() {}\n```".into() };
+        assert_eq!(fenced.render(), "Pasted text:\n````\n```rust\nfn main() {}\n```\n````");
+    }
+
+    #[test]
+    fn a_picture_is_said_in_words_for_a_backend_that_carries_only_text() {
+        let image = Attachment::Image { format: ImageFormat::Jpeg, bytes: vec![0; 2048].into() };
+        assert_eq!(image.render(), "An image was attached (image/jpeg, 2 KB), which this agent cannot read.");
     }
 
     #[test]

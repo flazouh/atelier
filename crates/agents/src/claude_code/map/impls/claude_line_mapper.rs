@@ -25,6 +25,7 @@ impl ClaudeLineMapper {
             }
             Line::Finished(finish) => self.finished(finish),
             Line::ControlRequest(request) => self.control_request(request),
+            Line::ControlResponse(response) => self.control_answered(response),
             Line::ControlCancelRequest { request_id } => self.permission_cancelled(request_id),
             Line::RateLimitEvent(event) => self.limit_told(event),
             Line::Ignored => Vec::new(),

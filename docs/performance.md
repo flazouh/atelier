@@ -596,3 +596,45 @@ On the HP, against oven-sh/bun through the real gh (`crates/forge/tests/live.rs`
   the read fills in the rest about a second later.
 - The card is a view that observes one store, so a read redraws the open card alone. It is not cached
   (`Entity::cached` needs a definite height), so it draws with the text around it while open.
+
+## Diff columns (2026-10-04)
+
+Found with a samply profile of the release app (`~/qa/big`: 200 changed files, one commit), on the HP at a
+load average of 18 to 46, llvmpipe, `ATELIER_FRAMES=each`, driven through the control socket: switch to Git, Files,
+History, Pulls, Tasks, Sessions and Git again, eight wheel steps in each. Profile tool: `samply record
+--save-only --unstable-presymbolicate` (set `kernel.perf_event_paranoid=1` for the run, then back to 3).
+
+| Case | Before | After |
+| --- | --- | --- |
+| Frame while scrolling the Changes column, 200 files, median / p95 / max | 53.4 / 64.6 / 82.8 ms | 10.2 / 19.5 / 29.5 ms |
+| Part `panels` in those frames, median | 48 to 52 ms | 3.4 to 4.9 ms |
+
+- Cause: the Changes and History columns were a plain scrolling `div` with one `FileDiff` card per file. Every frame
+  laid out all 200 cards (taffy flexbox: 58% of the main thread's samples) and built every row's colours.
+- Fix tried: one gpui `list` of cards (item 0 the head, item n + 1 file n's card, 600 px of overdraw). It gave the
+  "after" column above. It was not merged: `5a0da5dd4` (History and Changes show one file at a time, picked in a tree)
+  removes the stacked column, which is the same fix by another route. Any new stacked list of cards needs a list.
+- Next in the profile: the Changes sidebar still builds a row for each of the 200 files (5 to 7 ms a frame, cached
+  between changes). It needs the head, the notes and the worktrees split from the rows to become a list.
+- Startup under the profile: nothing of ours. 100 of 350 samples are wgpu pipeline creation on llvmpipe.
+
+### History file tree (2026-10-04)
+
+Same set-up, 201-file commit, eight wheel steps over the History view, `panels` part of each frame:
+
+| Case | Before | After |
+| --- | --- | --- |
+| Frames drawn while scrolling | 13, 13 to 20 ms each | 3 frames of 8 to 11 ms |
+
+- Cause: `ChangedFileTree` drew 201 rows, each with two animated `Digits` (a `Roll` per digit), on every frame of the diff beside it.
+- Fix: atelier-ui `ChangedFileTree::virtualised()` (uniform_list); History's column uses it (atelier#345, atelier-ui#33).
+- `Theme::faint()` searched 11 colour mixes three times a row of every diff. Now once a diff (atelier-ui#32).
+- Still open: the Changes sidebar tree draws 200 rows (first frame 25 ms, cached after). Its column also holds the
+  worktrees, so making it a list needs the head and the worktrees split from the scroll.
+
+### How to profile the app (HP)
+
+1. Build: `CARGO_TARGET_DIR=... cargo build --release -p atelier-app`. A build of `main` has no control socket; use a branch that has `crates/app/src/control`.
+2. `sudo sysctl -w kernel.perf_event_paranoid=1`, run under Xvfb with `samply record --save-only -o p.json.gz --unstable-presymbolicate -- atelier ~/qa/big`, with `ATELIER_FRAMES=each ATELIER_CONTROL=<sock>`. Set the sysctl back to 3 after.
+3. Drive with `tools/atelier-ctl.sh view git|files|history|pulls|tasks|sessions` and `xdotool click 5` for wheel steps. `new_session "Claude Code"` and `send` work for a real streaming turn (14 rows: 651 frames, median 4.6 ms, p95 11 ms).
+4. Read the profile without a browser: the `.json.gz` and its `.syms.json` hold the stacks. Sum inclusive and self samples of the `atelier` thread by symbol.

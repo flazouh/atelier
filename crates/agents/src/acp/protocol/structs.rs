@@ -158,6 +158,7 @@ impl Protocol {
                     None => self.want_mode = Some(id),
                 }
             }
+            Command::RefreshContext => return Err(SessionError::Unsupported("a breakdown of the context")),
         }
         Ok(step)
     }

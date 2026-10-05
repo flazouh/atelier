@@ -4,14 +4,27 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use base64::Engine as _;
 use serde_json::{Value, json};
 
 use crate::session::{Attachment, PermissionMode, message_text};
 
 /// `id` comes back in the result of the turn that takes the message, so a message `claude` holds for
 /// later is told apart from one it has answered.
+///
+/// The content is a string, until a picture comes with it: then it is blocks, the words first and each picture after.
 pub(super) fn user_message(id: &str, text: &str, attachments: &[Attachment]) -> String {
-    let content = message_text(text, attachments);
+    let content = if attachments.iter().any(|a| a.image().is_some()) {
+        let words: Vec<Attachment> = attachments.iter().filter(|a| a.image().is_none()).cloned().collect();
+        let mut blocks = vec![json!({"type": "text", "text": message_text(text, &words)})];
+        for (format, bytes) in attachments.iter().filter_map(Attachment::image) {
+            let data = base64::engine::general_purpose::STANDARD.encode(bytes);
+            blocks.push(json!({"type": "image", "source": {"type": "base64", "media_type": format.media_type(), "data": data}}));
+        }
+        Value::Array(blocks)
+    } else {
+        Value::String(message_text(text, attachments))
+    };
     json!({"type": "user", "uuid": id, "message": {"role": "user", "content": content}}).to_string()
 }
 
@@ -39,6 +52,13 @@ pub(super) fn message_id(seed: u32, number: u64) -> String {
 
 pub(super) fn interrupt(request_id: &str) -> String {
     control(request_id, json!({"subtype": "interrupt"}))
+}
+
+/// The prefix of the id of a request for the context's breakdown, so its answer is told from the answers to other requests.
+pub(super) const CONTEXT_REQUEST: &str = "atelier-context-";
+
+pub(super) fn context_usage(request_id: &str) -> String {
+    control(request_id, json!({"subtype": "get_context_usage"}))
 }
 
 pub(super) fn set_model(request_id: &str, model: &str) -> String {

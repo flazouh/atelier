@@ -663,3 +663,52 @@ fn a_reply_claude_wrote_without_a_limit_shows_before_the_turn_ends() {
     let [Event::Text { delta, .. }, Event::TurnEnded(_)] = events.as_slice() else { panic!("{events:?}") };
     assert_eq!(delta, "Prompt is too long");
 }
+
+fn context_answer(id: &str) -> String {
+    json!({"type": "control_response", "response": {"subtype": "success", "request_id": id, "response": {
+        "categories": [
+            {"name": "System prompt", "tokens": 2264, "color": "promptBorder", "kind": "used"},
+            {"name": "System tools (deferred)", "tokens": 13287, "color": "inactive", "isDeferred": true, "kind": "deferred"},
+            {"name": "Skills", "tokens": 9950, "color": "warning", "kind": "used"},
+            {"name": "Empty", "tokens": 0, "color": "warning", "kind": "used"},
+            {"name": "Messages", "tokens": 6107, "color": "purple", "kind": "used"},
+            {"name": "Autocompact buffer", "tokens": 33000, "color": "inactive", "kind": "buffer"},
+            {"name": "Free space", "tokens": 940980, "color": "promptBorder", "kind": "free"},
+        ],
+        "totalTokens": 18321, "maxTokens": 967000, "rawMaxTokens": 1000000,
+    }}})
+    .to_string()
+}
+
+#[test]
+fn the_answer_about_the_context_tells_its_parts_that_are_in_the_window_and_its_reading() {
+    let mut mapper = ClaudeLineMapper::new();
+    let events = mapper.line(&context_answer("atelier-context-atelier-3"), Instant::now());
+    let [Event::Context(fill), Event::ContextParts(parts)] = events.as_slice() else { panic!("{events:?}") };
+    assert_eq!((fill.used, fill.window), (18_321, Some(1_000_000)), "the window is the model's, not what is left after the buffer");
+    let told: Vec<_> = parts.iter().map(|p| (p.label.as_str(), p.tokens)).collect();
+    assert_eq!(told, [("System prompt", 2_264), ("Skills", 9_950), ("Messages", 6_107)], "only what is in the window, and no empty part");
+}
+
+#[test]
+fn a_repeated_answer_tells_the_parts_again_and_the_reading_once() {
+    let mut mapper = ClaudeLineMapper::new();
+    let now = Instant::now();
+    mapper.line(&context_answer("atelier-context-atelier-3"), now);
+    let events = mapper.line(&context_answer("atelier-context-atelier-4"), now);
+    assert!(matches!(events.as_slice(), [Event::ContextParts(_)]), "{events:?}");
+}
+
+#[test]
+fn the_answer_to_any_other_request_tells_nothing() {
+    let mut mapper = ClaudeLineMapper::new();
+    let line = json!({"type": "control_response", "response": {"subtype": "success", "request_id": "atelier-2", "response": {}}}).to_string();
+    assert!(mapper.line(&line, Instant::now()).is_empty());
+}
+
+#[test]
+fn an_answer_about_the_context_that_is_not_one_warns() {
+    let mut mapper = ClaudeLineMapper::new();
+    let line = json!({"type": "control_response", "response": {"subtype": "success", "request_id": "atelier-context-atelier-1", "response": {"categories": 7}}}).to_string();
+    assert!(matches!(mapper.line(&line, Instant::now()).as_slice(), [Event::Warning(_)]));
+}

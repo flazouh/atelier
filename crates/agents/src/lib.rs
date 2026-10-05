@@ -18,6 +18,7 @@ pub mod registry;
 pub mod session;
 mod strings;
 pub mod subprocess;
+pub mod usage;
 
 pub use assets::Assets;
 

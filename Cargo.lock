@@ -469,12 +469,15 @@ dependencies = [
  "atelier-i18n",
  "atelier-project",
  "atelier-ui",
+ "base64 0.22.1",
+ "chrono",
  "gpui-kit",
  "rustls",
  "rustls-native-certs",
  "serde",
  "serde_json",
  "tempfile",
+ "ureq",
 ]
 
 [[package]]
@@ -502,6 +505,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sysinfo",
  "tempfile",
  "ttf-parser",
  "ureq",
@@ -652,7 +656,7 @@ dependencies = [
 [[package]]
 name = "atelier-ui"
 version = "0.1.0"
-source = "git+https://github.com/flazouh/atelier-ui#424f05a5c769d9d0fa18e3b8e39075a1d45a2f00"
+source = "git+https://github.com/flazouh/atelier-ui#a9cf9bccb45f8977f8719442e567808658d349d4"
 dependencies = [
  "core-foundation 0.9.4",
  "core-foundation-sys",

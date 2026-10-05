@@ -301,3 +301,21 @@ fn the_card_parts_show_as_switches_that_hide_them_on_every_card(cx: &mut TestApp
     assert!(!shows(cx, atelier_ui::PrPart::Files), "the switch hid the files");
     assert!(shows(cx, atelier_ui::PrPart::Reviewers), "and nothing else");
 }
+
+/// While the mode is System, the app turns light or dark as the system does; a mode the reader picked stays.
+#[gpui_kit::test]
+fn the_system_mode_follows_a_change_of_the_systems_appearance(cx: &mut gpui_kit::TestAppContext) {
+    use atelier_ui::theme::{ActiveTheme, Appearance};
+    use gpui_kit::WindowAppearance;
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        Mode::System.apply(cx);
+        Mode::system_changed(WindowAppearance::Dark, cx);
+        assert_eq!(cx.theme().appearance, Appearance::Dark, "System follows the system to dark");
+        Mode::system_changed(WindowAppearance::Light, cx);
+        assert_eq!(cx.theme().appearance, Appearance::Light, "and back to light");
+        Mode::Dark.apply(cx);
+        Mode::system_changed(WindowAppearance::Light, cx);
+        assert_eq!(cx.theme().appearance, Appearance::Dark, "Dark stays dark");
+    });
+}

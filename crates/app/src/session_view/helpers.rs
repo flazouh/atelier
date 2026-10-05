@@ -25,6 +25,7 @@ use atelier_ui::{
     changed_files::ChangedFiles,
     icon::{Icon, IconName},
     message_rail::MessageRail,
+    preview_clamp::PREVIEW_ROWS,
     select::{Select, SelectOption},
     session_status::SessionStatus,
     theme::{ActiveTheme, radius},
@@ -122,12 +123,16 @@ fn tool_row(id: impl Into<gpui_kit::ElementId>, call: &Call, root: &str, mark: O
 }
 
 /// The diff of an edit, as the agent writes it: open while it streams, then shut to its line or kept open as the density says.
-fn edit_diff(id: impl Into<gpui_kit::ElementId>, view: super::edit::EditView) -> FileDiff {
+/// Its rows are clipped and do not scroll; pressing them opens them wider and opens the review on this file.
+fn edit_diff(session: &Entity<AgentSession>, id: impl Into<gpui_kit::ElementId>, view: super::edit::EditView) -> FileDiff {
     let path = view.preview.path().cloned().unwrap_or_default();
+    let (review, file) = (session.clone(), path.to_string());
     FileDiff::new(id, path, view.preview.rows())
         .status(if view.streaming { FileDiffStatus::Streaming } else { FileDiffStatus::Complete })
         .default_open(view.open)
         .collapse_on_complete(view.fold_when_done)
+        .preview_rows(PREVIEW_ROWS)
+        .on_open(move |_, cx| review.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: None, path: Some(file.clone()) })))
 }
 
 /// One row of the list: a conversation item, or a turn's changed files.
@@ -291,8 +296,11 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
             let mark = super::calls::mark_kept(items, &call.call.id, &s.reviews.approvals);
             let density = crate::tool_density::tool_density(cx);
             match super::edit::edit_view(call, &root, density, mark) {
-                Some(view) => edit_diff(id("tool"), view).into_any_element(),
-                None => tool_row(id("tool"), call, &root, mark, density == crate::tool_density::ToolDensity::Detailed).into_any_element(),
+                Some(view) => edit_diff(session, id("tool"), view).into_any_element(),
+                // A command's log is clipped like a diff, and does not scroll; pressing it opens it wider.
+                None => tool_row(id("tool"), call, &root, mark, density == crate::tool_density::ToolDensity::Detailed)
+                    .preview_rows(PREVIEW_ROWS)
+                    .into_any_element(),
             }
         }
         Item::Subagent { subagent, status, activity, calls, summary } => {

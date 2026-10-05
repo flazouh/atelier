@@ -3,7 +3,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use super::structs::{
-    BlockId, ContextFill, FileEdit, Limit, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
+    BlockId, ContextFill, ContextPart, FileEdit, Limit, PermissionRequest, RequestId, Started, Subagent, Todo, ToolCall, ToolId,
     ToolOutput, TurnEnd, Usage,
 };
 
@@ -113,6 +113,8 @@ pub enum Event {
     Usage(Usage),
     /// How full the context is, each time it changes.
     Context(ContextFill),
+    /// What fills the context, each time the agent tells it after a [`Command::RefreshContext`](crate::session::Command::RefreshContext).
+    ContextParts(Vec<ContextPart>),
     /// Where the account stands against its usage limit, each time it changes.
     Limit(Limit),
     /// The agent has no sign-in to work with: the turn that asked for it did not run. Signing in again is the

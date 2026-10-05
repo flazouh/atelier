@@ -56,3 +56,31 @@ fn a_message_carries_its_attachments_as_text_after_its_own() {
         "Please look\n\nReview comment on src/a.rs, lines 10-12:\n> let a = 1;\n> let b = 2;\nWhy not a struct?\n\nFile: src/b.rs"
     );
 }
+
+#[test]
+fn the_request_for_the_context_carries_the_prefix_its_answer_is_told_by() {
+    let line = parse(&control::context_usage(&format!("{}1", control::CONTEXT_REQUEST)));
+    assert_eq!(line["request"], json!({"subtype": "get_context_usage"}));
+    assert!(line["request_id"].as_str().unwrap().starts_with(control::CONTEXT_REQUEST));
+}
+
+#[test]
+fn a_message_with_a_picture_is_a_list_of_blocks_the_text_then_each_picture() {
+    use crate::session::ImageFormat;
+    let pasted = Attachment::Text { text: "log line".into() };
+    let image = Attachment::Image { format: ImageFormat::Png, bytes: vec![0, 1, 2, 3].into() };
+    let line = parse(&control::user_message("m1", "See this", &[pasted, image]));
+    assert_eq!(
+        line["message"]["content"],
+        json!([
+            {"type": "text", "text": "See this\n\nPasted text:\n```\nlog line\n```"},
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "AAECAw=="}},
+        ])
+    );
+}
+
+#[test]
+fn a_message_with_no_picture_stays_a_string_whatever_else_it_carries() {
+    let line = parse(&control::user_message("m1", "See this", &[Attachment::Text { text: "x".into() }]));
+    assert_eq!(line["message"]["content"], "See this\n\nPasted text:\n```\nx\n```");
+}

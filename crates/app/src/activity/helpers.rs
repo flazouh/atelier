@@ -41,7 +41,8 @@ pub fn summary(items: &[Item], from: usize, to: usize, visible: &dyn Fn(usize) -
     }
     let mut parts = Vec::new();
     if thought {
-        parts.push(format!("Thought for {seconds}s"));
+        // No time to tell (a session read back from history): say only that it thought.
+        parts.push(if seconds == 0 { "Thought".to_string() } else { format!("Thought for {seconds}s") });
     }
     parts.extend(KINDS.iter().zip(counts).filter(|(_, n)| *n > 0).map(|((_, word), n)| format!("{word} {n}")));
     if agents > 0 {

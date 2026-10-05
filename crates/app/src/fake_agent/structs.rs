@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use gpui_kit::Entity;
 use atelier_agents::session::{
-    Account, Backend, Capabilities, Command, Event, EventSink, OpenRequest, Session, SessionError,
+    Account, Backend, Capabilities, Command, Event, EventSink, OpenRequest, PermissionMode, Session, SessionError,
     SessionId, Started,
 };
 use atelier_project::Project;
@@ -25,6 +25,8 @@ pub struct Fake {
     pub opened: Arc<Mutex<Vec<OpenRequest>>>,
     /// It can start a new session from a past one.
     pub forks: bool,
+    /// It offers the permission modes Ask and Auto.
+    pub modes: bool,
     /// The sink of every session it opened, in order, for a test to speak as an agent that was replaced.
     pub sinks: Mutex<Vec<EventSink>>,
     /// What it reads back as any past session's history.
@@ -67,7 +69,12 @@ impl Backend for FakeBackend {
         self.0.named.unwrap_or("fake")
     }
     fn capabilities(&self) -> Capabilities {
-        Capabilities { providers: self.0.providers, forks: self.0.forks, ..Capabilities::default() }
+        Capabilities {
+            providers: self.0.providers,
+            forks: self.0.forks,
+            permission_modes: if self.0.modes { vec![PermissionMode::Ask, PermissionMode::Auto] } else { Vec::new() },
+            ..Capabilities::default()
+        }
     }
     fn history(&self, _: &dyn Project, _: &SessionId) -> Result<Vec<Event>, SessionError> {
         Ok(self.0.history.clone())
