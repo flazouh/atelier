@@ -11,6 +11,10 @@ static atelier_relaunch_callback relaunch_callback;
 static id controller;
 static id updater_delegate;
 static void (^pending_install)(void);
+// Whether Sparkle may restart the app. Sparkle asks the app once, through the postpone call below, and after that it
+// installs on any press of Install and Relaunch, so a no must also stop that second press: this is NO from the moment
+// the app is asked until it says yes, or until the update ends.
+static BOOL relaunch_allowed = YES;
 
 @interface AtelierUpdaterDelegate : NSObject
 @end
@@ -22,9 +26,21 @@ static void (^pending_install)(void);
     if (relaunch_callback == NULL) {
         return NO;
     }
+    relaunch_allowed = NO;
     pending_install = [installHandler copy];
     relaunch_callback();
     return YES;
+}
+
+// Sparkle asks this on every try to install and restart. A no ends the update without installing it.
+- (BOOL)updaterShouldRelaunchApplication:(id)updater {
+    return relaunch_allowed;
+}
+
+// The update ended, installed or not: the next one asks the app again.
+- (void)updater:(id)updater didFinishUpdateCycleForUpdateCheck:(NSInteger)updateCheck error:(NSError *)error {
+    relaunch_allowed = YES;
+    pending_install = nil;
 }
 @end
 
@@ -65,12 +81,13 @@ void atelier_updater_check(void) {
 void atelier_updater_proceed(void) {
     void (^install)(void) = pending_install;
     pending_install = nil;
+    relaunch_allowed = YES;
     if (install != nil) {
         install();
     }
 }
 
-// The app stays as it is. Sparkle keeps the update and asks again at its next check.
+// The app stays as it is: the update does not install, even on another press of Install and Relaunch.
 void atelier_updater_decline(void) {
     pending_install = nil;
 }

@@ -8,7 +8,7 @@ mod helpers;
 mod impls;
 mod structs;
 mod traits;
-pub use consts::{RequestSender, Requests, UNAVAILABLE_NOTICE};
+pub use consts::{RequestSender, Requests, UNAVAILABLE_NOTICE, UPDATE_WAITS_NOTICE};
 pub use helpers::driver;
 pub use enums::{CheckOutcome, Relaunch};
 pub use structs::{Held, NoDriver, Updater};

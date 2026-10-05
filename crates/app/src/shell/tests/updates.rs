@@ -122,6 +122,19 @@ fn cancel_keeps_the_app_and_its_unsaved_edits_when_an_update_wants_to_restart(cx
     settle(&shell, cx);
     assert_eq!((proceeded.get(), declined.get()), (0, 1));
     assert_eq!(shell.read_with(cx, |s, cx| s.unsaved(cx)), 1, "the edit is still there");
+    assert!(cx.debug_bounds("notice").is_some(), "the reader is told the update waits");
+}
+
+#[gpui_kit::test]
+fn a_yes_to_the_restart_adds_no_notice(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    leave_an_edit_unsaved(&shell, cx);
+    let (request, _, _) = waiting();
+    shell.update_in(cx, |s, window, cx| s.relaunch_for_update(request, window, cx));
+    settle(&shell, cx);
+    cx.simulate_prompt_answer("Restart Anyway");
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("notice").is_none());
 }
 
 fn requests() -> (RequestSender, crate::updater::Requests) {

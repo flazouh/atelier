@@ -4,7 +4,7 @@ use futures_util::StreamExt;
 use gpui_kit::{Context, PromptLevel, Window};
 
 use super::structs::{CheckForUpdates, Shell};
-use crate::updater::{CheckOutcome, Relaunch, RelaunchRequest, Requests, UNAVAILABLE_NOTICE, Updater};
+use crate::updater::{CheckOutcome, Relaunch, RelaunchRequest, Requests, UNAVAILABLE_NOTICE, UPDATE_WAITS_NOTICE, Updater};
 
 impl Shell {
     /// The app menu's Check for Updates…: the updater looks and shows its own window. A build that cannot update
@@ -23,7 +23,14 @@ impl Shell {
         let Some(held) = Updater::hold(request, self.unsaved(cx)) else { return };
         let relaunch = held.relaunch();
         let answer = window.prompt(PromptLevel::Warning, &relaunch.title(), Some(relaunch.detail()), &Relaunch::BUTTONS, cx);
-        cx.spawn(async move |_, _| held.answer(answer.await == Ok(0))).detach();
+        cx.spawn(async move |this, cx| {
+            let restart = answer.await == Ok(0);
+            held.answer(restart);
+            if !restart {
+                _ = this.update(cx, |this, cx| this.say(UPDATE_WAITS_NOTICE.to_string(), cx));
+            }
+        })
+        .detach();
     }
 
     /// Takes the restarts the platform updater asks for, one at a time, for as long as the window lives.
