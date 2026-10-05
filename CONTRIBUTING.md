@@ -68,3 +68,28 @@ the rows they show, `new_session [agent]` and `send "text"` act, and `tools/dev-
   say what each step does. A helper only one type uses is a private function in that type's `impls/` file.
 - One concept for each module. No inline `mod tests { ... }`.
 - A bug fix comes with a test that fails without it.
+## Releasing (on a Mac)
+The released app updates itself with [Sparkle](https://sparkle-project.org). An update downloads as a small patch
+when one fits the version the reader has, else as the whole app. Only the Apple silicon Mac app is released.
+
+Once, per Mac:
+- A Developer ID Application certificate in the keychain; `ATELIER_SIGN_IDENTITY` names it.
+- A notarytool profile: `xcrun notarytool store-credentials atelier-notary --apple-id <id> --team-id <team>`.
+- The update signing key: `tools/mac/sparkle.sh` prints the folder of the pinned Sparkle, and
+  `<folder>/bin/generate_keys --account dev.atelier.app` makes the key in the keychain. Export a copy to a safe place
+  with `generate_keys --account dev.atelier.app -x <file>`: without the key, no later version can be signed, and the
+  apps already installed refuse an update signed by another key.
+
+Each release:
+1. Raise `version` in the workspace `Cargo.toml`, and commit and push. A release is a commit; the script refuses a
+   checkout with uncommitted changes, and an archive it has made is never rebuilt.
+2. Build the Linux helper the app uploads (`tools/build-remote.sh` on a Linux x86_64 machine) and copy it here.
+3. `tools/release-mac.sh build <atelier-remote-linux-x86_64>` signs the app with the hardened runtime, notarizes
+   it, staples the ticket and archives it in `$ATELIER_RELEASES_DIR` (default `~/.local/share/atelier/releases`).
+   Keep that folder: a patch is made from the archive of the version it updates.
+4. `tools/release-mac.sh feed` makes `appcast.xml` and the patches, and checks every address, signature and length.
+5. `tools/release-mac.sh publish` puts them on the `updates` release, the feed last, and creates the `vX.Y.Z` release.
+
+To try an update first, without the real feed or app: `tools/mac/qa-update.sh prepare <helper>` builds two QA versions
+and a feed with a patch between them, `serve` serves it, and the QA app (its own bundle id, settings and control socket)
+installs it. The Check for Updates command is `{"cmd":"check_updates"}` on the control socket.
