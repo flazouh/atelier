@@ -15,23 +15,28 @@ pub const DEFAULT_ACCOUNT: &str = "default";
 const MARK: &str = "@@ ";
 const SHELL: &str = "sh";
 
-/// For each account folder: `MARK name`, then `claude auth status --json` run against it. `$0` is `claude`.
-const LIST_SCRIPT: &str = r#"for config in "$HOME/.claude" "$HOME"/.claude-*; do
+/// For each account folder: `MARK name`, then `claude auth status --json` run against it. `$0` is `claude`. A
+/// folder `~/.claude-*` is an account only when it holds a sign-in or atelier made it for one: other tools keep
+/// folders there too (`~/.claude-code-router`, `~/.claude-worktrees`), and `claude auth status` would turn them into
+/// a signed-out account by writing its own files in them. A sign-in by atelier leaves `.atelier-account` in its folder.
+pub(super) const LIST_SCRIPT: &str = r#"for config in "$HOME/.claude" "$HOME"/.claude-*; do
   [ -d "$config" ] || continue
   if [ "$config" = "$HOME/.claude" ]; then
     printf '@@ default\n'
     "$0" auth status --json 2>/dev/null
   else
+    [ -e "$config/.credentials.json" ] || [ -e "$config/.atelier-account" ] || grep -q oauthAccount "$config/.claude.json" 2>/dev/null || continue
     printf '@@ %s\n' "${config##*/.claude-}"
     CLAUDE_CONFIG_DIR="$config" "$0" auth status --json 2>/dev/null
   fi
   echo
 done"#;
 
-/// Makes `~/.claude-<name>` and signs in to it. The name comes in through the environment, so the script never
+/// Makes `~/.claude-<name>`, marks it as an account, and signs in to it. The name comes in through the environment, so the script never
 /// holds it.
 const SIGN_IN_SCRIPT: &str = r#"CLAUDE_CONFIG_DIR="$HOME/.claude-$ATELIER_CLAUDE_ACCOUNT"
 mkdir -p "$CLAUDE_CONFIG_DIR"
+: > "$CLAUDE_CONFIG_DIR/.atelier-account"
 export CLAUDE_CONFIG_DIR
 exec "$0" auth login"#;
 const ACCOUNT_ENV: &str = "ATELIER_CLAUDE_ACCOUNT";

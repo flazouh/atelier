@@ -712,3 +712,36 @@ fn an_answer_about_the_context_that_is_not_one_warns() {
     let line = json!({"type": "control_response", "response": {"subtype": "success", "request_id": "atelier-context-atelier-1", "response": {"categories": 7}}}).to_string();
     assert!(matches!(mapper.line(&line, Instant::now()).as_slice(), [Event::Warning(_)]));
 }
+
+fn api_retry(status: u16, error: &str) -> String {
+    json!({
+        "type": "system", "subtype": "api_retry", "attempt": 1, "max_retries": 10, "retry_delay_ms": 569,
+        "error_status": status, "error": error, "session_id": "s",
+    })
+    .to_string()
+}
+
+#[test]
+fn a_refused_sign_in_ends_the_turn_at_once_and_not_after_the_ten_retries() {
+    let mut mapper = ClaudeLineMapper::new();
+    mapper.user_sent("m1".into());
+    let events = mapper.line(&api_retry(401, "authentication_failed"), Instant::now());
+    assert!(events.iter().any(|e| matches!(e, Event::SignedOut)), "{events:#?}");
+    let Some(Event::TurnEnded(end)) = events.last() else { panic!("the last event is {:?}", events.last()) };
+    assert!(matches!(end.outcome, TurnOutcome::Failed(_)), "the turn did not go: {end:?}");
+    // `claude` goes on to retry in the background: the later attempts tell nothing new.
+    assert!(mapper.line(&api_retry(401, "authentication_failed"), Instant::now()).is_empty());
+}
+
+#[test]
+fn a_retry_with_no_turn_open_tells_nothing() {
+    assert!(ClaudeLineMapper::new().line(&api_retry(401, "authentication_failed"), Instant::now()).is_empty());
+}
+
+#[test]
+fn a_retry_for_another_reason_changes_nothing() {
+    let mut mapper = ClaudeLineMapper::new();
+    mapper.user_sent("m1".into());
+    assert!(mapper.line(&api_retry(529, "overloaded"), Instant::now()).is_empty());
+    assert!(mapper.line(&api_retry(500, "server_error"), Instant::now()).is_empty());
+}

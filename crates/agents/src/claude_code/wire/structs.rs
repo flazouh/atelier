@@ -5,7 +5,8 @@ use serde_json::Value;
 
 use super::types::{Content, ControlBody, StreamEvent};
 
-/// The `error` of the assistant line `claude` writes when it has no sign-in.
+/// The `error` of the assistant line `claude` writes when it has no sign-in, and of the `api_retry` it writes when the
+/// sign-in it has is refused.
 const SIGN_IN_FAILED: &str = "authentication_failed";
 
 /// A `system` line: `init`, `task_started`, `task_progress`, `task_notification`, and more that
@@ -27,6 +28,10 @@ pub(in super::super) struct System {
     pub task_type: Option<String>,
     pub status: Option<String>,
     pub summary: Option<String>,
+    /// An `api_retry`'s reason: `authentication_failed`, `overloaded`, and more.
+    pub error: Option<String>,
+    /// An `api_retry`'s HTTP status.
+    pub error_status: Option<u16>,
 }
 
 #[derive(Deserialize)]
@@ -78,6 +83,14 @@ pub(in super::super) struct Message {
 #[derive(Deserialize)]
 pub(in super::super) struct Origin {
     pub kind: String,
+}
+
+impl System {
+    /// Whether this is a retry of a request the API refused for want of a sign-in. `claude` retries it ten times over
+    /// minutes before it says so in an assistant line, so this is the first sign.
+    pub fn is_sign_in_retry(&self) -> bool {
+        self.subtype == "api_retry" && (self.error.as_deref() == Some(SIGN_IN_FAILED) || self.error_status == Some(401))
+    }
 }
 
 impl Message {
