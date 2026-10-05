@@ -16,6 +16,10 @@ pub enum Request {
     View { name: String },
     /// Opens the folder at `path`, on `host` over SSH when one is named, as the add menu does.
     Open { path: String, host: Option<String> },
+    /// Press Check for Updates, as the app menu does.
+    CheckUpdates,
+    /// Types `text` over the file `path` of the open project, which leaves a tab with an edit that is not saved.
+    Edit { path: String, text: String },
 }
 
 /// The longest text a row's description keeps.

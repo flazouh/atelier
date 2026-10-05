@@ -11,6 +11,18 @@
 # tools/mac/atelier.icon, which follows the light and dark appearance on macOS 26. Without it, the icon is
 # tools/mac/atelier-1024.png, the dark look, so the Mac needs only the tools macOS ships (sips, iconutil, codesign).
 # The app is signed ad hoc (`codesign -s -`), so it opens on the Mac that built it with no warning.
+#
+# A release build (ATELIER_RELEASE=1) is the app people install, and updates itself with Sparkle:
+#   ATELIER_SIGN_IDENTITY  the Developer ID Application identity that signs it (required)
+#   ATELIER_FEED_URL       the update feed; https, and the release's own unless ATELIER_QA=1 (default: the latest
+#                          release's appcast.xml)
+#   ATELIER_SPARKLE_ACCOUNT  the keychain account of the update signing key (default: dev.atelier.app)
+#   ATELIER_BUNDLE_VERSION   the version to stamp, for a QA build (default: the workspace version)
+# A QA build (ATELIER_QA=1, with ATELIER_QA_DIR) is for trying updates. It uses the bundle id dev.atelier.qa, keeps
+# its settings and control socket in ATELIER_QA_DIR, and holds a file that names its version, so two QA versions differ
+# by more than their numbers. It never touches the real app's settings.
+# It embeds the pinned Sparkle (tools/mac/sparkle.sh), signs every part with the hardened runtime, and stops at the
+# first thing missing. Notarize and publish with tools/release-mac.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -36,6 +48,42 @@ done
 export PATH
 
 version=$(awk -F'"' '/^version *=/ {print $2; exit}' Cargo.toml)
+version="${ATELIER_BUNDLE_VERSION:-$version}"
+release="${ATELIER_RELEASE:-0}"
+update_keys=""
+bundle_id=dev.atelier.app
+qa_keys=""
+if [ "${ATELIER_QA:-0}" = 1 ]; then
+  [ -n "${ATELIER_QA_DIR:-}" ] || { echo "A QA build needs ATELIER_QA_DIR." >&2; exit 1; }
+  bundle_id=dev.atelier.qa
+  qa_keys="  <key>LSEnvironment</key><dict><key>ATELIER_SETTINGS</key><string>${ATELIER_QA_DIR}/settings.json</string><key>ATELIER_CONTROL</key><string>${ATELIER_QA_DIR}/control.sock</string></dict>"
+fi
+if [ "$release" = 1 ]; then
+  [ -n "${ATELIER_SIGN_IDENTITY:-}" ] || { echo "A release build needs ATELIER_SIGN_IDENTITY (a Developer ID Application identity)." >&2; exit 1; }
+  security find-identity -v -p codesigning | grep -qF "$ATELIER_SIGN_IDENTITY" || { echo "No signing identity matches $ATELIER_SIGN_IDENTITY." >&2; exit 1; }
+  feed="${ATELIER_FEED_URL:-https://github.com/flazouh/atelier/releases/latest/download/appcast.xml}"
+  case "$feed" in
+    https://*) ;;
+    http://*) [ "${ATELIER_QA:-0}" = 1 ] || { echo "The update feed must be https; $feed is not (ATELIER_QA=1 allows it for a QA build)." >&2; exit 1; } ;;
+    *) echo "The update feed $feed is not a web address." >&2; exit 1 ;;
+  esac
+  sparkle=$(tools/mac/sparkle.sh)
+  account="${ATELIER_SPARKLE_ACCOUNT:-dev.atelier.app}"
+  public_key=$("$sparkle/bin/generate_keys" --account "$account" -p) || { echo "No update signing key for $account in the keychain." >&2; exit 1; }
+  case "$public_key" in
+    *ERROR*|"") echo "No update signing key for $account in the keychain." >&2; exit 1 ;;
+  esac
+  update_keys="  <key>SUFeedURL</key><string>${feed}</string>
+  <key>SUPublicEDKey</key><string>${public_key}</string>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUAutomaticallyUpdate</key><false/>
+  <key>SUAllowsAutomaticUpdates</key><false/>
+  <key>SUScheduledCheckInterval</key><integer>86400</integer>"
+  case "$feed" in
+    http://*) update_keys="$update_keys
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>" ;;
+  esac
+fi
 target=aarch64-apple-darwin
 host=$(rustc -vV | awk '/^host:/ {print $2}')
 if [ "$host" = "$target" ]; then
@@ -56,6 +104,14 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/remote/linux-x86_64"
 cp "$exe" "$app/Contents/MacOS/atelier"
 cp "$remote" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
 chmod +x "$app/Contents/MacOS/atelier" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
+if [ "${ATELIER_QA:-0}" = 1 ]; then
+  printf '%s\n' "$version" > "$app/Contents/Resources/qa-version.txt"
+fi
+if [ "$release" = 1 ]; then
+  # ditto keeps the framework's symbolic links, which a plain copy would follow and break.
+  mkdir -p "$app/Contents/Frameworks"
+  ditto "$sparkle/Sparkle.framework" "$app/Contents/Frameworks/Sparkle.framework"
+fi
 
 # The icon. actool compiles atelier.icon to Assets.car, with a light, a dark and a tinted look, and to
 # atelier.icns for a macOS before 26. The "A" is atelier's mark, at 780 of the 1024 points.
@@ -85,7 +141,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key><string>atelier</string>
   <key>CFBundleDisplayName</key><string>atelier</string>
-  <key>CFBundleIdentifier</key><string>dev.atelier.app</string>
+  <key>CFBundleIdentifier</key><string>${bundle_id}</string>
   <key>CFBundleExecutable</key><string>atelier</string>
   <key>CFBundleIconFile</key><string>atelier</string>
   <key>CFBundleIconName</key><string>atelier</string>
@@ -97,13 +153,28 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>NSMicrophoneUsageDescription</key><string>Atelier listens to your microphone when you press the microphone button, to turn your speech into text on this Mac.</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+${update_keys}
+${qa_keys}
 </dict>
 </plist>
 PLIST
 plutil -lint "$app/Contents/Info.plist"
 
-codesign --force --deep -s - "$app"
-codesign --verify --deep --strict "$app"
+if [ "$release" = 1 ]; then
+  # Every part is signed on its own, innermost first, with the hardened runtime and a secure timestamp. `--deep` on
+  # the outside would hide a part that failed to sign.
+  framework="$app/Contents/Frameworks/Sparkle.framework/Versions/B"
+  sign=(codesign --force --options runtime --timestamp --sign "$ATELIER_SIGN_IDENTITY")
+  for part in "$framework/XPCServices/Installer.xpc" "$framework/XPCServices/Downloader.xpc" "$framework/Autoupdate" "$framework/Updater.app"; do
+    [ -e "$part" ] && "${sign[@]}" "$part"
+  done
+  "${sign[@]}" "$app/Contents/Frameworks/Sparkle.framework"
+  "${sign[@]}" --entitlements tools/mac/entitlements.plist "$app"
+  codesign --verify --deep --strict --verbose=2 "$app"
+else
+  codesign --force --deep -s - "$app"
+  codesign --verify --deep --strict "$app"
+fi
 
 echo "Built $app (version $version)."
 echo "Run it: open $app"

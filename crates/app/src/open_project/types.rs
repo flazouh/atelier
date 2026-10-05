@@ -85,3 +85,7 @@ thread_local! {
     /// so there is no watch and its sessions talk to a fake agent on the test's thread.
     pub(crate) static TEST_THREAD_ONLY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
+
+/// How often `type_into` looks for the file it opens, and how many looks it makes: about five seconds.
+pub const TYPE_WAIT_POLL: std::time::Duration = std::time::Duration::from_millis(50);
+pub const TYPE_WAIT_POLLS: usize = 100;

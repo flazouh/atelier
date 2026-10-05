@@ -45,7 +45,7 @@ use super::types::{
 };
 use super::helpers::{folder_error, settings_path};
 
-actions!(atelier, [ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
+actions!(atelier, [CheckForUpdates, ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
 pub struct Shell {
     pub(super) projects: Vec<Entity<OpenProject>>,
@@ -2010,6 +2010,7 @@ impl Shell {
             .track_focus(&self.focus)
             .on_action(cx.listener(Self::open_folder))
             .on_action(cx.listener(Self::quit))
+            .on_action(cx.listener(Self::check_for_updates))
             .on_action(cx.listener(Self::open_ssh_form))
             .on_action(cx.listener(Self::open_settings))
             .on_action(cx.listener(Self::new_session_key))

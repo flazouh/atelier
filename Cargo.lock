@@ -497,6 +497,7 @@ dependencies = [
  "atelier-tracker",
  "atelier-ui",
  "atelier-voice",
+ "cc",
  "futures-channel",
  "futures-util",
  "gpui-kit",

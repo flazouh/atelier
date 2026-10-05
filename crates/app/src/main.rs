@@ -56,6 +56,7 @@ mod tool_density;
 mod tasks;
 mod tree;
 mod tree_view;
+mod updater;
 mod view_cache;
 mod worktrees;
 
@@ -79,6 +80,8 @@ fn main() {
         pr_glance::install(&saved.pr_card_off, cx);
         cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));
         cx.set_global(providers::ProviderServices::system());
+        let (relaunches, relaunch_requests) = futures_channel::mpsc::unbounded();
+        cx.set_global(updater::Updater::new(updater::driver(relaunches)));
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
         // or the system's, which keeps the pick.
@@ -112,6 +115,7 @@ fn main() {
             window.observe_window_appearance(|window, cx| settings_pane::Mode::system_changed(window.appearance(), cx)).detach();
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
+            shell.update(cx, |s, cx| s.serve_relaunches(relaunch_requests, window, cx));
             if let Some(path) = control::socket_path() {
                 control::serve(shell.downgrade(), window.window_handle(), path, cx);
             }
@@ -160,10 +164,14 @@ fn main() {
             cx.new(|cx| gpui_kit::component::Root::new(shell, window, cx))
         })
         .expect("open the window");
-        // The app menu holds Quit, as every desktop app's does; where there is no app menu, this does nothing.
+        // The app menu holds Check for Updates and Quit, as every desktop app's does; where there is no app menu, this does nothing.
         cx.set_menus([gpui_kit::Menu {
             name: "atelier".into(),
-            items: vec![gpui_kit::MenuItem::action("Quit atelier", shell::Quit)],
+            items: vec![
+                gpui_kit::MenuItem::action("Check for Updates…", shell::CheckForUpdates),
+                gpui_kit::MenuItem::separator(),
+                gpui_kit::MenuItem::action("Quit atelier", shell::Quit),
+            ],
             disabled: false,
         }]);
         // The last window closing ends the app, and says so: on Linux nothing else would end it.

@@ -40,7 +40,7 @@ use crate::{
     tabs::Tabs,
     tree::{ProjectTree, ancestors},
 };
-use super::types::{Deleted, Git, Listing, NO_FORGE_REMOTE, ProjectEvent};
+use super::types::{Deleted, Git, Listing, NO_FORGE_REMOTE, ProjectEvent, TYPE_WAIT_POLL, TYPE_WAIT_POLLS};
 use super::helpers::find_tracker;
 
 /// One open file.
@@ -1197,6 +1197,32 @@ impl OpenProject {
                 cx.notify();
             });
         }).detach();
+    }
+
+    /// Opens `path` and types `text` over its content, as a person would, so the tab holds an edit that is not
+    /// saved. The file is read first; a file that does not open in a few seconds is given up on. For QA through the
+    /// control socket.
+    pub fn type_into(&mut self, path: &str, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_file(path, window, cx);
+        let path = path.to_string();
+        cx.spawn_in(window, async move |this, cx| {
+            for _ in 0..TYPE_WAIT_POLLS {
+                let typed = this
+                    .update_in(cx, |this, window, cx| {
+                        let Some(buffer) = this.buffers.get_mut(&path) else { return false };
+                        buffer.editor.update(cx, |editor, cx| editor.set_value(text.as_str(), window, cx));
+                        buffer.dirty = true;
+                        cx.notify();
+                        true
+                    })
+                    .unwrap_or(true);
+                if typed {
+                    return;
+                }
+                cx.background_executor().timer(TYPE_WAIT_POLL).await;
+            }
+        })
+        .detach();
     }
 
     /// The language server session for `path`'s editor, with jumps to other files opening them here.
