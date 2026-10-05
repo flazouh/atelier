@@ -56,6 +56,7 @@ mod tool_density;
 mod tasks;
 mod tree;
 mod tree_view;
+mod updater;
 mod view_cache;
 mod worktrees;
 
