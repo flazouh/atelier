@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     ChangedFile, Check, Comment, Forge, ForgeError, ForgeResult, HeldComment, Involved, Job,
-    JobRef, MergeOutcome, MergeRequest, NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate,
+    JobRef, MergeOutcome, MergeRequest, NewLine, NewPull, Pull, PullBrief, PullRef, PullSummary, PullUpdate,
     Remark, RepoRef, Repository, Reviewer, Thread, ThreadId, UpdateMethod, Verdict,
 };
 use super::helpers::{decode, not_found, pull_field};
@@ -160,7 +160,7 @@ impl Forge for GitHub {
         super::involved::involved(&self.client, Some(repo))
     }
 
-    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullSummary>>> {
         super::briefs::briefs(&self.client, repo, numbers)
     }
 

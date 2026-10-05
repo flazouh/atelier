@@ -291,6 +291,15 @@ pub(in super::super) struct SearchHit {
     pub deletions: u32,
     pub comments: Option<Count>,
     pub commits: Option<Nodes<CommitNode>>,
+    #[serde(default)]
+    pub head_ref_name: String,
+    #[serde(default)]
+    pub base_ref_name: String,
+    pub mergeable: Option<String>,
+    #[serde(default)]
+    pub is_in_merge_queue: bool,
+    pub merge_queue_entry: Option<QueueEntry>,
+    pub auto_merge_request: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]

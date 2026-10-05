@@ -19,6 +19,7 @@ fn involved(number: u64, state: PullState, shelf: Option<Shelf>, updated: u64) -
             comments: 3,
             review: ReviewDecision::Required,
             checks: Some(CheckCounts { passed: 4, failed: 0, running: 0 }),
+            standing: Default::default(),
         },
         shelf,
     }

@@ -1,0 +1,43 @@
+//! Merge and Approve buttons
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. Merge and Approve are buttons on GitHub; keep the words as GitHub's own translations of them where it has any.
+use atelier_i18n::Message;
+
+pub const PR_CARD_ACTIONS: Message = Message {
+    ar: "زرا الدمج والموافقة",
+    ca: "Botons «Fusiona» i «Aprova»",
+    cs: "Tlačítka „Sloučit“ a „Schválit“",
+    da: "Knapperne »Flet« og »Godkend«",
+    de: "Schaltflächen „Zusammenführen“ und „Genehmigen“",
+    el: "Κουμπιά «Συγχώνευση» και «Έγκριση»",
+    en: "Merge and Approve buttons",
+    es: "Botones «Combinar» y «Aprobar»",
+    es_419: "Botones «Combinar» y «Aprobar»",
+    fi: "Yhdistä- ja Hyväksy-painikkeet",
+    fr: "Boutons « Fusionner » et « Approuver »",
+    fr_ca: "Boutons « Fusionner » et « Approuver »",
+    he: "כפתורי „מיזוג“ ו„אישור“",
+    hi: "मर्ज और स्वीकृत करें बटन",
+    hr: "Gumbi „Spoji” i „Odobri”",
+    hu: "„Egyesítés” és „Jóváhagyás” gombok",
+    id: "Tombol Gabungkan dan Setujui",
+    it: "Pulsanti «Unisci» e «Approva»",
+    ja: "「マージ」と「承認」ボタン",
+    ko: "병합 및 승인 버튼",
+    ms: "Butang Gabung dan Luluskan",
+    nl: "Knoppen ‘Samenvoegen’ en ‘Goedkeuren’",
+    no: "Knappene «Slå sammen» og «Godkjenn»",
+    pl: "Przyciski „Scal” i „Zatwierdź”",
+    pt_br: "Botões “Mesclar” e “Aprovar”",
+    pt_pt: "Botões «Intercalar» e «Aprovar»",
+    ro: "Butoanele „Îmbină” și „Aprobă”",
+    ru: "Кнопки «Слияние» и «Одобрить»",
+    sk: "Tlačidlá „Zlúčiť“ a „Schváliť“",
+    sv: "Knapparna Slå samman och Godkänn",
+    th: "ปุ่ม “ผสาน” และ “อนุมัติ”",
+    tr: "Birleştir ve Onayla düğmeleri",
+    uk: "Кнопки «Злити» й «Схвалити»",
+    vi: "Nút Hợp nhất và Phê duyệt",
+    zh_cn: "“合并”和“批准”按钮",
+    zh_tw: "「合併」和「核准」按鈕",
+};

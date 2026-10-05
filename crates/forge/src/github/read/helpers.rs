@@ -7,7 +7,9 @@ use super::super::wire::{
     Login,
     PullNode,
     Repo,
+    RequestNode,
     RestJob,
+    ReviewNode,
     SearchHit,
     StateCount,
     ThreadNode,
@@ -28,6 +30,7 @@ use crate::{
     MergeMethod,
     MergeSettings,
     MergeState,
+    Standing,
     Opinion,
     Pull,
     PullBrief,
@@ -169,18 +172,16 @@ fn login(author: &Option<Login>) -> String {
     author.as_ref().map_or_else(|| "ghost".to_string(), |a| a.login.clone())
 }
 
-pub(in super::super) fn pull(repo: &Repo, node: &PullNode) -> ForgeResult<Pull> {
-    let reference = PullRef { repo: repo_ref(&repo.name_with_owner)?, number: node.number };
-    let opinions = node
-        .latest_reviews
+fn opinions(reviews: Option<&super::super::wire::Nodes<ReviewNode>>) -> Vec<Opinion> {
+    reviews
         .iter()
         .flat_map(|reviews| reviews.nodes.iter().flatten())
-        .filter_map(|review| {
-            Some(Opinion { reviewer: login(&review.author), verdict: verdict(&review.state)? })
-        })
-        .collect();
-    let requested = node
-        .review_requests
+        .filter_map(|review| Some(Opinion { reviewer: login(&review.author), verdict: verdict(&review.state)? }))
+        .collect()
+}
+
+fn requested(requests: Option<&super::super::wire::Nodes<RequestNode>>) -> Vec<Reviewer> {
+    requests
         .iter()
         .flat_map(|requests| requests.nodes.iter().flatten())
         .filter_map(|request| {
@@ -190,7 +191,13 @@ pub(in super::super) fn pull(repo: &Repo, node: &PullNode) -> ForgeResult<Pull> 
                 _ => who.login.clone().map(Reviewer::Person),
             }
         })
-        .collect();
+        .collect()
+}
+
+pub(in super::super) fn pull(repo: &Repo, node: &PullNode) -> ForgeResult<Pull> {
+    let reference = PullRef { repo: repo_ref(&repo.name_with_owner)?, number: node.number };
+    let opinions = opinions(node.latest_reviews.as_ref());
+    let requested = requested(node.review_requests.as_ref());
     let rights = if node.viewer_can_merge_as_admin {
         Rights::Bypass
     } else if can_write(repo.viewer_permission.as_deref()) {
@@ -365,13 +372,19 @@ pub(in super::super) fn job(repo: &RepoRef, node: &RestJob) -> Job {
 /// A search hit that is a pull request, as a chip and as a list row. `None` for a hit that is not one.
 pub(in super::super) fn summary(hit: &SearchHit) -> Option<PullSummary> {
     let reference = PullRef { repo: repo_ref(&hit.repository.as_ref()?.name_with_owner).ok()?, number: hit.number? };
-    Some(PullSummary {
-        brief: PullBrief {
-            reference,
-            title: hit.title.clone()?,
-            state: pull_state(hit.state.as_deref()?, hit.is_draft, hit.merged),
-            url: hit.url.clone()?,
-        },
+    let brief = PullBrief {
+        reference,
+        title: hit.title.clone()?,
+        state: pull_state(hit.state.as_deref()?, hit.is_draft, hit.merged),
+        url: hit.url.clone()?,
+    };
+    Some(summary_of(brief, hit))
+}
+
+/// `brief` with what else `hit` says of it.
+pub(in super::super) fn summary_of(brief: PullBrief, hit: &SearchHit) -> PullSummary {
+    PullSummary {
+        brief,
         author: login(&hit.author),
         created_at: hit.created_at.as_deref().and_then(time::parse).unwrap_or(0),
         updated_at: hit.updated_at.as_deref().and_then(time::parse).unwrap_or(0),
@@ -380,5 +393,16 @@ pub(in super::super) fn summary(hit: &SearchHit) -> Option<PullSummary> {
         comments: hit.comments.as_ref().map_or(0, |c| c.total),
         review: decision(hit.review_decision.as_deref()),
         checks: rollup_counts(hit.commits.as_ref()),
-    })
+        standing: Standing {
+            head: hit.head_ref_name.clone(),
+            base: hit.base_ref_name.clone(),
+            conflicting: hit.mergeable.as_deref() == Some("CONFLICTING"),
+            // A list's query leaves out the merge state and the reviews: they cost GitHub the most.
+            merge_state: MergeState::Unknown,
+            queue: hit.is_in_merge_queue.then(|| QueuePlace { position: hit.merge_queue_entry.as_ref().and_then(|e| e.position) }),
+            auto_merge: hit.auto_merge_request.as_ref().is_some_and(|request| !request.is_null()),
+            opinions: Vec::new(),
+            requested: Vec::new(),
+        },
+    }
 }

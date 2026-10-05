@@ -159,7 +159,7 @@ fn a_queue_and_auto_merge_and_rights_reach_the_model() {
 #[test]
 fn a_brief_becomes_a_chip_and_a_state_keeps_its_meaning() {
     let briefs = github(&recorded()).briefs(&support::bun(), &[44169]).unwrap();
-    let chip = present::chip(briefs[0].as_ref().unwrap());
+    let chip = present::chip(&briefs[0].as_ref().unwrap().brief);
     assert_eq!((chip.number, chip.state), (44169, PrState::Merged));
     assert_eq!(chip.repo.as_ref(), "oven-sh/bun");
     assert_eq!(chip.label().as_ref(), "#44169");
@@ -171,4 +171,52 @@ fn checks_and_review_states_map_to_beuis() {
     let pull = github(&recorded()).pull(&pull_ref()).unwrap();
     assert_eq!(present::checks(pull.checks).summary(), ChecksSummary::Passed(13));
     assert_eq!(present::review_state(pull.review), ReviewState::Requested);
+}
+
+fn chip_facts(change: impl FnOnce(&mut Value)) -> atelier_ui::pr::PrFacts {
+    let pull = github(&patched_pull(change)).pull(&pull_ref()).unwrap();
+    present::chip_of(&pull.summary()).facts.unwrap()
+}
+
+#[test]
+fn a_chip_card_says_its_branches_and_whether_it_can_merge() {
+    let facts = chip_facts(open);
+    assert!(!facts.head.is_empty() && !facts.base.is_empty());
+    let standing = facts.standing.unwrap();
+    assert_eq!((standing.tone, standing.word.as_ref()), (atelier_ui::pr::StandingTone::Ready, "Ready to merge"));
+
+    let held = chip_facts(|r| {
+        open(r);
+        r["pullRequest"]["mergeStateStatus"] = json!("BLOCKED");
+        r["pullRequest"]["reviewDecision"] = json!("REVIEW_REQUIRED");
+    })
+    .standing
+    .unwrap();
+    assert_eq!((held.word.as_ref(), held.detail.as_ref()), ("Blocked", "needs a review"));
+
+    let queued = chip_facts(|r| {
+        open(r);
+        r["pullRequest"]["isInMergeQueue"] = json!(true);
+        r["pullRequest"]["mergeQueueEntry"] = json!({ "position": 2 });
+    })
+    .standing
+    .unwrap();
+    assert_eq!((queued.word.as_ref(), queued.detail.as_ref()), ("In the merge queue", "2nd in line"));
+
+    assert!(chip_facts(|_| {}).standing.is_none(), "a merged pull request's header says it all");
+}
+
+#[test]
+fn a_chip_card_lists_who_reviewed_then_who_was_asked() {
+    use atelier_ui::pr::PrVerdict;
+    let facts = chip_facts(|r| {
+        open(r);
+        r["pullRequest"]["latestReviews"] = json!({ "nodes": [{ "author": { "login": "ana" }, "state": "APPROVED" }] });
+        r["pullRequest"]["reviewRequests"] = json!({ "nodes": [
+            { "requestedReviewer": { "__typename": "User", "login": "ana" } },
+            { "requestedReviewer": { "__typename": "Team", "slug": "core" } },
+        ] });
+    });
+    let said: Vec<_> = facts.reviewers.iter().map(|r| (r.who.as_ref(), r.verdict)).collect();
+    assert_eq!(said, [("ana", PrVerdict::Approved), ("core", PrVerdict::Waiting)]);
 }

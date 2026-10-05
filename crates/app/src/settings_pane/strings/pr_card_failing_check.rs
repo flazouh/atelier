@@ -1,0 +1,43 @@
+//! The failing check and its error
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. This part shows the first failing CI check and the first line of its log that says what went wrong.
+use atelier_i18n::Message;
+
+pub const PR_CARD_FAILING_CHECK: Message = Message {
+    ar: "الفحص الفاشل وخطؤه",
+    ca: "La comprovació fallida i l’error",
+    cs: "Neúspěšná kontrola a její chyba",
+    da: "Den fejlede kontrol og dens fejl",
+    de: "Fehlgeschlagener Check und sein Fehler",
+    el: "Αποτυχημένος έλεγχος και το σφάλμα του",
+    en: "The failing check and its error",
+    es: "La comprobación fallida y su error",
+    es_419: "La verificación fallida y su error",
+    fi: "Epäonnistunut tarkistus ja sen virhe",
+    fr: "La vérification en échec et son erreur",
+    fr_ca: "La vérification en échec et son erreur",
+    he: "הבדיקה שנכשלה והשגיאה שלה",
+    hi: "विफल जाँच और उसकी त्रुटि",
+    hr: "Neuspjela provjera i njezina pogreška",
+    hu: "Sikertelen ellenőrzés és a hiba",
+    id: "Pemeriksaan yang gagal dan kesalahannya",
+    it: "Controllo non riuscito e relativo errore",
+    ja: "失敗したチェックとそのエラー",
+    ko: "실패한 검사와 오류",
+    ms: "Semakan gagal dan ralatnya",
+    nl: "Mislukte controle en de fout",
+    no: "Den mislykkede sjekken og feilen",
+    pl: "Nieudane sprawdzenie i jego błąd",
+    pt_br: "Verificação com falha e seu erro",
+    pt_pt: "Verificação falhada e respetivo erro",
+    ro: "Verificarea eșuată și eroarea ei",
+    ru: "Неудачная проверка и её ошибка",
+    sk: "Neúspešná kontrola a jej chyba",
+    sv: "Den misslyckade kontrollen och dess fel",
+    th: "การตรวจสอบที่ไม่ผ่านและข้อผิดพลาด",
+    tr: "Başarısız kontrol ve hatası",
+    uk: "Невдала перевірка та її помилка",
+    vi: "Kiểm tra không đạt và lỗi",
+    zh_cn: "失败的检查及其错误",
+    zh_tw: "失敗的檢查及其錯誤",
+};

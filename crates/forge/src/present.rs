@@ -6,13 +6,13 @@ use atelier_ui::{
         MergeFacts, MergeMethod as UiMethod, PullState as UiPullState, Queue, ReviewNeed, Rights as UiRights,
         UpdateWay,
     },
-    pr::{Checks, PrChipData, PrState, ReviewState},
+    pr::{Checks, PrChipData, PrFacts, PrReviewer, PrStanding, PrState, PrVerdict, ReviewState, StandingTone},
 };
 use gpui_kit::SharedString;
 
 use crate::{
     Check, CheckCounts, Conclusion, Court, Filed, MergeMethod, MergeState, Pull, PullBrief, PullState,
-    ReviewDecision, Rights, Shelf, Verdict, time,
+    PullSummary, ReviewDecision, Reviewer, Rights, Shelf, Verdict, time,
 };
 
 pub fn pr_state(state: PullState) -> PrState {
@@ -31,7 +31,96 @@ pub fn chip(brief: &PullBrief) -> PrChipData {
         title: brief.title.clone().into(),
         state: pr_state(brief.state),
         url: brief.url.clone().into(),
+        facts: None,
     }
+}
+
+/// A chip whose card says who wrote it, how big it is and how it stands.
+pub fn chip_of(summary: &PullSummary) -> PrChipData {
+    let facts = PrFacts {
+        author: summary.author.clone().into(),
+        added: summary.additions,
+        removed: summary.deletions,
+        comments: summary.comments,
+        review: review_state(summary.review),
+        checks: summary.checks.map(checks),
+        updated_at: summary.updated_at,
+        head: summary.standing.head.clone().into(),
+        base: summary.standing.base.clone().into(),
+        conflicting: summary.standing.conflicting,
+        reviewers: reviewers(summary),
+        standing: standing(summary),
+    };
+    PrChipData { facts: Some(facts), ..chip(&summary.brief) }
+}
+
+/// Who reviewed, then who was asked and has not yet.
+fn reviewers(summary: &PullSummary) -> Vec<PrReviewer> {
+    let standing = &summary.standing;
+    let said = standing.opinions.iter().map(|o| PrReviewer {
+        who: o.reviewer.clone().into(),
+        verdict: match o.verdict {
+            Verdict::Approve => PrVerdict::Approved,
+            Verdict::RequestChanges => PrVerdict::ChangesAsked,
+            Verdict::Comment => PrVerdict::Commented,
+        },
+    });
+    let asked = standing.requested.iter().filter_map(|r| {
+        let who = match r {
+            Reviewer::Person(login) => login,
+            Reviewer::Team(slug) => slug,
+        };
+        let answered = standing.opinions.iter().any(|o| &o.reviewer == who);
+        (!answered).then(|| PrReviewer { who: who.clone().into(), verdict: PrVerdict::Waiting })
+    });
+    said.chain(asked).collect()
+}
+
+/// Whether an open pull request can merge now, and if not what holds it, in a word and a few more.
+pub fn standing(summary: &PullSummary) -> Option<PrStanding> {
+    if summary.brief.state != PullState::Open {
+        return None;
+    }
+    let standing = &summary.standing;
+    let say = |tone, word: &str, detail: String| Some(PrStanding { tone, word: word.to_string().into(), detail: detail.into() });
+    if let Some(place) = standing.queue {
+        let detail = place.position.map_or_else(String::new, |p| format!("{} in line", ordinal(p)));
+        return say(StandingTone::Waiting, "In the merge queue", detail);
+    }
+    if standing.auto_merge {
+        return say(StandingTone::Waiting, "Auto-merge on", "merges once it can".into());
+    }
+    let failing = summary.checks.is_some_and(|c| c.failed > 0);
+    if standing.conflicting {
+        return say(StandingTone::Held, "Conflicts", format!("with {}", standing.base));
+    }
+    match standing.merge_state {
+        MergeState::Clean => say(StandingTone::Ready, "Ready to merge", String::new()),
+        MergeState::Unstable => say(StandingTone::Ready, "Can merge", "a check that is not required fails".into()),
+        MergeState::Dirty => say(StandingTone::Held, "Conflicts", format!("with {}", standing.base)),
+        MergeState::Behind => say(StandingTone::Held, "Behind", format!("{} moved on", standing.base)),
+        MergeState::Blocked => {
+            let why = match summary.review {
+                ReviewDecision::ChangesRequested => "changes asked",
+                ReviewDecision::Required => "needs a review",
+                _ if failing => "a check fails",
+                _ => "a rule holds it",
+            };
+            say(StandingTone::Held, "Blocked", why.into())
+        }
+        MergeState::Draft | MergeState::Unknown => None,
+    }
+}
+
+fn ordinal(n: u32) -> String {
+    let suffix = match (n % 10, n % 100) {
+        (_, 11..=13) => "th",
+        (1, _) => "st",
+        (2, _) => "nd",
+        (3, _) => "rd",
+        _ => "th",
+    };
+    format!("{n}{suffix}")
 }
 
 pub fn checks(counts: CheckCounts) -> Checks {
@@ -84,7 +173,7 @@ fn why(filed: &Filed) -> &'static str {
 pub fn court_item(filed: &Filed, now: u64) -> CourtItem {
     let summary = &filed.involved.summary;
     CourtItem {
-        pr: chip(&summary.brief),
+        pr: chip_of(summary),
         author: SharedString::from(summary.author.clone()),
         court: ui_court(filed.court),
         why: why(filed).into(),

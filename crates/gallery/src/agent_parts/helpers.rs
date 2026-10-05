@@ -1,9 +1,10 @@
 use atelier_ui::{
     AgentText, AgentTextStatus, Button, ButtonVariant, ChangedFile, ChangedFiles, Checks,
-    FileChange, ModelBadge, PrCard, PrChip, PrChipData, PrState, ReviewState, SubagentCard,
-    SubagentRow, SubagentStrip, ToolCall, ToolStatus,
+    FileChange, ModelBadge, PrCard, PrChip, PrChipData, PrFacts, PrReviewer, PrStanding, PrState, PrVerdict, ReviewState,
+    StandingTone, SubagentCard, SubagentRow, SubagentStrip, ToolCall, ToolStatus,
+    pr_glance::{PrDoing, PrFailing, PrFile, PrGlanceCard, PrSession, key_of, pr_cards},
 };
-use gpui_kit::{Context, IntoElement, ParentElement, Styled, div, px};
+use gpui_kit::{Context, IntoElement, ParentElement, RenderOnce, Styled, div, px};
 use atelier_agents::{claude, coding_agents::CodingAgent, labs::Lab};
 
 use super::super::{Gallery, narrow, row, section};
@@ -40,6 +41,109 @@ pub fn pr_3344() -> PrChipData {
         title: "Fix the off-by-one in the diff view's line numbers".into(),
         state: PrState::Open,
         url: "https://github.com/flazouh/atelier/pull/3344".into(),
+        facts: Some(PrFacts {
+            author: "flazouh".into(),
+            added: 128,
+            removed: 41,
+            comments: 3,
+            review: ReviewState::Approved,
+            checks: Some(Checks { passed: 12, failed: 0, running: 0 }),
+            updated_at: hours_ago(3),
+            head: "diff-line-numbers".into(),
+            base: "main".into(),
+            conflicting: false,
+            reviewers: vec![PrReviewer { who: "ana".into(), verdict: PrVerdict::Approved }],
+            standing: Some(PrStanding { tone: StandingTone::Ready, word: "Ready to merge".into(), detail: "".into() }),
+        }),
+    }
+}
+
+fn hours_ago(hours: u64) -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()) - hours * 3600
+}
+
+/// A pull request whose test fails, waiting on a team's review.
+fn pr_3311() -> PrChipData {
+    PrChipData {
+        number: 3311,
+        repo: "flazouh/atelier".into(),
+        title: "fix(relay): detach the byte stream before a second write".into(),
+        state: PrState::Open,
+        url: "https://github.com/flazouh/atelier/pull/3311".into(),
+        facts: Some(PrFacts {
+            author: "flazouh".into(),
+            added: 79,
+            removed: 10,
+            comments: 4,
+            review: ReviewState::Requested,
+            checks: Some(Checks { passed: 9, failed: 1, running: 0 }),
+            updated_at: hours_ago(1),
+            head: "relay-abort".into(),
+            base: "main".into(),
+            conflicting: false,
+            reviewers: vec![
+                PrReviewer { who: "ana".into(), verdict: PrVerdict::Commented },
+                PrReviewer { who: "core".into(), verdict: PrVerdict::Waiting },
+            ],
+            standing: Some(PrStanding { tone: StandingTone::Held, word: "Blocked".into(), detail: "a check fails".into() }),
+        }),
+    }
+}
+
+/// The open cards, each in one state, and the chips that open them on a hover.
+#[derive(IntoElement)]
+pub struct PrCardsStory;
+
+impl RenderOnce for PrCardsStory {
+    fn render(self, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) -> impl IntoElement {
+        let failing = pr_3311();
+        let reading = PrChipData { number: 3312, title: "Retry the socket once before it times out".into(), ..pr_3311() };
+        let merging = PrChipData { number: 3344, ..pr_3344() };
+        let merged = PrChipData { number: 3298, state: PrState::Merged, title: "Keep the tab's scroll on a reload".into(), facts: pr_3344().facts.map(|f| PrFacts { standing: None, ..f }), ..pr_3344() };
+        let running = PrChipData {
+            number: 3350,
+            title: "Read the theme file once per window".into(),
+            facts: pr_3344().facts.map(|f| PrFacts { checks: Some(Checks { passed: 12, failed: 0, running: 8 }), review: ReviewState::None, reviewers: Vec::new(), comments: 0, standing: None, ..f }),
+            ..pr_3344()
+        };
+        let store = pr_cards(cx);
+        store.update(cx, |s, cx| {
+            s.update_glance(key_of(&failing), |g| {
+                g.failing = Some(PrFailing { name: "test (linux-x64)".into(), line: Some("error[E0308]: mismatched types".into()), url: Some("https://github.com".into()) });
+                g.files = Some(vec![
+                    PrFile { path: "crates/relay/src/stream.rs".into(), added: 42, removed: 8 },
+                    PrFile { path: "crates/relay/tests/abort.rs".into(), added: 31, removed: 0 },
+                    PrFile { path: "crates/relay/src/request.rs".into(), added: 6, removed: 2 },
+                ]);
+                g.session = Some(PrSession { title: "Detach the stream on abort".into(), status: "Idle".into(), running: false });
+            }, cx);
+            s.update_glance(key_of(&reading), |g| {
+                g.failing = Some(PrFailing { name: "lint".into(), line: None, url: None });
+                g.session = Some(PrSession { title: "Retry the socket".into(), status: "Working".into(), running: true });
+            }, cx);
+            s.update_glance(key_of(&merging), |g| g.doing = Some(PrDoing::Working("Merging…".into())), cx);
+        });
+        let card = |id: &'static str, pr: PrChipData, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App| {
+            let card = window.use_keyed_state(id, cx, |_, cx| {
+                PrGlanceCard::new(id, pr, Some(std::sync::Arc::new(|pr: &PrChipData, _: &mut gpui_kit::Window, _: &mut gpui_kit::App| println!("open #{}", pr.number))), cx)
+            });
+            div().flex_none().child(card)
+        };
+        let chip = |id: &'static str, pr: PrChipData| PrChip::new(id, pr).on_open(|pr, _, _| println!("open #{}", pr.number));
+        div()
+            .child(section("Hover a chip", row().child(chip("cards-chip-3311", pr_3311())).child(chip("cards-chip-3344", pr_3344()))))
+            .child(section(
+                "Open: a failing check, a review asked, its session; reading a log; merging; merged; checks running",
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap(px(16.))
+                    .child(card("glance-failing", failing, window, cx))
+                    .child(card("glance-reading", reading, window, cx))
+                    .child(card("glance-merging", merging, window, cx))
+                    .child(card("glance-merged", merged, window, cx))
+                    .child(card("glance-running", running, window, cx)),
+            ))
     }
 }
 

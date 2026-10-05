@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use atelier_ui::{PrChipData, PrState};
 use super::*;
 fn chip(number: u64, title: &str) -> PrChipData {
-    PrChipData { number, repo: "flazouh/atelier".into(), title: title.into(), state: PrState::Open, url: format!("https://github.com/flazouh/atelier/pull/{number}").into() }
+    PrChipData { number, repo: "flazouh/atelier".into(), title: title.into(), state: PrState::Open, url: format!("https://github.com/flazouh/atelier/pull/{number}").into(), facts: None }
 }
 /// The numbers to ask about: the ones in the text that the list does not hold and nobody asked about,
 /// each once.

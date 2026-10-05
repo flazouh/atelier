@@ -13,6 +13,7 @@ pub(crate) mod strings;
 mod types;
 
 pub use helpers::colour;
+pub(crate) use helpers::save;
 #[cfg(test)]
 pub(crate) use helpers::rule_switch;
 pub use structs::{AgentRow, SettingsPane};

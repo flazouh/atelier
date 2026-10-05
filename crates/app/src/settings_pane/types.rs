@@ -88,11 +88,12 @@ pub enum Section {
     Providers,
     Dictation,
     Tasks,
+    PullRequests,
     Keys,
 }
 
 impl Section {
-    pub const ALL: [Section; 7] = [Section::Appearance, Section::Sidebar, Section::Agents, Section::Providers, Section::Dictation, Section::Tasks, Section::Keys];
+    pub const ALL: [Section; 8] = [Section::Appearance, Section::Sidebar, Section::Agents, Section::Providers, Section::Dictation, Section::Tasks, Section::PullRequests, Section::Keys];
 
     pub fn words(self) -> &'static str {
         match self {
@@ -102,6 +103,7 @@ impl Section {
             Section::Providers => "Providers",
             Section::Dictation => t(&words::SECTION_DICTATION),
             Section::Tasks => t(&words::SECTION_TASKS),
+            Section::PullRequests => t(&words::SECTION_PULL_REQUESTS),
             Section::Keys => t(&words::SECTION_KEYS),
         }
     }
@@ -115,6 +117,7 @@ impl Section {
             Section::Providers => "Where Claude Code gets its model. A session picks one beside its agent.",
             Section::Dictation => t(&words::GIST_DICTATION),
             Section::Tasks => t(&words::GIST_TASKS),
+            Section::PullRequests => t(&words::GIST_PULL_REQUESTS),
             Section::Keys => t(&words::GIST_KEYS),
         }
     }
@@ -128,6 +131,7 @@ impl Section {
             Section::Providers => "section-providers",
             Section::Dictation => "section-dictation",
             Section::Tasks => "section-tasks",
+            Section::PullRequests => "section-pull-requests",
             Section::Keys => "section-keys",
         }
     }

@@ -726,6 +726,7 @@ impl Shell {
         cx.notify();
     }
 
+
     pub(super) fn open_ssh_form(&mut self, _: &OpenRemote, window: &mut Window, cx: &mut Context<Self>) {
         let form = cx.new(|cx| SshForm::new(Vec::new(), window, cx));
         // ~/.ssh/config is read off the UI thread; the form fills its hosts in when it has them.

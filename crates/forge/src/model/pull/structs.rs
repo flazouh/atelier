@@ -102,6 +102,54 @@ pub struct PullSummary {
     pub review: ReviewDecision,
     /// `None` until the checks are known.
     pub checks: Option<CheckCounts>,
+    #[serde(default)]
+    pub standing: Standing,
+}
+
+impl Pull {
+    /// What a list row would read of where it stands.
+    pub fn standing(&self) -> Standing {
+        Standing {
+            head: self.head.clone(),
+            base: self.base.clone(),
+            conflicting: self.conflicting,
+            merge_state: self.merge_state,
+            queue: self.queue,
+            auto_merge: self.auto_merge,
+            opinions: self.opinions.clone(),
+            requested: self.requested.clone(),
+        }
+    }
+
+    /// What a list row would read of it.
+    pub fn summary(&self) -> PullSummary {
+        PullSummary {
+            brief: PullBrief { reference: self.reference.clone(), title: self.title.clone(), state: self.state, url: self.url.clone() },
+            author: self.author.clone(),
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            additions: self.additions,
+            deletions: self.deletions,
+            comments: self.remarks,
+            review: self.review,
+            checks: Some(self.checks),
+            standing: self.standing(),
+        }
+    }
+}
+
+/// Where a pull request stands for merging, as a list row reads it: its branches, what the forge says of
+/// merging it, and who reviewed or was asked to.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Standing {
+    pub head: String,
+    pub base: String,
+    pub conflicting: bool,
+    pub merge_state: MergeState,
+    pub queue: Option<QueuePlace>,
+    pub auto_merge: bool,
+    pub opinions: Vec<Opinion>,
+    pub requested: Vec<Reviewer>,
 }
 
 /// An involved pull request and the shelf that holds it. One the reader is only assigned to or

@@ -1,0 +1,43 @@
+//! Linked session
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. This part shows the agent session the pull request came from.
+use atelier_i18n::Message;
+
+pub const PR_CARD_SESSIONS: Message = Message {
+    ar: "الجلسة المرتبطة",
+    ca: "Sessió vinculada",
+    cs: "Propojená relace",
+    da: "Tilknyttet session",
+    de: "Verknüpfte Sitzung",
+    el: "Συνδεδεμένη συνεδρία",
+    en: "Linked session",
+    es: "Sesión vinculada",
+    es_419: "Sesión vinculada",
+    fi: "Linkitetty istunto",
+    fr: "Session associée",
+    fr_ca: "Session associée",
+    he: "הסשן המקושר",
+    hi: "लिंक किया गया सेशन",
+    hr: "Povezana sesija",
+    hu: "Kapcsolt munkamenet",
+    id: "Sesi tertaut",
+    it: "Sessione collegata",
+    ja: "リンクされたセッション",
+    ko: "연결된 세션",
+    ms: "Sesi dipautkan",
+    nl: "Gekoppelde sessie",
+    no: "Tilknyttet økt",
+    pl: "Połączona sesja",
+    pt_br: "Sessão vinculada",
+    pt_pt: "Sessão associada",
+    ro: "Sesiune asociată",
+    ru: "Связанный сеанс",
+    sk: "Prepojená relácia",
+    sv: "Länkad session",
+    th: "เซสชันที่ลิงก์ไว้",
+    tr: "Bağlı oturum",
+    uk: "Пов’язаний сеанс",
+    vi: "Phiên được liên kết",
+    zh_cn: "关联的会话",
+    zh_tw: "連結的工作階段",
+};

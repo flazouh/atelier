@@ -7,7 +7,7 @@ pub enum PullState {
 }
 
 /// What the forge says about merging the pull request now.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MergeState {
     Clean,
     /// A check that is not required fails.
@@ -19,6 +19,7 @@ pub enum MergeState {
     /// The branch conflicts with its base.
     Dirty,
     Draft,
+    #[default]
     Unknown,
 }
 

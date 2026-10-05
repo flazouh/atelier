@@ -121,6 +121,7 @@ fn involved(number: u64, shelf: Shelf, updated_at: u64) -> Involved {
             comments: 0,
             review: ReviewDecision::Required,
             checks: Some(CheckCounts { passed: 1, failed: 0, running: 0 }),
+            standing: Default::default(),
         },
         shelf: Some(shelf),
     }

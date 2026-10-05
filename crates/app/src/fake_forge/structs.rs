@@ -48,13 +48,25 @@ impl Forge for FakeForge {
     fn job_log(&self, _: &JobRef) -> ForgeResult<String> { unimplemented!() }
     fn last_review_point(&self, _: &PullRef) -> ForgeResult<Option<String>> { unimplemented!() }
     fn involved(&self) -> ForgeResult<Vec<Involved>> { unimplemented!() }
-    fn briefs(&self, _: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+    fn briefs(&self, _: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullSummary>>> {
         self.briefs_asked.lock().unwrap().push(numbers.to_vec());
         if let Some(error) = self.reads_fail.lock().unwrap().clone() {
             return Err(error);
         }
         let known = self.known.lock().unwrap();
-        Ok(numbers.iter().map(|n| known.iter().find(|b| b.reference.number == *n).cloned()).collect())
+        let summary = |brief: &PullBrief| PullSummary {
+            brief: brief.clone(),
+            author: "a".into(),
+            created_at: 0,
+            updated_at: 0,
+            additions: 0,
+            deletions: 0,
+            comments: 0,
+            review: atelier_forge::ReviewDecision::NotRequired,
+            checks: None,
+            standing: Default::default(),
+        };
+        Ok(numbers.iter().map(|n| known.iter().find(|b| b.reference.number == *n).map(summary)).collect())
     }
     fn update_pull(&self, _: &PullRef, _: &PullUpdate) -> ForgeResult<()> { unimplemented!() }
     fn merge(&self, _: &PullRef, _: &MergeRequest) -> ForgeResult<MergeOutcome> { unimplemented!() }

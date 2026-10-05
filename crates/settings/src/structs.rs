@@ -38,6 +38,8 @@ pub struct Settings {
     pub project_icons: std::collections::BTreeMap<String, String>,
     /// The ids of the task rules the reader turned off (`atelier_tracker::Rule::id`).
     pub task_rules_off: Vec<String>,
+    /// The parts of a pull request chip's card the reader hid (`atelier_ui::PrPart::key`).
+    pub pr_card_off: Vec<String>,
     /// Names the reader gave sessions, by the agent's id for the session.
     pub session_names: std::collections::BTreeMap<String, String>,
     /// The sessions the reader archived, by the agent's id for each. An archived session leaves the list until the
