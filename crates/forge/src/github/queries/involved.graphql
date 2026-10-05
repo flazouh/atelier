@@ -19,6 +19,12 @@ query Involved($search: String!, $after: String) {
         deletions
         comments { totalCount }
         viewerLatestReview { state }
+        headRefName
+        baseRefName
+        mergeable
+        isInMergeQueue
+        mergeQueueEntry { position }
+        autoMergeRequest { enabledAt }
         commits(last: 1) {
           nodes {
             commit {

@@ -61,6 +61,11 @@ numbers in one request. A number that is not a pull request there is looked for 
 the reader is involved in. An answer is kept 60 seconds, including "not a pull request"; the involved list
 is kept 5 minutes, since reading it is ten searches. It asks the forge only for what it does not hold.
 
+A brief also reads the branches, whether it conflicts, its place in a merge queue and auto-merge
+(`PullSummary::standing`), but not `mergeStateStatus` nor the reviews: on 20 numbers of oven-sh/bun those took
+the request from 1.1 s to 2.5 s (median of 6), and the lean fields cost about 8%. A chip's card reads them
+with `pull` when it opens. `tests/live.rs` `a_chip_card_reads_in_one_round_trip` measures both.
+
 The app's chips do not use `Lookup::resolve`: a chip names the project's own repository only, so the app
 calls `Forge::briefs` for its repository with the numbers its pull request list lacks
 (`crates/app/src/open_project/chips.rs`), keeps each answer, and asks a number again after 5 minutes.
@@ -75,6 +80,9 @@ Every call runs off the UI thread; every refusal shows in `ForgeError`'s own wor
 | `pull(ref)`, `checks(ref)` | The PR card, while a card of it is on screen in an active window: every 10 s while checks run, 30 s once they settle, never after a merge or a close. | 10 s, then doubling to 5 min; a rate limit waits as the forge says; signed out, gh missing, not found and denied stop the reads. The card says why. |
 | `merge`, `delete_branch`, `update_pull`, `update_branch`, `cancel_auto_merge`, `dequeue`, `revert` | The card's merge actions; a merge, a branch delete and a revert ask first. | The card shows the words and reads again. |
 | `briefs(repo, numbers)` | A session's text settles (a turn ends, the history loads) and names numbers the list lacks. | No chip, and no alarm. |
+| `pull(ref)`, `checks(ref)`, `files(ref)` | A chip's card opens: the three in parallel, then `pull` and `checks` every 10 s while it stays open, and `files` again only when the size changed. | The card keeps what the chip said. |
+| `job_log(job)` | The card's first failing check has a job: once per job, for `log::first_error_line`. | The card names the check without a line. |
+| `merge`, `submit_review(Approve)` | The card's Merge (after its confirmation) and Approve. | The card shows the words. |
 
 `open_pull_for` is new in M4. Its default fails rather than answering "none", so a forge that cannot say
 never leads the app to open a second pull request. GitHub asks `pullRequests(headRefName:, states: OPEN)`.

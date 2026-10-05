@@ -89,9 +89,9 @@ pub struct OpenProject {
     /// What the reader asked the right pane for last.
     right_asked: super::front::Front,
     /// A pull request to show once the pull request view has mounted.
-    pending_pull: Option<atelier_forge::PullRef>,
+    pub(super) pending_pull: Option<atelier_forge::PullRef>,
     /// The project's own repository on its forge, from the origin remote; `None` when it has none.
-    pub(super) repo: Option<atelier_forge::RepoRef>,
+    pub(crate) repo: Option<atelier_forge::RepoRef>,
     /// Every pull request the list holds, as chips, and what a `#N` in an agent's text can name of
     /// them, handed to each session.
     pub(crate) list_rows: Vec<atelier_ui::PrChipData>,
@@ -102,6 +102,8 @@ pub struct OpenProject {
     pub(super) asked: HashMap<u64, std::time::Instant>,
     /// The forge the lookups ask; GitHub through gh unless a test gives another.
     chip_forge: Option<std::sync::Arc<dyn atelier_forge::Forge>>,
+    /// What the open chip cards read, and their reads while open.
+    pub(crate) glance: crate::pr_glance::Reading,
     opening_pulls: Task<()>,
     pulls_loading: bool,
     /// The tasks hearing of sessions, one at a time and in order.
@@ -150,6 +152,7 @@ impl OpenProject {
             None => Workers::new(project.clone(), Store::from_env(), READY, ASK),
         };
         let workers = Arc::new(workers);
+        crate::pr_glance::register(cx.weak_entity(), cx);
         let mut this = Self {
             location,
             project,
@@ -177,6 +180,7 @@ impl OpenProject {
             looked_up: HashMap::new(),
             asked: HashMap::new(),
             chip_forge: None,
+            glance: Default::default(),
             opening_pulls: Task::ready(()),
             pulls_loading: false,
             task_signals: Task::ready(()),
@@ -675,6 +679,24 @@ impl OpenProject {
         self.chip_forge = Some(forge);
     }
 
+    /// The forge the chips read: GitHub through gh unless a test gave another.
+    pub(crate) fn chip_forge(&mut self) -> std::sync::Arc<dyn atelier_forge::Forge> {
+        let project = self.project.clone();
+        self.chip_forge
+            .get_or_insert_with(|| {
+                // Tests never reach a forge: their lookups ask an empty one.
+                #[cfg(test)]
+                let forge: std::sync::Arc<dyn atelier_forge::Forge> = {
+                    drop(project);
+                    std::sync::Arc::new(atelier_pr_view::fixture::FixtureForge::new())
+                };
+                #[cfg(not(test))]
+                let forge: std::sync::Arc<dyn atelier_forge::Forge> = std::sync::Arc::new(atelier_forge::github::GitHub::new(project));
+                forge
+            })
+            .clone()
+    }
+
     /// Looks up the `#N` in `texts` that the list lacks, in the project's own repository: one request
     /// for all the new numbers, off the UI thread. A number asked in the last five minutes waits; a
     /// failed request gives no chip and says nothing, since the text reads as well without one.
@@ -689,21 +711,7 @@ impl OpenProject {
             return;
         }
         self.asked.extend(numbers.iter().map(|n| (*n, now)));
-        let project = self.project.clone();
-        let forge = self
-            .chip_forge
-            .get_or_insert_with(|| {
-                // Tests never reach a forge: their lookups ask an empty one.
-                #[cfg(test)]
-                let forge: std::sync::Arc<dyn atelier_forge::Forge> = {
-                    drop(project);
-                    std::sync::Arc::new(atelier_pr_view::fixture::FixtureForge::new())
-                };
-                #[cfg(not(test))]
-                let forge: std::sync::Arc<dyn atelier_forge::Forge> = std::sync::Arc::new(atelier_forge::github::GitHub::new(project));
-                forge
-            })
-            .clone();
+        let forge = self.chip_forge();
         let asking = cx.background_spawn(async move {
             let found = forge.briefs(&repo, &numbers);
             (numbers, found)
@@ -714,7 +722,7 @@ impl OpenProject {
             let Ok(found) = found else { return };
             _ = this.update(cx, |this, cx| {
                 for (number, brief) in numbers.into_iter().zip(found) {
-                    this.looked_up.insert(number, brief.as_ref().map(atelier_forge::present::chip));
+                    this.looked_up.insert(number, brief.as_ref().map(atelier_forge::present::chip_of));
                 }
                 this.refresh_chips(cx);
             });
@@ -722,16 +730,13 @@ impl OpenProject {
         .detach();
     }
 
-    /// Opens the pull request a chip names, in the pull request pane.
-    fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(pulls) = &mut self.pulls else { return };
-        let hub = pulls.hub.clone();
-        let Some(reference) = hub.read(cx).list().read(cx).model().reference_of(chip) else { return };
-        pulls.shown = true;
-        self.right_asked = super::front::Front::Pulls;
-        hub.update(cx, |hub, cx| hub.open(reference, window, cx));
-        cx.emit(ProjectEvent::PullsShown);
-        cx.notify();
+    /// Opens the pull request a chip names, in the pull request pane, which mounts if it never showed. A chip
+    /// the list does not hold opens when it names this project's repository.
+    pub(super) fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
+        let listed = self.pulls.as_ref().and_then(|pulls| pulls.hub.read(cx).list().read(cx).model().reference_of(chip));
+        let ours = || self.repo.clone().filter(|r| r.slug() == chip.repo.as_ref()).map(|repo| atelier_forge::PullRef { repo, number: chip.number });
+        let Some(reference) = listed.or_else(ours) else { return };
+        self.show_pull(reference, window, cx);
     }
 
 

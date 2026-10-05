@@ -378,7 +378,7 @@ fn a_session_opened_again_runs_the_agent_that_ran_it(cx: &mut TestAppContext) {
 }
 
 fn chip(repo: &str, number: u64) -> atelier_ui::PrChipData {
-    atelier_ui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::pr::PrState::Open, url: "u".into() }
+    atelier_ui::PrChipData { number, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::pr::PrState::Open, url: "u".into(), facts: None }
 }
 
 /// The chips follow the project's repository when it lands after the list, and a list change that
@@ -401,6 +401,20 @@ fn the_chips_follow_the_repository_and_stay_quiet_when_the_list_does(cx: &mut Te
     assert_eq!(told.get(), before, "the same chips tell no session");
     cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some(atelier_forge::RepoRef { host: "github.com".into(), owner: "b".into(), name: "two".into() }), cx)));
     assert_eq!(numbers(cx), [4], "the repository landed: only its own");
+}
+
+/// Pressing a chip of the project's repository opens its pull request even before the pane ever showed and
+/// when the list does not hold it; a chip of another repository opens nothing.
+#[gpui_kit::test]
+fn a_chip_opens_its_pull_request_before_the_pane_ever_showed(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[]);
+    let repo = atelier_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "atelier".into() };
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some(repo.clone()), cx)));
+    let chip = |repo: &str| atelier_ui::PrChipData { number: 7, repo: repo.to_string().into(), title: "t".into(), state: atelier_ui::PrState::Open, url: "u".into(), facts: None };
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_pull(&chip("someone/else"), window, cx)));
+    assert_eq!(cx.update(|_, cx| project.read(cx).pending_pull.clone()), None, "another repository's chip");
+    cx.update(|window, cx| project.update(cx, |p, cx| p.open_pull(&chip("flazouh/atelier"), window, cx)));
+    assert_eq!(cx.update(|_, cx| project.read(cx).pending_pull.clone()), Some(atelier_forge::PullRef { repo, number: 7 }), "it opens once the pane mounts");
 }
 
 /// A project with no GitHub remote opens no pull requests: the pane does nothing, and says why.
@@ -435,6 +449,8 @@ fn a_number_the_list_lacks_is_looked_up_once(cx: &mut TestAppContext) {
     assert_eq!(*forge.briefs_asked.lock().unwrap(), [vec![12, 13]], "one request for the new numbers");
     let chips: Vec<u64> = cx.update(|_, cx| project.read(cx).chips().iter().map(|c| c.number).collect());
     assert_eq!(chips, [12], "13 is not a pull request, so it has no chip");
+    let author = cx.update(|_, cx| project.read(cx).chips()[0].facts.as_ref().map(|f| f.author.to_string()));
+    assert_eq!(author.as_deref(), Some("a"), "the chip's card has what the forge said beyond the title");
     cx.update(|_, cx| project.update(cx, |p, cx| p.look_up_chips(vec!["#12 and #13 again".into()], cx)));
     cx.run_until_parked();
     assert_eq!(forge.briefs_asked.lock().unwrap().len(), 1, "asked once");
@@ -585,4 +601,41 @@ fn a_project_starts_watching_off_the_ui_thread(cx: &mut TestAppContext) {
     assert_eq!(asked_while_opening, Some(false), "opening did not wait for the watch");
     cx.run_until_parked();
     assert!(sink.lock().unwrap().is_some(), "and the project watches once the call has run");
+}
+
+/// An open chip card reads the pull request, its checks and its files, then the first failing job's log for
+/// the line that says why; closing the card stops its reads.
+#[gpui_kit::test]
+fn an_open_chip_card_reads_its_pull_request_and_the_failing_line(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
+    let relay = atelier_pr_view::fixture::relay::Relay::build();
+    let pr = atelier_ui::PrChipData {
+        number: relay.reference.number,
+        repo: relay.reference.repo.slug().into(),
+        title: "t".into(),
+        state: atelier_ui::PrState::Open,
+        url: "u".into(),
+        facts: None,
+    };
+    cx.update(|_, cx| {
+        crate::pr_glance::install(&[], cx);
+        project.update(cx, |p, cx| {
+            p.set_chip_forge(relay.forge.clone());
+            p.set_repo(Some(relay.reference.repo.clone()), cx);
+        });
+        crate::pr_glance::opened(&pr, true, cx);
+    });
+    cx.run_until_parked();
+    let glance = cx.update(|_, cx| atelier_ui::pr_cards(cx).read(cx).glance(&atelier_ui::pr_glance::key_of(&pr)).cloned()).unwrap();
+    let failing = glance.failing.unwrap();
+    assert_eq!(failing.name.as_ref(), "linux-x64");
+    assert_eq!(failing.line.as_deref(), Some("error[E0308]: mismatched types"));
+    assert_eq!(glance.files.map(|f| f.len()), Some(3), "the three biggest files");
+    let facts = glance.facts.unwrap();
+    assert_eq!((facts.head.as_ref(), facts.base.as_ref()), ("rui/detach-stream", "main"));
+    assert_eq!(facts.standing.map(|s| s.word.to_string()).as_deref(), Some("Blocked"));
+    assert_eq!(facts.reviewers.iter().map(|r| r.who.to_string()).collect::<Vec<_>>(), ["Ada"]);
+    assert!(cx.update(|_, cx| project.read(cx).glance.open.contains_key(&pr.number)), "it reads again while open");
+    cx.update(|_, cx| crate::pr_glance::opened(&pr, false, cx));
+    assert!(cx.update(|_, cx| project.read(cx).glance.open.is_empty()), "closing stops the reads");
 }

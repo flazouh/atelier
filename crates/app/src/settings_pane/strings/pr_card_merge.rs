@@ -1,0 +1,43 @@
+//! Merge standing
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. This part says whether the pull request can merge now, and if not what holds it.
+use atelier_i18n::Message;
+
+pub const PR_CARD_MERGE: Message = Message {
+    ar: "حالة الدمج",
+    ca: "Estat de la fusió",
+    cs: "Stav sloučení",
+    da: "Flettestatus",
+    de: "Merge-Status",
+    el: "Κατάσταση συγχώνευσης",
+    en: "Merge standing",
+    es: "Estado de la fusión",
+    es_419: "Estado de la fusión",
+    fi: "Yhdistämisen tila",
+    fr: "État de la fusion",
+    fr_ca: "État de la fusion",
+    he: "מצב המיזוג",
+    hi: "मर्ज की स्थिति",
+    hr: "Status spajanja",
+    hu: "Összevonás állapota",
+    id: "Status penggabungan",
+    it: "Stato dell’unione",
+    ja: "マージ状況",
+    ko: "병합 상태",
+    ms: "Status gabungan",
+    nl: "Samenvoegstatus",
+    no: "Flettestatus",
+    pl: "Stan scalania",
+    pt_br: "Status da mesclagem",
+    pt_pt: "Estado da integração",
+    ro: "Starea îmbinării",
+    ru: "Статус слияния",
+    sk: "Stav zlúčenia",
+    sv: "Sammanfogningsstatus",
+    th: "สถานะการรวม",
+    tr: "Birleştirme durumu",
+    uk: "Стан злиття",
+    vi: "Trạng thái hợp nhất",
+    zh_cn: "合并状态",
+    zh_tw: "合併狀態",
+};

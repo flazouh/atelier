@@ -71,7 +71,7 @@ fn reads_a_public_pull_end_to_end() {
 
     let briefs = forge.briefs(&reference.repo, &[44169, 1, 44032]).unwrap();
     assert_eq!(briefs.len(), 3);
-    assert_eq!(briefs[0].as_ref().unwrap().state, PullState::Merged);
+    assert_eq!(briefs[0].as_ref().unwrap().brief.state, PullState::Merged);
     assert!(briefs[1].is_none(), "#1 is not a pull request");
 
     // Fifty numbers, one request: how long GitHub takes to answer it.
@@ -89,5 +89,52 @@ fn reads_a_public_pull_end_to_end() {
             *shelves.entry(format!("{:?}", row.shelf)).or_insert(0) += 1;
         }
         println!("working set: {} pull requests {shelves:?}, {:.0} ms", involved.len(), start.elapsed().as_secs_f64() * 1000.);
+    }
+}
+
+#[test]
+#[ignore = "reads GitHub through the real gh"]
+fn a_chip_card_reads_in_one_round_trip() {
+    let (forge, _folder) = forge();
+    let forge: Arc<dyn Forge> = Arc::new(forge);
+    let reference = public_pull();
+    let numbers: Vec<u64> = (0..20).map(|n| reference.number - n).collect();
+    let mut times: Vec<u128> = (0..6)
+        .map(|_| {
+            let started = std::time::Instant::now();
+            forge.briefs(&reference.repo, &numbers).unwrap();
+            started.elapsed().as_millis()
+        })
+        .collect();
+    times.sort();
+    println!("briefs of {} numbers: min {} ms, median {} ms", numbers.len(), times[0], times[times.len() / 2]);
+    let briefs = forge.briefs(&reference.repo, &numbers).unwrap();
+    let summary = briefs[0].as_ref().unwrap();
+    assert!(!summary.standing.head.is_empty() && !summary.standing.base.is_empty(), "a brief says its branches");
+
+    let started = std::time::Instant::now();
+    let reads: Vec<_> = (0..3)
+        .map(|which| {
+            let (forge, reference) = (forge.clone(), reference.clone());
+            std::thread::spawn(move || {
+                let at = std::time::Instant::now();
+                match which {
+                    0 => _ = forge.pull(&reference).unwrap(),
+                    1 => _ = forge.checks(&reference).unwrap(),
+                    _ => _ = forge.files(&reference).unwrap(),
+                }
+                at.elapsed().as_millis()
+            })
+        })
+        .collect();
+    let each: Vec<u128> = reads.into_iter().map(|r| r.join().unwrap()).collect();
+    println!("card read: pull {} ms, checks {} ms, files {} ms; all three in parallel {} ms", each[0], each[1], each[2], started.elapsed().as_millis());
+
+    let checks = forge.checks(&reference).unwrap();
+    if let Some(job) = checks.iter().find(|c| c.conclusion == Some(Conclusion::Failure)).and_then(|c| c.job.clone()) {
+        let started = std::time::Instant::now();
+        let log = forge.job_log(&job).unwrap();
+        let line = atelier_forge::log::first_error_line(&log);
+        println!("failing log: {} KB in {} ms, line {line:?}", log.len() / 1024, started.elapsed().as_millis());
     }
 }

@@ -1,0 +1,43 @@
+//! Live updates while open
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. While the card is open, it reads the pull request again every few seconds.
+use atelier_i18n::Message;
+
+pub const PR_CARD_LIVE: Message = Message {
+    ar: "تحديثات مباشرة أثناء فتح البطاقة",
+    ca: "Actualitzacions en directe mentre està obert",
+    cs: "Průběžné aktualizace při otevření",
+    da: "Liveopdateringer, mens kortet er åbent",
+    de: "Live-Updates, solange die Karte geöffnet ist",
+    el: "Ζωντανές ενημερώσεις όσο είναι ανοιχτή",
+    en: "Live updates while open",
+    es: "Actualizaciones en directo mientras está abierta",
+    es_419: "Actualizaciones en vivo mientras está abierta",
+    fi: "Livepäivitykset kortin ollessa avoinna",
+    fr: "Mises à jour en direct pendant l’ouverture",
+    fr_ca: "Mises à jour en direct pendant l’ouverture",
+    he: "עדכונים בזמן אמת כשהכרטיס פתוח",
+    hi: "खुला रहने तक लाइव अपडेट",
+    hr: "Ažuriranja uživo dok je otvoreno",
+    hu: "Élő frissítések, amíg nyitva van",
+    id: "Pembaruan langsung saat kartu terbuka",
+    it: "Aggiornamenti in tempo reale quando è aperta",
+    ja: "開いている間はリアルタイムで更新",
+    ko: "열려 있는 동안 실시간 업데이트",
+    ms: "Kemas kini langsung semasa kad dibuka",
+    nl: "Live-updates zolang de kaart openstaat",
+    no: "Liveoppdateringer mens kortet er åpent",
+    pl: "Aktualizacje na żywo, gdy karta jest otwarta",
+    pt_br: "Atualizações em tempo real enquanto estiver aberto",
+    pt_pt: "Atualizações em tempo real enquanto está aberto",
+    ro: "Actualizări live cât timp este deschis",
+    ru: "Обновлять при открытой карточке",
+    sk: "Živé aktualizácie, keď je karta otvorená",
+    sv: "Liveuppdateringar medan kortet är öppet",
+    th: "อัปเดตสดขณะเปิดการ์ด",
+    tr: "Açıkken canlı güncellemeler",
+    uk: "Оновлення в реальному часі, поки картка відкрита",
+    vi: "Cập nhật trực tiếp khi thẻ đang mở",
+    zh_cn: "打开时实时更新",
+    zh_tw: "開啟時即時更新",
+};

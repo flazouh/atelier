@@ -1,0 +1,43 @@
+//! Pull requests
+//!
+//! An entry in the list of Settings sections at the left. About 14 characters of room. It is also the heading of the section. A pull request is a proposed code change on GitHub.
+use atelier_i18n::Message;
+
+pub const SECTION_PULL_REQUESTS: Message = Message {
+    ar: "طلبات السحب",
+    ca: "Peticions d’extracció",
+    cs: "Pull requesty",
+    da: "Pull requests",
+    de: "Pull Requests",
+    el: "Pull requests",
+    en: "Pull requests",
+    es: "Solicitudes",
+    es_419: "Solicitudes",
+    fi: "Pull requestit",
+    fr: "Pull requests",
+    fr_ca: "Pull requests",
+    he: "בקשות משיכה",
+    hi: "पुल रिक्वेस्ट",
+    hr: "Pull requestovi",
+    hu: "Pull requestek",
+    id: "Pull request",
+    it: "Pull request",
+    ja: "プルリクエスト",
+    ko: "풀 리퀘스트",
+    ms: "Pull request",
+    nl: "Pull requests",
+    no: "Pull requests",
+    pl: "Pull requesty",
+    pt_br: "Pull requests",
+    pt_pt: "Pull requests",
+    ro: "Pull requesturi",
+    ru: "Пул-реквесты",
+    sk: "Pull requesty",
+    sv: "Pull requests",
+    th: "Pull request",
+    tr: "Çekme istekleri",
+    uk: "Пул-реквести",
+    vi: "Pull request",
+    zh_cn: "拉取请求",
+    zh_tw: "提取要求",
+};

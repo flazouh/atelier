@@ -79,6 +79,7 @@ fn pr_of(link: &tracker::PrLink) -> PrChipData {
         title: SharedString::default(),
         state: PrState::Open,
         url: format!("https://github.com/{}/pull/{}", link.repo, link.number).into(),
+        facts: None,
     }
 }
 

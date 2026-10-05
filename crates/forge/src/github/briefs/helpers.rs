@@ -2,13 +2,13 @@ use std::collections::{HashMap, HashSet};
 
 use serde_json::{Value, json};
 
-use super::super::{client::Client, queries};
-use crate::{ForgeError, ForgeResult, PullBrief, PullRef, PullState, RepoRef};
+use super::super::{client::Client, queries, read, wire::SearchHit};
+use crate::{ForgeError, ForgeResult, PullBrief, PullRef, PullState, PullSummary, RepoRef};
 use super::types::MOST_ALIASES;
 
 /// The chip fields of many numbers of one repository. One request per hundred numbers. A number that is
 /// not a pull request, or is not there, is `None`.
-pub(in super::super) fn briefs(client: &Client, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>> {
+pub(in super::super) fn briefs(client: &Client, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullSummary>>> {
     let mut unique: Vec<u64> = Vec::new();
     let mut seen = HashSet::new();
     for number in numbers {
@@ -30,7 +30,7 @@ pub(in super::super) fn briefs(client: &Client, repo: &RepoRef, numbers: &[u64])
             return Err(ForgeError::NotFound(repo.slug()));
         }
         for number in chunk {
-            found.insert(*number, brief(repo, *number, &repository[format!("p{number}")]));
+            found.insert(*number, summary(repo, *number, &repository[format!("p{number}")]));
         }
     }
     Ok(numbers.iter().map(|n| found.get(n).cloned().flatten()).collect())
@@ -50,6 +50,11 @@ pub(in super::super) fn open_for(client: &Client, repo: &RepoRef, head: &str) ->
     let Some(node) = repository["pullRequests"]["nodes"].as_array().and_then(|nodes| nodes.first()) else { return Ok(None) };
     let number = node["number"].as_u64().ok_or_else(|| ForgeError::Unexpected("a pull request with no number".into()))?;
     Ok(brief(repo, number, node))
+}
+
+fn summary(repo: &RepoRef, number: u64, node: &Value) -> Option<PullSummary> {
+    let hit: SearchHit = serde_json::from_value(node.clone()).ok()?;
+    Some(read::summary_of(brief(repo, number, node)?, &hit))
 }
 
 fn brief(repo: &RepoRef, number: u64, node: &Value) -> Option<PullBrief> {

@@ -3,7 +3,7 @@
 //! and the checks, and a job's log only when a reader opens it.
 use crate::{
     ChangedFile, Check, Comment, ForgeResult, HeldComment, Involved, Job, JobRef, MergeOutcome, MergeRequest,
-    NewLine, NewPull, Pull, PullBrief, PullRef, PullUpdate, RepoRef, Repository, Remark, Reviewer, Thread, ThreadId,
+    NewLine, NewPull, Pull, PullBrief, PullRef, PullSummary, PullUpdate, RepoRef, Repository, Remark, Reviewer, Thread, ThreadId,
     UpdateMethod, Verdict,
 };
 use crate::ForgeError;
@@ -45,9 +45,9 @@ pub trait Forge: Send + Sync {
         Ok(self.involved()?.into_iter().filter(|row| row.summary.brief.reference.repo == *repo).collect())
     }
 
-    /// Many pull numbers of one repository in one request. The answer has one entry per number, in
-    /// order; a number that is not a pull request is `None`.
-    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullBrief>>>;
+    /// Many pull numbers of one repository in one request, each as a list row knows it. The answer has one
+    /// entry per number, in order; a number that is not a pull request is `None`.
+    fn briefs(&self, repo: &RepoRef, numbers: &[u64]) -> ForgeResult<Vec<Option<PullSummary>>>;
 
     fn create_pull(&self, repo: &RepoRef, new: &NewPull) -> ForgeResult<PullRef>;
     /// The open pull request whose head is `head` in `repo`, if there is one. A forge that cannot say

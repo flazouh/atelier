@@ -1,0 +1,43 @@
+//! Reviewers
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. This part shows who reviewed and who was asked to.
+use atelier_i18n::Message;
+
+pub const PR_CARD_REVIEWERS: Message = Message {
+    ar: "المراجعون",
+    ca: "Revisors",
+    cs: "Recenzenti",
+    da: "Reviewere",
+    de: "Reviewer",
+    el: "Αξιολογητές",
+    en: "Reviewers",
+    es: "Revisores",
+    es_419: "Revisores",
+    fi: "Tarkastajat",
+    fr: "Réviseurs",
+    fr_ca: "Réviseurs",
+    he: "סוקרים",
+    hi: "समीक्षक",
+    hr: "Recenzenti",
+    hu: "Véleményezők",
+    id: "Peninjau",
+    it: "Revisori",
+    ja: "レビュー担当者",
+    ko: "리뷰어",
+    ms: "Penyemak",
+    nl: "Reviewers",
+    no: "Granskere",
+    pl: "Recenzenci",
+    pt_br: "Revisores",
+    pt_pt: "Revisores",
+    ro: "Revizori",
+    ru: "Ревьюеры",
+    sk: "Recenzenti",
+    sv: "Granskare",
+    th: "ผู้รีวิว",
+    tr: "İnceleyenler",
+    uk: "Рев’юери",
+    vi: "Người đánh giá",
+    zh_cn: "评审者",
+    zh_tw: "審查者",
+};

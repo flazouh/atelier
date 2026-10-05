@@ -24,7 +24,7 @@ use crate::tool_density::ToolDensity;
 use crate::agent_session::dictation;
 use super::strings as words;
 use super::types::{Mode, PRIMARIES, Section, SettingsEvent, dictation_keys};
-use super::helpers::{colour, font_size_words, rule_switch, save};
+use super::helpers::{card_part_switch, card_part_words, colour, font_size_words, rule_switch, save};
 
 /// An agent the build can start, as the pane lists it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -359,6 +359,23 @@ impl Render for SettingsPane {
                     .into_any_element(),
             )
         }));
+        let parts = atelier_ui::pr_cards(cx).read(cx).parts();
+        let pull_requests = div().flex().flex_col().children(atelier_ui::PrPart::ALL.into_iter().map(|part| {
+            row(
+                card_part_words(part),
+                atelier_ui::Switch::new(card_part_switch(part), parts.shows(part))
+                    .debug_name(card_part_switch(part))
+                    .on_change(move |on, _, cx| {
+                        let store = atelier_ui::pr_cards(cx);
+                        store.update(cx, |s, cx| {
+                            let mut parts = s.parts();
+                            parts.set(part, on);
+                            s.set_parts(parts, cx);
+                        });
+                    })
+                    .into_any_element(),
+            )
+        }));
         let skills_pane = this.clone();
         let density_pane = this.clone();
         let density = {
@@ -447,6 +464,7 @@ impl Render for SettingsPane {
             Section::Providers => self.providers_body(cx),
             Section::Dictation => dictation_pane.into_any_element(),
             Section::Tasks => tasks.into_any_element(),
+            Section::PullRequests => pull_requests.into_any_element(),
             Section::Keys => keys_list.into_any_element(),
         };
         // The list of sections, at the left: the front one on a card.

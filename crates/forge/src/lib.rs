@@ -7,6 +7,7 @@ mod forge;
 pub mod github;
 mod lookup;
 mod model;
+pub mod log;
 pub mod present;
 pub mod time;
 

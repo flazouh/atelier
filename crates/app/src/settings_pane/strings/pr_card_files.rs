@@ -1,0 +1,43 @@
+//! Top changed files
+//!
+//! The label of an on/off switch on the Settings page, in the Pull requests section. Each switch shows or hides one part of the card that opens when hovering a pull request's chip. About 40 characters of room. This part lists the three files with the most changed lines.
+use atelier_i18n::Message;
+
+pub const PR_CARD_FILES: Message = Message {
+    ar: "الملفات الأكثر تغييرًا",
+    ca: "Fitxers amb més canvis",
+    cs: "Nejvíce změněné soubory",
+    da: "Mest ændrede filer",
+    de: "Dateien mit den meisten Änderungen",
+    el: "Αρχεία με τις περισσότερες αλλαγές",
+    en: "Top changed files",
+    es: "Archivos con más cambios",
+    es_419: "Archivos con más cambios",
+    fi: "Eniten muutetut tiedostot",
+    fr: "Fichiers les plus modifiés",
+    fr_ca: "Fichiers les plus modifiés",
+    he: "הקבצים עם הכי הרבה שינויים",
+    hi: "सबसे ज़्यादा बदली गई फ़ाइलें",
+    hr: "Datoteke s najviše izmjena",
+    hu: "Legtöbbet módosított fájlok",
+    id: "File dengan perubahan terbanyak",
+    it: "File con più modifiche",
+    ja: "変更行数の多いファイル",
+    ko: "변경량이 가장 많은 파일",
+    ms: "Fail paling banyak diubah",
+    nl: "Meest gewijzigde bestanden",
+    no: "Mest endrede filer",
+    pl: "Najwięcej zmienione pliki",
+    pt_br: "Arquivos com mais alterações",
+    pt_pt: "Ficheiros com mais alterações",
+    ro: "Fișiere cu cele mai multe modificări",
+    ru: "Файлы с наибольшим числом изменений",
+    sk: "Najviac zmenené súbory",
+    sv: "Mest ändrade filer",
+    th: "ไฟล์ที่มีการเปลี่ยนแปลงมากที่สุด",
+    tr: "En çok değiştirilen dosyalar",
+    uk: "Файли з найбільшою кількістю змін",
+    vi: "Các tệp thay đổi nhiều nhất",
+    zh_cn: "改动最多的文件",
+    zh_tw: "異動最多的檔案",
+};

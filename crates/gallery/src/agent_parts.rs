@@ -9,7 +9,7 @@ mod types;
 
 pub use helpers::{
     anthropic, changed_files, changed_files_story, model_badge_story, pr_3344, pr_card_story,
-    pr_chip_story, resolve_pr, running_card, strip_rows, subagent_card_story,
+    pr_chip_story, PrCardsStory, resolve_pr, running_card, strip_rows, subagent_card_story,
     subagent_strip_story, worktrees_story,
 };
 pub use types::{LIVE_STEP, PR_TEXT};
