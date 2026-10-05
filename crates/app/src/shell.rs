@@ -16,12 +16,13 @@ mod rail;
 mod restore;
 mod structs;
 mod types;
+mod updates;
 mod view;
 
 pub use view::ShellView;
 
 pub use helpers::bind_keys;
-pub use structs::{Quit, Shell};
+pub use structs::{CheckForUpdates, Quit, Shell};
 #[cfg(test)]
 pub use structs::{NewSession, OpenSettings};
 

@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui_kit::Global;
 
-use super::super::{CheckOutcome, Relaunch, RelaunchRequest, UpdateDriver, Updater};
+use super::super::{CheckOutcome, Held, Relaunch, RelaunchRequest, UpdateDriver, Updater};
 
 impl Global for Updater {}
 
@@ -20,13 +20,15 @@ impl Updater {
         CheckOutcome::Started
     }
 
-    /// Answers the updater's wait for a restart. With nothing unsaved it proceeds at once; else `ask` puts the
-    /// question to the reader, and the restart goes ahead only on a yes.
-    pub fn answer(request: Box<dyn RelaunchRequest>, unsaved: usize, ask: impl FnOnce(Relaunch) -> bool) {
+    /// Takes the updater's wait for a restart. With nothing unsaved the restart goes ahead at once and nothing is
+    /// held; else the request is held until the reader answers the question that [`Held::relaunch`] words.
+    pub fn hold(request: Box<dyn RelaunchRequest>, unsaved: usize) -> Option<Held> {
         match Relaunch::for_unsaved(unsaved) {
-            Relaunch::Go => request.proceed(),
-            relaunch if ask(relaunch) => request.proceed(),
-            _ => request.decline(),
+            Relaunch::Go => {
+                request.proceed();
+                None
+            }
+            relaunch => Some(Held::new(request, relaunch)),
         }
     }
 }

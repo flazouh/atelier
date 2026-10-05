@@ -1182,3 +1182,5 @@ fn a_long_project_name_on_a_long_host_stays_inside_the_sidebar_head(cx: &mut Tes
     assert!(add.right() <= sidebar + px(48.), "the add button is inside the sidebar: {add:?} in {sidebar:?}");
     assert!(face.right() <= add.left() + px(2.), "the face leaves the add button its place: {face:?} {add:?}");
 }
+
+mod updates;

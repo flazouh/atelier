@@ -57,31 +57,47 @@ fn the_default_driver_is_the_one_that_cannot_update() {
     assert_eq!(Updater::new(Rc::new(NoDriver)).check_now(), CheckOutcome::Unavailable);
 }
 
-#[test]
-fn a_clean_window_proceeds_with_the_restart_and_declines_nothing() {
+/// A restart request and the two counters that show which answer it got.
+type Answers = (Box<Waiting>, Rc<Cell<u32>>, Rc<Cell<u32>>);
+
+fn waiting() -> Answers {
     let (proceeded, declined) = (Rc::new(Cell::new(0)), Rc::new(Cell::new(0)));
-    let request = Waiting { proceeded: proceeded.clone(), declined: declined.clone() };
-    Updater::answer(Box::new(request), 0, |_| unreachable!("a clean window is not asked"));
+    (Box::new(Waiting { proceeded: proceeded.clone(), declined: declined.clone() }), proceeded, declined)
+}
+
+#[test]
+fn a_clean_window_proceeds_with_the_restart_at_once_and_asks_nothing() {
+    let (request, proceeded, declined) = waiting();
+    assert!(Updater::hold(request, 0).is_none(), "nothing is held back");
     assert_eq!((proceeded.get(), declined.get()), (1, 0));
 }
 
 #[test]
-fn unsaved_edits_hold_the_restart_until_the_reader_says_yes() {
-    let (proceeded, declined) = (Rc::new(Cell::new(0)), Rc::new(Cell::new(0)));
-    let request = Waiting { proceeded: proceeded.clone(), declined: declined.clone() };
-    let mut asked = None;
-    Updater::answer(Box::new(request), 2, |relaunch| {
-        asked = Some(relaunch);
-        true
-    });
-    assert_eq!(asked.map(|r| r.title()), Some("2 tabs have unsaved changes.".to_string()));
+fn unsaved_edits_hold_the_restart_and_name_the_tabs_at_risk() {
+    let (request, proceeded, declined) = waiting();
+    let held = Updater::hold(request, 2).expect("the restart waits for the reader");
+    assert_eq!(held.relaunch().title(), "2 tabs have unsaved changes.");
+    assert_eq!((proceeded.get(), declined.get()), (0, 0), "neither answer is given yet");
+    drop(held);
+}
+
+#[test]
+fn a_yes_lets_the_held_restart_go() {
+    let (request, proceeded, declined) = waiting();
+    Updater::hold(request, 1).unwrap().answer(true);
     assert_eq!((proceeded.get(), declined.get()), (1, 0));
 }
 
 #[test]
-fn unsaved_edits_keep_the_app_running_when_the_reader_says_no() {
-    let (proceeded, declined) = (Rc::new(Cell::new(0)), Rc::new(Cell::new(0)));
-    let request = Waiting { proceeded: proceeded.clone(), declined: declined.clone() };
-    Updater::answer(Box::new(request), 1, |_| false);
+fn a_no_keeps_the_app_running() {
+    let (request, proceeded, declined) = waiting();
+    Updater::hold(request, 1).unwrap().answer(false);
     assert_eq!((proceeded.get(), declined.get()), (0, 1));
+}
+
+#[test]
+fn a_held_restart_dropped_without_an_answer_is_declined_not_lost() {
+    let (request, proceeded, declined) = waiting();
+    drop(Updater::hold(request, 1).unwrap());
+    assert_eq!((proceeded.get(), declined.get()), (0, 1), "the updater is never left waiting");
 }

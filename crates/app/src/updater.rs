@@ -4,12 +4,14 @@
 //! unsaved edits. [`UpdateDriver`] is the platform updater; [`RelaunchRequest`] is its wait for the app's answer.
 mod consts;
 mod enums;
+mod helpers;
 mod impls;
 mod structs;
 mod traits;
-pub use consts::UNAVAILABLE_NOTICE;
+pub use consts::{RequestSender, Requests, UNAVAILABLE_NOTICE};
+pub use helpers::driver;
 pub use enums::{CheckOutcome, Relaunch};
-pub use structs::{NoDriver, Updater};
+pub use structs::{Held, NoDriver, Updater};
 pub use traits::{RelaunchRequest, UpdateDriver};
 #[cfg(test)]
 mod tests;
