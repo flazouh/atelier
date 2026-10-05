@@ -34,14 +34,18 @@ build() {
   remote="${1:-}"
   [ -n "$remote" ] || { echo "Usage: tools/release-mac.sh build <atelier-remote-linux-x86_64>" >&2; exit 1; }
   [ ! -e "$archive" ] || { echo "$archive exists. A released archive is never rebuilt; raise the version." >&2; exit 1; }
-  [ -z "$(git status --porcelain --untracked-files=no 2>/dev/null)" ] || { echo "The checkout has uncommitted changes; release a commit." >&2; exit 1; }
+  commit=$(git rev-parse HEAD 2>/dev/null) || { echo "Release from a git checkout, so the release names its commit." >&2; exit 1; }
+  [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "The checkout has uncommitted changes; release a commit." >&2; exit 1; }
+  # What people download must be source anyone can read: the commit is on the remote's main.
+  git fetch -q origin main
+  git merge-base --is-ancestor "$commit" origin/main || { echo "Commit $commit is not on origin/main; push it first." >&2; exit 1; }
   ATELIER_RELEASE=1 tools/bundle-mac.sh "$remote"
   notarize
   mkdir -p "$releases"
   ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
   (cd "$releases" && shasum -a 256 "$(basename "$archive")" > "$(basename "$archive").sha256")
   echo "Archived $archive"
-  git rev-parse HEAD > "$archive.commit" 2>/dev/null || true
+  printf '%s\n' "$commit" > "$archive.commit"
 }
 
 # Apple checks the app for malware; a stapled ticket lets it open with no network.
@@ -124,7 +128,7 @@ publish() {
   if ! gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
     notes="docs/release-notes/$version.md"
     [ -f "$notes" ] || { printf 'atelier %s for Apple silicon Macs.\n' "$version" > target/release-notes.md; notes=target/release-notes.md; }
-    gh release create "$tag" --repo "$repo" --draft --title "atelier $version" --notes-file "$notes" "$archive" "$archive.sha256" --target "$(git rev-parse HEAD)"
+    gh release create "$tag" --repo "$repo" --draft --title "atelier $version" --notes-file "$notes" "$archive" "$archive.sha256" --target "$(cat "$archive.commit")"
     check_published "$tag"
     gh release edit "$tag" --repo "$repo" --draft=false
   fi

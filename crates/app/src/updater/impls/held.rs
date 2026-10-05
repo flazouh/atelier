@@ -1,13 +1,13 @@
-use super::super::{Held, Relaunch, RelaunchRequest};
+use super::super::{Held, Question, RelaunchRequest};
 
 impl Held {
-    pub(super) fn new(request: Box<dyn RelaunchRequest>, relaunch: Relaunch) -> Self {
-        Held { request: Some(request), relaunch }
+    pub(super) fn new(request: Box<dyn RelaunchRequest>, question: Question) -> Self {
+        Held { request: Some(request), question }
     }
 
     /// The question the reader answers.
-    pub fn relaunch(&self) -> Relaunch {
-        self.relaunch
+    pub fn question(&self) -> Question {
+        self.question
     }
 
     /// The reader's answer: yes restarts the app so that the update installs, no keeps it as it is.

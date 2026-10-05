@@ -10,10 +10,12 @@ mod structs;
 mod traits;
 pub use consts::{RequestSender, Requests, UNAVAILABLE_NOTICE, UPDATE_WAITS_NOTICE};
 pub use helpers::driver;
-pub use enums::{CheckOutcome, Relaunch};
-pub use structs::{Held, NoDriver, Updater};
+pub use enums::CheckOutcome;
+pub use structs::{Held, NoDriver, Question, Updater};
 #[cfg(target_os = "macos")]
 pub use structs::{NativeRelaunch, SparkleDriver};
 pub use traits::{RelaunchRequest, UpdateDriver};
+#[cfg(test)]
+pub(crate) mod fakes;
 #[cfg(test)]
 mod tests;

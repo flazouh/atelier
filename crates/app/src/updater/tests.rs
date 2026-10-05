@@ -1,2 +1,2 @@
-mod relaunch;
+mod question;
 mod updater;
