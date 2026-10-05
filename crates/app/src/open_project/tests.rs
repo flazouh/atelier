@@ -639,3 +639,34 @@ fn an_open_chip_card_reads_its_pull_request_and_the_failing_line(cx: &mut TestAp
     cx.update(|_, cx| crate::pr_glance::opened(&pr, false, cx));
     assert!(cx.update(|_, cx| project.read(cx).glance.open.is_empty()), "closing stops the reads");
 }
+
+/// Typing into a file, as the control socket does for QA, opens its tab and leaves an edit that is not saved.
+#[gpui_kit::test]
+fn typing_into_a_file_opens_its_tab_and_leaves_an_unsaved_edit(cx: &mut TestAppContext) {
+    let (dir, project, _, cx) = open(cx, &[("a.txt", "a\n"), ("b.txt", "b\n")]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.type_into("a.txt", "typed\n".into(), window, cx)));
+    cx.run_until_parked();
+    cx.executor().advance_clock(std::time::Duration::from_millis(200));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let p = project.read(cx);
+        assert_eq!(p.unsaved(), 1, "one tab holds an edit");
+        assert!(p.buffers["a.txt"].dirty);
+        assert_eq!(p.buffers["a.txt"].editor.read(cx).value().as_ref(), "typed\n");
+        assert!(!p.buffers.contains_key("b.txt"), "the other file stays closed");
+    });
+    assert_eq!(std::fs::read_to_string(dir.path().join("a.txt")).unwrap(), "a\n", "nothing is saved");
+}
+
+/// A file that does not exist leaves nothing dirty, and the wait for it ends.
+#[gpui_kit::test]
+fn typing_into_a_missing_file_leaves_no_edit(cx: &mut TestAppContext) {
+    let (_dir, project, _, cx) = open(cx, &[("a.txt", "a\n")]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.type_into("nope.txt", "x".into(), window, cx)));
+    for _ in 0..40 {
+        cx.run_until_parked();
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    }
+    cx.run_until_parked();
+    cx.update(|_, cx| assert_eq!(project.read(cx).unsaved(), 0));
+}

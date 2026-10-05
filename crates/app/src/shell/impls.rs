@@ -25,4 +25,12 @@ impl Shell {
         self.show_session(at, &session, window, cx);
         Some(session)
     }
+
+    /// Types `text` over the file `path` of the active project, which leaves a tab with an edit that is not saved.
+    /// False when no project is open.
+    pub(crate) fn edit_file(&mut self, path: &str, text: String, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(project) = self.projects.get(self.active).cloned() else { return false };
+        project.update(cx, |p, cx| p.type_into(path, text, window, cx));
+        true
+    }
 }

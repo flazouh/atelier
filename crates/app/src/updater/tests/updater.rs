@@ -52,6 +52,13 @@ fn a_build_that_cannot_update_never_reaches_the_driver_and_says_so() {
 }
 
 #[test]
+fn the_updater_says_whether_its_driver_can_update() {
+    let checks = Rc::new(Cell::new(0));
+    assert!(Updater::new(Rc::new(Counting { available: true, checks: checks.clone() })).available());
+    assert!(!Updater::new(Rc::new(Counting { available: false, checks })).available());
+}
+
+#[test]
 fn the_default_driver_is_the_one_that_cannot_update() {
     assert!(!NoDriver.available());
     assert_eq!(Updater::new(Rc::new(NoDriver)).check_now(), CheckOutcome::Unavailable);

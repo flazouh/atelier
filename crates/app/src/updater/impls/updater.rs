@@ -11,6 +11,11 @@ impl Updater {
         Updater { driver }
     }
 
+    /// Whether this build can update itself.
+    pub fn available(&self) -> bool {
+        self.driver.available()
+    }
+
     /// Asks the driver to look for an update, when this build can update itself.
     pub fn check_now(&self) -> CheckOutcome {
         if !self.driver.available() {

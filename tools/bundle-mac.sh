@@ -18,6 +18,9 @@
 #                          release's appcast.xml)
 #   ATELIER_SPARKLE_ACCOUNT  the keychain account of the update signing key (default: dev.atelier.app)
 #   ATELIER_BUNDLE_VERSION   the version to stamp, for a QA build (default: the workspace version)
+# A QA build (ATELIER_QA=1, with ATELIER_QA_DIR) is for trying updates. It uses the bundle id dev.atelier.qa, keeps
+# its settings and control socket in ATELIER_QA_DIR, and holds a file that names its version, so two QA versions differ
+# by more than their numbers. It never touches the real app's settings.
 # It embeds the pinned Sparkle (tools/mac/sparkle.sh), signs every part with the hardened runtime, and stops at the
 # first thing missing. Notarize and publish with tools/release-mac.sh.
 set -euo pipefail
@@ -48,6 +51,13 @@ version=$(awk -F'"' '/^version *=/ {print $2; exit}' Cargo.toml)
 version="${ATELIER_BUNDLE_VERSION:-$version}"
 release="${ATELIER_RELEASE:-0}"
 update_keys=""
+bundle_id=dev.atelier.app
+qa_keys=""
+if [ "${ATELIER_QA:-0}" = 1 ]; then
+  [ -n "${ATELIER_QA_DIR:-}" ] || { echo "A QA build needs ATELIER_QA_DIR." >&2; exit 1; }
+  bundle_id=dev.atelier.qa
+  qa_keys="  <key>LSEnvironment</key><dict><key>ATELIER_SETTINGS</key><string>${ATELIER_QA_DIR}/settings.json</string><key>ATELIER_CONTROL</key><string>${ATELIER_QA_DIR}/control.sock</string></dict>"
+fi
 if [ "$release" = 1 ]; then
   [ -n "${ATELIER_SIGN_IDENTITY:-}" ] || { echo "A release build needs ATELIER_SIGN_IDENTITY (a Developer ID Application identity)." >&2; exit 1; }
   security find-identity -v -p codesigning | grep -qF "$ATELIER_SIGN_IDENTITY" || { echo "No signing identity matches $ATELIER_SIGN_IDENTITY." >&2; exit 1; }
@@ -94,6 +104,9 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/remote/linux-x86_64"
 cp "$exe" "$app/Contents/MacOS/atelier"
 cp "$remote" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
 chmod +x "$app/Contents/MacOS/atelier" "$app/Contents/Resources/remote/linux-x86_64/atelier-remote"
+if [ "${ATELIER_QA:-0}" = 1 ]; then
+  printf '%s\n' "$version" > "$app/Contents/Resources/qa-version.txt"
+fi
 if [ "$release" = 1 ]; then
   # ditto keeps the framework's symbolic links, which a plain copy would follow and break.
   mkdir -p "$app/Contents/Frameworks"
@@ -128,7 +141,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key><string>atelier</string>
   <key>CFBundleDisplayName</key><string>atelier</string>
-  <key>CFBundleIdentifier</key><string>dev.atelier.app</string>
+  <key>CFBundleIdentifier</key><string>${bundle_id}</string>
   <key>CFBundleExecutable</key><string>atelier</string>
   <key>CFBundleIconFile</key><string>atelier</string>
   <key>CFBundleIconName</key><string>atelier</string>
@@ -141,6 +154,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
 ${update_keys}
+${qa_keys}
 </dict>
 </plist>
 PLIST

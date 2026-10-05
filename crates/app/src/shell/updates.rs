@@ -9,7 +9,7 @@ use crate::updater::{CheckOutcome, Relaunch, RelaunchRequest, Requests, UNAVAILA
 impl Shell {
     /// The app menu's Check for Updates…: the updater looks and shows its own window. A build that cannot update
     /// says so in a notice.
-    pub(super) fn check_for_updates(&mut self, _: &CheckForUpdates, _: &mut Window, cx: &mut Context<Self>) {
+    pub fn check_for_updates(&mut self, _: &CheckForUpdates, _: &mut Window, cx: &mut Context<Self>) {
         let outcome = cx.try_global::<Updater>().map_or(CheckOutcome::Unavailable, Updater::check_now);
         if outcome == CheckOutcome::Unavailable {
             self.say(UNAVAILABLE_NOTICE.to_string(), cx);

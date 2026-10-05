@@ -148,6 +148,17 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
             }
             json!({ "ok": true })
         }
+        Request::CheckUpdates => {
+            shell.check_for_updates(&crate::shell::CheckForUpdates, window, cx);
+            json!({ "ok": true })
+        }
+        Request::Edit { path, text } => {
+            if shell.edit_file(&path, text, window, cx) {
+                json!({ "ok": true })
+            } else {
+                json!({ "error": "no project is open" })
+            }
+        }
         Request::Send { text } => match shell.front_session(cx) {
             Some(session) => {
                 session.update(cx, |s, cx| s.send(text, cx));
@@ -179,7 +190,8 @@ fn state(shell: &Shell, cx: &App) -> Value {
         })
         .collect();
     let theme = atelier_ui::theme::ActiveTheme::theme(cx);
-    json!({ "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
+    let updates = cx.try_global::<crate::updater::Updater>().is_some_and(crate::updater::Updater::available);
+    json!({ "unsaved": shell.unsaved(cx), "updates": { "available": updates }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
 }
 
 /// One session: who the agent is, how it stands, and the rows its list shows.
