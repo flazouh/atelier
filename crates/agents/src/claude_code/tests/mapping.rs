@@ -749,3 +749,22 @@ fn a_retry_for_another_reason_changes_nothing() {
     assert!(mapper.line(&api_retry(529, "overloaded"), Instant::now()).is_empty());
     assert!(mapper.line(&api_retry(500, "server_error"), Instant::now()).is_empty());
 }
+
+/// `claude` writes a retry's error as a map in some runs: the line is read, not refused, and a sign-in refusal in it still
+/// ends the turn.
+#[test]
+fn a_retry_whose_error_is_a_map_is_read() {
+    let line = |status: u16, error: serde_json::Value| {
+        json!({"type": "system", "subtype": "api_retry", "attempt": 1, "max_retries": 10, "retry_delay_ms": 569,
+               "error_status": status, "error": error, "session_id": "s"})
+        .to_string()
+    };
+    let mut mapper = ClaudeLineMapper::new();
+    mapper.user_sent("m1".into());
+    let events = mapper.line(&line(529, json!({"type": "overloaded_error", "message": "busy"})), Instant::now());
+    assert!(events.is_empty(), "no warning for a line that parses: {events:?}");
+    let events = mapper.line(&line(401, json!({"type": "authentication_failed"})), Instant::now());
+    assert!(events.iter().any(|e| matches!(e, Event::SignedOut)), "{events:?}");
+    // A line with an error of any other shape is read too.
+    assert!(ClaudeLineMapper::new().line(&line(500, json!(["odd"])), Instant::now()).is_empty());
+}
