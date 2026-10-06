@@ -110,3 +110,17 @@ fn the_providers_asked_are_claude_and_codex_and_openrouter_only_with_a_key() {
     assert_eq!(names(None), ["Claude", "Codex"]);
     assert_eq!(names(Some("sk-or-x")), ["Claude", "Codex", "OpenRouter"]);
 }
+
+/// A first read that fails shows no chip, as on a machine without that agent, unless the failure proves the account is
+/// there: a call asked for too often has a chip that says why.
+#[test]
+fn a_first_failure_shows_a_chip_only_when_it_proves_an_account() {
+    let mut vitals = Vitals::new(Box::new(Fixed { cpu: 0.1 }));
+    let lead = Lead::Monogram;
+    vitals.settle("Claude", lead.clone(), Err("Claude is not signed in on this machine".into()));
+    assert!(vitals.providers.is_empty(), "no account, no chip");
+    let too_often = "Claude's usage was asked for too often: it shows again in a few minutes";
+    vitals.settle("Claude", lead, Err(too_often.into()));
+    assert_eq!(vitals.providers.len(), 1);
+    assert!(vitals.providers[0].tooltip().contains("asked for too often"));
+}

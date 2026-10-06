@@ -442,7 +442,8 @@ fn entering(session: &Entity<AgentSession>, ix: usize, window: &mut Window, cx: 
     let Some(at) = arrived else { return body };
     let f = atelier_ui::message_pop::frame(at.elapsed().as_secs_f32(), cx.reduce_motion());
     if f.settled {
-        return body;
+        // The same name as while it moves, so a reader of the screen finds the row whenever it looks.
+        return div().debug_selector(move || format!("entering-{ix}")).child(body).into_any_element();
     }
     window.request_animation_frame();
     div().debug_selector(move || format!("entering-{ix}")).relative().top(px(f.y)).opacity(f.opacity).child(body).into_any_element()
