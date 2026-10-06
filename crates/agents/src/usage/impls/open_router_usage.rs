@@ -16,10 +16,13 @@ impl OpenRouterUsage {
     pub(in super::super) fn parse(text: &str) -> Result<Reading, String> {
         let value: Value = serde_json::from_str(text).map_err(|_| "OpenRouter's answer could not be read".to_string())?;
         let data = value.get("data").ok_or("OpenRouter's answer had no key in it")?;
-        let used = data.get("usage").and_then(Value::as_f64).unwrap_or(0.);
+        let spent = data.get("usage").and_then(Value::as_f64).unwrap_or(0.);
         let Some(limit) = data.get("limit").and_then(Value::as_f64).filter(|limit| *limit > 0.) else {
-            return Ok(Reading::default().note(Some(format!("${used:.2} spent, no limit on the key"))));
+            return Ok(Reading::default().note(Some(format!("${spent:.2} spent, no limit on the key"))));
         };
+        // `usage` is all the key ever spent, and a limit that resets is spent from its own start: the credit left is the
+        // truth about the window. Without it, the spend is all there is.
+        let used = data.get("limit_remaining").and_then(Value::as_f64).map_or(spent, |left| (limit - left).max(0.));
         Ok(Reading::default().window("credit", used / limit * 100., None).note(Some(format!("${used:.2} of ${limit:.2} credit"))))
     }
 
