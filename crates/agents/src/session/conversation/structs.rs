@@ -98,6 +98,12 @@ impl Conversation {
         self.working = true;
     }
 
+    /// The agent never took the reader's message, for it could not start or the session had ended: the turn that opened
+    /// with the message is over, and nothing waits for an answer.
+    pub fn turn_refused(&mut self) {
+        self.working = false;
+    }
+
     /// The reader signed in again: what [`Self::signed_out`] showed is over.
     pub fn signed_in(&mut self) {
         self.signed_out = false;
