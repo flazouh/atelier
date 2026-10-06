@@ -315,7 +315,8 @@ impl Shell {
         let theme = cx.theme().clone();
         let p = project.read(cx);
         let pulls = p.pulls.as_ref().map(|_| p.list_rows.len());
-        let changes = self.focused(cx).map(|(_, s)| s.read(cx).changed_files().len()).filter(|n| *n > 0);
+        let in_session = self.focused(cx).map_or(0, |(_, s)| s.read(cx).changed_files().len());
+        let changes = super::helpers::changes_badge(p.uncommitted.as_ref(), in_session);
         let row = |view: ShellView, icon: IconName, label: &'static str, count: Option<usize>, cx: &mut Context<Self>| {
             let this = cx.entity().downgrade();
             nav_row(format!("code-nav-{}", view.words()), self.view == view, Icon::new(icon).into_any_element(), label.into(), count, cx)

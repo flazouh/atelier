@@ -73,3 +73,13 @@ pub(super) fn project_mark(statuses: &[atelier_ui::session_status::SessionStatus
         ProjectMark::Quiet
     }
 }
+
+/// The count on the Changes row: what the checkout holds uncommitted once git has been read, else what the front session
+/// changed. The row opens the checkout's changes, so its count is theirs.
+pub(super) fn changes_badge(uncommitted: Option<&crate::history::Read<Vec<crate::history::CommitFile>>>, in_session: usize) -> Option<usize> {
+    let count = match uncommitted {
+        Some(crate::history::Read::Ready(files)) => files.len(),
+        _ => in_session,
+    };
+    (count > 0).then_some(count)
+}
