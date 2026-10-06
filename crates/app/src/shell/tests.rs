@@ -71,6 +71,19 @@ fn a_long_error_shows_on_the_start_screen_above_recent_and_wraps(cx: &mut TestAp
     assert!(error.size.height > px(20.), "the error wraps to more than one line: {error:?}");
 }
 
+/// A line the start screen shows, such as a folder that is not there, stays until a project opens.
+#[gpui_kit::test]
+fn a_start_screen_error_stays_until_a_project_opens(cx: &mut TestAppContext) {
+    let (shell, cx) = open_shell(cx);
+    shell.update(cx, |s, cx| s.say("Could not open the folder: no such folder".into(), cx));
+    cx.executor().advance_clock(std::time::Duration::from_secs(6));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("start-error").is_some(), "it is still there after the notice time");
+    let dir = tempfile::tempdir().unwrap();
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("start-error").is_none(), "and it goes when a project opens");
+}
 /// The Settings button holds the window's top right; a press opens the page, whose Back button holds the top
 /// left; a press on Back closes it. The sidebar has no foot and the window has no status bar.
 #[gpui_kit::test]

@@ -131,6 +131,19 @@ fn forgetting_the_key_takes_new_sessions_back_to_the_usual_account(cx: &mut Test
     assert_eq!(cx.update(|_, cx| providers::default_choice(cx)), Choice::usual());
 }
 
+/// The Forget button, pressed by its name as a script does, takes the key out of the keychain.
+#[gpui_kit::test]
+fn the_forget_button_takes_the_key_out_of_the_keychain(cx: &mut TestAppContext) {
+    let secrets = Arc::new(InMemory::default());
+    secrets.write(OPENROUTER_KEY, KEY).unwrap();
+    let (pane, cx) = open(services(&secrets, key_works), cx);
+    pane.update(cx, |pane, cx| pane.show(crate::settings_pane::Section::Providers, cx));
+    settle(cx);
+    let at = cx.update(|_, cx| crate::control::find("forget-key", cx)).expect("Forget is drawn while a key is kept").center();
+    cx.update(|window, cx| crate::control::press_in_steps(window, at, cx));
+    settle(cx);
+    assert_eq!(secrets.read(OPENROUTER_KEY).unwrap(), None);
+}
 #[test]
 fn an_account_name_must_make_a_plain_folder_name() {
     for good in ["work", "client-a", "team_2"] {

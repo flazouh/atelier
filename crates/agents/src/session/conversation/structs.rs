@@ -251,6 +251,10 @@ impl Conversation {
                 {
                     self.items.push(Item::Notice(crate::subprocess::strip_ansi(why)));
                 }
+                // A stop the reader asked for leaves a line behind, so the end of the answer is not a guess.
+                if end.outcome == TurnOutcome::Interrupted {
+                    self.items.push(Item::Notice("Stopped before it finished.".into()));
+                }
                 self.last_turn = Some(end.clone());
             }
             Event::Warning(text) => self.items.push(Item::Notice(crate::subprocess::strip_ansi(text))),

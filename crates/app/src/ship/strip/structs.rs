@@ -353,7 +353,8 @@ impl ShipStrip {
         }
         let message = self.message.read(cx).value().trim().to_string();
         if message.is_empty() {
-            return;
+            self.refused = Some("Write a commit message first".into());
+            return cx.notify();
         }
         let subject = message.lines().next().unwrap_or_default().to_string();
         let new_branch = self.on_default.then(|| self.new_branch.read(cx).value().trim().to_string());

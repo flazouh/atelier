@@ -938,6 +938,7 @@ impl Shell {
             cx.notify();
             return;
         }
+        self.said = None;
         let entity = cx.new(|cx| OpenProject::new(location.clone(), project, window, cx));
         self._subscriptions.push(cx.subscribe_in(&entity, window, |this, project, event: &ProjectEvent, window, cx| match event {
             ProjectEvent::Said(line) => this.say(line.to_string(), cx),
@@ -1037,6 +1038,11 @@ impl Shell {
     pub(super) fn say(&mut self, line: String, cx: &mut Context<Self>) {
         let line: SharedString = line.into();
         self.said = Some(line.clone());
+        // On the start screen the line is the only answer to what was asked, such as a folder that is not there:
+        // it stays until a project opens.
+        if self.projects.is_empty() {
+            return cx.notify();
+        }
         // The notice goes after a few seconds, unless something newer was said in the meantime.
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(NOTICE_FOR).await;
