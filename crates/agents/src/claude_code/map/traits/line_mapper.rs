@@ -18,6 +18,9 @@ pub trait LineMapper {
     /// answered.
     fn answer(&mut self, request: &RequestId, choice: &ChoiceId) -> Option<String>;
 
+    /// The line to write for the reader's answers to a question, or `None` when it is not waiting.
+    fn answer_questions(&mut self, request: &RequestId, answers: &[(String, String)]) -> Option<String>;
+
     /// The events for a process that ended: `code` is its exit code, `None` when a signal ended it. A
     /// turn or a tool still open fails, so the UI never waits for an agent that is gone. A session ends
     /// once: a second call to `exited` or `closed` gives nothing.

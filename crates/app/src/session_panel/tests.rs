@@ -99,3 +99,35 @@ fn the_header_names_the_provider_in_a_pill(cx: &mut TestAppContext) {
     let title = cx.debug_bounds("panel-project").expect("the project badge is drawn");
     assert!(pill.left() > title.right() && pill.size.height <= px(24.), "in the header row: {pill:?}");
 }
+
+/// The agent's question with choices is a card of its own: it waits for the reader's answers, the answers go back to the agent
+/// as a command, and the card folds into what was said.
+#[gpui_kit::test]
+fn a_question_with_choices_is_a_card_the_reader_answers(cx: &mut TestAppContext) {
+    use atelier_agents::session::{Command, PermissionRequest, RequestId, ToolCall, ToolId, ToolKind, ToolStatus};
+    let input = serde_json::json!({"questions": [
+        {"question": "Which toy?", "header": "Toy", "options": [{"label": "Chain", "description": "Blocks"}, {"label": "Cipher", "description": "XOR"}], "multiSelect": false}
+    ]});
+    let call = ToolCall { id: ToolId::new("q"), name: "AskUserQuestion".into(), kind: ToolKind::Other, input, file: None, parent: None, status: ToolStatus::Pending };
+    let request = PermissionRequest { id: RequestId::new("r"), call: call.clone(), reason: None, choices: vec![] };
+    let (session, fake, cx) = start(cx, vec![vec![Event::ToolStarted(call.clone()), Event::Permission(request)]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("ask me".into(), cx)));
+    cx.run_until_parked();
+    let shown = session.clone();
+    let (_panel, cx) = cx.add_window_view(move |_, cx| SessionPanel::new(shown, cx));
+    cx.simulate_resize(size(px(700.), px(800.)));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("question-card").is_some(), "the question is a card, not an approval");
+    assert!(cx.update(|_, cx| session.read(cx).conversation.asking()), "it waits for the reader");
+
+    let answers = vec![("Which toy?".to_string(), "Chain".to_string())];
+    cx.update(|_, cx| session.update(cx, |s, cx| s.answer_questions(&RequestId::new("r"), answers.clone(), cx)));
+    cx.run_until_parked();
+    assert!(!cx.update(|_, cx| session.read(cx).conversation.asking()), "answered");
+    assert_eq!(cx.update(|_, cx| session.read(cx).conversation.answers_of(&call.id).map(<[_]>::to_vec)), Some(answers.clone()));
+    assert!(
+        fake.received.lock().unwrap().iter().any(|c| matches!(c, Command::AnswerQuestions { request, answers: a } if request.as_str() == "r" && *a == answers)),
+        "the agent got the answers"
+    );
+    assert!(cx.debug_bounds("question-card").is_some(), "the card stays, folded into the answers");
+}

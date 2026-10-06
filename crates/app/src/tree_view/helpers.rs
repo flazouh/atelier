@@ -45,19 +45,20 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                 let shown = active.as_deref() == Some(row.path.as_str());
                 let (path, dir) = (row.path.clone(), row.dir);
                 let project = project.clone();
-                div()
+                // The slot is the list item: it takes the list's whole width, and the row fills it inside its margin.
+                div().w_full().px(px(6.)).child(div()
                     .id(("tree-row", i))
                     .debug_selector({
                         let path = path.clone();
                         move || format!("tree-row-{path}")
                     })
+                    .w_full()
                     .flex()
                     .items_center()
                     .gap(px(6.))
                     .h(px(ROW))
                     .pl(px(8. + STEP * row.depth as f32))
                     .pr(px(8.))
-                    .mx(px(6.))
                     .rounded(radius::md())
                     .cursor_pointer()
                     .text_size(TextSize::Sm.font_size())
@@ -79,7 +80,7 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                         }),
                     )
                     .child(if row.dir { FileIcon::folder(&row.name, row.open).size(px(14.)) } else { FileIcon::file(&row.name).size(px(14.)) })
-                    .child(div().min_w_0().truncate().child(row.name.clone()))
+                    .child(div().min_w_0().truncate().child(row.name.clone())))
             })
             .collect()
     })

@@ -42,6 +42,12 @@ impl ClaudeLineMapper {
         })
     }
 
+    /// The line to write for the reader's answers to a question the agent asked, or `None` when it is not waiting.
+    pub(super) fn answer_questions_line(&mut self, request: &RequestId, answers: &[(String, String)]) -> Option<String> {
+        let asked = self.asked.remove(request)?;
+        Some(control::allow_with_answers(request.as_str(), &asked.input, answers))
+    }
+
     pub(super) fn permission_cancelled(&mut self, request_id: String) -> Vec<Event> {
         let id = RequestId::new(request_id);
         if self.asked.remove(&id).is_some() { vec![Event::PermissionCancelled(id)] } else { Vec::new() }

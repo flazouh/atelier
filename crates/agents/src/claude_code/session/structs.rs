@@ -77,6 +77,10 @@ impl Session for ClaudeSession {
                 let answer = lock(&self.mapper).answer(&request, &choice);
                 answer.ok_or(SessionError::Unsupported("an answer to a request that is not waiting"))?
             }
+            Command::AnswerQuestions { request, answers } => {
+                let answer = lock(&self.mapper).answer_questions(&request, &answers);
+                answer.ok_or(SessionError::Unsupported("an answer to a question that is not waiting"))?
+            }
             Command::Interrupt => control::interrupt(&self.request_id()),
             Command::SetModel { model } => control::set_model(&self.request_id(), &model),
             Command::SetPermissionMode { mode } => control::set_permission_mode(&self.request_id(), mode),
