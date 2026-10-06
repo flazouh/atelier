@@ -532,6 +532,7 @@ impl AgentSession {
                     }
                     Err(error) => {
                         s.waiting_send = None;
+                        s.conversation.turn_refused();
                         s.status = SessionStatus::Failed(atelier_ui::session_status::short_reason(&problem_words(&error)));
                         s.problem = Some(problem_words(&error).into());
                     }
@@ -733,6 +734,11 @@ impl AgentSession {
         };
         if let Err(why) = sent {
             self.problem = Some(format!("Not sent: {why}").into());
+            // Nothing will answer: a turn left open would show "Waiting for Claude" and a Stop button for good.
+            self.conversation.turn_refused();
+            if self.status == SessionStatus::Working {
+                self.status = SessionStatus::Idle;
+            }
         }
         cx.notify();
     }

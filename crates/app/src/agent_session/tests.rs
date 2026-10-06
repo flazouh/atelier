@@ -69,6 +69,30 @@ fn a_failed_start_is_retried_by_the_next_message(cx: &mut TestAppContext) {
     assert!(fake.received.lock().unwrap().iter().any(|c| matches!(c, Command::Send { text, .. } if text == "hello")), "and the message went");
 }
 
+/// A message whose agent cannot start is not a turn that goes on: the session says why and stops waiting, with no Stop
+/// button and no "Waiting for" line left for good.
+#[gpui_kit::test]
+fn a_message_the_agent_could_not_start_for_does_not_leave_the_turn_open(cx: &mut TestAppContext) {
+    let (session, fake, cx) = start(cx, vec![], true);
+    fake.fail_next_open();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hello".into(), cx)));
+    cx.run_until_parked();
+    assert!(cx.update(|_, cx| session.read(cx).problem.clone()).is_some_and(|p| p.contains("not installed")));
+    assert!(!cx.update(|_, cx| session.read(cx).conversation.working()), "no turn waits for an agent that never started");
+}
+
+/// An answer that cannot reach the agent, because its session has ended, does not leave the session working.
+#[gpui_kit::test]
+fn an_answer_the_ended_session_cannot_take_does_not_leave_it_working(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![vec![Event::Permission(ask())]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("write a.txt".into(), cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| session.update(cx, |s, cx| s.stop(cx)));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.answer(&RequestId::new("r1"), ChoiceKind::Allow, cx)));
+    assert_ne!(cx.update(|_, cx| session.read(cx).status.clone()), SessionStatus::Working, "nothing runs");
+    assert!(!cx.update(|_, cx| session.read(cx).conversation.working()));
+}
+
 /// Streaming text joins into one row, and only the rows that changed are measured again.
 #[gpui_kit::test]
 fn a_stream_folds_into_one_row(cx: &mut TestAppContext) {

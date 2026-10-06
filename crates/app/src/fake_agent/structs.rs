@@ -41,6 +41,13 @@ pub struct Fake {
     pub signed_in_as: Mutex<Vec<String>>,
 }
 
+impl Fake {
+    /// The next open fails as a missing program does, as the first one can.
+    pub fn fail_next_open(&self) {
+        *self.fail_first.lock().unwrap() = true;
+    }
+}
+
 struct FakeSession {
     pub(super) backend: Arc<Fake>,
     pub(super) sink: EventSink,
