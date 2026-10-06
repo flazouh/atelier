@@ -127,6 +127,10 @@ pub struct OpenProject {
     opening: HashSet<String>,
     /// Where the caret goes in a file still being read, after a jump to it.
     caret_at: HashMap<String, Position>,
+    /// The menu open on a row of the file tree.
+    pub tree_menu: Option<super::tree_edit::TreeMenu>,
+    /// A name being typed in the file tree.
+    pub tree_edit: Option<super::tree_edit::TreeEdit>,
     pub(super) _watch: Option<Watch>,
     /// Hands the watch's batches to this entity, as long as it lives.
     watching: Task<()>,
@@ -195,6 +199,8 @@ impl OpenProject {
             reading_uncommitted: Task::ready(()),
             opening: HashSet::new(),
             caret_at: HashMap::new(),
+            tree_menu: None,
+            tree_edit: None,
             _watch: None,
             watching: Task::ready(()),
             linking: Task::ready(()),
@@ -354,7 +360,7 @@ impl OpenProject {
         self.location.name()
     }
 
-    fn relist(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn relist(&mut self, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let listed = cx.background_spawn(async move {
             let started = Instant::now();

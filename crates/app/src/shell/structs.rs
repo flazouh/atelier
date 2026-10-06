@@ -1777,8 +1777,14 @@ impl Shell {
     /// The Files view's tree: the front project's files, under their heading.
     pub(super) fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
+        let menu = project.clone();
         div()
             .debug_selector(|| "files-tree".into())
+            // A press with the other button where there is no row opens the project's folder's menu.
+            .on_mouse_down(gpui_kit::MouseButton::Right, move |event, _, cx| {
+                let at = event.position;
+                menu.update(cx, |p, cx| p.open_tree_menu(String::new(), true, at, cx));
+            })
             .flex()
             .flex_col()
             .size_full()
@@ -2126,6 +2132,7 @@ impl Shell {
                             .child(words),
                     )
             }))
+            .children(self.tree_menu(cx))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(gpui_kit::px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {

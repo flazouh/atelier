@@ -71,6 +71,10 @@ fn the_file_tree_s_operations_change_the_disk_and_refuse_to_overwrite() {
     use crate::FsOp;
     let (dir, p) = project(&[("a.txt", "a"), ("src/m.rs", "m"), ("src/deep/n.rs", "n")]);
     let there = |path: &str| dir.path().join(path);
+    p.apply(&FsOp::NewFile { path: "docs/n/x.txt".into() }).unwrap();
+    assert_eq!(fs::read_to_string(there("docs/n/x.txt")).unwrap(), "", "an empty file, and the folders above it");
+    assert!(p.apply(&FsOp::NewFile { path: "a.txt".into() }).is_err(), "a file that is there is not made again");
+    assert_eq!(fs::read_to_string(there("a.txt")).unwrap(), "a");
     p.apply(&FsOp::NewFolder { path: "docs/new".into() }).unwrap();
     assert!(there("docs/new").is_dir(), "a folder and the folders above it");
     assert!(p.apply(&FsOp::NewFolder { path: "docs".into() }).is_err(), "a folder that is there is not made again");

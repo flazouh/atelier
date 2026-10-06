@@ -6,9 +6,7 @@ mod helpers;
 mod structs;
 
 pub use helpers::ancestors;
-pub use structs::ProjectTree;
-#[cfg(test)]
-pub use structs::Row;
+pub use structs::{ProjectTree, Row};
 
 #[cfg(test)]
 use std::collections::HashSet;

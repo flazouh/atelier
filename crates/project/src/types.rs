@@ -8,6 +8,8 @@ pub const TRACKER_FILE: &str = "tracker.sqlite";
 /// A change to the project's files and folders that the file tree offers. Paths are relative to the root.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FsOp {
+    /// An empty file, with the folders above it. Refused when `path` is there already.
+    NewFile { path: String },
     NewFolder { path: String },
     /// Moves a file or a folder. Refused when `to` is there already.
     Rename { from: String, to: String },

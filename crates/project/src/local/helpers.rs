@@ -51,6 +51,13 @@ pub(crate) fn apply_op(root: &Path, op: &crate::FsOp) -> io::Result<()> {
         }
     };
     match op {
+        FsOp::NewFile { path } => {
+            let at = there(path)?;
+            if let Some(parent) = at.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::OpenOptions::new().write(true).create_new(true).open(at).map(drop)
+        }
         FsOp::NewFolder { path } => {
             let at = there(path)?;
             free(&at)?;

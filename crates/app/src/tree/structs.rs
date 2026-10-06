@@ -38,6 +38,11 @@ impl ProjectTree {
         Self { entries, children }
     }
 
+    /// Whether the tree lists `path`, a file or a folder.
+    pub fn has(&self, path: &str) -> bool {
+        self.children.get(parent(path)).is_some_and(|list| list.iter().any(|&i| self.entries[i].path == path))
+    }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

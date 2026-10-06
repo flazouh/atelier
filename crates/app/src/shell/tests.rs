@@ -714,6 +714,70 @@ fn the_files_views_tabs_stand_in_the_title_bar(cx: &mut TestAppContext) {
     assert!(tab.bottom() <= gpui_kit::px(super::types::TITLE_BAR), "the tab is in the title bar: {tab:?}");
 }
 
+/// A name typed in the tree makes a file, renames one and copies one on the disk, and the tree lists the result.
+#[gpui_kit::test]
+fn the_tree_makes_renames_and_copies_files_on_the_disk(cx: &mut TestAppContext) {
+    use crate::open_project::tree_edit::TreeEditKind;
+    let (shell, cx, dir) = with_a_session(cx, 1600.);
+    open_files_from_the_menu(&shell, cx);
+    let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+    let type_name = |kind: TreeEditKind, name: &str, cx: &mut gpui_kit::VisualTestContext| {
+        project.update_in(cx, |p, window, cx| p.start_tree_edit(kind, window, cx));
+        settle(&shell, cx);
+        assert!(cx.debug_bounds("tree-edit-row").is_some(), "the name has a row in the tree");
+        let input = project.read_with(cx, |p, _| p.tree_edit.as_ref().unwrap().input.clone());
+        input.update_in(cx, |i, window, cx| i.set_value(name, window, cx));
+        project.update(cx, |p, cx| p.commit_tree_edit(cx));
+        settle(&shell, cx);
+    };
+    type_name(TreeEditKind::NewFile { parent: String::new() }, "b.txt", cx);
+    assert!(dir.path().join("b.txt").exists(), "a new file is made");
+    type_name(TreeEditKind::NewFolder { parent: String::new() }, "docs", cx);
+    assert!(dir.path().join("docs").is_dir(), "a new folder is made");
+    type_name(TreeEditKind::Rename { path: "a.txt".into() }, "c.txt", cx);
+    assert!(!dir.path().join("a.txt").exists() && dir.path().join("c.txt").exists(), "a file is renamed");
+    assert!(cx.debug_bounds("tree-row-c.txt").is_some(), "and the tree lists it under its new name");
+    project.update(cx, |p, cx| p.duplicate("c.txt", cx));
+    settle(&shell, cx);
+    assert_eq!(std::fs::read_to_string(dir.path().join("c copy.txt")).unwrap(), "a", "a copy beside it");
+    // A name that is there already is refused, and the typing stays.
+    project.update_in(cx, |p, window, cx| p.start_tree_edit(TreeEditKind::NewFile { parent: String::new() }, window, cx));
+    let input = project.read_with(cx, |p, _| p.tree_edit.as_ref().unwrap().input.clone());
+    input.update_in(cx, |i, window, cx| i.set_value("b.txt", window, cx));
+    project.update(cx, |p, cx| p.commit_tree_edit(cx));
+    settle(&shell, cx);
+    assert!(project.read_with(cx, |p, _| p.tree_edit.is_some()), "the name is kept to change");
+}
+
+/// A mention from the tree waits as a chip in the composer of the session chosen.
+#[gpui_kit::test]
+fn a_file_mentioned_from_the_tree_is_a_chip_in_the_session(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    let (project, session) = shell.read_with(cx, |s, cx| {
+        let project = s.active().cloned().unwrap();
+        let session = project.read(cx).sessions[0].clone();
+        (project, session)
+    });
+    project.update(cx, |p, cx| p.mention_in(&session, "src/a.rs", cx));
+    settle(&shell, cx);
+    let chips = cx.update(|_, cx| session.read(cx).composer.read(cx).chips().iter().map(|c| (c.label.to_string(), c.mention.clone().map(|m| m.to_string()))).collect::<Vec<_>>());
+    assert_eq!(chips, [("a.rs".to_string(), Some("@src/a.rs".to_string()))]);
+}
+
+/// The right press on a row opens the menu with what a file offers, and the empty part of the tree opens a shorter one.
+#[gpui_kit::test]
+fn the_tree_has_a_menu_on_a_right_press(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    open_files_from_the_menu(&shell, cx);
+    let row = cx.debug_bounds("tree-row-a.txt").expect("the tree lists a.txt");
+    cx.simulate_mouse_down(row.center(), gpui_kit::MouseButton::Right, gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    for item in ["tree-new-file", "tree-new-folder", "tree-rename", "tree-duplicate", "tree-delete", "tree-copy-path", "tree-copy-relative", "tree-mention"] {
+        assert!(cx.debug_bounds(item).is_some(), "the file's menu has {item}");
+    }
+    assert!(cx.debug_bounds("tree-collapse").is_none(), "a file has no folders to collapse");
+}
+
 /// The tabs leave room for the ⋯ of the layout menu, where it stands.
 #[test]
 fn the_tabs_leave_room_for_the_layout_menu() {
