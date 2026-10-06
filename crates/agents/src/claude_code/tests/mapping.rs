@@ -383,7 +383,7 @@ fn a_signal_with_no_stderr_says_only_that() {
     let mut mapper = ClaudeLineMapper::new();
     mapper.user_sent("m1".into());
     let events = mapper.exited(None, "  \n");
-    assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("the agent was stopped by a signal".into()))));
+    assert!(events.iter().any(|e| matches!(e, Event::TurnEnded(end) if end.outcome == TurnOutcome::Failed("the agent ended with no exit code: a signal stopped it, or its connection dropped".into()))));
 }
 
 /// A shell command run in the background is the call that started it, still running: `claude` reports it

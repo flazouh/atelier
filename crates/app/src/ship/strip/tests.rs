@@ -168,6 +168,23 @@ fn a_drafted_branch_name_that_is_taken_gets_a_number(cx: &mut TestAppContext) {
     });
     cx.update(|_, cx| assert_eq!(strip.read(cx).new_branch.read(cx).value().as_ref(), "fix/keep-two-2"));
 }
+
+/// A commit with no message says what is missing, and leaves the card open and the branch alone.
+#[gpui_kit::test]
+fn a_commit_with_no_message_says_so(cx: &mut TestAppContext) {
+    let (dir, _pane, strip, cx) = opened_strip(cx, |_| {});
+    let head = String::from_utf8(Git::new("git").args(["rev-parse", "HEAD"]).current_dir(&dir).output().unwrap().stdout).unwrap();
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.message.update(cx, |m, cx| m.set_value("", window, cx))));
+    cx.update(|window, cx| strip.update(cx, |s, cx| s.commit(window, cx)));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let s = strip.read(cx);
+        assert_eq!(s.stage, Stage::Open);
+        assert_eq!(s.refused.as_deref(), Some("Write a commit message first"));
+    });
+    let after = String::from_utf8(Git::new("git").args(["rev-parse", "HEAD"]).current_dir(&dir).output().unwrap().stdout).unwrap();
+    assert_eq!(after, head, "nothing was committed");
+}
 /// A hook that refuses the commit keeps the card open with its words, and leaves the reader where
 /// they were: on their branch, with no new branch made. Commit works once the hook agrees.
 #[gpui_kit::test]

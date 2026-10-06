@@ -82,7 +82,7 @@ pub fn stderr_tail(stderr: &str) -> String {
 pub fn exit_why(code: Option<i32>, tail: &str) -> String {
     let how = match code {
         Some(code) => format!("the agent exited with code {code}"),
-        None => "the agent was stopped by a signal".to_string(),
+        None => "the agent ended with no exit code: a signal stopped it, or its connection dropped".to_string(),
     };
     match tail.lines().rev().find(|line| !line.trim().is_empty()).map(str::trim) {
         Some(line) => format!("{how}: {line}"),
@@ -129,7 +129,7 @@ pub fn run(project: &dyn Project, command: &Command, cancelled: &AtomicBool) -> 
     match code {
         Some(0) => Ok(()),
         _ => {
-            let how = code.map_or_else(|| "it was stopped by a signal".to_string(), |code| format!("it exited with code {code}"));
+            let how = code.map_or_else(|| "it ended with no exit code: a signal stopped it, or its connection dropped".to_string(), |code| format!("it exited with code {code}"));
             let tail = stderr_tail(&control.stderr());
             Err(match tail.lines().rev().find(|line| !line.trim().is_empty()).map(str::trim) {
                 Some(line) => format!("{how}: {line}"),
