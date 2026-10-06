@@ -261,6 +261,26 @@ mod conversation {
         assert_eq!(answers, [Answer::Answered(ChoiceKind::Allow), Answer::Withdrawn], "an answered request stays answered");
     }
 
+    /// A question nobody can answer is withdrawn: the session ended (Stop drops it, or its process died), or the turn that
+    /// asked it is over. Its buttons must not stay live.
+    #[test]
+    fn a_question_nobody_can_answer_is_withdrawn() {
+        let request = |id: &str| PermissionRequest { id: RequestId::new(id), call: call("t", "Write", None), reason: None, choices: vec![] };
+        let answers = |conversation: &Conversation| -> Vec<Answer> {
+            conversation.items().iter().filter_map(|item| if let Item::Permission { answer, .. } = item { Some(*answer) } else { None }).collect()
+        };
+        for ending in [
+            Event::Ended(EndReason::Closed),
+            Event::Ended(EndReason::Exited { code: None, stderr: String::new() }),
+            Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Interrupted, summary: None }),
+        ] {
+            let mut conversation = fold(vec![Event::Permission(request("a")), Event::Permission(request("b"))]);
+            conversation.answered(&RequestId::new("a"), ChoiceKind::Allow);
+            conversation.apply(&ending);
+            assert_eq!(answers(&conversation), [Answer::Answered(ChoiceKind::Allow), Answer::Withdrawn], "after {ending:?}");
+        }
+    }
+
     #[test]
     fn a_notice_has_no_colour_codes() {
         let mut conversation = Conversation::new();

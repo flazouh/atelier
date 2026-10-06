@@ -228,6 +228,7 @@ impl Conversation {
             Event::SignedOut => self.signed_out = true,
             Event::TurnEnded(end) => {
                 self.working = false;
+                self.withdraw_questions();
                 // A turn that ran shows the agent is signed in, whoever signed it in.
                 self.signed_out &= end.outcome != TurnOutcome::Completed;
                 // The notice for a missing sign-in says it, and a reached usage limit has its own box with the
@@ -244,7 +245,20 @@ impl Conversation {
             Event::Warning(text) => self.items.push(Item::Notice(crate::subprocess::strip_ansi(text))),
             Event::Ended(reason) => {
                 self.working = false;
+                self.withdraw_questions();
                 self.ended = Some(reason.clone());
+            }
+        }
+    }
+
+    /// A question nobody can answer any more, for its turn or its session is over, is withdrawn: its buttons must not stay
+    /// live.
+    fn withdraw_questions(&mut self) {
+        for item in &mut self.items {
+            if let Item::Permission { answer, .. } = item
+                && *answer == Answer::Asking
+            {
+                *answer = Answer::Withdrawn;
             }
         }
     }
