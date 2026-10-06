@@ -16,6 +16,7 @@ use gpui_kit::{
 
 use crate::providers::{self, Choice, DefaultProvider};
 use super::{SettingsPane, helpers::save};
+use crate::control::marked;
 
 /// The narrowest a card gets before its row wraps: two to a row in the page's column.
 const CARD_MIN_W: f32 = 220.;
@@ -364,16 +365,16 @@ impl SettingsPane {
                         div()
                             .flex()
                             .gap(px(6.))
-                            .child(Button::new("keep-key").label("Keep in the keychain").variant(ButtonVariant::Secondary).on_click(move |_, _, cx| {
+                            .child(marked("keep-key", Button::new("keep-key").label("Keep in the keychain").variant(ButtonVariant::Secondary).on_click(move |_, _, cx| {
                                 let key = value.read(cx).value().to_string();
                                 pane.update(cx, |p, cx| p.keep_key(key, cx)).ok();
-                            }))
-                            .child(Button::new("cancel-key").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                            })))
+                            .child(marked("cancel-key", Button::new("cancel-key").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
                                 cancel.update(cx, |p, cx| {
                                     p.providers.key_field = None;
                                     cx.notify();
                                 }).ok();
-                            })),
+                            }))),
                     )
                     .into_any_element()
             }
@@ -406,16 +407,16 @@ impl SettingsPane {
                             .flex()
                             .items_center()
                             .gap(px(6.))
-                            .child(Button::new("test-key").label("Test").variant(ButtonVariant::Secondary).disabled(page.check == KeyCheck::Checking).on_click(move |_, _, cx| {
+                            .child(marked("test-key", Button::new("test-key").label("Test").variant(ButtonVariant::Secondary).disabled(page.check == KeyCheck::Checking).on_click(move |_, _, cx| {
                                 test.update(cx, |p, cx| p.test_key(cx)).ok();
-                            }))
-                            .child(Button::new("replace-key").label("Replace key").variant(ButtonVariant::Ghost).on_click(move |_, window, cx| {
+                            })))
+                            .child(marked("replace-key", Button::new("replace-key").label("Replace key").variant(ButtonVariant::Ghost).on_click(move |_, window, cx| {
                                 replace.update(cx, |p, cx| p.open_key_field(window, cx)).ok();
-                            }))
+                            })))
                             .child(div().flex_1())
-                            .child(Button::new("forget-key").label("Forget").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
+                            .child(marked("forget-key", Button::new("forget-key").label("Forget").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
                                 forget.update(cx, |p, cx| p.forget_key(cx)).ok();
-                            })),
+                            }))),
                     )
                     .into_any_element()
             }
@@ -425,9 +426,9 @@ impl SettingsPane {
                     .flex()
                     .items_center()
                     .gap(px(6.))
-                    .child(Button::new("add-key").label("Add a key").icon(IconName::Add).variant(ButtonVariant::Secondary).on_click(move |_, window, cx| {
+                    .child(marked("add-key", Button::new("add-key").label("Add a key").icon(IconName::Add).variant(ButtonVariant::Secondary).on_click(move |_, window, cx| {
                         add.update(cx, |p, cx| p.open_key_field(window, cx)).ok();
-                    }))
+                    })))
                     .child(div().flex_1())
                     .child(Button::new("openrouter-site").label("Get a key").trailing_icon(IconName::OpenInNew).variant(ButtonVariant::Ghost).on_click(|_, _, cx| {
                         cx.open_url(OPENROUTER_SITE);

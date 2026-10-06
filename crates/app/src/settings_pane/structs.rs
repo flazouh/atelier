@@ -105,6 +105,11 @@ impl SettingsPane {
         cx.notify();
     }
 
+    /// The section that is open.
+    pub(crate) fn section(&self) -> Section {
+        self.section
+    }
+
     pub(crate) fn show(&mut self, section: Section, cx: &mut Context<Self>) {
         self.section = section;
         if section == Section::Dictation {
@@ -482,7 +487,7 @@ impl Render for SettingsPane {
             .children(Section::ALL.into_iter().map(|section| {
                 let pane = this.clone();
                 let front = section == self.section;
-                div()
+                crate::control::marked(section.entry(), div()
                     .id(section.entry())
                     .debug_selector(move || section.entry().to_string())
                     .flex()
@@ -498,7 +503,7 @@ impl Render for SettingsPane {
                     .on_click(move |_, _, cx| {
                         pane.update(cx, |p, cx| p.show(section, cx)).ok();
                     })
-                    .child(section.words())
+                    .child(section.words()))
             }));
         div()
             .id("settings-pane")

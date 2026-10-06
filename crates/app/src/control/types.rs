@@ -12,6 +12,10 @@ pub enum Request {
     Find { name: String },
     /// A press on a marked element's centre, or on a point (`x`, `y`) of the window.
     Click { name: Option<String>, x: Option<f32>, y: Option<f32> },
+    /// A press on a marked element, as a pointer makes it: onto the element, down, then up, one frame apart.
+    Press { name: String },
+    /// The names of the elements that can be found and pressed, as they were last drawn.
+    Marks,
     /// Brings a view to the front by the name the settings keep it by: sessions, tasks, pulls, files or git.
     View { name: String },
     /// Opens the folder at `path`, on `host` over SSH when one is named, as the add menu does.

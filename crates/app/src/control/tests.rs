@@ -22,6 +22,9 @@ fn a_line_names_its_command() {
         Request::Edit { path: "a.txt".into(), text: "x".into() }
     );
     assert!(serde_json::from_str::<Request>(r#"{"cmd":"edit","path":"a.txt"}"#).is_err(), "an edit needs its text");
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"press","name":"a"}"#).unwrap(), Request::Press { name: "a".into() });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"marks"}"#).unwrap(), Request::Marks);
+    assert!(serde_json::from_str::<Request>(r#"{"cmd":"press"}"#).is_err(), "a press needs its name");
     assert!(serde_json::from_str::<Request>(r#"{"cmd":"explode"}"#).is_err());
     assert!(serde_json::from_str::<Request>(r#"{"cmd":"send"}"#).is_err(), "a message needs its text");
 }

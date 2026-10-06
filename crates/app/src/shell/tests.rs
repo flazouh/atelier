@@ -1226,3 +1226,20 @@ fn a_long_project_name_on_a_long_host_stays_inside_the_sidebar_head(cx: &mut Tes
 }
 
 mod updates;
+
+/// A script presses the Settings button and a section by name, with no pointer, and the page answers.
+#[gpui_kit::test]
+fn a_script_opens_the_providers_page_by_pressing_names(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let press = |name: &str, cx: &mut gpui_kit::VisualTestContext| {
+        let at = cx.update(|_, cx| crate::control::find(name, cx)).unwrap_or_else(|| panic!("{name} was not drawn")).center();
+        cx.update(|window, cx| crate::control::press_in_steps(window, at, cx));
+        settle(&shell, cx);
+        settle(&shell, cx);
+    };
+    assert_eq!(shell.read_with(cx, |s, cx| s.settings_section(cx)), None, "the page starts closed");
+    press("settings-entry", cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.settings_section(cx)), Some("section-appearance"));
+    press("section-providers", cx);
+    assert_eq!(shell.read_with(cx, |s, cx| s.settings_section(cx)), Some("section-providers"));
+}
