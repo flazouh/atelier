@@ -69,19 +69,6 @@ fn a_failed_start_is_retried_by_the_next_message(cx: &mut TestAppContext) {
     assert!(fake.received.lock().unwrap().iter().any(|c| matches!(c, Command::Send { text, .. } if text == "hello")), "and the message went");
 }
 
-/// A message sent while a question waits queues behind it: the session still needs the reader, and does not say it works.
-#[gpui_kit::test]
-fn a_message_sent_over_a_waiting_question_leaves_the_session_needing_the_reader(cx: &mut TestAppContext) {
-    let (session, _fake, cx) = start(cx, vec![vec![Event::Permission(ask())]], false);
-    cx.update(|_, cx| session.update(cx, |s, cx| s.send("write a.txt".into(), cx)));
-    cx.run_until_parked();
-    let waiting = SessionStatus::NeedsYou(atelier_ui::session_status::Need::Approval);
-    assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), waiting);
-    cx.update(|_, cx| session.update(cx, |s, cx| s.send("and one more thing".into(), cx)));
-    cx.run_until_parked();
-    assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), waiting, "the question still waits");
-}
-
 /// Streaming text joins into one row, and only the rows that changed are measured again.
 #[gpui_kit::test]
 fn a_stream_folds_into_one_row(cx: &mut TestAppContext) {
@@ -1090,4 +1077,17 @@ fn the_composer_shows_the_mode_the_agent_reports(cx: &mut TestAppContext) {
     agent(Event::Started(Started { session: atelier_agents::session::SessionId::new("s"), model: None, mode: Some(PermissionMode::Ask), commands: Vec::new() }));
     cx.run_until_parked();
     assert_eq!(word(cx), Some(crate::agent_session::helpers::mode_word(PermissionMode::Ask).to_string()), "and follows it back");
+}
+
+/// A message sent while a question waits queues behind it: the session still needs the reader, and does not say it works.
+#[gpui_kit::test]
+fn a_message_sent_over_a_waiting_question_leaves_the_session_needing_the_reader(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![vec![Event::Permission(ask())]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("write a.txt".into(), cx)));
+    cx.run_until_parked();
+    let waiting = SessionStatus::NeedsYou(atelier_ui::session_status::Need::Approval);
+    assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), waiting);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("and one more thing".into(), cx)));
+    cx.run_until_parked();
+    assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), waiting, "the question still waits");
 }
