@@ -1256,3 +1256,14 @@ fn a_script_opens_the_providers_page_by_pressing_names(cx: &mut TestAppContext) 
     press("section-providers", cx);
     assert_eq!(shell.read_with(cx, |s, cx| s.settings_section(cx)), Some("section-providers"));
 }
+
+/// The count on the Changes row is the checkout's once it is read: a clean checkout shows none whatever the session changed.
+#[test]
+fn the_changes_count_is_the_checkouts_once_it_is_read() {
+    use crate::history::{CommitFile, Read};
+    let file = |path: &str| CommitFile { path: path.to_string().into(), change: atelier_ui::FileChange::Modified, lines: vec![] };
+    assert_eq!(super::helpers::changes_badge(None, 3), Some(3), "before git is read, the session's count");
+    assert_eq!(super::helpers::changes_badge(Some(&Read::Reading), 0), None);
+    assert_eq!(super::helpers::changes_badge(Some(&Read::Ready(vec![])), 3), None, "a clean checkout shows none");
+    assert_eq!(super::helpers::changes_badge(Some(&Read::Ready(vec![file("a"), file("b")])), 0), Some(2));
+}

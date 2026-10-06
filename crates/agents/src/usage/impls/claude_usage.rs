@@ -43,6 +43,15 @@ impl ClaudeUsage {
         Ok(reading.note(extra_usage(value.get("extra_usage"))))
     }
 
+    /// Why the usage call failed, in words that say what to do: a refused sign-in is renewed in Claude, and a call that was
+    /// asked for too often comes back by itself.
+    pub(in super::super) fn fetch_failed(error: &ureq::Error) -> String {
+        match error {
+            ureq::Error::StatusCode(401 | 403) => "Claude's sign-in was refused: open Claude once to renew it".into(),
+            ureq::Error::StatusCode(429) => "Claude's usage was asked for too often: it shows again in a few minutes".into(),
+            error => format!("Claude's usage could not be reached: {error}"),
+        }
+    }
     fn fetch(token: &str) -> Result<String, String> {
         let agent: ureq::Agent = ureq::Agent::config_builder()
             .timeout_global(Some(std::time::Duration::from_secs(CLAUDE_TIMEOUT_SECS)))
@@ -51,8 +60,7 @@ impl ClaudeUsage {
         let answer = agent.get(CLAUDE_URL).header("Authorization", format!("Bearer {token}")).header(CLAUDE_BETA.0, CLAUDE_BETA.1).call();
         match answer {
             Ok(mut answer) => answer.body_mut().read_to_string().map_err(|e| format!("Claude's usage could not be read: {e}")),
-            Err(ureq::Error::StatusCode(401 | 403)) => Err("Claude's sign-in was refused: open Claude once to renew it".into()),
-            Err(error) => Err(format!("Claude's usage could not be reached: {error}")),
+            Err(error) => Err(Self::fetch_failed(&error)),
         }
     }
 }

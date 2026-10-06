@@ -62,3 +62,11 @@ fn no_sign_in_says_so_without_echoing_what_was_read() {
         assert_eq!(ClaudeUsage::token(text, NOW), Err("Claude is not signed in on this machine".into()), "{text:?}");
     }
 }
+
+/// A call asked for too often says it comes back by itself, and a refused sign-in says what to do.
+#[test]
+fn a_failed_call_says_what_to_do() {
+    assert!(ClaudeUsage::fetch_failed(&ureq::Error::StatusCode(429)).contains("shows again"));
+    assert!(ClaudeUsage::fetch_failed(&ureq::Error::StatusCode(401)).contains("open Claude once"));
+    assert!(ClaudeUsage::fetch_failed(&ureq::Error::StatusCode(500)).contains("could not be reached"));
+}
