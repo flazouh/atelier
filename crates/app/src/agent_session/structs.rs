@@ -772,7 +772,10 @@ impl AgentSession {
         self.asked_turn = true;
         // Running from the moment it goes, not from the agent's first word: ⌘↵ before then queues.
         self.composer.update(cx, |c, cx| c.set_running(true, cx));
-        self.status = status::sent();
+        // A question that waits is still the reader's to answer: the agent is not working, whatever else they send.
+        if !self.conversation.asking() {
+            self.status = status::sent();
+        }
         self.problem = None;
         self.stderr = None;
         self.refresh_rows();

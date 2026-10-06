@@ -70,6 +70,11 @@ impl Conversation {
         self.signed_out
     }
 
+    /// Whether a question waits for the reader's answer.
+    pub fn asking(&self) -> bool {
+        self.items.iter().any(|item| matches!(item, Item::Permission { answer: Answer::Asking, .. }))
+    }
+
     /// Whether a turn is open: the agent works, or waits for an answer.
     pub fn working(&self) -> bool {
         self.working
