@@ -69,6 +69,7 @@ impl Vitals {
             Ok(reading) => Some(gauges(name, lead, reading)),
             Err(why) => match at {
                 Some(at) => Some(failed(self.providers[at].clone(), why)),
+                None if ClaudeUsage::proves_account(&why) => Some(failed(ProviderGauge::new(name.to_string(), lead), why)),
                 None => None,
             },
         };

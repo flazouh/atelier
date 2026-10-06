@@ -14,7 +14,15 @@ use super::super::{
 const WINDOWS: [(&str, &str); 4] =
     [("five_hour", "5h"), ("seven_day", "7d"), ("seven_day_opus", "Opus 7d"), ("seven_day_sonnet", "Sonnet 7d")];
 
+const RUN_OUT: &str = "Claude's sign-in has run out: open Claude once to renew it";
+const REFUSED: &str = "Claude's sign-in was refused: open Claude once to renew it";
+const TOO_OFTEN: &str = "Claude's usage was asked for too often: it shows again in a few minutes";
 impl ClaudeUsage {
+    /// Whether a failure proves there is a Claude account, so the status bar shows the chip with the reason: a sign-in
+    /// that ran out or was refused, or a call asked for too often. Not being signed in at all is not that.
+    pub fn proves_account(why: &str) -> bool {
+        [RUN_OUT, REFUSED, TOO_OFTEN].contains(&why)
+    }
     /// The access token in the sign-in `credentials` holds, unless it has run out at `now`.
     pub(in super::super) fn token(credentials: &str, now: i64) -> Result<String, String> {
         let signed_in = || "Claude is not signed in on this machine".to_string();
@@ -23,7 +31,7 @@ impl ClaudeUsage {
         let token = oauth.get("accessToken").and_then(Value::as_str).filter(|t| !t.is_empty()).ok_or_else(signed_in)?;
         let expired = oauth.get("expiresAt").and_then(Value::as_i64).is_some_and(|at_ms| at_ms / 1000 <= now);
         if expired {
-            return Err("Claude's sign-in has run out: open Claude once to renew it".into());
+            return Err(RUN_OUT.into());
         }
         Ok(token.to_string())
     }
@@ -47,8 +55,8 @@ impl ClaudeUsage {
     /// asked for too often comes back by itself.
     pub(in super::super) fn fetch_failed(error: &ureq::Error) -> String {
         match error {
-            ureq::Error::StatusCode(401 | 403) => "Claude's sign-in was refused: open Claude once to renew it".into(),
-            ureq::Error::StatusCode(429) => "Claude's usage was asked for too often: it shows again in a few minutes".into(),
+            ureq::Error::StatusCode(401 | 403) => REFUSED.into(),
+            ureq::Error::StatusCode(429) => TOO_OFTEN.into(),
             error => format!("Claude's usage could not be reached: {error}"),
         }
     }
