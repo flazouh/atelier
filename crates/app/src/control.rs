@@ -18,6 +18,8 @@ mod types;
 
 pub use helpers::{serve, socket_path};
 pub use marks::marked;
+#[cfg(test)]
+pub(crate) use {helpers::press_in_steps, marks::find};
 
 #[cfg(test)]
 mod tests;

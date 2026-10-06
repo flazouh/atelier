@@ -1496,15 +1496,20 @@ impl Shell {
     /// The Settings button at the top right, lit while the page is open.
     fn settings_button(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity();
-        Button::new("settings-entry")
+        let button = Button::new("settings-entry")
             .debug_name("settings-entry")
             .icon(atelier_ui::IconName::Settings)
             .variant(ButtonVariant::Ghost)
             .size(ButtonSize::IconSm)
             .tooltip("Settings")
             .open(self.settings.is_some())
-            .on_click(move |_, window, cx| this.update(cx, |this, cx| this.open_settings(&OpenSettings, window, cx)))
-            .into_any_element()
+            .on_click(move |_, window, cx| this.update(cx, |this, cx| this.open_settings(&OpenSettings, window, cx)));
+        crate::control::marked("settings-entry", button)
+    }
+
+    /// The section of the Settings page that is open, by the name of its entry, or none when the page is closed.
+    pub fn settings_section(&self, cx: &App) -> Option<&'static str> {
+        self.settings.as_ref().map(|(pane, _)| pane.read(cx).section().entry())
     }
 
     fn close_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {

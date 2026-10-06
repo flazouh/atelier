@@ -34,6 +34,7 @@ type Call = (Request, mpsc::Sender<String>);
 
 /// Listens at `path` and answers the requests on the UI thread, in the order they came.
 pub fn serve(shell: WeakEntity<Shell>, window: AnyWindowHandle, path: PathBuf, cx: &mut App) {
+    super::marks::enable();
     _ = std::fs::remove_file(&path);
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
@@ -127,12 +128,21 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
             match at {
                 Some(position) => {
                     // The press runs once the shell is no longer being updated, so a handler can update it.
-                    window.defer(cx, move |window, cx| press(window, position, cx));
+                    window.defer(cx, move |window, cx| press_in_steps(window, position, cx));
                     json!({ "ok": true, "x": f32::from(position.x), "y": f32::from(position.y) })
                 }
                 None => json!({ "error": "click needs a name that has been drawn, or x and y" }),
             }
         }
+        Request::Press { name } => match super::marks::find(&name, cx) {
+            Some(b) => {
+                let position = b.center();
+                window.defer(cx, move |window, cx| press_in_steps(window, position, cx));
+                json!({ "ok": true, "x": f32::from(position.x), "y": f32::from(position.y) })
+            }
+            None => json!({ "error": format!("{name} has not been drawn"), "marks": super::marks::names(cx) }),
+        },
+        Request::Marks => json!({ "marks": super::marks::names(cx) }),
         Request::View { name } => {
             let view = crate::shell::ShellView::from_words(Some(&name));
             if view.words() != name {
@@ -191,7 +201,7 @@ fn state(shell: &Shell, cx: &App) -> Value {
         .collect();
     let theme = atelier_ui::theme::ActiveTheme::theme(cx);
     let updates = cx.try_global::<crate::updater::Updater>().is_some_and(crate::updater::Updater::available);
-    json!({ "unsaved": shell.unsaved(cx), "updates": { "available": updates }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
+    json!({ "settings": shell.settings_section(cx), "unsaved": shell.unsaved(cx), "updates": { "available": updates }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
 }
 
 /// One session: who the agent is, how it stands, and the rows its list shows.
@@ -235,11 +245,19 @@ fn cut(text: &str) -> String {
     text.chars().take(TEXT_KEPT).collect()
 }
 
-/// A left press and release at `position`, as the pointer would do.
-fn press(window: &mut Window, position: gpui_kit::Point<gpui_kit::Pixels>, cx: &mut App) {
+/// A press the way a hand makes it: the pointer comes onto the element, then it goes down, then it lets go.
+/// Each step runs once the one before has been handled, so the element knows it is hovered when the press arrives.
+/// No step waits for a frame, so a window that nothing is drawing, as one under another window, takes the press too.
+pub(crate) fn press_in_steps(window: &mut Window, position: gpui_kit::Point<gpui_kit::Pixels>, cx: &mut App) {
     use gpui_kit::{Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput};
     let modifiers = Modifiers::default();
     window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position, pressed_button: None, modifiers }), cx);
-    window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: MouseButton::Left, position, modifiers, click_count: 1, first_mouse: false }), cx);
-    window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: MouseButton::Left, position, modifiers, click_count: 1 }), cx);
+    window.defer(cx, move |window, cx| {
+        let down = MouseDownEvent { button: MouseButton::Left, position, modifiers, click_count: 1, first_mouse: false };
+        window.dispatch_event(PlatformInput::MouseDown(down), cx);
+        window.defer(cx, move |window, cx| {
+            let up = MouseUpEvent { button: MouseButton::Left, position, modifiers, click_count: 1 };
+            window.dispatch_event(PlatformInput::MouseUp(up), cx);
+        });
+    });
 }
