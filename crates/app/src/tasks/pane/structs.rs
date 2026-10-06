@@ -523,14 +523,14 @@ impl Render for TasksPane {
             })
             .child(
                 Button::new("tasks-new")
-                    .label("New issue")
+                    .label("New task")
                     .variant(ButtonVariant::Secondary)
                     .size(ButtonSize::Sm)
                     .cap("c")
                     .on_click(move |_, window, cx| pane.update(cx, |p, cx| p.new_task(window, cx))),
             );
         let body = match (&self.load, &self.open, mode) {
-            (Load::Loading, ..) => div().flex_1().flex().items_center().justify_center().text_color(muted).child("Reading the issues…").into_any_element(),
+            (Load::Loading, ..) => div().flex_1().flex().items_center().justify_center().text_color(muted).child("Reading the tasks…").into_any_element(),
             (Load::Failed(why), ..) => {
                 div().flex_1().flex().items_center().justify_center().px(px(24.)).text_color(muted).child(why.clone()).into_any_element()
             }

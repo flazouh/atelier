@@ -1891,7 +1891,7 @@ impl Shell {
             let p = project.read(cx);
             match p.front() {
                 crate::open_project::front::Front::Pulls => Some("Pull requests"),
-                crate::open_project::front::Front::Tasks => Some("Issues"),
+                crate::open_project::front::Front::Tasks => Some("Tasks"),
                 crate::open_project::front::Front::Editor => None,
             }
         };

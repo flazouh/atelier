@@ -1,5 +1,5 @@
 //! The views of a window, one on screen at a time. The rail holds three lenses: Sessions (every project's
-//! sessions and their panels), Issues (one project's tasks) and Code (one project's pull requests, files and
+//! sessions and their panels), Tasks (one project's tasks) and Code (one project's pull requests, files and
 //! changes). Code is four views: Pulls, Files (the tree and the editor), History (the branch's commits) and
 //! Git (the focused session's changed files and their review).
 
@@ -39,7 +39,7 @@ impl ShellView {
         }
     }
 
-    /// The lenses the left rail switches between, in its order: Sessions, Issues, Code. Code is named by Git.
+    /// The lenses the left rail switches between, in its order: Sessions, Tasks, Code. Code is named by Git.
     pub const ON_RAIL: [Self; 3] = [Self::Sessions, Self::Tasks, Self::Git];
 
     /// The views of the Code lens, in the order its sidebar lists them.
