@@ -871,6 +871,22 @@ impl AgentSession {
         cx.emit(SessionEvent::Changed);
     }
 
+    /// Answers the questions the agent asked: each question's text, and the label or labels the reader picked.
+    pub fn answer_questions(&mut self, request: &atelier_agents::session::RequestId, answers: Vec<(String, String)>, cx: &mut Context<Self>) {
+        let call = self.conversation.items().iter().find_map(|item| match item {
+            Item::Permission { request: r, answer: Answer::Asking } if r.id == *request => Some(r.call.id.as_str().to_string()),
+            _ => None,
+        });
+        let Some(call) = call else { return };
+        self.reviews.approvals.insert(call, crate::review_state::Approval::Approved);
+        self.save_review(cx);
+        self.conversation.answered_questions(request, answers.clone());
+        self.status = status::sent();
+        self.refresh_rows();
+        self.command(Command::AnswerQuestions { request: request.clone(), answers }, cx);
+        cx.emit(SessionEvent::Changed);
+    }
+
     pub fn set_model(&mut self, model: String, cx: &mut Context<Self>) {
         self.model = Some(model.clone());
         if self.session.is_some() {

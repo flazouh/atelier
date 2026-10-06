@@ -18,6 +18,7 @@ use atelier_project::Project;
 
 pub use map::{ClaudeLineMapper, LineMapper};
 pub use store::history;
+pub use tools::ASK_QUESTION;
 
 use crate::{
     session::{
