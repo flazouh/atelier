@@ -1,7 +1,7 @@
 use serde_json::json;
 
 use crate::{
-    claude_code::accounts::{is_account_name, parse_accounts},
+    claude_code::accounts::{LIST_SCRIPT, is_account_name, parse_accounts, sign_in_command},
     session::Account,
 };
 
@@ -76,4 +76,53 @@ fn an_account_name_is_letters_digits_dashes_and_underscores() {
     for name in ["", LOCK_FOLDER, "a b", "../x"] {
         assert!(!is_account_name(name), "{name}");
     }
+}
+
+/// The folders in a home, with a `claude` that says it is signed in only where `.signed-in` lies in the folder.
+fn names_listed_in(home: &std::path::Path) -> Vec<String> {
+    let stub = home.join("claude");
+    std::fs::write(&stub, "#!/bin/sh\n[ -e \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.signed-in\" ] && echo '{\"loggedIn\":true}' || echo '{\"loggedIn\":false}'\n").unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(&stub).status().unwrap();
+    let out = std::process::Command::new("sh").args(["-c", LIST_SCRIPT]).arg(&stub).env("HOME", home).output().unwrap();
+    parse_accounts(&String::from_utf8_lossy(&out.stdout)).into_iter().map(|a| a.name).collect()
+}
+
+fn folder(home: &std::path::Path, name: &str, files: &[(&str, &str)]) {
+    let dir = home.join(name);
+    std::fs::create_dir_all(&dir).unwrap();
+    for (file, text) in files {
+        std::fs::write(dir.join(file), text).unwrap();
+    }
+}
+
+#[test]
+fn a_folder_another_tool_keeps_is_not_an_account() {
+    let home = tempfile::tempdir().unwrap();
+    folder(home.path(), ".claude", &[]);
+    folder(home.path(), ".claude-openrouter", &[(".credentials.json", "{}"), (".signed-in", "")]);
+    folder(home.path(), ".claude-viaoauth", &[(".claude.json", r#"{"oauthAccount":{"emailAddress":"a@b.c"}}"#)]);
+    folder(home.path(), ".claude-code-router", &[("config.json", "{}"), (".claude.json", "{}")]);
+    folder(home.path(), ".claude-worktrees", &[(".claude.json", "{}")]);
+    assert_eq!(names_listed_in(home.path()), ["default", "openrouter", "viaoauth"]);
+}
+
+#[test]
+fn an_account_atelier_made_shows_before_its_sign_in_is_done() {
+    let home = tempfile::tempdir().unwrap();
+    folder(home.path(), ".claude-team", &[(".atelier-account", "")]);
+    assert_eq!(names_listed_in(home.path()), ["team"]);
+}
+
+#[test]
+fn the_sign_in_marks_the_folder_it_makes() {
+    let home = tempfile::tempdir().unwrap();
+    let stub = home.path().join("claude");
+    std::fs::write(&stub, "#!/bin/sh\ntrue\n").unwrap();
+    std::process::Command::new("chmod").arg("+x").arg(&stub).status().unwrap();
+    let command = sign_in_command(stub.to_str().unwrap(), "team");
+    let mut run = std::process::Command::new(&command.program);
+    run.args(&command.args).env("HOME", home.path());
+    run.envs(command.env.iter().cloned());
+    assert!(run.status().unwrap().success());
+    assert!(home.path().join(".claude-team/.atelier-account").exists());
 }
