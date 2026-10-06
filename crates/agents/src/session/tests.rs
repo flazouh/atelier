@@ -302,6 +302,17 @@ mod conversation {
             assert_eq!(status, Some(ToolStatus::Failed), "after {ending:?}");
         }
     }
+    /// The reader's answers to a question are kept with the request, and the call finds them.
+    #[test]
+    fn the_answers_to_a_question_are_kept_and_found_by_the_call() {
+        let asked = call("q", "AskUserQuestion", None);
+        let request = PermissionRequest { id: RequestId::new("r"), call: asked.clone(), reason: None, choices: vec![] };
+        let mut conversation = fold(vec![Event::ToolStarted(asked.clone()), Event::Permission(request)]);
+        assert_eq!(conversation.answers_of(&asked.id), None);
+        conversation.answered_questions(&RequestId::new("r"), vec![("Which toy?".into(), "Chain".into())]);
+        assert_eq!(conversation.answers_of(&asked.id), Some(&[("Which toy?".to_string(), "Chain".to_string())][..]));
+        assert!(!conversation.asking(), "the question is answered");
+    }
     #[test]
     fn a_notice_has_no_colour_codes() {
         let mut conversation = Conversation::new();

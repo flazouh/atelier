@@ -30,6 +30,8 @@ pub struct Conversation {
     last_turn: Option<TurnEnd>,
     pub(super) calls: HashMap<ToolId, Slot>,
     subagents: HashMap<ToolId, usize>,
+    /// What the reader answered to each question the agent asked: the question's text, and the label or labels picked.
+    question_answers: HashMap<RequestId, Vec<(String, String)>>,
 }
 
 impl Conversation {
@@ -136,6 +138,18 @@ impl Conversation {
         }
     }
 
+    /// The reader answered the agent's questions: the card shows the answers at once, and the request counts as allowed.
+    pub fn answered_questions(&mut self, request: &RequestId, answers: Vec<(String, String)>) {
+        self.answered(request, ChoiceKind::Allow);
+        self.question_answers.insert(request.clone(), answers);
+    }
+    /// What the reader answered to the question that call `call` asked, when it was answered here.
+    pub fn answers_of(&self, call: &ToolId) -> Option<&[(String, String)]> {
+        self.items.iter().find_map(|item| match item {
+            Item::Permission { request, .. } if request.call.id == *call => self.question_answers.get(&request.id).map(Vec::as_slice),
+            _ => None,
+        })
+    }
     pub fn apply(&mut self, event: &Event) {
         match event {
             Event::Started(started) => self.started = Some(started.clone()),

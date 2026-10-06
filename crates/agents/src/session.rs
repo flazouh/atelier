@@ -8,6 +8,7 @@ mod coalesce;
 mod command;
 mod conversation;
 mod event;
+mod question;
 #[cfg(test)]
 mod fake;
 
@@ -16,6 +17,7 @@ pub use backend::{
 };
 pub use coalesce::EventQueue;
 pub use conversation::{Answer, Call, Conversation, Item, SubagentStatus};
+pub use question::{Question, QuestionOption, answers_input, questions_of};
 pub use command::{Attachment, Command, ImageFormat, PermissionMode, message_text};
 pub use event::{
     BlockId, Choice, ChoiceId, ChoiceKind, ContextFill, ContextPart, EndReason, Event, FileEdit, Limit, LimitState, LimitWindow, PermissionRequest, RequestId, SessionId, Started,

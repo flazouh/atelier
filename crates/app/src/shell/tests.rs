@@ -498,6 +498,17 @@ fn a_file_picked_in_a_narrow_tree_shows_in_the_editor(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("editor-tab-0").is_some(), "the editor shows a.txt");
 }
 
+/// A tree row fills the list: its hover and its selection reach from one margin to the other, whatever the name.
+#[gpui_kit::test]
+fn a_tree_row_takes_the_full_width_of_the_tree(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    open_files_from_the_menu(&shell, cx);
+    settle(&shell, cx);
+    let tree = cx.debug_bounds("files-tree").expect("the tree shows");
+    let row = cx.debug_bounds("tree-row-a.txt").expect("the tree lists a.txt");
+    let (tree, row) = (f32::from(tree.size.width), f32::from(row.size.width));
+    assert!((tree - row - 12.).abs() < 1., "the row ({row}) fills the tree ({tree}) less its two 6 px margins");
+}
 /// Back in the Sessions view the caret is in the composer of the session in front: typing goes on there.
 #[gpui_kit::test]
 fn going_back_to_sessions_puts_the_caret_in_the_composer(cx: &mut TestAppContext) {

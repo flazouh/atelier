@@ -103,6 +103,8 @@ impl Attachment {
 pub enum Command {
     Send { text: String, attachments: Vec<Attachment> },
     Answer { request: RequestId, choice: ChoiceId },
+    /// The reader's answers to an agent's questions: each question's text, and the label (or labels, joined by a comma) picked.
+    AnswerQuestions { request: RequestId, answers: Vec<(String, String)> },
     Interrupt,
     SetModel { model: String },
     SetPermissionMode { mode: PermissionMode },

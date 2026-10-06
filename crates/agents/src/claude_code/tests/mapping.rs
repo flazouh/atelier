@@ -768,3 +768,51 @@ fn a_retry_whose_error_is_a_map_is_read() {
     // A line with an error of any other shape is read too.
     assert!(ClaudeLineMapper::new().line(&line(500, json!(["odd"])), Instant::now()).is_empty());
 }
+
+fn stream(event: serde_json::Value) -> String {
+    json!({"type": "stream_event", "event": event, "session_id": "s", "parent_tool_use_id": null, "uuid": "u"}).to_string()
+}
+
+fn ask_delta(piece: &str) -> String {
+    stream(json!({"type": "content_block_delta", "index": 1, "delta": {"type": "input_json_delta", "partial_json": piece}}))
+}
+
+/// A question's input is told as it streams: the call is announced at once, then each piece that adds to what can be read
+/// brings the input so far, and the whole input ends it.
+#[test]
+fn a_question_is_told_as_its_input_streams() {
+    let mut mapper = ClaudeLineMapper::new();
+    let now = Instant::now();
+    let started = mapper.line(&stream(json!({"type": "content_block_start", "index": 1, "content_block": {"type": "tool_use", "id": "toolu_q", "name": "AskUserQuestion", "input": {}}})), now);
+    assert!(matches!(started.as_slice(), [Event::ToolStarted(call)] if call.name == "AskUserQuestion"), "{started:?}");
+    let mut told = Vec::new();
+    for piece in [r#"{"questions":[{"question":"Which"#, r#" toy?","header":"Toy","options":[{"label":"Cha"#, r#"in","description":"Blocks"}],"multiSelect":false}]}"#] {
+        for event in mapper.line(&ask_delta(piece), now) {
+            if let Event::ToolInput { input, .. } = event {
+                told.push(crate::session::questions_of(&input));
+            }
+        }
+    }
+    assert_eq!(told.len(), 3, "each piece changed what can be read: {told:?}");
+    assert_eq!(told[0][0].question, "Which");
+    assert_eq!(told[1][0].question, "Which toy?");
+    assert_eq!(told[1][0].options[0].label, "Cha");
+    assert_eq!(told[2][0].options[0].description, "Blocks");
+}
+
+/// The answer to a question goes back as the same input with the reader's answers added.
+#[test]
+fn the_answers_to_a_question_go_back_in_the_updated_input() {
+    let mut mapper = ClaudeLineMapper::new();
+    let ask = json!({"type": "control_request", "request_id": "r1", "request": {"subtype": "can_use_tool", "tool_name": "AskUserQuestion", "tool_use_id": "toolu_q",
+        "input": {"questions": [{"question": "Which toy?", "header": "Toy", "options": [{"label": "Chain", "description": "Blocks"}], "multiSelect": false}]}}});
+    let events = mapper.line(&ask.to_string(), Instant::now());
+    assert!(matches!(events.as_slice(), [Event::Permission(_)]), "{events:?}");
+    let line = mapper.answer_questions(&crate::session::RequestId::new("r1"), &[("Which toy?".into(), "Chain".into())]).expect("a line");
+    let sent: serde_json::Value = serde_json::from_str(&line).unwrap();
+    let body = &sent["response"]["response"];
+    assert_eq!(body["behavior"], "allow");
+    assert_eq!(body["updatedInput"]["answers"], json!({"Which toy?": "Chain"}));
+    assert_eq!(body["updatedInput"]["questions"][0]["question"], "Which toy?");
+    assert!(mapper.answer_questions(&crate::session::RequestId::new("r1"), &[]).is_none(), "answered once");
+}

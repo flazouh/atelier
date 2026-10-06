@@ -130,3 +130,77 @@ pub(crate) fn string_end(bytes: &[u8], start: usize) -> Option<usize> {
     }
     None
 }
+
+/// The whole value of `json` as far as it has come, with what the stream cut closed off: a string cut mid-word ends there, an
+/// array or an object closes where it stands, and a key with no value yet, or a comma with nothing after it, is left out.
+/// `None` until something has begun.
+pub(crate) fn value(json: &str) -> Option<Value> {
+    let mut cuts = boundaries(json);
+    let mut end = json.len();
+    loop {
+        if let Ok(value) = serde_json::from_str::<Value>(&closed_at(&json[..end])) {
+            return Some(value);
+        }
+        end = cuts.pop()?;
+    }
+}
+
+/// Where a cut value can be trimmed to: just before each comma, and just after each opening bracket, outside strings, the
+/// last one at the end of the list.
+fn boundaries(json: &str) -> Vec<usize> {
+    let (mut cuts, mut in_string, mut escaped) = (Vec::new(), false, false);
+    for (at, byte) in json.bytes().enumerate() {
+        if in_string {
+            match (escaped, byte) {
+                (true, _) => escaped = false,
+                (false, b'\\') => escaped = true,
+                (false, b'"') => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b',' => cuts.push(at),
+            b'{' | b'[' => cuts.push(at + 1),
+            _ => {}
+        }
+    }
+    cuts
+}
+
+/// `json` with its open string, arrays and objects closed.
+fn closed_at(json: &str) -> String {
+    let (mut stack, mut in_string, mut escaped) = (Vec::new(), false, false);
+    for byte in json.bytes() {
+        if in_string {
+            match (escaped, byte) {
+                (true, _) => escaped = false,
+                (false, b'\\') => escaped = true,
+                (false, b'"') => in_string = false,
+                _ => {}
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' => stack.push(b'}'),
+            b'[' => stack.push(b']'),
+            b'}' | b']' => {
+                stack.pop();
+            }
+            _ => {}
+        }
+    }
+    let mut text = json.to_string();
+    if in_string {
+        if escaped {
+            text.pop();
+        }
+        text.push('"');
+    }
+    let trimmed = text.trim_end().trim_end_matches(',').len();
+    text.truncate(trimmed);
+    text.extend(stack.iter().rev().map(|close| *close as char));
+    text
+}

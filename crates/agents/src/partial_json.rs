@@ -3,7 +3,7 @@
 
 mod helpers;
 
-pub(crate) use helpers::{closed, fields, string_end};
+pub(crate) use helpers::{closed, fields, string_end, value};
 
 #[cfg(test)]
 mod tests;

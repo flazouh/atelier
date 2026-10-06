@@ -53,6 +53,10 @@ impl LineMapper for ClaudeLineMapper {
         self.answer_line(request, choice)
     }
 
+    fn answer_questions(&mut self, request: &RequestId, answers: &[(String, String)]) -> Option<String> {
+        self.answer_questions_line(request, answers)
+    }
+
     fn exited(&mut self, code: Option<i32>, stderr: &str) -> Vec<Event> {
         self.process_exited(code, stderr)
     }
