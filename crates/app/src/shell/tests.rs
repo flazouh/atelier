@@ -1108,6 +1108,48 @@ fn changes_lists_what_the_checkout_holds_uncommitted(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("file-diff-new.txt").is_some() && cx.debug_bounds("file-diff-a.txt").is_none(), "the file picked in the tree");
 }
 
+/// A commit leaves `.git` alone in the file tree, so the watch says nothing: reading git again must read the checkout
+/// again, or Changes keeps listing files that are committed.
+#[gpui_kit::test]
+fn changes_empties_when_git_is_read_again_after_a_commit(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let git = |args: &[&str]| {
+        let out = std::process::Command::new("git")
+            .args(["-c", "user.name=Ada", "-c", "user.email=ada@example.com", "-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    };
+    git(&["init", "-q"]);
+    std::fs::write(dir.path().join("a.txt"), "one
+").unwrap();
+    git(&["add", "-A"]);
+    git(&["commit", "-qm", "First"]);
+    std::fs::write(dir.path().join("a.txt"), "two
+").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1400.), px(900.)));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Git, window, cx));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let listed = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| {
+        shell.read_with(cx, |s, cx| match &s.active().unwrap().read(cx).uncommitted {
+            Some(crate::history::Read::Ready(files)) => files.len(),
+            other => panic!("the changes are read: {other:?}"),
+        })
+    };
+    assert_eq!(listed(&shell, cx), 1);
+    git(&["commit", "-qam", "Second"]);
+    shell.update(cx, |s, cx| s.active().unwrap().update(cx, |p, cx| p.refresh_git(cx)));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    assert_eq!(listed(&shell, cx), 0, "the committed file is not listed");
+}
+
 /// The switcher heads the sidebar, under the title bar and above the sessions, and the title bar keeps the sidebar's
 /// toggle. The add button is as wide as it is tall: an icon alone has no words to part from.
 #[gpui_kit::test]
