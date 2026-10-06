@@ -216,11 +216,14 @@ impl Conversation {
                 self.items.push(Item::Permission { request: request.clone(), answer: Answer::Asking });
             }
             Event::PermissionCancelled(id) => {
-                if let Some(answer) = self.items.iter_mut().rev().find_map(|item| match item {
-                    Item::Permission { request, answer } if request.id == *id && *answer == Answer::Asking => Some(answer),
+                if let Some((answer, call)) = self.items.iter_mut().rev().find_map(|item| match item {
+                    Item::Permission { request, answer } if request.id == *id && *answer == Answer::Asking => {
+                        Some((answer, request.call.id.clone()))
+                    }
                     _ => None,
                 }) {
                     *answer = Answer::Withdrawn;
+                    self.stop_running(&call);
                 }
             }
             Event::Usage(usage) => {
@@ -269,12 +272,26 @@ impl Conversation {
     /// A question nobody can answer any more, for its turn or its session is over, is withdrawn: its buttons must not stay
     /// live.
     fn withdraw_questions(&mut self) {
+        let mut withdrawn = Vec::new();
         for item in &mut self.items {
-            if let Item::Permission { answer, .. } = item
+            if let Item::Permission { request, answer } = item
                 && *answer == Answer::Asking
             {
                 *answer = Answer::Withdrawn;
+                withdrawn.push(request.call.id.clone());
             }
+        }
+        for id in withdrawn {
+            self.stop_running(&id);
+        }
+    }
+
+    /// A call whose question was withdrawn never runs, and nothing will report on it: its row stops spinning.
+    fn stop_running(&mut self, id: &ToolId) {
+        if let Some(entry) = self.call_mut(id)
+            && matches!(entry.call.status, ToolStatus::Pending | ToolStatus::Running)
+        {
+            entry.call.status = ToolStatus::Failed;
         }
     }
 

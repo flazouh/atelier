@@ -286,6 +286,22 @@ mod conversation {
         let conversation = fold(vec![Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Interrupted, summary: None })]);
         assert!(matches!(conversation.items(), [Item::Notice(text)] if text == "Stopped before it finished."), "{:?}", conversation.items());
     }
+    /// The row of a call whose question was withdrawn stops spinning: the call will never run.
+    #[test]
+    fn a_call_whose_question_is_withdrawn_stops_running() {
+        let started = call("t", "Write", None);
+        let request = PermissionRequest { id: RequestId::new("a"), call: started.clone(), reason: None, choices: vec![] };
+        for ending in [
+            Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Interrupted, summary: None }),
+            Event::Ended(EndReason::Closed),
+            Event::PermissionCancelled(RequestId::new("a")),
+        ] {
+            let mut conversation = fold(vec![Event::ToolStarted(started.clone()), Event::Permission(request.clone())]);
+            conversation.apply(&ending);
+            let status = conversation.items().iter().find_map(|item| if let Item::Tool(c) = item { Some(c.call.status) } else { None });
+            assert_eq!(status, Some(ToolStatus::Failed), "after {ending:?}");
+        }
+    }
     #[test]
     fn a_notice_has_no_colour_codes() {
         let mut conversation = Conversation::new();
