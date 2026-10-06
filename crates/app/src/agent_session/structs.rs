@@ -205,6 +205,21 @@ impl AgentSession {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        Self::start_on(key, agent, project, resume, None, window, cx)
+    }
+
+    /// As `start`, on `provider` for an agent that has providers: the one a session that resumes ran on, else (for a new
+    /// session) the default.
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_on(
+        key: SharedString,
+        agent: Agent,
+        project: Arc<dyn Project>,
+        resume: Option<(SessionId, SharedString)>,
+        provider: Option<crate::providers::Choice>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let (wake, mut woken) = mpsc::unbounded::<()>();
         let queue = EventQueue::new(move || drop(wake.unbounded_send(())));
         let tracker: Arc<Mutex<Option<TurnTracker>>> = Arc::default();
@@ -324,7 +339,7 @@ impl AgentSession {
             seen: false,
             model: None,
             mode: None,
-            provider: (resume.is_none() && agent_has_providers).then(|| crate::providers::default_choice(cx)),
+            provider: agent_has_providers.then(|| provider.or_else(|| resume.is_none().then(|| crate::providers::default_choice(cx)))).flatten(),
             handoff: None,
             task: None,
             task_told: false,
