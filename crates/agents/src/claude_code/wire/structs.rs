@@ -8,6 +8,15 @@ use super::types::{Content, ControlBody, StreamEvent};
 /// The `error` of the assistant line `claude` writes when it has no sign-in, and of the `api_retry` it writes when the
 /// sign-in it has is refused.
 const SIGN_IN_FAILED: &str = "authentication_failed";
+/// The name of an error in a line. `claude` writes it as a word, such as `rate_limit`, or as a map with a `type`; a line
+/// with anything else is still read, with no name, rather than refused whole.
+fn error_name<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Option<String>, D::Error> {
+    Ok(match Option::<Value>::deserialize(deserializer)? {
+        Some(Value::String(name)) => Some(name),
+        Some(Value::Object(map)) => map.get("type").and_then(Value::as_str).map(str::to_string),
+        _ => None,
+    })
+}
 
 /// A `system` line: `init`, `task_started`, `task_progress`, `task_notification`, and more that
 /// atelier ignores. One shape holds every field any of them uses.
@@ -28,7 +37,8 @@ pub(in super::super) struct System {
     pub task_type: Option<String>,
     pub status: Option<String>,
     pub summary: Option<String>,
-    /// An `api_retry`'s reason: `authentication_failed`, `overloaded`, and more.
+    /// An `api_retry`'s reason: `authentication_failed`, `overloaded`, and more. A word, or a map with a `type`.
+    #[serde(default, deserialize_with = "error_name")]
     pub error: Option<String>,
     /// An `api_retry`'s HTTP status.
     pub error_status: Option<u16>,
@@ -76,7 +86,7 @@ pub(in super::super) struct Message {
     pub origin: Option<Origin>,
     /// Why `claude` wrote this assistant line itself instead of the model: `authentication_failed` for a run with no
     /// sign-in, `rate_limit` for a limit, and more.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "error_name")]
     pub error: Option<String>,
 }
 
