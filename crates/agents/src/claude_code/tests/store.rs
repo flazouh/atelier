@@ -4,7 +4,7 @@ use serde_json::json;
 use tempfile::TempDir;
 
 use crate::{
-    claude_code::store::{holder_account, holder_script, list_script, parse_listing, read_script, slug},
+    claude_code::store::{holder_account, holder_script, list_script, parse_listing, parse_listing_in, read_script, slug},
     session::SessionId,
 };
 
@@ -138,4 +138,30 @@ fn the_account_holding_a_session_is_told_by_the_folder_it_is_in() {
     assert_eq!(holder(WORK_SESSION).as_deref(), Some(WORK_ACCOUNT));
     assert_eq!(holder(USUAL_SESSION), None, "the usual account has no name");
     assert_eq!(holder("cccc-3333"), None, "a session no account holds is left to the usual one");
+}
+
+/// `claude` names a project's folder by turning every character that is not a letter or a digit into "-", so
+/// `/work/my-app` and `/work/my_app` share one. A listing for one of them leaves out the sessions the transcripts
+/// say were run in the other.
+#[test]
+fn a_folder_that_shares_claudes_name_for_another_does_not_list_its_sessions() {
+    let line = |cwd: &str, text: &str| json!({"type": "user", "cwd": cwd, "message": {"role": "user", "content": text}}).to_string();
+    let listing = format!(
+        "@@ /h/.claude/projects/p/aaa-1.jsonl 20\n{}\n@@ /h/.claude/projects/p/bbb-2.jsonl 10\n{}\n@@ /h/.claude/projects/p/ccc-3.jsonl 5\n{}\n",
+        line("/work/my-app", "mine"),
+        line("/work/my_app", "the other folder's"),
+        user("no folder recorded"),
+    );
+    let titles: Vec<String> = parse_listing_in(&listing, "/work/my-app").into_iter().map(|s| s.title).collect();
+    assert_eq!(titles, ["mine", "no folder recorded"]);
+    assert_eq!(parse_listing(&listing).len(), 3, "the plain reading still lists every file");
+}
+
+/// macOS gives a folder two names, `/tmp/x` and `/private/tmp/x`: the transcripts and the project may use either.
+#[test]
+fn the_private_prefix_does_not_make_a_folder_another() {
+    let line = |cwd: &str| json!({"type": "user", "cwd": cwd, "message": {"role": "user", "content": "x"}}).to_string();
+    let listing = format!("@@ /h/p/a.jsonl 1\n{}\n@@ /h/p/b.jsonl 2\n{}\n", line("/private/tmp/qa/proj"), line("/tmp/qa/proj/"));
+    assert_eq!(parse_listing_in(&listing, "/tmp/qa/proj").len(), 2);
+    assert_eq!(parse_listing_in(&listing, "/private/tmp/qa/proj").len(), 2);
 }
