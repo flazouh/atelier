@@ -78,3 +78,24 @@ fn the_account_picker_fits_its_name(cx: &mut TestAppContext) {
     let picker = cx.debug_bounds("provider-picker").expect("the account picker is drawn on a new session");
     assert!(picker.size.width < px(120.), "it is as wide as its name, not 180: {picker:?}");
 }
+
+/// The panel's header says where the agent runs, as a pill with the account's name; a session with no provider has none.
+#[gpui_kit::test]
+fn the_header_names_the_provider_in_a_pill(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![], false);
+    let shown = session.clone();
+    let (_panel, cx) = cx.add_window_view(move |_, cx| SessionPanel::new(shown, cx));
+    cx.simulate_resize(size(px(900.), px(800.)));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("panel-provider").is_none(), "no provider, no pill");
+    cx.update(|_, cx| {
+        session.update(cx, |s, cx| {
+            s.provider = Some(crate::providers::Choice::OpenRouter);
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    let pill = cx.debug_bounds("panel-provider").expect("the pill is drawn");
+    let title = cx.debug_bounds("panel-project").expect("the project badge is drawn");
+    assert!(pill.left() > title.right() && pill.size.height <= px(24.), "in the header row: {pill:?}");
+}

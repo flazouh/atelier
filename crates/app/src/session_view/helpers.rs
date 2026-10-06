@@ -802,6 +802,32 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             .tooltip("Open the task")
             .on_click(move |_, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenTask)))
     });
+    // Where the agent runs, as the design system's model badge in a pill: the lab's mark and the account or OpenRouter. The
+    // sidebar's rows carry nothing of it, so the panel is the one place that says it.
+    let provider = {
+        let s = session.read(cx);
+        s.provider.as_ref().map(|choice| {
+            let label = crate::providers::label(choice, &s.provider_accounts);
+            let id = gpui_kit::ElementId::Name(format!("{key}-provider-mark").into());
+            let badge = atelier_ui::model_badge::ModelBadge::new(label.clone());
+            let badge = match crate::providers::mark(choice) {
+                Some(mark) => badge.mark(id, mark),
+                None => badge.monogram(id),
+            };
+            div()
+                .id(gpui_kit::ElementId::Name(format!("{key}-provider").into()))
+                .debug_selector(|| "panel-provider".into())
+                .flex()
+                .flex_none()
+                .items_center()
+                .h(px(22.))
+                .px(px(8.))
+                .rounded_full()
+                .bg(theme.card_strong)
+                .tooltip(atelier_ui::tooltip::Tooltip::text(format!("Runs on {label}")))
+                .child(badge)
+        })
+    };
     let more = panel_menu(session, &key, session_id, window, cx);
     let close = {
         let close = session.clone();
@@ -834,6 +860,7 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             None => div().debug_selector(|| "panel-project".into()).flex_none().max_w(px(120.)).truncate().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(project).into_any_element(),
         })
         .child(title)
+        .children(provider)
         .children(chip)
         .children(stop)
         .child(more)

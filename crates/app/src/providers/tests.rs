@@ -1,7 +1,7 @@
 use atelier_agents::session::{Account, ApiKey, Provider};
 use atelier_settings::secrets::{InMemory, OPENROUTER_KEY, Secrets};
 
-use super::{Choice, NO_KEY, label, provider, row_words};
+use super::{Choice, NO_KEY, label, provider};
 
 const WORK: &str = "work";
 const USUAL: &str = "default";
@@ -58,9 +58,3 @@ fn an_account_is_named_by_its_plan_and_its_name() {
     assert_eq!(label(&Choice::OpenRouter, &accounts), "OpenRouter");
 }
 
-#[test]
-fn a_session_row_names_every_provider_but_the_usual_account() {
-    assert_eq!(row_words(&Choice::Account(USUAL.into())), None);
-    assert_eq!(row_words(&Choice::Account(WORK.into())).as_deref(), Some(WORK));
-    assert_eq!(row_words(&Choice::OpenRouter).as_deref(), Some("OpenRouter"));
-}

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use atelier_agents::session::{Account, ApiKey, Backend, Provider};
 use atelier_project::{LocalProject, Project};
 use atelier_settings::secrets::{InMemory, Keychain, OPENROUTER_KEY, Secrets};
-use gpui_kit::{App, Global, SharedString};
+use gpui_kit::{App, Global};
 
 /// The words a session shows when it is set to OpenRouter and no key is kept.
 pub const NO_KEY: &str = "No OpenRouter key yet. Add one in Settings, Providers.";
@@ -87,15 +87,6 @@ pub fn sign_in_account(provider: Option<&Choice>) -> String {
 /// The account a notice names: only one the reader made, as the usual one needs no name.
 pub fn named_account(provider: Option<&Choice>) -> Option<String> {
     Some(sign_in_account(provider)).filter(|name| name != USUAL_ACCOUNT)
-}
-
-/// What a session row says of its provider: nothing for the usual account, so most rows stay quiet.
-pub fn row_words(choice: &Choice) -> Option<SharedString> {
-    match choice {
-        Choice::Account(name) if name == USUAL_ACCOUNT => None,
-        Choice::Account(name) => Some(name.clone().into()),
-        Choice::OpenRouter => Some(OPENROUTER_WORDS.into()),
-    }
 }
 
 /// The lab behind a choice: Anthropic for an account, OpenRouter for OpenRouter.
