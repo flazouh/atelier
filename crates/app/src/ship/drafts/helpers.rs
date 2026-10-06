@@ -48,7 +48,19 @@ pub fn message(draft: &str) -> String {
     };
     let lines: Vec<&str> = draft.trim().lines().filter(|l| !l.trim_start().starts_with("```") && !trailer(l)).collect();
     let text = lines.join("\n");
-    text.trim().trim_matches(|c| c == '"' || c == '`' || c == '\'').trim().to_string()
+    unwrapped(text.trim()).to_string()
+}
+
+/// `text` without the quotes that wrap the whole of it. A quote that closes a quoted word inside the message stays:
+/// `Change "hello" to "hi"` is a whole subject, and has no wrapping.
+fn unwrapped(text: &str) -> &str {
+    for quote in ['"', '`', '\''] {
+        let inside = text.strip_prefix(quote).and_then(|rest| rest.strip_suffix(quote));
+        if let Some(inside) = inside.filter(|inside| !inside.contains(quote)) {
+            return unwrapped(inside.trim());
+        }
+    }
+    text
 }
 
 /// The message with a line that names the task it works on, unless it names it already. The reader sees

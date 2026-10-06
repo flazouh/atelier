@@ -16,6 +16,12 @@ fn a_drafted_message_loses_its_fences_and_quotes() {
     assert_eq!(message("  Keep TWO  "), "Keep TWO");
 }
 
+#[test]
+fn a_quote_that_closes_a_quoted_word_is_not_a_wrapping_quote() {
+    assert_eq!(message("Change greeting from \"hello\" to \"hi\""), "Change greeting from \"hello\" to \"hi\"");
+    assert_eq!(message("`Fix the lease`"), "Fix the lease");
+}
+
 /// The prompt shows the kept change as a diff against HEAD, file by file.
 #[test]
 fn the_prompt_holds_the_kept_diff() {
