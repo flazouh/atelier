@@ -19,3 +19,13 @@ fn an_answer_that_is_not_a_key_is_a_reason() {
     assert!(OpenRouterUsage::parse("{}").is_err());
     assert!(OpenRouterUsage::parse("nope").is_err());
 }
+
+/// A key with a limit that resets spends from the start of its window: `usage` is the lifetime spend, `limit_remaining` the
+/// credit left, as the endpoint answered for a monthly limit.
+#[test]
+fn a_limit_that_resets_is_read_from_the_credit_left() {
+    let answer = r#"{"data":{"usage":7667.82,"limit":1500,"limit_remaining":1351.75,"limit_reset":"monthly"}}"#;
+    let reading = OpenRouterUsage::parse(answer).unwrap();
+    assert!((reading.windows[0].used - 0.0988).abs() < 0.001, "{:?}", reading.windows);
+    assert_eq!(reading.note.as_deref(), Some("$148.25 of $1500.00 credit"));
+}
