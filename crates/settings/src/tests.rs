@@ -92,8 +92,8 @@ fn the_open_sessions_come_back() {
     let here = Location::Local { path: "/work/atelier".into() };
     update(&path, |s| {
         s.open = vec![
-            OpenSession { location: here.clone(), id: "s1".into(), title: "Fix the lease".into(), agent: None },
-            OpenSession { location: here.clone(), id: "s2".into(), title: "Add a test".into(), agent: None },
+            OpenSession { location: here.clone(), id: "s1".into(), title: "Fix the lease".into(), agent: None, provider: None },
+            OpenSession { location: here.clone(), id: "s2".into(), title: "Add a test".into(), agent: None, provider: None },
         ];
         s.front = Some("s2".into());
     })
@@ -108,7 +108,7 @@ fn the_open_sessions_come_back() {
 #[test]
 fn an_open_session_keeps_its_agent_and_an_old_file_has_none() {
     let here = Location::Local { path: "/work/atelier".into() };
-    let kept = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: Some("cursor".into()) };
+    let kept = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: Some("cursor".into()), provider: Some("openrouter".into()) };
     let round: OpenSession = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
     assert_eq!(round, kept);
     let old: OpenSession = serde_json::from_str(r#"{"location":{"kind":"local","path":"/w"},"id":"s1","title":"hi"}"#).unwrap();
@@ -200,4 +200,14 @@ fn the_language_is_kept_by_its_tag() {
     assert_eq!(load(&file).language.as_deref(), Some("pt-BR"));
     update(&file, |s| s.language = None).unwrap();
     assert_eq!(load(&file).language, None, "unset follows the system");
+}
+
+/// A session with no provider writes none, so a file from before the provider was kept reads the same way.
+#[test]
+fn an_open_session_with_no_provider_writes_none_and_reads_back() {
+    let here = Location::Local { path: "/p".into() };
+    let saved = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: None, provider: None };
+    let text = serde_json::to_string(&saved).unwrap();
+    assert!(!text.contains("provider"), "{text}");
+    assert_eq!(serde_json::from_str::<OpenSession>(&text).unwrap(), saved);
 }

@@ -245,14 +245,22 @@ impl OpenProject {
 
     /// Starts a new session, or resumes the past one `resume`, and returns it.
     /// A session of `agent`, or of the project's agent with `None`: a new one, or `resume`d.
+    /// As `open_session_on`, on whatever provider the session resumes on.
     pub fn open_session(&mut self, resume: Option<(SessionId, SharedString)>, agent: Option<Agent>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+        self.open_session_on(resume, agent, None, window, cx)
+    }
+    /// Starts a new session, or resumes the past one `resume`, on `provider` when one is named. A resumed session with none
+    /// runs on the account it was saved under.
+    pub fn open_session_on(&mut self, resume: Option<(SessionId, SharedString)>, agent: Option<Agent>, provider: Option<crate::providers::Choice>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let key: SharedString = format!("session-{}", NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)).into();
         let when = resume.as_ref().and_then(|(id, _)| super::past::last_activity(&self.past, id));
+        let holder = resume.as_ref().and_then(|(id, _)| self.past.iter().find(|p| p.id == *id)).and_then(|p| p.account.clone());
+        let provider = provider.or_else(|| resume.as_ref().map(|_| holder.map_or_else(crate::providers::Choice::usual, crate::providers::Choice::Account)));
         if let Some((id, _)) = &resume {
             self.past.retain(|p| p.id != *id);
         }
-        let session = self.start_session(key, agent.unwrap_or_else(|| self.agent.clone()), resume, window, cx);
+        let session = self.start_session(key, agent.unwrap_or_else(|| self.agent.clone()), resume, provider, window, cx);
         // An opened past session keeps its place: its stamp is its last activity, not now.
         if let Some(when) = when {
             session.update(cx, |s, _| {
@@ -267,14 +275,14 @@ impl OpenProject {
     }
 
     /// A new session keyed `key` of `agent`, and the project listening to it.
-    fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+    fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, provider: Option<crate::providers::Choice>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         let project = self.project.clone();
         let chips = self.pr_chips.clone();
         #[cfg(test)]
         let agent = if super::TEST_THREAD_ONLY.get() { Agent { backend: crate::fake_agent::fake_agent("fake").backend, ..agent } } else { agent };
         let branches = self.handoff_targets.branches();
         let session = cx.new(|cx| {
-            let mut session = AgentSession::start(key, agent, project, resume, window, cx);
+            let mut session = AgentSession::start_on(key, agent, project, resume, provider, window, cx);
             session.pr_chips = chips;
             session.handoff_branches = branches;
             session
@@ -331,7 +339,7 @@ impl OpenProject {
             return;
         }
         let continues = self.sessions[at].read(cx).continues().cloned();
-        self.sessions[at] = self.start_session(key.to_string().into(), agent, None, window, cx);
+        self.sessions[at] = self.start_session(key.to_string().into(), agent, None, None, window, cx);
         if let Some(source) = continues {
             self.sessions[at].update(cx, |s, cx| s.continue_from(source, None, cx));
         }
