@@ -7,15 +7,20 @@
 #   tools/atelier-ctl.sh send "a message"
 #   tools/atelier-ctl.sh limit                  pretend the front session hit its weekly limit
 #   tools/atelier-ctl.sh open PATH [HOST]       open a folder, over SSH on HOST when named
+#   tools/atelier-ctl.sh marks                  the names that can be pressed, as last drawn
+#   tools/atelier-ctl.sh press NAME             press a named element with no pointer, e.g. settings-entry,
+#                                               section-providers, add-key, keep-key, test-key, forget-key
 # Each prints the app's JSON answer, one line.
 set -euo pipefail
-[ $# -ge 1 ] || { sed -n 2,10p "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n 2,13p "$0"; exit 2; }
 exec python3 - "$@" <<'PY'
 import glob, json, os, socket, sys
 cmd, rest = sys.argv[1], sys.argv[2:]
 request = {"cmd": cmd}
 if cmd == "new_session" and rest:
     request["agent"] = rest[0]
+if cmd == "press":
+    request["name"] = rest[0]
 if cmd == "find" or cmd == "click":
     if rest and not rest[0].isdigit():
         request["name"] = rest[0]
