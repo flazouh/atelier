@@ -282,6 +282,11 @@ mod conversation {
     }
 
     #[test]
+    fn a_stopped_turn_leaves_a_line_saying_so() {
+        let conversation = fold(vec![Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Interrupted, summary: None })]);
+        assert!(matches!(conversation.items(), [Item::Notice(text)] if text == "Stopped before it finished."), "{:?}", conversation.items());
+    }
+    #[test]
     fn a_notice_has_no_colour_codes() {
         let mut conversation = Conversation::new();
         conversation.apply(&Event::TurnEnded(TurnEnd { outcome: TurnOutcome::Failed("\u{1b}[31mboom\u{1b}[0m".into()), summary: None }));

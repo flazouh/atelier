@@ -330,7 +330,11 @@ fn every_captured_run_folds_into_a_finished_conversation() {
         assert!(!conversation.working(), "{name}: the turn is over");
         assert!(conversation.started().is_some(), "{name}");
         assert!(
-            conversation.items().iter().all(|item| !matches!(item, Item::Notice(_))),
+            // Only a stop the reader asked for leaves a line behind.
+            conversation.items().iter().all(|item| match item {
+                Item::Notice(text) => name == "permission_interrupt" && text == "Stopped before it finished.",
+                _ => true,
+            }),
             "{name}: {:?}",
             conversation.items()
         );
