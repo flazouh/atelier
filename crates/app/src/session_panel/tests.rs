@@ -60,3 +60,21 @@ fn a_wide_session_keeps_its_rows_and_composer_to_a_centred_reading_width(cx: &mu
         }
     }
 }
+
+/// Where the agent runs is as wide as the account's name and has no chevron; the agent's own picker keeps its width.
+#[gpui_kit::test]
+fn the_account_picker_fits_its_name(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![], false);
+    cx.update(|_, cx| {
+        session.update(cx, |s, _| {
+            s.provider = Some(crate::providers::Choice::usual());
+            s.provider_accounts = vec![atelier_agents::session::Account { name: "default".into(), signed_in: true, plan: Some("max".into()), email: None }];
+        })
+    });
+    let shown = session.clone();
+    let (_panel, cx) = cx.add_window_view(move |_, cx| SessionPanel::new(shown, cx));
+    cx.simulate_resize(size(px(900.), px(800.)));
+    cx.run_until_parked();
+    let picker = cx.debug_bounds("provider-picker").expect("the account picker is drawn on a new session");
+    assert!(picker.size.width < px(120.), "it is as wide as its name, not 180: {picker:?}");
+}
