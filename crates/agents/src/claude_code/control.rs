@@ -79,6 +79,11 @@ pub(super) fn allow(request_id: &str, input: &Value, always: Option<&Value>) -> 
     answer(request_id, body)
 }
 
+/// The answer to a `can_use_tool` request for a question: allow, with the reader's answers added to the input.
+pub(super) fn allow_with_answers(request_id: &str, input: &Value, answers: &[(String, String)]) -> String {
+    let body = json!({"behavior": "allow", "updatedInput": crate::session::answers_input(input, answers)});
+    answer(request_id, body)
+}
 pub(super) fn deny(request_id: &str) -> String {
     answer(request_id, json!({"behavior": "deny", "message": "The user denied this action."}))
 }

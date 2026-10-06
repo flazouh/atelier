@@ -34,3 +34,20 @@ fn only_the_strings_that_closed_count_as_closed() {
     assert_eq!(closed(r#"{"path":"a.txt","content":"hel"#), Some(json!({"path": "a.txt"})));
     assert_eq!(closed(r#"{"path":"a.txt"}"#), Some(json!({"path": "a.txt"})));
 }
+
+#[test]
+fn a_value_cut_anywhere_reads_as_far_as_it_came() {
+    use serde_json::json;
+    let whole = r#"{"questions":[{"question":"Which toy?","options":[{"label":"Chain","description":"Blocks"},{"label":"Cipher"}],"multiSelect":false}]}"#;
+    assert_eq!(super::value(whole), Some(json!({"questions":[{"question":"Which toy?","options":[{"label":"Chain","description":"Blocks"},{"label":"Cipher"}],"multiSelect":false}]})));
+    assert_eq!(super::value(""), None);
+    assert_eq!(super::value(r#"{"questions":[{"question":"Which to"#), Some(json!({"questions":[{"question":"Which to"}]})), "a string cut mid-word");
+    assert_eq!(super::value(r#"{"questions":[{"question":"Which toy?","options":[{"label":"Chain","descr"#), Some(json!({"questions":[{"question":"Which toy?","options":[{"label":"Chain"}]}]})), "a key with no value is left out");
+    assert_eq!(super::value(r#"{"a":1,"b":"#), Some(json!({"a":1})), "a key waiting for its value");
+    assert_eq!(super::value(r#"{"a":[1,2,"#), Some(json!({"a":[1,2]})), "a comma with nothing after it");
+    assert_eq!(super::value(r#"{"a":"x\"#), Some(json!({"a":"x"})), "an escape cut in two");
+    // Every cut of the whole text reads, and never reads more than the whole holds.
+    for end in 1..whole.len() {
+        assert!(super::value(&whole[..end]).is_some() || end < 2, "cut at {end}: {}", &whole[..end]);
+    }
+}

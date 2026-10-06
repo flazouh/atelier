@@ -292,6 +292,12 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
             let loading = if look.mark.working == atelier_agents::claude::mark().working { atelier_agents::claude::loading_strips() } else { Vec::new() };
             Thinking::new(id("think"), look, phase).loading(loading).subagents(running).into_any_element()
         }
+        // The agent's question is a card of its own: streaming as it is written, answered once the reader has said.
+        Item::Tool(call) if call.call.name == atelier_agents::claude_code::ASK_QUESTION => {
+            let approval = super::calls::approval(items, &call.call.id);
+            let (status, answers) = super::question::call_state(call, approval, s.conversation.answers_of(&call.call.id));
+            atelier_ui::QuestionCard::new(id("question"), super::question::views(&call.call.input)).status(status).answers(answers).into_any_element()
+        }
         Item::Tool(call) => {
             let mark = super::calls::mark_kept(items, &call.call.id, &s.reviews.approvals);
             let density = crate::tool_density::tool_density(cx);
@@ -332,6 +338,18 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
                 .into_any_element()
         }
         Item::Permission { request, answer } => {
+            // A question with choices is answered on its own card, not allowed or denied.
+            let questions = super::question::views(&request.call.input);
+            if request.call.name == atelier_agents::claude_code::ASK_QUESTION && !questions.is_empty() {
+                let submit = {
+                    let (session, request) = (session.clone(), request.id.clone());
+                    move |answers: Vec<(SharedString, SharedString)>, _: &mut Window, cx: &mut App| {
+                        let answers = answers.into_iter().map(|(question, answer)| (question.to_string(), answer.to_string())).collect();
+                        session.update(cx, |s, cx| s.answer_questions(&request, answers, cx))
+                    }
+                };
+                return Some(atelier_ui::QuestionCard::new(id("question"), questions).status(atelier_ui::QuestionStatus::Pending).on_submit(submit).into_any_element());
+            }
             let preview = super::preview::preview(&request.call, &root);
             // With a preview, the raw input stays behind View details; with none, it is all there is.
             let mut approval = ToolApproval::new(id("ask"), request.call.name.clone())

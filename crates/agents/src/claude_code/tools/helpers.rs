@@ -2,6 +2,9 @@ use serde_json::Value;
 
 use crate::partial_json::string_end;
 
+/// The tool that asks the reader a question and takes the answer back in its input.
+pub const ASK_QUESTION: &str = "AskUserQuestion";
+
 use crate::session::{FileEdit, ToolKind};
 use super::types::{FILE_KEYS, TodoTool};
 

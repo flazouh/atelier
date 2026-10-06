@@ -32,7 +32,7 @@ impl ClaudeLineMapper {
                 Block::ToolUse { id, name, .. } => {
                     let deferred = tools::starts_subagent(&name) || tools::todo_tool(&name).is_some();
                     // A deferred call never names a file the review needs, so its input is not followed.
-                    self.open.insert(index, Open::Tool { id: ToolId::new(&id), name: name.clone(), json: String::new(), targeted: deferred, shown: None });
+                    self.open.insert(index, Open::Tool { id: ToolId::new(&id), name: name.clone(), json: String::new(), targeted: deferred, shown: None, told: None });
                     if deferred {
                         return Vec::new();
                     }
@@ -41,9 +41,17 @@ impl ClaudeLineMapper {
                 Block::ToolResult { .. } | Block::Other => Vec::new(),
             },
             StreamEvent::ContentBlockDelta { index, delta } => match (self.open.get_mut(&index), delta) {
-                (Some(Open::Tool { id, name, json, targeted, shown }), Delta::InputJson { partial_json }) if !*targeted || tools::streams_input(name) => {
+                (Some(Open::Tool { id, name, json, targeted, shown, told }), Delta::InputJson { partial_json }) if !*targeted || tools::streams_input(name) => {
                     json.push_str(&partial_json);
                     let mut events = Vec::new();
+                    // A question is told as its text comes: what the card needs is in the input, which is whole only at the end.
+                    if name == tools::ASK_QUESTION
+                        && let Some(input) = crate::partial_json::value(json)
+                        && told.as_ref() != Some(&input)
+                    {
+                        events.push(Event::ToolInput { id: id.clone(), input: input.clone(), file: None });
+                        *told = Some(input);
+                    }
                     if !*targeted && let Some(file) = tools::file_in_partial_input(json) {
                         *targeted = true;
                         events.push(Event::ToolTarget { id: id.clone(), file });
