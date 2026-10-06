@@ -714,12 +714,15 @@ fn provider_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElemen
     let pick = session.clone();
     Some(
         div()
-            .w(px(180.))
+            .flex_none()
             .debug_selector(|| "provider-picker".into())
             .child(
                 Select::new(gpui_kit::ElementId::Name(format!("{}-provider", s.key).into()), words)
                     .corners(atelier_ui::button_group::segment_corners(1, 2, gpui_kit::Axis::Horizontal))
                     .fill(cx.theme().card_strong)
+                    // As wide as the account's name, with no chevron: the menu still opens at a readable width.
+                    .chevron(false)
+                    .panel_width(px(180.))
                     .selected(choices.iter().position(|c| *c == current))
                     .on_change(move |ix, _, cx| {
                         let Some(choice) = choices.get(ix).cloned() else { return };
