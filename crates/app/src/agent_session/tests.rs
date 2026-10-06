@@ -395,7 +395,7 @@ mod providers {
 
     use atelier_agents::session::{Account, ApiKey, EndReason, Event, Provider};
     use atelier_settings::secrets::{InMemory, OPENROUTER_KEY, Secrets};
-    use gpui_kit::TestAppContext;
+    use gpui_kit::{AppContext, TestAppContext};
 
     use crate::{
         fake_agent::{start, start_on_providers},
@@ -431,6 +431,27 @@ mod providers {
 
         assert_eq!(cx.update(|_, cx| session.read(cx).provider.clone()), Some(Choice::Account(WORK.into())));
         assert_eq!(fake.opened.lock().unwrap()[0].provider, Some(Provider::Account(WORK.into())));
+    }
+
+    /// A session that resumes runs on the provider it ran on, and a resume that names none keeps the agent's own sign-in.
+    #[gpui_kit::test]
+    fn a_resumed_session_runs_on_the_provider_it_is_given(cx: &mut TestAppContext) {
+        set_up(cx, &Arc::new(InMemory::default()), Choice::Account(WORK.into()));
+        let (session, fake, cx) = start_on_providers(cx, accounts());
+        let (agent, project) = cx.update(|_, cx| (session.read(cx).agent.clone(), session.read(cx).project.clone()));
+        let resume = || Some((atelier_agents::session::SessionId::new("old"), "title".into()));
+
+        let (a, p) = (agent.clone(), project.clone());
+        let on_work = cx.update(|window, cx| {
+            cx.new(|cx| super::super::AgentSession::start_on("k2".into(), a, p, resume(), Some(Choice::Account(WORK.into())), window, cx))
+        });
+        cx.run_until_parked();
+        assert_eq!(cx.update(|_, cx| on_work.read(cx).provider.clone()), Some(Choice::Account(WORK.into())));
+        assert_eq!(fake.opened.lock().unwrap().last().unwrap().provider, Some(Provider::Account(WORK.into())));
+
+        let none = cx.update(|window, cx| cx.new(|cx| super::super::AgentSession::start("k3".into(), agent, project, resume(), window, cx)));
+        cx.run_until_parked();
+        assert_eq!(cx.update(|_, cx| none.read(cx).provider.clone()), None, "a plain resume names no provider");
     }
 
     #[gpui_kit::test]

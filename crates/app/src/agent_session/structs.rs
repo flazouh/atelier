@@ -197,6 +197,7 @@ impl AgentSession {
     }
 
     /// Starts a new session, or resumes `resume` after reading its history, in `project`.
+    #[cfg(test)]
     pub fn start(
         key: SharedString,
         agent: Agent,
