@@ -69,9 +69,10 @@ pub(in super::super) fn holder(project: &dyn Project, session: &SessionId) -> Re
 }
 
 pub(in super::super) fn list(project: &dyn Project) -> Result<Vec<SessionSummary>, SessionError> {
-    let script = list_script(&slug(&project.root().to_string_lossy()));
+    let root = project.root().to_string_lossy().into_owned();
+    let script = list_script(&slug(&root));
     let command = Command::new("sh").args(["-c", script.as_str()]);
-    Ok(parse_listing(&subprocess::output(project, &command)?))
+    Ok(parse_listing_in(&subprocess::output(project, &command)?, &root))
 }
 
 /// The account a session file was saved under: `None` for `~/.claude`, `work` for `~/.claude-work`.
@@ -84,25 +85,62 @@ fn account_of(path: &str) -> Option<String> {
     config.strip_prefix(".claude-").map(str::to_string)
 }
 
-/// Reads the listing script's output: a `@@ path mtime` line, then the head of that file.
+/// Reads the listing script's output: a `@@ path mtime` line, then the head of that file. Every file, whatever folder it ran in.
+#[cfg(test)]
 pub(in super::super) fn parse_listing(text: &str) -> Vec<SessionSummary> {
-    let mut sessions: Vec<SessionSummary> = Vec::new();
+    parse(text).into_iter().map(|(session, _)| session).collect()
+}
+
+/// The sessions of the project at `root`. `claude` names a project's folder by turning every character that is not a
+/// letter or a digit into `-`, so two folders can share one; a transcript records the folder it ran in, and a session
+/// that ran in another is left out. A transcript that records none stays.
+pub(in super::super) fn parse_listing_in(text: &str, root: &str) -> Vec<SessionSummary> {
+    parse(text)
+        .into_iter()
+        .filter(|(_, cwd)| cwd.as_deref().is_none_or(|cwd| same_folder(cwd, root)))
+        .map(|(session, _)| session)
+        .collect()
+}
+
+/// Whether two paths name one folder, as macOS does for `/tmp/x` and `/private/tmp/x`.
+fn same_folder(a: &str, b: &str) -> bool {
+    let plain = |path: &str| {
+        let path = path.trim_end_matches('/');
+        path.strip_prefix("/private").filter(|rest| rest.starts_with('/')).unwrap_or(path).to_string()
+    };
+    plain(a) == plain(b)
+}
+
+fn parse(text: &str) -> Vec<(SessionSummary, Option<String>)> {
+    let mut sessions: Vec<(SessionSummary, Option<String>)> = Vec::new();
     let mut titled = true;
     for line in text.lines() {
         if let Some(header) = line.strip_prefix(MARK) {
             let (path, updated) = header.rsplit_once(' ').unwrap_or((header, ""));
             let id = path.rsplit('/').next().unwrap_or(path).trim_end_matches(".jsonl");
-            sessions.push(SessionSummary { id: SessionId::new(id), title: String::new(), updated: updated.parse().ok(), account: account_of(path) });
+            sessions.push((SessionSummary { id: SessionId::new(id), title: String::new(), updated: updated.parse().ok(), account: account_of(path) }, None));
             titled = false;
-        } else if !titled
-            && let Some((session, text)) = sessions.last_mut().zip(user_text(line))
+            continue;
+        }
+        let Some((session, cwd)) = sessions.last_mut() else { continue };
+        if cwd.is_none() {
+            *cwd = folder_of(line);
+        }
+        if !titled
+            && let Some(text) = user_text(line)
         {
             session.title = cut(&text);
             titled = true;
         }
     }
-    sessions.retain(|session| !session.title.is_empty());
+    sessions.retain(|(session, _)| !session.title.is_empty());
     sessions
+}
+
+/// The folder a transcript line says the session ran in.
+fn folder_of(line: &str) -> Option<String> {
+    let value: Value = serde_json::from_str(line).ok()?;
+    value.get("cwd")?.as_str().map(str::to_string)
 }
 
 /// What the user typed, from one transcript line, when it is a user message.
