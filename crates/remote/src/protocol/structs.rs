@@ -17,6 +17,7 @@ impl From<&io::Error> for Failure {
             io::ErrorKind::NotFound => FailureKind::NotFound,
             io::ErrorKind::PermissionDenied => FailureKind::PermissionDenied,
             io::ErrorKind::InvalidInput => FailureKind::InvalidInput,
+            io::ErrorKind::AlreadyExists => FailureKind::AlreadyExists,
             _ => FailureKind::Other,
         };
         Self { kind, message: error.to_string() }

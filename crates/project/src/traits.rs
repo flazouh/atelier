@@ -9,7 +9,7 @@ use atelier_tracker::{Tracker, TrackerError, TrackerResult};
 pub use super::data::DataEntry;
 pub use super::process::{Command, Process};
 use super::structs::{DirEntry, Entry, GitOutput, Match, Query, Watch};
-use super::types::{ChangeSink, LinkSink};
+use super::types::{ChangeSink, FsOp, LinkSink};
 use super::helpers::unsupported;
 
 pub trait Project: Send + Sync {
@@ -23,6 +23,10 @@ pub trait Project: Send + Sync {
     /// Removes the file at `path`; a folder is refused.
     fn remove(&self, path: &str) -> io::Result<()> {
         Err(unsupported("remove", path))
+    }
+    /// Makes a folder, moves, copies or removes, as the file tree asks.
+    fn apply(&self, op: &FsOp) -> io::Result<()> {
+        Err(unsupported("apply", &format!("{op:?}")))
     }
     fn watch(&self, sink: ChangeSink) -> io::Result<Watch>;
     fn search(&self, query: &Query) -> io::Result<Vec<Match>>;

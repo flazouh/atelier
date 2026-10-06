@@ -201,6 +201,21 @@ fn a_process_starts_after_a_reconnect() {
 }
 
 #[test]
+fn a_remote_project_makes_moves_copies_and_removes_as_the_file_tree_asks() {
+    use atelier_project::FsOp;
+    let dir = folder(&[("a.txt", "a"), ("src/m.rs", "m")]);
+    let (_host, dial) = host();
+    let remote = connect(&dir, dial);
+    remote.apply(&FsOp::NewFolder { path: "docs".into() }).unwrap();
+    remote.apply(&FsOp::Rename { from: "a.txt".into(), to: "docs/a.txt".into() }).unwrap();
+    remote.apply(&FsOp::Copy { from: "src".into(), to: "lib".into() }).unwrap();
+    assert!(dir.path().join("docs/a.txt").exists() && dir.path().join("lib/m.rs").exists());
+    assert_eq!(remote.apply(&FsOp::Copy { from: "src".into(), to: "lib".into() }).unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+    remote.apply(&FsOp::Delete { path: "lib".into() }).unwrap();
+    assert!(!dir.path().join("lib").exists());
+}
+
+#[test]
 fn a_remote_project_removes_files_and_keeps_its_data_on_the_host() {
     let dir = folder(&[("a.txt", "a")]);
     let data = tempfile::tempdir().unwrap();

@@ -61,6 +61,10 @@ impl Project for Locked {
         self.0.remove(path)
     }
 
+    fn apply(&self, op: &atelier_project::FsOp) -> io::Result<()> {
+        self.0.apply(op)
+    }
+
     fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
         self.0.data_read(path)
     }

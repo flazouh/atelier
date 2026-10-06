@@ -127,6 +127,7 @@ fn answer_in(call: Call, scope: Option<&str>, state: &Arc<State>, out: &Out) -> 
         Call::Read { path } => Ok(Reply::Bytes(here()?.read(&path)?)),
         Call::Write { path, bytes } => here()?.write(&path, &bytes).map(|()| Reply::Done),
         Call::Remove { path } => here()?.remove(&path).map(|()| Reply::Done),
+        Call::Fs { op } => here()?.apply(&op).map(|()| Reply::Done),
         Call::DataRead { path } => Ok(Reply::Bytes(here()?.data_read(&path)?)),
         Call::DataWrite { path, bytes } => here()?.data_write(&path, &bytes).map(|()| Reply::Done),
         Call::DataList { prefix } => Ok(Reply::DataEntries(here()?.data_list(&prefix)?)),
