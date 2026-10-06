@@ -1702,12 +1702,20 @@ impl Shell {
     }
 
     /// The foot of the sidebar: the Settings entry, which is the one home of the theme.
-    pub(super) fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
         // The project switcher heads every sidebar: which project the lens is about.
-        let head = self.project_switcher(cx).map(|switcher| div().flex().flex_none().items_center().min_w_0().px(px(8.)).pt(px(8.)).pb(px(4.)).child(switcher));
-        div().flex().flex_col().size_full().children(head).child(div().flex_1().min_h_0().child(self.sidebar_body(cx)))
+        let switcher = self.project_switcher(cx);
+        // The Sessions sidebar has a row of its own at the top, with the ⋯ at its right: the switcher stands on that row,
+        // left of the ⋯, so the head is one row. The other lenses have no such row and give the switcher one.
+        if !self.view.in_code() && self.view != ShellView::Tasks {
+            let row = switcher.map(|switcher| {
+                div().absolute().top(px(5.)).left(px(8.)).right(px(44.)).h(px(36.)).flex().items_center().min_w_0().child(switcher)
+            });
+            return div().relative().size_full().child(self.sidebar_body(cx)).children(row).into_any_element();
+        }
+        let head = switcher.map(|switcher| div().flex().flex_none().items_center().min_w_0().px(px(8.)).pt(px(8.)).pb(px(4.)).child(switcher));
+        div().flex().flex_col().size_full().children(head).child(div().flex_1().min_h_0().child(self.sidebar_body(cx))).into_any_element()
     }
-
     fn sidebar_body(&self, cx: &mut Context<Self>) -> impl IntoElement {
         // The projects and their sessions, or in the Git view the focused session's changes; the files
         // are the Files view's.

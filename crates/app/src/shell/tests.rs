@@ -1267,3 +1267,14 @@ fn the_changes_count_is_the_checkouts_once_it_is_read() {
     assert_eq!(super::helpers::changes_badge(Some(&Read::Ready(vec![])), 3), None, "a clean checkout shows none");
     assert_eq!(super::helpers::changes_badge(Some(&Read::Ready(vec![file("a"), file("b")])), 0), Some(2));
 }
+
+/// The Sessions sidebar has one row at its head: the project picker at the left and the ⋯ at the right, on the same line.
+#[gpui_kit::test]
+fn the_project_picker_and_the_sidebar_options_share_one_row(cx: &mut TestAppContext) {
+    let (_shell, cx, _dir) = with_a_session(cx, 1400.);
+    let picker = cx.update(|_, cx| crate::control::find("project-switcher", cx)).expect("the picker is drawn");
+    let options = cx.debug_bounds("sidebar-options").expect("the ⋯ is drawn");
+    let (a, b) = (f32::from(picker.center().y), f32::from(options.center().y));
+    assert!((a - b).abs() <= 2., "the picker's middle is at {a} and the ⋯'s at {b}");
+    assert!(picker.right() < options.left(), "the picker is left of the ⋯: {picker:?} {options:?}");
+}
