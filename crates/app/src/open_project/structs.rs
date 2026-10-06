@@ -378,6 +378,10 @@ impl OpenProject {
     /// Reads the branch, the changed files and the remote again, as after a commit.
     pub fn refresh_git(&mut self, cx: &mut Context<Self>) {
         self.read_git(cx);
+        // A commit changes `.git` and no file the watch sees, so Changes would keep listing what is committed.
+        if self.uncommitted.is_some() {
+            self.load_uncommitted(cx);
+        }
     }
 
     fn read_git(&mut self, cx: &mut Context<Self>) {
