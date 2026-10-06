@@ -165,3 +165,18 @@ fn the_private_prefix_does_not_make_a_folder_another() {
     assert_eq!(parse_listing_in(&listing, "/tmp/qa/proj").len(), 2);
     assert_eq!(parse_listing_in(&listing, "/private/tmp/qa/proj").len(), 2);
 }
+
+/// A transcript that stops after a request, or after a call with no result, says it stopped; one that ends on an answer,
+/// or on the reader's own stop, does not.
+#[test]
+fn a_transcript_that_ends_mid_turn_says_so() {
+    let user = r#"{"type":"user","message":{"role":"user","content":"go"}}"#;
+    let answer = r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"done"}]}}"#;
+    let call = r#"{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t","name":"Bash","input":{}}]}}"#;
+    let stop = r#"{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}"#;
+    let said = |lines: &[&str]| crate::claude_code::store::history(&lines.join("\n")).iter().any(|e| matches!(e, crate::session::Event::Warning(w) if w.starts_with("This stopped before")));
+    assert!(said(&[user]), "a request nobody answered");
+    assert!(said(&[user, call]), "a call with no result");
+    assert!(!said(&[user, answer]), "an answer ends it");
+    assert!(!said(&[user, call, stop]), "the reader's own stop is recorded already");
+}

@@ -186,5 +186,31 @@ pub fn history(transcript: &str) -> Vec<Event> {
     let now = Instant::now();
     let mut events: Vec<Event> = transcript.lines().flat_map(|line| mapper.line(line, now)).collect();
     events.extend(mapper.end_of_history());
+    if ends_mid_turn(transcript) {
+        events.push(Event::Warning("This stopped before it finished: the app or the agent closed mid-answer.".into()));
+    }
     events
+}
+
+/// Whether the last thing a transcript records is a request, or a call that waits for its result, with no answer after
+/// it: the session closed in the middle of a turn. A stop the reader asked for is recorded as its own user line.
+fn ends_mid_turn(transcript: &str) -> bool {
+    let last = transcript.lines().rev().filter_map(|line| serde_json::from_str::<Value>(line).ok()).find(|value| {
+        matches!(value.get("type").and_then(Value::as_str), Some("user" | "assistant")) && value.get("isMeta").and_then(Value::as_bool) != Some(true)
+    });
+    let Some(last) = last else { return false };
+    let blocks = last.get("message").and_then(|m| m.get("content"));
+    let text_of = |blocks: Option<&Value>| match blocks {
+        Some(Value::String(text)) => Some(text.clone()),
+        Some(Value::Array(items)) => items.iter().find_map(|b| b.get("text")?.as_str()).map(str::to_string),
+        _ => None,
+    };
+    match last.get("type").and_then(Value::as_str) {
+        Some("user") => {
+            let stopped = text_of(blocks).is_some_and(|text| text.starts_with("[Request interrupted"));
+            let command_output = text_of(blocks).is_some_and(|text| text.trim_start().starts_with('<'));
+            !stopped && !command_output
+        }
+        _ => matches!(blocks, Some(Value::Array(items)) if items.last().and_then(|b| b.get("type")?.as_str()) == Some("tool_use")),
+    }
 }
