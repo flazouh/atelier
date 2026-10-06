@@ -57,21 +57,21 @@ wake from the watcher's own thread; atelier-project tests the real watcher.
 - Head of the sidebar, in every lens: the project switcher: each open project's badge, with a dot
   while one of its sessions works (accent) or needs the reader (warning), and how many need them. Sessions
   are every project's, so in Sessions the switcher narrows the list and the panels to one project or shows
-  "All projects"; in Issues and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
+  "All projects"; in Tasks and Code it is the project the view is about (`crates/app/src/shell/lens.rs`).
   A "+" joined to the switcher as a button group adds a project: a folder (⌘O) or one over SSH (⌘⇧O). The
   "+" is as wide as it is tall: a button with only an icon pads to a square in every size. With the sidebar
   hidden the switcher is hidden with it.
   A project's badge is its letter on a colour of the palette (acepe's twelve), or an image. "Choose an icon…" in the
   project's ⋯ menu offers both: a disc for each colour, and the project's image files. A colour picked applies at once,
   stays open for the image, and is kept in the settings (`project_colors`).
-- Far left: the view rail, three lenses: Sessions, Issues and Code (`crates/app/src/shell/rail.rs`).
+- Far left: the view rail, three lenses: Sessions, Tasks and Code (`crates/app/src/shell/rail.rs`).
   Sessions carries a count of the sessions that need the reader, in every project. A press on another lens
   shows it with the sidebar; a press on the lens in front hides the sidebar, and the next press shows it
   again. The lens in front has a wash, or an edge bar while its sidebar is hidden.
   - **Sessions:** the sidebar with the projects open in this window and each project's sessions, the
     agent panels, and the right pane. A new session opens at the left of the strip.
-  - **Issues:** a sidebar of views over the project's issues (My issues, Active, Backlog, All issues), its
-    labels, and the agents that hold issues, each with a count; the list or the board in the main area
+  - **Tasks:** a sidebar of views over the project's tasks (My tasks, Active, Backlog, All tasks), its
+    labels, and the agents that hold tasks, each with a count; the list or the board in the main area
     shows the one picked.
   - **Code:** a sidebar that lists its four views, then what the one in front lists:
     - **Pull requests:** the project's pull requests, read on the first look, and the one open.
@@ -111,7 +111,7 @@ them at 640, 900, 1100 and 1440 px, and at every 10 px from 640 to 2000.
 - **From 1100 px:** the sidebar, the session column and the right pane, side by side.
 - **From 900 to 1099 px:** the session column and the right pane. The sidebar shows on ⌘B.
 - **Below 900 px:** one pane at a time, with tabs: Projects (⌘B), Session, and Editor (⌘⇧B). The
-  third tab says Issues or Pull requests while one of them is in the right pane. Opening a session
+  third tab says Tasks or Pull requests while one of them is in the right pane. Opening a session
   or a review shows the Session tab, which holds the view's main area.
 - **Least widths:** the session column 320 px, the right pane 320 px, and the sidebar 180 px.
 - **Who gives way:** the session column keeps its least width. The right pane gives way first, down

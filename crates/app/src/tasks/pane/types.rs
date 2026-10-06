@@ -32,7 +32,7 @@ pub(super) enum Source {
     None,
 }
 
-/// Which of the project's issues the pane shows, as the Issues sidebar names them. The filter chips of the
+/// Which of the project's tasks the pane shows, as the Tasks sidebar names them. The filter chips of the
 /// list narrow it further.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum Scope {
@@ -55,10 +55,10 @@ impl Scope {
     /// The scope's name, over the pane.
     pub fn title(&self) -> SharedString {
         match self {
-            Self::Mine => "My issues".into(),
+            Self::Mine => "My tasks".into(),
             Self::Active => "Active".into(),
             Self::Backlog => "Backlog".into(),
-            Self::All => "All issues".into(),
+            Self::All => "All tasks".into(),
             Self::Label(name) | Self::Agent(name) => name.clone(),
         }
     }

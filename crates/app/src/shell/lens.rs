@@ -1,5 +1,5 @@
-//! What the lenses add to the window: the project switcher in the title bar, the Issues and Code lenses'
-//! sidebars, and the pull requests. Sessions are every project's; Issues and Code are about the project the switcher names.
+//! What the lenses add to the window: the project switcher in the title bar, the Tasks and Code lenses'
+//! sidebars, and the pull requests. Sessions are every project's; Tasks and Code are about the project the switcher names.
 
 use atelier_ui::button::{Button, ButtonSize, ButtonVariant};
 use atelier_ui::button_group::ButtonGroup;
@@ -347,7 +347,7 @@ impl Shell {
             .into_any_element()
     }
 
-    /// The Issues lens's sidebar: the views over the project's issues, its labels, and the agents that hold
+    /// The Tasks lens's sidebar: the views over the project's tasks, its labels, and the agents that hold
     /// issues. Each sets the scope of the project's Tasks pane.
     pub(super) fn issues_sidebar(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let Some(pane) = project.read(cx).tasks.as_ref().map(|slot| slot.pane.clone()) else {
@@ -365,10 +365,10 @@ impl Shell {
         };
         let views = Scope::VIEWS.map(|at| {
             let (id, label, mark) = match at {
-                Scope::Mine => ("mine", "My issues", Icon::new(IconName::VerifiedUser).into_any_element()),
+                Scope::Mine => ("mine", "My tasks", Icon::new(IconName::VerifiedUser).into_any_element()),
                 Scope::Active => ("active", "Active", TaskStatusMark::new(TaskStatus::InProgress).size(px(14.)).into_any_element()),
                 Scope::Backlog => ("backlog", "Backlog", TaskStatusMark::new(TaskStatus::Backlog).size(px(14.)).into_any_element()),
-                _ => ("all", "All issues", Icon::new(IconName::FormatListBulleted).into_any_element()),
+                _ => ("all", "All tasks", Icon::new(IconName::FormatListBulleted).into_any_element()),
             };
             row(format!("issues-{id}"), at, mark, label.into(), cx)
         });

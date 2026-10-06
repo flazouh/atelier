@@ -16,7 +16,7 @@ use crate::review_pane::Scope;
 
 fn rail_view(view: ShellView, needs_you: usize) -> RailView {
     match view {
-        ShellView::Tasks => RailView { icon: IconName::Checklist, label: "Issues".into(), debug: "rail-tasks", count: 0 },
+        ShellView::Tasks => RailView { icon: IconName::Checklist, label: "Tasks".into(), debug: "rail-tasks", count: 0 },
         ShellView::Git => RailView { icon: IconName::Code, label: "Code".into(), debug: "rail-git", count: 0 },
         _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions", count: needs_you },
     }
