@@ -686,6 +686,45 @@ fn the_sidebar_marks_the_open_session_in_the_single_view_only(cx: &mut TestAppCo
     assert!(!marked(&shell, cx), "back side by side: none");
 }
 
+/// In the single view the session tabs stand in the title bar, not above the panel; side by side there are none.
+#[gpui_kit::test]
+fn the_single_views_tabs_stand_in_the_title_bar(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    assert!(cx.debug_bounds("title-tabs").is_none(), "side by side: the title bar has no tabs");
+    shell.update(cx, |s, cx| s.choose_layout(atelier_ui::panel_types::Layout::Single, cx));
+    settle(&shell, cx);
+    let tabs = cx.debug_bounds("title-tabs").expect("the tabs have a zone in the title bar");
+    assert!(tabs.bottom() <= gpui_kit::px(super::types::TITLE_BAR), "the zone is inside the title bar: {tabs:?}");
+    assert!(shell.read_with(cx, |s, cx| s.panels.read(cx).tabs_hoisted()), "the panels leave their own bar out");
+    shell.update(cx, |s, cx| s.choose_layout(atelier_ui::panel_types::Layout::SideBySide, cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("title-tabs").is_none(), "back side by side: none");
+    assert!(!shell.read_with(cx, |s, cx| s.panels.read(cx).tabs_hoisted()), "and the panels are as they were");
+}
+
+/// The Files view's file tabs stand in the title bar too.
+#[gpui_kit::test]
+fn the_files_views_tabs_stand_in_the_title_bar(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    open_files_from_the_menu(&shell, cx);
+    let row = cx.debug_bounds("tree-row-a.txt").expect("the tree lists a.txt");
+    cx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    let tab = cx.debug_bounds("editor-tab-0").expect("a.txt has a tab");
+    assert!(tab.bottom() <= gpui_kit::px(super::types::TITLE_BAR), "the tab is in the title bar: {tab:?}");
+}
+
+/// The tabs leave room for the ⋯ of the layout menu, where it stands.
+#[test]
+fn the_tabs_leave_room_for_the_layout_menu() {
+    use super::helpers::tab_room;
+    // The session area reaches the window's edge: the ⋯ is left of the Settings button.
+    assert_eq!(tab_room(1400., Some(1400.)), 32.);
+    // A pane at the right shortens the area: the ⋯ is at its right edge, and the tabs end before it.
+    assert_eq!(tab_room(1400., Some(1000.)), 1400. - 48. - (1000. - 36. - 8.));
+    assert_eq!(tab_room(1400., None), 36.);
+}
+
 /// The sidebar lists by project, or in one list by priority with a heading for each section; the choice is behind
 /// the ⋯ in its head.
 #[gpui_kit::test]

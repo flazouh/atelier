@@ -18,7 +18,9 @@ use atelier_ui::scale::px;
 
 use crate::open_project::{Deleted, OpenProject};
 
-pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
+/// The tab strip: a tab per open file, and a pending tab for each file being read. The Files view draws it in the title bar,
+/// and the right pane draws it above the file.
+pub fn editor_tabs(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
     let theme = cx.theme().clone();
     let muted = theme.muted_foreground;
     let p = project.read(cx);
@@ -71,6 +73,28 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         let name = path.rsplit('/').next().unwrap_or(path).to_string();
         Tab::new(name).pending(true).leading(atelier_ui::spinner::Spinner::new(("opening", i)).size(px(12.)).color(muted))
     });
+    let open = project.clone();
+    Tabs::new("editor-tabs", atelier_ui::design_preview::tab_variant(atelier_ui::design_preview::tabs(cx)), tabs.chain(opening), selected).on_select(move |i, window, cx| {
+        if let Some(path) = paths.get(i) {
+            open.update(cx, |p, cx| p.open_file(path, window, cx));
+        }
+    })
+}
+
+pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
+    editor_view(project, cx, true)
+}
+
+/// The editor under a tab strip that is drawn elsewhere: the crumbs and the file.
+pub fn editor_below_tabs(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
+    editor_view(project, cx, false)
+}
+
+fn editor_view(project: &Entity<OpenProject>, cx: &App, with_tabs: bool) -> impl IntoElement {
+    let theme = cx.theme().clone();
+    let muted = theme.muted_foreground;
+    let p = project.read(cx);
+    let active = p.tabs.active().map(str::to_string);
     let crumbs = active.as_deref().map(|path| {
         let parts: Vec<String> = path.split('/').map(str::to_string).collect();
         let reveal = project.clone();
@@ -80,12 +104,6 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
                 reveal.update(cx, |p, cx| p.reveal_folder(&folders[..=i].join("/"), cx));
             }),
         )
-    });
-    let open = project.clone();
-    let strip = Tabs::new("editor-tabs", atelier_ui::design_preview::tab_variant(atelier_ui::design_preview::tabs(cx)), tabs.chain(opening), selected).on_select(move |i, window, cx| {
-        if let Some(path) = paths.get(i) {
-            open.update(cx, |p, cx| p.open_file(path, window, cx));
-        }
     });
     let body = match p.active_buffer() {
         None => div()
@@ -146,7 +164,7 @@ pub fn editor_pane(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement 
         .flex()
         .flex_col()
         .size_full()
-        .child(div().flex().flex_none().px(px(6.)).child(strip))
+        .children(with_tabs.then(|| div().flex().flex_none().px(px(6.)).child(editor_tabs(project, cx))))
         .children(crumbs)
         .child(body)
 }

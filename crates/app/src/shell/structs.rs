@@ -40,10 +40,10 @@ use crate::{
     tree_view::tree_view,
 };
 use super::types::{
-    AGENT_BESIDE_RIGHT, AGE_TICK, Edge, FolderSource, NOTICE_FOR, TITLE_BAR, WIDE_RIGHT,
+    AGENT_BESIDE_RIGHT, AGE_TICK, Edge, FolderSource, NOTICE_FOR, TITLE_BAR, TitleTabs, WIDE_RIGHT,
     TRAFFIC_LIGHTS, WHAT_ATELIER_IS,
 };
-use super::helpers::{folder_error, settings_path};
+use super::helpers::{folder_error, settings_path, tab_room};
 
 actions!(atelier, [CheckForUpdates, ZoomIn, ZoomOut, ZoomReset, ShowSessions, OpenTasks, OpenFolder, OpenRemote, NewSession, Save, CloseTab, ToggleSidebar, ToggleRight, PullRequests, OpenSettings, Quit]);
 
@@ -71,6 +71,8 @@ pub struct Shell {
     pub(super) agents_sidebar: Entity<Sidebar>,
     /// The open sessions' panels.
     pub(super) panels: Entity<AgentPanels>,
+    /// The single view's tabs, drawn in the title bar.
+    tab_strip: Entity<atelier_ui::panel_tabs::TabStrip>,
     /// The open sessions' keys from the left of the strip: a new session stands first.
     pub(super) order: Vec<SharedString>,
     /// Names the reader gave sessions, by the agent's id.
@@ -166,6 +168,7 @@ impl Shell {
             settings: None,
             focus: cx.focus_handle(),
             agents_sidebar,
+            tab_strip: cx.new(|cx| atelier_ui::panel_tabs::TabStrip::new(panels.clone(), cx)),
             panels,
             order: Vec::new(),
             names: saved.session_names.clone(),
@@ -1443,7 +1446,42 @@ impl Shell {
         cx.notify();
     }
 
-    fn title_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    /// What the title bar's free room carries: the single view's session tabs in the Sessions view, the open files' tabs
+    /// in the Files view. A narrow window has a row of tabs for its panes already, and Settings has none.
+    fn title_tabs(&self, cx: &App) -> TitleTabs {
+        if self.settings.is_some() || super::fit::Fit::of(self.width) == Fit::Narrow || self.active().is_none() {
+            return TitleTabs::None;
+        }
+        match self.view {
+            ShellView::Files => TitleTabs::Files,
+            ShellView::Sessions
+                if self.panels.read(cx).layout() == Layout::Single && self.projects.iter().any(|p| !p.read(cx).sessions.is_empty()) =>
+            {
+                TitleTabs::Sessions
+            }
+            _ => TitleTabs::None,
+        }
+    }
+
+    fn title_bar(&self, tabs: TitleTabs, cx: &mut Context<Self>) -> impl IntoElement {
+        let room = match tabs {
+            TitleTabs::None => div().flex_1(),
+            TitleTabs::Sessions => div()
+                .debug_selector(|| "title-tabs".into())
+                .flex_1()
+                .min_w_0()
+                .h_full()
+                .mr(px(tab_room(self.width, self.session_right)))
+                .child(self.tab_strip.clone()),
+            TitleTabs::Files => match self.active() {
+                Some(project) => div()
+                    .debug_selector(|| "title-tabs".into())
+                    .flex_1()
+                    .min_w_0()
+                    .child(crate::editor_pane::editor_tabs(project, cx)),
+                None => div().flex_1(),
+            },
+        };
         div()
             .id("title-bar")
             .window_control_area(WindowControlArea::Drag)
@@ -1466,7 +1504,7 @@ impl Shell {
             .child(self.title_left(cx))
             .relative()
             .children(self.layout_button(cx))
-            .child(div().flex_1())
+            .child(room)
             .child(self.settings_button(cx))
     }
 
@@ -1758,8 +1796,13 @@ impl Shell {
     }
 
     /// The Files view's editor, on its card; it says "No file open" until a file is.
-    fn files_editor(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
-        self.code_card(div().size_full().pt(px(8.)).child(crate::editor_pane::editor_pane(project, cx)).into_any_element(), cx)
+    fn files_editor(&self, project: &Entity<OpenProject>, tabs_above: bool, cx: &mut Context<Self>) -> AnyElement {
+        let editor = if tabs_above {
+            crate::editor_pane::editor_pane(project, cx).into_any_element()
+        } else {
+            crate::editor_pane::editor_below_tabs(project, cx).into_any_element()
+        };
+        self.code_card(div().size_full().pt(px(8.)).child(editor).into_any_element(), cx)
     }
 
     /// The Files view in a narrow window: the tree or the editor, with a tab for each.
@@ -1781,7 +1824,7 @@ impl Shell {
         );
         let body = match self.files_narrow {
             FilesPane::Tree => self.files_tree(project, cx),
-            FilesPane::Editor => self.files_editor(project, cx),
+            FilesPane::Editor => self.files_editor(project, true, cx),
         };
         div()
             .debug_selector(|| "files-view".into())
@@ -1960,7 +2003,7 @@ impl Shell {
         match self.view {
             ShellView::Tasks => self.tasks_main(project, window, cx),
             ShellView::Git => self.changes_main(project, cx),
-            ShellView::Files => self.files_editor(project, cx),
+            ShellView::Files => self.files_editor(project, false, cx),
             ShellView::Pulls => self.pulls_main(project, cx),
             ShellView::History => self.history_main(project, cx),
             _ => self.agent_panel(cx),
@@ -2004,6 +2047,8 @@ impl Shell {
             None => self.start_screen(window, cx).into_any_element(),
             Some(project) => self.panes(&project, window, cx),
         };
+        let title_tabs = self.title_tabs(cx);
+        self.panels.update(cx, |p, cx| p.set_tabs_hoisted(title_tabs == TitleTabs::Sessions, cx));
         let link_down = self.active().and_then(|p| match &p.read(cx).link {
             atelier_project::Link::Down(why) => Some((p.read(cx).location.place(), why.clone())),
             atelier_project::Link::Up => None,
@@ -2054,7 +2099,7 @@ impl Shell {
             .text_color(theme.foreground)
             .font_family(FONT_FAMILY)
             .relative()
-            .child(self.title_bar(cx))
+            .child(self.title_bar(title_tabs, cx))
             .children(banner)
             .child(div().flex().flex_1().min_h_0().child(body))
             .children(self.footer())
