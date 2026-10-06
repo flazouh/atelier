@@ -6,7 +6,8 @@
 #   tools/release-mac.sh publish                               put the archives, patches and feed on GitHub
 #
 # Updates come from one GitHub release, `updates`, that holds every archive, every patch and appcast.xml, so every
-# address in the feed is stable. Each version also gets its own release (`v0.1.0`) for people who download the app.
+# address in the feed is stable. Each version also gets its own release (`v0.1.0`) for people who download the app;
+# it carries appcast.xml too, because the installed app asks the latest release for it.
 #
 # $ATELIER_RELEASES_DIR (default ~/.local/share/atelier/releases) keeps every archive ever released. Keep it: a patch
 # is made from the archive of the version it updates, and an archive is never rebuilt, because the feed signs its bytes.
@@ -128,11 +129,30 @@ publish() {
   if ! gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
     notes="docs/release-notes/$version.md"
     [ -f "$notes" ] || { printf 'atelier %s for Apple silicon Macs.\n' "$version" > target/release-notes.md; notes=target/release-notes.md; }
-    gh release create "$tag" --repo "$repo" --draft --title "atelier $version" --notes-file "$notes" "$archive" "$archive.sha256" --target "$(cat "$archive.commit")"
+    # The app asks the latest release for appcast.xml (SUFeedURL), so each version's release carries the feed as well.
+    gh release create "$tag" --repo "$repo" --draft --title "atelier $version" --notes-file "$notes" "$archive" "$archive.sha256" "$releases/appcast.xml" --target "$(cat "$archive.commit")"
     check_published "$tag"
     gh release edit "$tag" --repo "$repo" --draft=false
+  else
+    gh release upload "$tag" "$releases/appcast.xml" --repo "$repo" --clobber
   fi
+  check_latest_feed
   echo "Published $tag and the update channel."
+}
+
+# The address the installed app asks, as anyone would ask it. GitHub can take several minutes to serve a new file.
+check_latest_feed() {
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' RETURN
+  for _ in $(seq 1 60); do
+    if curl -fsSL "https://github.com/$repo/releases/latest/download/appcast.xml" -o "$tmp/appcast.xml" 2>/dev/null; then
+      cmp -s "$tmp/appcast.xml" "$releases/appcast.xml" && { echo "The app's feed address serves the feed made."; return 0; }
+      echo "The app's feed address serves a different feed." >&2; exit 1
+    fi
+    sleep 10
+  done
+  echo "The app's feed address (releases/latest/download/appcast.xml) serves nothing." >&2
+  exit 1
 }
 
 # The files, fetched as anyone would fetch them: no login, the real addresses.
