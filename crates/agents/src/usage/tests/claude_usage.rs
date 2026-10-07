@@ -70,3 +70,27 @@ fn a_failed_call_says_what_to_do() {
     assert!(ClaudeUsage::fetch_failed(&ureq::Error::StatusCode(401)).contains("open Claude once"));
     assert!(ClaudeUsage::fetch_failed(&ureq::Error::StatusCode(500)).contains("could not be reached"));
 }
+
+/// A credentials file that holds only the MCP servers' sign-ins does not hide the Keychain item that holds Claude's own: the
+/// bar showed no Claude chip on a Mac with such a file.
+#[test]
+fn a_file_without_the_sign_in_does_not_hide_the_keychain_item() {
+    use std::{fs, os::unix::fs::PermissionsExt, process::Command};
+    let home = std::env::temp_dir().join(format!("claude-usage-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&home);
+    fs::create_dir_all(home.join(".claude")).unwrap();
+    fs::create_dir_all(home.join("bin")).unwrap();
+    fs::write(home.join(".claude/.credentials.json"), r#"{"mcpOAuth":{}}"#).unwrap();
+    let stub = home.join("bin/security");
+    fs::write(&stub, "#!/bin/sh\necho '{\"claudeAiOauth\":{\"accessToken\":\"t\"}}'\n").unwrap();
+    fs::set_permissions(&stub, fs::Permissions::from_mode(0o755)).unwrap();
+    let path = format!("{}:{}", home.join("bin").display(), std::env::var("PATH").unwrap_or_default());
+    let run = |script: &str| {
+        let out = Command::new("sh").args(["-c", script]).env("HOME", &home).env("PATH", &path).output().unwrap();
+        String::from_utf8_lossy(&out.stdout).to_string()
+    };
+    assert!(run(crate::usage::consts::CLAUDE_CREDENTIALS).contains("claudeAiOauth"), "the Keychain item is read");
+    fs::write(home.join(".claude/.credentials.json"), r#"{"claudeAiOauth":{"accessToken":"f"}}"#).unwrap();
+    assert!(run(crate::usage::consts::CLAUDE_CREDENTIALS).contains("\"f\""), "a file that holds the sign-in is read first");
+    let _ = fs::remove_dir_all(&home);
+}
