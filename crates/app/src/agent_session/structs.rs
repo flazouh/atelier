@@ -132,6 +132,8 @@ pub struct AgentSession {
     pub(super) dictation: super::dictation::Dictation,
     /// The project's badge, as the sidebar draws it.
     pub badge: Option<atelier_ui::sidebar_model::Badge>,
+    /// The pool colour each running subagent holds, by the id of the call that started it.
+    pub subagent_tints: std::cell::RefCell<Vec<(String, usize)>>,
     /// The activity groups the reader opened, by the index of their first item.
     pub opened_groups: std::collections::HashSet<usize>,
     /// What the project adds to the `/` list, and the agent's own commands once it has said them.
@@ -386,6 +388,7 @@ impl AgentSession {
             composer,
             dictation: super::dictation::Dictation::new(),
             badge: None,
+            subagent_tints: Default::default(),
             opened_groups: std::collections::HashSet::new(),
             project_commands: Vec::new(),
             agent_commands: Vec::new(),

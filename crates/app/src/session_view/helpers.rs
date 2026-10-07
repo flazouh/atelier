@@ -297,6 +297,9 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
             let mut card = SubagentCard::new(id("sub"), look, name, subagent.task.clone())
                 .tool_calls(calls.len() as u64)
                 .calls(calls.iter().enumerate().map(|(n, c)| tool_row(id(&format!("sub-call-{n}")), c, &root, None, false)).collect());
+            if matches!(status, SubagentStatus::Running) {
+                card = card.tint(super::tint::colour(running_tint(s, subagent.id.as_str())));
+            }
             if let Some(model) = &subagent.model {
                 card = card.model(model.clone());
                 if let Some(mark) = atelier_agents::registry::model_mark(model) {
@@ -948,4 +951,26 @@ fn short_title(title: &str) -> String {
         Some((cut, _)) => format!("{}…", title[..cut].trim_end()),
         None => title.to_string(),
     }
+}
+
+/// The pool index the running subagent `call` holds: the one it took when it first ran, else the next free one. The ones that ended
+/// give theirs back.
+fn running_tint(s: &AgentSession, call: &str) -> usize {
+    let running: Vec<&str> = s
+        .conversation
+        .items()
+        .iter()
+        .filter_map(|item| match item {
+            Item::Subagent { subagent, status: SubagentStatus::Running, .. } => Some(subagent.id.as_str()),
+            _ => None,
+        })
+        .collect();
+    let mut held = s.subagent_tints.borrow_mut();
+    held.retain(|(id, _)| running.contains(&id.as_str()));
+    if let Some((_, index)) = held.iter().find(|(id, _)| id == call) {
+        return *index;
+    }
+    let index = super::tint::next(&held.iter().map(|(_, i)| *i).collect::<Vec<_>>());
+    held.push((call.to_string(), index));
+    index
 }
