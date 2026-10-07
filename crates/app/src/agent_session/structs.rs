@@ -197,11 +197,27 @@ impl AgentSession {
     }
 
     /// Starts a new session, or resumes `resume` after reading its history, in `project`.
+    #[cfg(test)]
     pub fn start(
         key: SharedString,
         agent: Agent,
         project: Arc<dyn Project>,
         resume: Option<(SessionId, SharedString)>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self::start_on(key, agent, project, resume, None, window, cx)
+    }
+
+    /// As `start`, on `provider` for an agent that has providers: the one a session that resumes ran on, else (for a new
+    /// session) the default.
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_on(
+        key: SharedString,
+        agent: Agent,
+        project: Arc<dyn Project>,
+        resume: Option<(SessionId, SharedString)>,
+        provider: Option<crate::providers::Choice>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -324,7 +340,7 @@ impl AgentSession {
             seen: false,
             model: None,
             mode: None,
-            provider: (resume.is_none() && agent_has_providers).then(|| crate::providers::default_choice(cx)),
+            provider: agent_has_providers.then(|| provider.or_else(|| resume.is_none().then(|| crate::providers::default_choice(cx)))).flatten(),
             handoff: None,
             task: None,
             task_told: false,
@@ -868,6 +884,22 @@ impl AgentSession {
         self.status = status::sent();
         self.refresh_rows();
         self.command(Command::Answer { request: request.clone(), choice }, cx);
+        cx.emit(SessionEvent::Changed);
+    }
+
+    /// Answers the questions the agent asked: each question's text, and the label or labels the reader picked.
+    pub fn answer_questions(&mut self, request: &atelier_agents::session::RequestId, answers: Vec<(String, String)>, cx: &mut Context<Self>) {
+        let call = self.conversation.items().iter().find_map(|item| match item {
+            Item::Permission { request: r, answer: Answer::Asking } if r.id == *request => Some(r.call.id.as_str().to_string()),
+            _ => None,
+        });
+        let Some(call) = call else { return };
+        self.reviews.approvals.insert(call, crate::review_state::Approval::Approved);
+        self.save_review(cx);
+        self.conversation.answered_questions(request, answers.clone());
+        self.status = status::sent();
+        self.refresh_rows();
+        self.command(Command::AnswerQuestions { request: request.clone(), answers }, cx);
         cx.emit(SessionEvent::Changed);
     }
 

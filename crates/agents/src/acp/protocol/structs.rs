@@ -146,6 +146,7 @@ impl Protocol {
                 let id = self.asked.remove(&request).ok_or(SessionError::Unsupported("an answer to a request that is not waiting"))?;
                 step.lines.push(rpc::result(&id, client::permission_selected(choice.as_str())));
             }
+            Command::AnswerQuestions { .. } => return Err(SessionError::Unsupported("questions with choices")),
             Command::Interrupt => self.interrupt(&mut step),
             Command::SetModel { model } => match self.ready_session() {
                 Some(session) => step.lines.push(self.set_model(&session, model)),

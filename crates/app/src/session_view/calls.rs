@@ -4,7 +4,7 @@
 use atelier_agents::session::{Answer, ChoiceKind, Item, ToolId};
 
 /// The approval of the call `id`, if the call asked for one.
-fn approval<'a>(items: &'a [Item], id: &ToolId) -> Option<&'a Answer> {
+pub(super) fn approval<'a>(items: &'a [Item], id: &ToolId) -> Option<&'a Answer> {
     items.iter().rev().find_map(|item| match item {
         Item::Permission { request, answer } if request.call.id == *id => Some(answer),
         _ => None,

@@ -40,6 +40,7 @@ impl Session for Handle {
         match command {
             Command::Send { text, attachments } => self.tx.send(Inbox::Send(message_text(&text, &attachments))).map_err(gone),
             Command::Answer { request, choice } => self.tx.send(Inbox::Answer(request, choice)).map_err(gone),
+            Command::AnswerQuestions { .. } => Err(SessionError::Unsupported("questions with choices")),
             Command::Interrupt => {
                 self.shared.cancel.set();
                 Ok(())

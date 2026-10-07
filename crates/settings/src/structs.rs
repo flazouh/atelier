@@ -99,6 +99,9 @@ pub struct OpenSession {
     pub title: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<String>,
+    /// The provider the session ran on, as the settings keep a provider choice; none for a session saved before this was kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 impl Settings {
