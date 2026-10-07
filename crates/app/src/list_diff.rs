@@ -5,7 +5,7 @@
 mod helpers;
 mod types;
 
-pub use helpers::{activity_fingerprint, arrivals, changes, changes_fingerprint, fingerprint, grouped, rows, waiting_fingerprint, waits};
+pub use helpers::{activity_fingerprint, arrivals, changes, fingerprint, grouped, rows, waiting_fingerprint, waits};
 pub use types::{Arrival, Row};
 
 #[cfg(test)]

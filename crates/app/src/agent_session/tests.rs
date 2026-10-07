@@ -163,9 +163,9 @@ fn a_long_session_scrolls_under_a_frame(cx: &mut TestAppContext) {
 }
 
 /// A turn that edits one file and makes another, one of them through a shell command no tool names,
-/// ends with its changed files, and their card follows the turn's last row.
+/// ends with its changed files kept in the review; the session's list draws no card for them.
 #[gpui_kit::test]
-fn a_turn_ends_with_its_changed_files_after_its_rows(cx: &mut TestAppContext) {
+fn a_turn_keeps_its_changed_files_in_the_review(cx: &mut TestAppContext) {
     let dir = git_project(&[("a.txt", "one\n"), ("b.txt", "keep\n")]);
     let (session, fake, cx) = start_in(cx, dir.clone(), vec![vec![Event::Text { block: atelier_agents::session::BlockId(1), delta: "done".into() }, ended()]], false);
     let root = dir.clone();
@@ -182,7 +182,7 @@ fn a_turn_ends_with_its_changed_files_after_its_rows(cx: &mut TestAppContext) {
     });
     assert_eq!(turns, 1);
     assert_eq!(counts.unwrap(), [("a.txt".to_string(), (1, 0)), ("c.txt".to_string(), (1, 0))], "b.txt did not change");
-    assert_eq!(shown.last(), Some(&list_diff::Row::Changes { turn: 0 }), "the card comes after the turn's rows");
+    assert!(shown.iter().all(|row| !matches!(row, list_diff::Row::Waiting)), "the turn is over");
 }
 
 /// The review is kept in the data folder with the session: a session resumed after a restart opens its

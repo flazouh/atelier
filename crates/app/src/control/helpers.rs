@@ -224,7 +224,6 @@ pub(super) fn session_json(s: &AgentSession, front: bool) -> Value {
 fn row_json(s: &AgentSession, row: Row) -> Value {
     match row {
         Row::Item(ix) => s.conversation.items().get(ix).map_or(json!({ "kind": "missing" }), item_json),
-        Row::Changes { turn } => json!({ "kind": "changes", "turn": turn }),
         Row::Activity { from, to } => json!({ "kind": "activity", "from": from, "to": to }),
         Row::Waiting => json!({ "kind": "waiting", "label": s.agent.look.labels.waiting.as_ref() }),
     }
