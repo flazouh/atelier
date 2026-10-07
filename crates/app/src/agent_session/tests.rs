@@ -390,6 +390,29 @@ fn a_density_of_lines_gives_each_call_its_own_row_and_follows_the_setting(cx: &m
     assert_eq!(rows(cx), [list_diff::Row::Item(0), list_diff::Row::Activity { from: 1, to: 4 }], "grouped again");
 }
 
+/// The conversation follows the output from inside the row that grows. That row is measured again on every delta, and the list
+/// puts the scroll back at the start of a row it measures again: the place in the row must be kept, or each delta paints one
+/// frame at the top of the row before the follow moves it back.
+#[gpui_kit::test]
+fn the_scroll_keeps_its_place_in_a_row_that_grows(cx: &mut TestAppContext) {
+    use atelier_agents::session::{BlockId, Event};
+    use gpui_kit::{ListOffset, px};
+    let (session, _fake, cx) = start(cx, vec![vec![Event::Text { block: BlockId(1), delta: "one two three ".into() }]], false);
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("go".into(), cx)));
+    cx.run_until_parked();
+    let list = cx.update(|_, cx| session.read(cx).list.clone());
+    let (item, at) = (1, px(80.));
+    cx.update(|_, cx| {
+        session.update(cx, |s, _| {
+            s.list.scroll_to(ListOffset { item_ix: item, offset_in_item: at });
+            s.conversation.apply(&Event::Text { block: BlockId(1), delta: "four five six seven".into() });
+            s.refresh_rows();
+        })
+    });
+    let top = list.logical_scroll_top();
+    assert_eq!((top.item_ix, top.offset_in_item), (item, at), "the place in the growing row stays");
+}
+
 mod providers {
     use std::sync::Arc;
 
