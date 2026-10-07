@@ -38,7 +38,7 @@ fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
         let shown = input.clone();
         let panel = PanelData {
             id: "p".into(),
-            project: ProjectLabel { id: "project".into(), name: "project".into(), location: Location::Local },
+            project: ProjectLabel { id: "project".into(), name: "project".into(), location: Location::Local, badge: None },
             title: "A session".into(),
             look: atelier_agents::registry::agents()[0].look.clone(),
             status: SessionStatus::Idle,
