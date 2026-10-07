@@ -15,6 +15,7 @@ mod lens;
 mod rail;
 mod restore;
 mod structs;
+mod tree_menu;
 mod types;
 mod updates;
 mod view;

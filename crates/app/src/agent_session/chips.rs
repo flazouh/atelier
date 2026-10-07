@@ -189,6 +189,11 @@ impl AgentSession {
         self.add_chip(Chip::file(shown.to_string_lossy().into_owned()), None, cx);
     }
 
+    /// A file of the project, as a chip in the composer: its mention goes with the message.
+    pub fn mention_file(&mut self, path: &str, cx: &mut Context<Self>) {
+        self.add_chip(Chip::file(path.to_string()), None, cx);
+    }
+
     /// Words from the conversation were replied to: they become a quote chip. `key` is the chip being changed, if the reader
     /// opened one to edit it; it then keeps its place.
     pub(super) fn quoted(&mut self, quote: &str, note: &str, key: Option<SharedString>, cx: &mut Context<Self>) {

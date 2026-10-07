@@ -7,7 +7,7 @@
 //! - `{"cmd":"new_session"}` or `{"cmd":"new_session","agent":"Cursor"}`: opens a session in the active project.
 //! - `{"cmd":"send","text":"hello"}`: sends a message in the session in front, as the composer does.
 //! - `{"cmd":"find","name":"limit-continue"}` and `{"cmd":"click","name":"limit-continue"}`: where an element marked with
-//!   [`marked`] was last drawn, and a press on it. `{"cmd":"click","x":10,"y":20}` presses a point of the window.
+//!   [`marked`] was last drawn, and a press on it. `{"cmd":"click","x":10,"y":20}` presses a point of the window; `"button":"right"` presses it with the other button.
 //! - `{"cmd":"limit"}`: pretends the account of the session in front reached its weekly limit, to see the box.
 //!
 //! `tools/atelier-ctl.sh` is the client, and `tools/dev-qa.sh` starts an app to drive.

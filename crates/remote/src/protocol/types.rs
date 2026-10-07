@@ -1,4 +1,4 @@
-use atelier_project::{Change, Command, DataEntry, DirEntry, Entry, GitOutput, Match, Query};
+use atelier_project::{Change, Command, DataEntry, DirEntry, Entry, FsOp, GitOutput, Match, Query};
 use serde::{Deserialize, Serialize};
 
 use super::tracker::{TrackerCall, TrackerReply};
@@ -6,12 +6,12 @@ use super::structs::Failure;
 
 /// The protocol's version: both ends must agree, or the hello fails.
 /// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`. 5: `Tracker`. 6: worktrees (`Open`, `At`,
-/// `ChangesAt`).
-pub const VERSION: u32 = 6;
+/// `ChangesAt`). 7: `Fs`.
+pub const VERSION: u32 = 7;
 
 /// The protocol, as bytes a helper binary carries, so the app reads a copy's protocol from the file
 /// with no need to run it (it may be built for another machine). Keep it in step with [`VERSION`].
-pub const STAMP: &[u8] = b"atelier-remote-protocol:6;";
+pub const STAMP: &[u8] = b"atelier-remote-protocol:7;";
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -39,6 +39,8 @@ pub enum Call {
     Stderr { pid: Pid },
     Git { args: Vec<String> },
     Remove { path: String },
+    /// A new folder, a move, a copy or a removal that the file tree asked for.
+    Fs { op: FsOp },
     /// The project's data folder, on the host.
     DataRead { path: String },
     DataWrite { path: String, bytes: Vec<u8> },
@@ -78,6 +80,7 @@ pub enum FailureKind {
     NotFound,
     PermissionDenied,
     InvalidInput,
+    AlreadyExists,
     Other,
 }
 

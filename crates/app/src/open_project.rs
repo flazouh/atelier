@@ -13,6 +13,7 @@ mod handoff;
 mod helpers;
 mod past;
 mod structs;
+pub mod tree_edit;
 mod types;
 
 pub use structs::OpenProject;

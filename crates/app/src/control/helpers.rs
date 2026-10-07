@@ -119,7 +119,8 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
             Some(b) => json!({ "x": f32::from(b.origin.x), "y": f32::from(b.origin.y), "w": f32::from(b.size.width), "h": f32::from(b.size.height) }),
             None => json!({ "error": format!("{name} has not been drawn") }),
         },
-        Request::Click { name, x, y } => {
+        Request::Click { name, x, y, button } => {
+            let button = if button.as_deref() == Some("right") { gpui_kit::MouseButton::Right } else { gpui_kit::MouseButton::Left };
             let at = match (name, x, y) {
                 (Some(name), _, _) => super::marks::find(&name, cx).map(|b| b.center()),
                 (None, Some(x), Some(y)) => Some(gpui_kit::point(gpui_kit::px(x), gpui_kit::px(y))),
@@ -128,7 +129,7 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
             match at {
                 Some(position) => {
                     // The press runs once the shell is no longer being updated, so a handler can update it.
-                    window.defer(cx, move |window, cx| press_in_steps(window, position, cx));
+                    window.defer(cx, move |window, cx| press_with(window, position, button, cx));
                     json!({ "ok": true, "x": f32::from(position.x), "y": f32::from(position.y) })
                 }
                 None => json!({ "error": "click needs a name that has been drawn, or x and y" }),
@@ -249,14 +250,19 @@ fn cut(text: &str) -> String {
 /// Each step runs once the one before has been handled, so the element knows it is hovered when the press arrives.
 /// No step waits for a frame, so a window that nothing is drawing, as one under another window, takes the press too.
 pub(crate) fn press_in_steps(window: &mut Window, position: gpui_kit::Point<gpui_kit::Pixels>, cx: &mut App) {
-    use gpui_kit::{Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput};
+    press_with(window, position, gpui_kit::MouseButton::Left, cx)
+}
+
+/// [`press_in_steps`] with the button named.
+fn press_with(window: &mut Window, position: gpui_kit::Point<gpui_kit::Pixels>, button: gpui_kit::MouseButton, cx: &mut App) {
+    use gpui_kit::{Modifiers, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PlatformInput};
     let modifiers = Modifiers::default();
     window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position, pressed_button: None, modifiers }), cx);
     window.defer(cx, move |window, cx| {
-        let down = MouseDownEvent { button: MouseButton::Left, position, modifiers, click_count: 1, first_mouse: false };
+        let down = MouseDownEvent { button, position, modifiers, click_count: 1, first_mouse: false };
         window.dispatch_event(PlatformInput::MouseDown(down), cx);
         window.defer(cx, move |window, cx| {
-            let up = MouseUpEvent { button: MouseButton::Left, position, modifiers, click_count: 1 };
+            let up = MouseUpEvent { button, position, modifiers, click_count: 1 };
             window.dispatch_event(PlatformInput::MouseUp(up), cx);
         });
     });

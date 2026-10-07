@@ -10,8 +10,9 @@ pub enum Request {
     /// Pretends the front session's account reached its weekly limit, resetting in 30 h 39 min.
     Limit,
     Find { name: String },
-    /// A press on a marked element's centre, or on a point (`x`, `y`) of the window.
-    Click { name: Option<String>, x: Option<f32>, y: Option<f32> },
+    /// A press on a marked element's centre, or on a point (`x`, `y`) of the window. `button` is `right` for the other
+    /// button; any other value, or none, is the left one.
+    Click { name: Option<String>, x: Option<f32>, y: Option<f32>, button: Option<String> },
     /// A press on a marked element, as a pointer makes it: onto the element, down, then up.
     Press { name: String },
     /// The names of the elements that can be found and pressed, as they were last drawn.

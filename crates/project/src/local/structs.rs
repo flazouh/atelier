@@ -32,7 +32,7 @@ use crate::{
     process::{Control as _, LocalChild},
 };
 use super::types::{SEARCH_MAX_BYTES, WATCH_BATCH};
-use super::helpers::{Ignores, follow, write_whole};
+use super::helpers::{Ignores, apply_op, follow, write_whole};
 use super::types::EACH_FOLDER;
 
 pub struct LocalProject {
@@ -136,6 +136,10 @@ impl Project for LocalProject {
 
     fn remove(&self, path: &str) -> io::Result<()> {
         fs::remove_file(host_path(&self.root, path)?)
+    }
+
+    fn apply(&self, op: &crate::FsOp) -> io::Result<()> {
+        apply_op(&self.root, op)
     }
 
     fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {

@@ -304,6 +304,13 @@ impl Project for RemoteProject {
         }
     }
 
+    fn apply(&self, op: &atelier_project::FsOp) -> io::Result<()> {
+        match self.call(Call::Fs { op: op.clone() })? {
+            Reply::Done => Ok(()),
+            other => Err(unexpected(other)),
+        }
+    }
+
     fn data_read(&self, path: &str) -> io::Result<Vec<u8>> {
         match self.call(Call::DataRead { path: path.into() })? {
             Reply::Bytes(bytes) => Ok(bytes),

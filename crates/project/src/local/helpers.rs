@@ -22,6 +22,63 @@ pub(crate) fn write_whole(target: &Path, bytes: &[u8]) -> io::Result<()> {
     })
 }
 
+/// Copies a file, or a folder with all it holds, to a place that is not there yet.
+pub(crate) fn copy_all(from: &Path, to: &Path) -> io::Result<()> {
+    if fs::symlink_metadata(to).is_ok() {
+        return Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{} is there already", to.display())));
+    }
+    if fs::metadata(from)?.is_dir() {
+        fs::create_dir(to)?;
+        for entry in fs::read_dir(from)? {
+            let entry = entry?;
+            copy_all(&entry.path(), &to.join(entry.file_name()))?;
+        }
+        Ok(())
+    } else {
+        fs::copy(from, to).map(drop)
+    }
+}
+
+/// Does `op` in the folder `root`.
+pub(crate) fn apply_op(root: &Path, op: &crate::FsOp) -> io::Result<()> {
+    use crate::{FsOp, host_path};
+    let there = |path: &str| host_path(root, path);
+    let free = |path: &Path| {
+        if fs::symlink_metadata(path).is_ok() {
+            Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{} is there already", path.display())))
+        } else {
+            Ok(())
+        }
+    };
+    match op {
+        FsOp::NewFile { path } => {
+            let at = there(path)?;
+            if let Some(parent) = at.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::OpenOptions::new().write(true).create_new(true).open(at).map(drop)
+        }
+        FsOp::NewFolder { path } => {
+            let at = there(path)?;
+            free(&at)?;
+            fs::create_dir_all(at)
+        }
+        FsOp::Rename { from, to } => {
+            let (from, to) = (there(from)?, there(to)?);
+            free(&to)?;
+            fs::rename(from, to)
+        }
+        FsOp::Copy { from, to } => copy_all(&there(from)?, &there(to)?),
+        FsOp::Delete { path } => {
+            let at = there(path)?;
+            if at == root {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "the project's own folder stays"));
+            }
+            if fs::symlink_metadata(&at)?.is_dir() { fs::remove_dir_all(at) } else { fs::remove_file(at) }
+        }
+    }
+}
+
 /// The walk the listing makes: dotfiles show, as editors show them, and `.git` never does. A .gitignore counts even
 /// before the folder is a git repository, and each nested checkout's own counts below it.
 pub(crate) fn walker(root: &Path) -> WalkBuilder {

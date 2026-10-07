@@ -9,6 +9,7 @@ impl From<Failure> for io::Error {
             FailureKind::NotFound => io::ErrorKind::NotFound,
             FailureKind::PermissionDenied => io::ErrorKind::PermissionDenied,
             FailureKind::InvalidInput => io::ErrorKind::InvalidInput,
+            FailureKind::AlreadyExists => io::ErrorKind::AlreadyExists,
             FailureKind::Other => io::ErrorKind::Other,
         };
         io::Error::new(kind, failure.message)

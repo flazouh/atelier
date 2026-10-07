@@ -8,6 +8,7 @@
 #   tools/atelier-ctl.sh limit                  pretend the front session hit its weekly limit
 #   tools/atelier-ctl.sh open PATH [HOST]       open a folder, over SSH on HOST when named
 #   tools/atelier-ctl.sh marks                  the names that can be pressed, as last drawn
+#   tools/atelier-ctl.sh click X Y [right]      press a point of the window, with the other button when asked
 #   tools/atelier-ctl.sh press NAME             press a named element with no pointer, e.g. settings-entry,
 #                                               section-providers, add-key, keep-key, test-key, forget-key
 # Each prints the app's JSON answer, one line.
@@ -24,8 +25,10 @@ if cmd == "press":
 if cmd == "find" or cmd == "click":
     if rest and not rest[0].isdigit():
         request["name"] = rest[0]
-    elif len(rest) == 2:
+    elif len(rest) >= 2:
         request["x"], request["y"] = float(rest[0]), float(rest[1])
+        if len(rest) == 3:
+            request["button"] = rest[2]
 if cmd == "view":
     request["name"] = rest[0]
 if cmd == "open":

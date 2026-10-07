@@ -67,6 +67,41 @@ fn a_path_outside_the_project_is_refused() {
 }
 
 #[test]
+fn the_file_tree_s_operations_change_the_disk_and_refuse_to_overwrite() {
+    use crate::FsOp;
+    let (dir, p) = project(&[("a.txt", "a"), ("src/m.rs", "m"), ("src/deep/n.rs", "n")]);
+    let there = |path: &str| dir.path().join(path);
+    p.apply(&FsOp::NewFile { path: "docs/n/x.txt".into() }).unwrap();
+    assert_eq!(fs::read_to_string(there("docs/n/x.txt")).unwrap(), "", "an empty file, and the folders above it");
+    assert!(p.apply(&FsOp::NewFile { path: "a.txt".into() }).is_err(), "a file that is there is not made again");
+    assert_eq!(fs::read_to_string(there("a.txt")).unwrap(), "a");
+    p.apply(&FsOp::NewFolder { path: "docs/new".into() }).unwrap();
+    assert!(there("docs/new").is_dir(), "a folder and the folders above it");
+    assert!(p.apply(&FsOp::NewFolder { path: "docs".into() }).is_err(), "a folder that is there is not made again");
+    p.apply(&FsOp::Rename { from: "a.txt".into(), to: "b.txt".into() }).unwrap();
+    assert!(!there("a.txt").exists() && there("b.txt").exists());
+    p.apply(&FsOp::Copy { from: "src".into(), to: "src2".into() }).unwrap();
+    assert_eq!(fs::read_to_string(there("src2/deep/n.rs")).unwrap(), "n", "a folder is copied with all it holds");
+    assert!(there("src/deep/n.rs").exists(), "and the original stays");
+    assert!(p.apply(&FsOp::Copy { from: "b.txt".into(), to: "src2/m.rs".into() }).is_err(), "a copy does not overwrite");
+    assert!(p.apply(&FsOp::Rename { from: "b.txt".into(), to: "src2/m.rs".into() }).is_err(), "a rename does not overwrite");
+    assert_eq!(fs::read_to_string(there("src2/m.rs")).unwrap(), "m");
+    p.apply(&FsOp::Delete { path: "src2".into() }).unwrap();
+    p.apply(&FsOp::Delete { path: "b.txt".into() }).unwrap();
+    assert!(!there("src2").exists() && !there("b.txt").exists());
+    for op in [
+        FsOp::Delete { path: "../x".into() },
+        FsOp::Rename { from: "src/m.rs".into(), to: "../m.rs".into() },
+        FsOp::NewFolder { path: "/abs".into() },
+        FsOp::Delete { path: "".into() },
+    ] {
+        let refused = p.apply(&op);
+        assert!(refused.is_err() || matches!(op, FsOp::NewFolder { .. }), "{op:?} is refused");
+    }
+    assert!(there("src/m.rs").exists() && dir.path().exists(), "nothing outside the folder, and not the folder itself");
+}
+
+#[test]
 fn search_finds_literal_and_regex_lines_skips_binary_and_stops_at_the_limit() {
     let (_dir, p) = project(&[
         ("a.rs", "let x = 1;\nfn detach() {}\nlet y = x.detach();\n"),

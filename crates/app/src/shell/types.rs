@@ -35,3 +35,13 @@ pub(super) enum Edge {
     Sidebar,
     Right,
 }
+
+/// What the title bar carries in its free room, between the sidebar's button and the buttons at its right.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum TitleTabs {
+    None,
+    /// The single view's session tabs.
+    Sessions,
+    /// The open files' tabs.
+    Files,
+}
