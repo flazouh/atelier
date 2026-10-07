@@ -59,7 +59,7 @@ impl TurnTracker {
         if !matches!(kind, ToolKind::Edit | ToolKind::Write) {
             return;
         }
-        let Some(path) = self.relative(file) else { return };
+        let Some(path) = self.place_of(file) else { return };
         if self.baselines.contains_key(&path) {
             return;
         }
@@ -72,10 +72,15 @@ impl TurnTracker {
         self.baselines.insert(path, baseline);
     }
 
-    /// The path of a file the agent named, relative to the project; `None` outside it.
-    fn relative(&self, file: &str) -> Option<String> {
-        let rest = file.strip_prefix(self.root.as_str())?.strip_prefix('/')?;
-        (!rest.is_empty() && !rest.split('/').any(|part| part == ".." || part == ".")).then(|| rest.to_string())
+    /// The path a review keeps for a file the agent named: relative to the project when it is inside the folder, else
+    /// the absolute path (see [`crate::place`]). `None` for a path that climbs (`..`), is not absolute, or names the
+    /// folder itself.
+    fn place_of(&self, file: &str) -> Option<String> {
+        let plain = |path: &str| !path.is_empty() && !path.split('/').any(|part| part == ".." || part == ".");
+        if let Some(rest) = file.strip_prefix(self.root.as_str()).and_then(|rest| rest.strip_prefix('/')) {
+            return plain(rest).then(|| rest.to_string());
+        }
+        (file.starts_with('/') && plain(&file[1..]) && !file.ends_with('/') && file.as_bytes() != self.root.as_bytes()).then(|| file.to_string())
     }
 
     /// The turn's files, with their hunks.

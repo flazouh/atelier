@@ -21,7 +21,7 @@ pub use local::LocalProject;
 pub use process::{Command, Control, Process, STDERR_KEEP, Tail};
 pub use tracker_slot::TrackerSlot;
 
-pub use helpers::{expand_home, host_path, read_local_dir};
+pub use helpers::{expand_home, host_path, outside_path, read_local_dir};
 pub use structs::{Change, DirEntry, Entry, GitOutput, Match, Query, Watch};
 pub use traits::Project;
 pub use types::{ChangeKind, ChangeSink, FsOp, Link, LinkSink, TRACKER_FILE};

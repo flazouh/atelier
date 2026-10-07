@@ -117,6 +117,57 @@ fn the_changed_files_sit_above_the_composer_and_review_opens_the_session(cx: &mu
     assert_eq!(heard.borrow().as_slice(), [(None, Some("a.txt".to_string()))]);
 }
 
+/// A file the agent changed beyond the project shows in the changed files by its absolute path, so it reads as outside, and a
+/// press on it opens the review on it, since the editor holds only the project's files.
+#[gpui_kit::test]
+fn a_file_changed_beyond_the_project_shows_by_its_path_and_a_press_reviews_it(cx: &mut TestAppContext) {
+    use std::{cell::RefCell, rc::Rc};
+    use atelier_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolStatus};
+    let dir = crate::fake_agent::git_project(&[("a.txt", "one\n")]);
+    let far = crate::test_dirs::path().join("far.txt");
+    std::fs::write(&far, "one\n").unwrap();
+    let (session, _, cx) = crate::fake_agent::start_shown_in(cx, dir.clone(), vec![vec![crate::fake_agent::ended()]]);
+    cx.simulate_resize(gpui_kit::size(px(600.), px(800.)));
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let log = heard.clone();
+    cx.update(|_, cx| {
+        cx.subscribe(&session, move |_, event: &crate::agent_session::SessionEvent, _| match event {
+            crate::agent_session::SessionEvent::Review { path, .. } => log.borrow_mut().push(("review", path.clone())),
+            crate::agent_session::SessionEvent::OpenFile(path) => log.borrow_mut().push(("open", Some(path.clone()))),
+            _ => {}
+        })
+        .detach()
+    });
+    let project: std::sync::Arc<dyn atelier_project::Project> = std::sync::Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
+    let mut tracker = atelier_review::TurnTracker::begin(project.as_ref());
+    tracker.observe(project.as_ref(), &Event::ToolStarted(ToolCall {
+        id: ToolId::new("t1"),
+        name: "Edit".into(),
+        kind: ToolKind::Edit,
+        input: serde_json::Value::Null,
+        file: Some(far.display().to_string()),
+        parent: None,
+        status: ToolStatus::Running,
+    }));
+    std::fs::write(&far, "one\ntwo\n").unwrap();
+    let turn = tracker.finish(project.as_ref());
+    cx.update(|_, cx| session.update(cx, |s, cx| {
+        s.reviews.turns.push(turn);
+        s.diff_session(cx);
+    }));
+    cx.run_until_parked();
+    let shown = far.display().to_string();
+    assert_eq!(cx.update(|_, cx| session.read(cx).changed_files().iter().map(|f| f.path.to_string()).collect::<Vec<_>>()), std::slice::from_ref(&shown));
+    let header = cx.debug_bounds("changed-files-toggle").expect("the header is drawn");
+    cx.simulate_click(header.center(), gpui_kit::Modifiers::default());
+    cx.run_until_parked();
+    let name: &'static str = Box::leak(format!("changed-file-{shown}").into_boxed_str());
+    let row = cx.debug_bounds(name).expect("the file has a row, named by its absolute path");
+    cx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    cx.run_until_parked();
+    assert_eq!(heard.borrow().as_slice(), [("review", Some(shown))], "it opens the review, not the editor");
+}
+
 #[test]
 fn a_read_shows_no_file_content_and_only_its_error_when_it_fails() {
     use atelier_agents::session::{ToolKind, ToolStatus};

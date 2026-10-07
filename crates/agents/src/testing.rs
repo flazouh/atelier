@@ -61,6 +61,18 @@ impl Project for Locked {
         self.0.remove(path)
     }
 
+    fn read_outside(&self, path: &str) -> io::Result<Vec<u8>> {
+        self.0.read_outside(path)
+    }
+
+    fn write_outside(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
+        self.0.write_outside(path, bytes)
+    }
+
+    fn remove_outside(&self, path: &str) -> io::Result<()> {
+        self.0.remove_outside(path)
+    }
+
     fn apply(&self, op: &atelier_project::FsOp) -> io::Result<()> {
         self.0.apply(op)
     }

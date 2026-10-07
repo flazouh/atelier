@@ -275,6 +275,63 @@ fn a_rejected_new_file_is_removed(cx: &mut TestAppContext) {
     assert!(!dir.join("new.txt").exists(), "the file the agent made is gone");
 }
 
+/// A turn that edits a file beyond the project, made by the real tracker in the order a run has: the tool call names the file,
+/// then the file changes, then the turn ends. Returns the pane open on it, the session and the file's path.
+fn reviewing_beyond_the_project<'a>(cx: &'a mut TestAppContext, beyond: &str, after: &str) -> (Entity<ReviewPane>, Entity<AgentSession>, std::path::PathBuf, &'a mut gpui_kit::VisualTestContext) {
+    use atelier_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolStatus};
+    let dir = git_project(&[("a.txt", BEFORE)]);
+    let far = crate::test_dirs::path().join("far.txt");
+    if !beyond.is_empty() {
+        std::fs::write(&far, beyond).unwrap();
+    }
+    let (session, _, cx) = start_in(cx, dir.clone(), vec![vec![ended()]], false);
+    let project: Arc<dyn Project> = Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
+    let mut tracker = atelier_review::TurnTracker::begin(project.as_ref());
+    tracker.observe(project.as_ref(), &Event::ToolStarted(ToolCall {
+        id: ToolId::new("t1"),
+        name: "Write".into(),
+        kind: ToolKind::Write,
+        input: serde_json::Value::Null,
+        file: Some(far.display().to_string()),
+        parent: None,
+        status: ToolStatus::Running,
+    }));
+    std::fs::write(&far, after).unwrap();
+    let turn = tracker.finish(project.as_ref());
+    cx.update(|_, cx| session.update(cx, |s, _| {
+        s.reviews.turns.push(turn);
+    }));
+    let path = far.display().to_string();
+    let pane = cx.update(|window, cx| cx.new(|cx| ReviewPane::new(session.clone(), project, Scope::Turn(0), Some(&path), window, cx)));
+    cx.run_until_parked();
+    (pane, session, far, cx)
+}
+
+#[gpui_kit::test]
+fn a_file_beyond_the_project_is_in_the_turn_and_a_rejected_edit_goes_back(cx: &mut TestAppContext) {
+    let (pane, session, far, cx) = reviewing_beyond_the_project(cx, "one\n", "one\ntwo\n");
+    let listed = cx.update(|_, cx| session.read(cx).reviews.turns.turns()[0].files().iter().map(|f| f.path.clone()).collect::<Vec<_>>());
+    assert_eq!(listed, [far.display().to_string()], "the turn lists it by its absolute path");
+    assert_eq!(cx.update(|_, cx| pane.read(cx).files[0].hunks().len()), 1);
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_file(Decision::Reject, window, cx)));
+    cx.run_until_parked();
+    assert_eq!(std::fs::read_to_string(&far).unwrap(), "one\n", "the edit is undone on the disk, outside the project");
+}
+
+#[gpui_kit::test]
+fn a_new_file_beyond_the_project_is_removed_when_rejected_and_kept_when_accepted(cx: &mut TestAppContext) {
+    let (pane, _, far, cx) = reviewing_beyond_the_project(cx, "", "made\n");
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_file(Decision::Reject, window, cx)));
+    cx.run_until_parked();
+    assert!(!far.exists(), "the file the agent made beyond the project is gone");
+    std::fs::write(&far, "made\n").unwrap();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.check_disk(vec![far.display().to_string()], window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.decide_file(Decision::Accept, window, cx)));
+    cx.run_until_parked();
+    assert_eq!(std::fs::read_to_string(&far).unwrap(), "made\n", "accepted, it stays");
+}
+
 /// The whole session is diffed off the UI thread: the switch keeps the turn drawn until its files land.
 #[gpui_kit::test]
 fn the_whole_session_is_read_off_the_ui_thread(cx: &mut TestAppContext) {
