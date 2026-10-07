@@ -134,3 +134,19 @@ fn a_sent_message_waits_until_the_agent_says_something() {
     assert!(!waits(&[user, text], true), "the agent has answered");
     assert!(!waits(&[], true));
 }
+
+/// A question that streams in changes its row as it grows, so the list lays it out again; another tool's input does not.
+#[test]
+fn a_question_row_changes_as_its_text_streams_in() {
+    use atelier_agents::session::{Call, Item, ToolCall, ToolId, ToolKind, ToolStatus};
+    let call = |name: &str, input: serde_json::Value| {
+        Item::Tool(Call {
+            call: ToolCall { id: ToolId::new("t"), name: name.into(), kind: ToolKind::Other, input, file: None, parent: None, status: ToolStatus::Pending },
+            output: None,
+            edit: None,
+        })
+    };
+    let cut = |question: &str| serde_json::json!({"questions": [{"question": question, "options": []}]});
+    assert_ne!(super::fingerprint(&call("AskUserQuestion", cut("Which"))), super::fingerprint(&call("AskUserQuestion", cut("Which toy do you want?"))));
+    assert_eq!(super::fingerprint(&call("Bash", cut("Which"))), super::fingerprint(&call("Bash", cut("Which toy do you want?"))));
+}

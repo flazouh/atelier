@@ -234,3 +234,16 @@ fn inline_settings_env(command: &Command) -> Map<String, Value> {
     let settings: Value = serde_json::from_str(&command.args[at + 1]).expect("the settings are JSON");
     settings["env"].as_object().expect("the settings have an env").clone()
 }
+
+/// An account's session gets a tool call's input as it is written, unless the environment says otherwise; an OpenRouter session
+/// never asks.
+#[test]
+fn an_account_session_streams_tool_input_unless_the_environment_says() {
+    use crate::claude_code::launch::streams_tool_input;
+    let account = Provider::Account(DEFAULT_ACCOUNT.into());
+    let router = Provider::OpenRouter { key: ApiKey::new("sk-or-test") };
+    assert!(streams_tool_input(Some(&account), false));
+    assert!(streams_tool_input(None, false));
+    assert!(!streams_tool_input(Some(&account), true), "the reader's own setting stands");
+    assert!(!streams_tool_input(Some(&router), false));
+}

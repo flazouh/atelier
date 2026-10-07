@@ -50,14 +50,26 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
     if let Some(mode) = request.mode.filter(|mode| *mode != PermissionMode::Ask) {
         args.extend(["--permission-mode".into(), mode_name(mode).into()]);
     }
-    match (&request.provider, &request.resume) {
+    let mut command = match (&request.provider, &request.resume) {
         (Some(Provider::OpenRouter { key }), _) => on_openrouter(program, key, args),
         (Some(Provider::Account(name)), Some(session)) => on_account_with(program, name, session, args),
         (Some(Provider::Account(name)), None) if name != DEFAULT_ACCOUNT => on_account(program, name, args),
         (Some(Provider::Account(_)), None) => Command::new(program).args(args),
         (None, Some(session)) => on_the_account_holding(program, session, args),
         (None, None) => Command::new(program).args(args),
+    };
+    if streams_tool_input(request.provider.as_ref(), std::env::var_os(TOOL_STREAMING_ENV).is_some()) {
+        command.env.extend([(TOOL_STREAMING_ENV.to_string(), "1".to_string())]);
     }
+    command
+}
+/// Makes `claude` send a tool call's input as the model writes it, not once the model has finished a whole field. Without it
+/// a question's text arrives in one burst, after the model has written all of it, so a card has nothing to show until the end.
+const TOOL_STREAMING_ENV: &str = "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING";
+/// Whether to ask for that: for an account, unless the environment says already. Not for OpenRouter, a proxy that may not take
+/// the request that goes with it.
+pub(super) fn streams_tool_input(provider: Option<&Provider>, already_said: bool) -> bool {
+    !already_said && !matches!(provider, Some(Provider::OpenRouter { .. }))
 }
 
 const SHELL: &str = "sh";

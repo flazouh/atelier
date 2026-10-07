@@ -16,7 +16,7 @@ pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
         Item::User { text } => (0, text.len(), 0),
         Item::Text { text, .. } => (1, text.len(), 0),
         Item::Thinking { text, took, .. } => (2, text.len(), usize::from(took.is_some())),
-        Item::Tool(call) => (3, tool(call.call.status) + 4 * call.edit.as_ref().map_or(0, |e| e.old.len() + e.new.len() + 1), call.output.as_ref().map_or(0, |o| o.text.len() + 1)),
+        Item::Tool(call) => (3, tool(call.call.status) + 4 * call.edit.as_ref().map_or(0, |e| e.old.len() + e.new.len() + 1), call.output.as_ref().map_or(0, |o| o.text.len() + 1) + question_size(call)),
         Item::Subagent { status, activity, calls, summary, .. } => {
             let status = match status {
                 SubagentStatus::Running => 0,
@@ -33,6 +33,18 @@ pub fn fingerprint(item: &Item) -> (u8, usize, usize) {
         }, 0),
         Item::Notice(text) => (6, text.len(), 0),
     }
+}
+
+/// How much of a question a call has written so far, so the row of a question that is still streaming is laid out again as its
+/// text grows: its input is not in the rest of the fingerprint.
+fn question_size(call: &atelier_agents::session::Call) -> usize {
+    if call.call.name != atelier_agents::claude_code::ASK_QUESTION {
+        return 0;
+    }
+    atelier_agents::session::questions_of(&call.call.input)
+        .iter()
+        .map(|q| 1 + q.question.len() + q.header.len() + q.options.iter().map(|o| 1 + o.label.len() + o.description.len()).sum::<usize>())
+        .sum()
 }
 
 /// The rows for `items` conversation items, with each turn's changed files after the item it ended at:
