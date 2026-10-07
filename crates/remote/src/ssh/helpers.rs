@@ -120,12 +120,21 @@ pub fn candidates(exe: &std::path::Path, platform: &Platform, env_dir: Option<&s
     found
 }
 
-/// The copy of atelier-remote to upload to a host of `platform`, if there is one.
-pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
+/// Where a copy for `platform` may be, for this app and this environment.
+fn places(platform: &Platform) -> Vec<PathBuf> {
+    let Ok(exe) = std::env::current_exe() else { return Vec::new() };
     let env_dir = std::env::var_os("ATELIER_REMOTE_DIR").map(PathBuf::from);
     let home = std::env::var_os("HOME").map(PathBuf::from);
-    first_matching(&candidates(&exe, platform, env_dir.as_deref(), home.as_deref(), *platform == Platform::here()))
+    candidates(&exe, platform, env_dir.as_deref(), home.as_deref(), *platform == Platform::here())
+}
+/// The copy of atelier-remote to upload to a host of `platform`, if there is one.
+pub fn local_binary(platform: &Platform) -> Option<PathBuf> {
+    first_matching(&places(platform))
+}
+/// The first copy among `candidates` that is a file, and the protocol it speaks (none for a copy with no stamp): what is
+/// found when none matches, which is not the same as finding nothing.
+pub fn first_found(candidates: &[PathBuf]) -> Option<(PathBuf, Option<u32>)> {
+    candidates.iter().find_map(|p| std::fs::read(p).ok().map(|bytes| (p.clone(), speaks(&bytes))))
 }
 
 /// The protocol a helper binary's bytes say it speaks, from its stamp; `None` for a copy with none, as
@@ -160,14 +169,29 @@ pub fn missing_words(host: &str, platform: &Platform) -> String {
     )
 }
 
+/// What the reader reads when a copy for the host is found but speaks another protocol, as every copy does after the app
+/// moves on to a new one: which copy, what it speaks, what is needed, and how to make one.
+pub fn outdated_words(host: &str, platform: &Platform, path: &std::path::Path, found: Option<u32>) -> String {
+    let speaks = found.map_or_else(|| "no protocol it can name".to_string(), |n| format!("protocol {n}"));
+    format!(
+        "{host} is a {} machine. The helper this app found for it, {}, speaks {speaks}, and this build needs protocol {}. \
+         Build a new one with tools/build-remote.sh from a atelier checkout on a {} machine, and put it in {}.",
+        platform.describe(),
+        path.display(),
+        crate::protocol::VERSION,
+        platform.describe(),
+        path.parent().map_or_else(String::new, |p| p.display().to_string()),
+    )
+}
 /// Makes sure the host has this version's atelier-remote, uploading it when not, and returns its path
 /// from the host's home.
 pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Result<String> {
     let local = local_binary(platform).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            missing_words(host, platform),
-        )
+        let words = match first_found(&places(platform)) {
+            Some((path, found)) => outdated_words(host, platform, &path, found),
+            None => missing_words(host, platform),
+        };
+        io::Error::new(io::ErrorKind::NotFound, words)
     })?;
     let bytes = std::fs::read(&local)?;
     let path = remote_binary(VERSION, &short_hash(&bytes));
