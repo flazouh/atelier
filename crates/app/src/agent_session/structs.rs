@@ -731,8 +731,16 @@ impl AgentSession {
                 list_diff::Row::Activity { from, to } => list_diff::activity_fingerprint(items, from, to, self.group_is_live(to), self.group_is_open(from, to)),
             })
             .collect();
+        // A row that changes as it streams is measured again, and the list puts the scroll back at the start of the row it is in.
+        // While the conversation follows the output the scroll is inside the row that grows, so each delta would paint one frame
+        // at the row's top and the follow would then move it back: a flicker. The place in the row is kept instead.
+        let place = self.list.logical_scroll_top();
         for (range, count) in list_diff::changes(&self.rows, &after) {
+            let keeps = range.contains(&place.item_ix) && range.len() == count;
             self.list.splice(range, count);
+            if keeps {
+                self.list.scroll_to(place);
+            }
         }
         let now = std::time::Instant::now();
         self.arrived.retain(|_, at| now.duration_since(*at) < ARRIVAL_KEPT);
