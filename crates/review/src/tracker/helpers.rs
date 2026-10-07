@@ -20,7 +20,7 @@ pub(super) fn changed_since(start: &State, end: &State, path: &str) -> bool {
 }
 
 pub(super) fn read(project: &dyn Project, path: &str) -> Option<Now> {
-    match project.read(path) {
+    match crate::place::read(project, path) {
         Ok(bytes) if bytes.contains(&0) => Some(Now::Binary(hash_bytes(&bytes))),
         Ok(bytes) => Some(match String::from_utf8(bytes) {
             Ok(text) => Now::Text(text),

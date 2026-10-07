@@ -166,7 +166,7 @@ impl AgentSession {
     }
 
     /// Diffs the whole session off the UI thread, for [`Self::changed_files`].
-    fn diff_session(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn diff_session(&mut self, cx: &mut Context<Self>) {
         let turns = self.reviews.turns.clone();
         let whole = cx.background_spawn(async move { atelier_review::present::changed_files(&turns.whole()) });
         self._changed = cx.spawn(async move |this, cx| {

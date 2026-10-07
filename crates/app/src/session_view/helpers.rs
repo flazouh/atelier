@@ -167,7 +167,15 @@ fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElem
         .on_review(move |path, _, cx| {
             review.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: Some(turn), path: Some(path.to_string()) }))
         })
-        .on_open_file(move |path, _, cx| open.update(cx, |_, cx| cx.emit(SessionEvent::OpenFile(path.to_string()))));
+        .on_open_file(move |path, _, cx| {
+            // The editor holds the project's files. A file beyond the project is read in the review.
+            let event = if atelier_review::place::is_outside(path) {
+                SessionEvent::Review { turn: Some(turn), path: Some(path.to_string()) }
+            } else {
+                SessionEvent::OpenFile(path.to_string())
+            };
+            open.update(cx, |_, cx| cx.emit(event))
+        });
     div().px(px(16.)).pb(px(14.)).child(card).into_any_element()
 }
 

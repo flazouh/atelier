@@ -177,23 +177,50 @@ fn a_file_written_back_the_way_it_was_is_not_a_change() {
 }
 
 #[test]
-fn a_file_outside_the_project_is_left_alone() {
+fn a_file_beyond_the_project_is_tracked_by_its_absolute_path() {
     let repo = Repo::with(&[("a.txt", "x\n")]);
     let outside = tempfile::tempdir().unwrap();
-    write(outside.path(), "z.txt", b"z");
+    write(outside.path(), "z.txt", b"z\n");
+    let (z, fresh) = (outside.path().join("z.txt"), outside.path().join("new/n.txt"));
     let mut tracker = repo.begin();
-    let event = Event::ToolStarted(ToolCall {
-        id: ToolId::new("t1"),
-        name: "Write".into(),
-        kind: ToolKind::Write,
+    let start = |id: &str, kind: ToolKind, file: &Path| Event::ToolStarted(ToolCall {
+        id: ToolId::new(id),
+        name: "Tool".into(),
+        kind,
         input: serde_json::Value::Null,
-        file: Some(outside.path().join("z.txt").to_string_lossy().to_string()),
+        file: Some(file.to_string_lossy().to_string()),
         parent: None,
         status: ToolStatus::Running,
     });
-    tracker.observe(repo.project.as_ref(), &event);
-    let dotdot = Event::ToolTarget { id: ToolId::new("t1"), file: format!("{}/../etc/passwd", repo.root().display()) };
-    tracker.observe(repo.project.as_ref(), &dotdot);
+    tracker.observe(repo.project.as_ref(), &start("t1", ToolKind::Edit, &z));
+    tracker.observe(repo.project.as_ref(), &start("t2", ToolKind::Write, &fresh));
+    fs::write(&z, "z\nmore\n").unwrap();
+    write(outside.path(), "new/n.txt", b"n\n");
+    let mut files = repo.files(tracker);
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    assert_eq!(files.len(), 2, "{files:?}");
+    let by = |path: &Path| files.iter().find(|f| f.path == path.to_string_lossy()).unwrap_or_else(|| panic!("{path:?} is listed"));
+    assert_eq!((&by(&z).change, by(&z).before.as_deref(), by(&z).after.as_deref()), (&Change::Modified, Some("z\n"), Some("z\nmore\n")));
+    assert_eq!((&by(&fresh).change, by(&fresh).before.as_deref()), (&Change::Added, None));
+    assert_eq!(by(&z).counts(), (1, 0));
+}
+
+#[test]
+fn a_path_that_climbs_or_names_the_folder_is_left_alone() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let mut tracker = repo.begin();
+    let root = repo.root().display().to_string();
+    for file in [format!("{root}/../etc/passwd"), format!("{root}/./a.txt"), root.clone(), format!("{root}/"), "/tmp/../etc/hosts".to_string(), "relative.txt".to_string(), "/".to_string()] {
+        tracker.observe(repo.project.as_ref(), &Event::ToolStarted(ToolCall {
+            id: ToolId::new("t"),
+            name: "Write".into(),
+            kind: ToolKind::Write,
+            input: serde_json::Value::Null,
+            file: Some(file),
+            parent: None,
+            status: ToolStatus::Running,
+        }));
+    }
     assert!(repo.files(tracker).is_empty());
 }
 

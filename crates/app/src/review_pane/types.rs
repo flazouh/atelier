@@ -51,8 +51,8 @@ impl DiskChange {
 
     pub(super) fn apply(&self, project: &dyn Project, path: &str) -> std::io::Result<()> {
         match self {
-            Self::Write(text) => project.write(path, text.as_bytes()),
-            Self::Remove => project.remove(path),
+            Self::Write(text) => atelier_review::place::write(project, path, text.as_bytes()),
+            Self::Remove => atelier_review::place::remove(project, path),
         }
     }
 }

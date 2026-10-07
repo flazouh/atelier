@@ -517,7 +517,7 @@ impl ReviewPane {
         let project = self.project.clone();
         let read = cx.background_spawn(async move {
             ours.into_iter().map(|path| {
-                let text = project.read(&path).ok().map(|b| String::from_utf8_lossy(&b).into_owned());
+                let text = atelier_review::place::read(project.as_ref(), &path).ok().map(|b| String::from_utf8_lossy(&b).into_owned());
                 (path, text)
             }).collect::<Vec<_>>()
         });

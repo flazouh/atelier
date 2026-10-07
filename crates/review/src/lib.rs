@@ -9,6 +9,7 @@ mod file_review;
 mod git_state;
 mod lines;
 mod merged;
+pub mod place;
 pub mod present;
 mod reviewed;
 mod tracker;
