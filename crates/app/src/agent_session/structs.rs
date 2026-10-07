@@ -114,6 +114,8 @@ pub struct AgentSession {
     pub reviews: ReviewState,
     /// The files the whole session changed, each against its text before the session, above the composer.
     changed: std::rc::Rc<Vec<atelier_ui::ChangedFile>>,
+    /// The paths in [`Self::changed_files`], for the Files tree to say which sessions changed a file.
+    touched: std::rc::Rc<std::collections::BTreeSet<String>>,
     _changed: Task<()>,
     /// The card of the pull request the session opened, above the composer.
     pub pull_card: Option<Entity<crate::pull_card::PullCard>>,
@@ -165,6 +167,16 @@ impl AgentSession {
         self.changed.clone()
     }
 
+    /// Whether the session changed the file at `path`, or, for a folder (`dir`), a file under it. A path is relative to the
+    /// project; a file beyond the project is never a tree row's.
+    pub fn touches(&self, path: &str, dir: bool) -> bool {
+        if !dir {
+            return self.touched.contains(path);
+        }
+        let below = format!("{path}/");
+        self.touched.range(below.clone()..).next().is_some_and(|first| first.starts_with(&below))
+    }
+
     /// Diffs the whole session off the UI thread, for [`Self::changed_files`].
     pub(crate) fn diff_session(&mut self, cx: &mut Context<Self>) {
         let turns = self.reviews.turns.clone();
@@ -172,6 +184,7 @@ impl AgentSession {
         self._changed = cx.spawn(async move |this, cx| {
             let files = whole.await;
             _ = this.update(cx, |s, cx| {
+                s.touched = std::rc::Rc::new(files.iter().map(|f| f.path.to_string()).collect());
                 s.changed = std::rc::Rc::new(files);
                 cx.notify();
             });
@@ -391,6 +404,7 @@ impl AgentSession {
             density: tool_density(cx),
             _density,
             changed: std::rc::Rc::default(),
+            touched: std::rc::Rc::default(),
             _changed: Task::ready(()),
             _pump,
             _start: Task::ready(()),

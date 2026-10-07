@@ -823,6 +823,80 @@ fn a_name_in_the_tree_ends_on_escape_and_on_a_press_elsewhere(cx: &mut TestAppCo
     assert!(!editing(cx), "a press on another row ends it");
 }
 
+/// Gives the front project's one session a finished turn that changed `files` (names relative to the project): the real tracker takes
+/// each file's text, the file changes, and the turn is pushed to the session's review.
+fn session_changed(shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext, dir: &std::path::Path, files: &[&str]) {
+    use atelier_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolStatus};
+    let (project, session) = shell.read_with(cx, |s, cx| {
+        let project = s.active().cloned().unwrap();
+        let session = project.read(cx).sessions[0].clone();
+        (project, session)
+    });
+    let host = project.read_with(cx, |p, _| p.host());
+    let mut tracker = atelier_review::TurnTracker::begin(host.as_ref());
+    for (n, file) in files.iter().enumerate() {
+        std::fs::create_dir_all(dir.join(file).parent().unwrap()).unwrap();
+        tracker.observe(host.as_ref(), &Event::ToolStarted(ToolCall {
+            id: ToolId::new(format!("t{n}")),
+            name: "Write".into(),
+            kind: ToolKind::Write,
+            input: serde_json::Value::Null,
+            file: Some(dir.join(file).display().to_string()),
+            parent: None,
+            status: ToolStatus::Running,
+        }));
+        std::fs::write(dir.join(file), format!("changed {n}\n")).unwrap();
+    }
+    let turn = tracker.finish(host.as_ref());
+    cx.update(|_, cx| session.update(cx, |s, cx| {
+        s.reviews.turns.push(turn);
+        s.diff_session(cx);
+    }));
+    settle(shell, cx);
+}
+
+/// The Files tree marks a file a session changed, and the folders above it, and a press on the mark reviews that session's changes.
+#[gpui_kit::test]
+fn the_files_tree_marks_what_a_session_changed_and_a_press_reviews_it(cx: &mut TestAppContext) {
+    let (shell, cx, dir) = with_a_session(cx, 1600.);
+    session_changed(&shell, cx, dir.path(), &["a.txt", "src/deep/b.rs"]);
+    let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+    let heard = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let log = heard.clone();
+    cx.update(|_, cx| {
+        cx.subscribe(&project, move |_, event: &crate::open_project::ProjectEvent, _| {
+            if let crate::open_project::ProjectEvent::Review { turn, path, .. } = event {
+                log.borrow_mut().push((*turn, path.clone()));
+            }
+        })
+        .detach()
+    });
+    project.update(cx, |p, cx| p.relist(cx));
+    open_files_from_the_menu(&shell, cx);
+    assert!(cx.debug_bounds("tree-mark-a.txt").is_some(), "the file the session changed has a mark");
+    assert!(cx.debug_bounds("tree-mark-src").is_some(), "and so has the folder that holds a file it changed");
+    let mark = cx.debug_bounds("tree-mark-a.txt").unwrap();
+    cx.simulate_click(mark.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(heard.borrow().as_slice(), [(None, Some("a.txt".to_string()))], "a press reviews the session's changes on that file");
+    assert!(cx.debug_bounds("editor-tab-0").is_none(), "and does not open the file");
+}
+
+/// A file no session changed has no mark; the menu of a changed file offers the review by the session that changed it.
+#[gpui_kit::test]
+fn an_unchanged_file_has_no_mark_and_a_changed_one_has_a_review_row_in_its_menu(cx: &mut TestAppContext) {
+    let (shell, cx, dir) = with_a_session(cx, 1600.);
+    std::fs::write(dir.path().join("other.txt"), "x").unwrap();
+    session_changed(&shell, cx, dir.path(), &["a.txt"]);
+    open_files_from_the_menu(&shell, cx);
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("tree-mark-other.txt").is_none(), "no session changed it");
+    let row = cx.debug_bounds("tree-row-a.txt").expect("the tree lists a.txt");
+    cx.simulate_mouse_down(row.center(), gpui_kit::MouseButton::Right, gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("tree-review-session").is_some(), "the menu offers the review by that session");
+}
+
 /// The tabs leave room for the ⋯ of the layout menu, where it stands.
 #[test]
 fn the_tabs_leave_room_for_the_layout_menu() {

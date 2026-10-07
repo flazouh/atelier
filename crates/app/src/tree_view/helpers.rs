@@ -56,7 +56,7 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
     let active = p.tabs.active().map(str::to_string);
     let menu_on = p.tree_menu.as_ref().map(|m| m.path.clone());
     let project = project.clone();
-    uniform_list("project-tree", rows.len(), move |range, _, _| {
+    uniform_list("project-tree", rows.len(), move |range, _, cx| {
         range
             .map(|i| {
                 let row = &rows[i];
@@ -100,6 +100,27 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                 let (path, dir) = (row.path.clone(), row.dir);
                 let (project, on_press, on_more) = (project.clone(), project.clone(), project.clone());
                 let menu_path = path.clone();
+                // The sessions that changed it, newest first: a dot says so, and a press on it reviews the newest one's changes.
+                let touching = project.read(cx).touched_by(&path, dir, cx);
+                let mark = touching.first().cloned().map(|session| {
+                    let (shown, review_path) = (path.clone(), (!dir).then(|| path.clone()));
+                    div()
+                        .id(("tree-mark", i))
+                        .debug_selector(move || format!("tree-mark-{shown}"))
+                        .flex()
+                        .flex_none()
+                        .items_center()
+                        .justify_center()
+                        .size(px(16.))
+                        .cursor_pointer()
+                        .on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                            cx.stop_propagation();
+                            let (session, path) = (session.clone(), review_path.clone());
+                            session.update(cx, |_, cx| cx.emit(crate::agent_session::SessionEvent::Review { turn: None, path }));
+                        })
+                        .on_click(|_, _, cx| cx.stop_propagation())
+                        .child(div().size(px(6.)).rounded_full().bg(theme.accent))
+                });
                 let (more, more_path) = (on_more.clone(), path.clone());
                 let group: gpui_kit::SharedString = format!("tree-group-{i}").into();
                 slot.child(
@@ -143,6 +164,7 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                         }))
                         .child(if row.dir { FileIcon::folder(&row.name, row.open).size(px(14.)) } else { FileIcon::file(&row.name).size(px(14.)) })
                         .child(div().flex_1().min_w_0().truncate().child(row.name.clone()))
+                        .children(mark)
                         // The row's own menu, behind a button that shows while the pointer is on the row or its menu is open.
                         .child(
                             div()
