@@ -15,6 +15,7 @@ mod question;
 mod rail;
 mod sign_in;
 mod summary;
+mod tint;
 mod types;
 
 pub use helpers::{rows, session_view_with};
