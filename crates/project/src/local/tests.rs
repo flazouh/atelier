@@ -102,6 +102,23 @@ fn the_file_tree_s_operations_change_the_disk_and_refuse_to_overwrite() {
 }
 
 #[test]
+fn files_beyond_the_folder_are_read_written_and_removed_by_absolute_path_only() {
+    let (_dir, p) = project(&[("a.txt", "a")]);
+    let outside = tempfile::tempdir().unwrap();
+    let file = outside.path().join("deep/x.txt").display().to_string();
+    p.write_outside(&file, b"one").unwrap();
+    assert_eq!(p.read_outside(&file).unwrap(), b"one", "the folders above it are made");
+    p.write_outside(&file, b"two").unwrap();
+    assert_eq!(p.read_outside(&file).unwrap(), b"two");
+    p.remove_outside(&file).unwrap();
+    assert_eq!(p.read_outside(&file).unwrap_err().kind(), std::io::ErrorKind::NotFound);
+    for bad in ["a.txt", "../a.txt", "/tmp/../etc/passwd", "/tmp/./x", "", "/tmp/a\\b"] {
+        assert_eq!(p.read_outside(bad).unwrap_err().kind(), std::io::ErrorKind::InvalidInput, "{bad:?} is refused");
+        assert!(p.write_outside(bad, b"x").is_err() && p.remove_outside(bad).is_err(), "{bad:?} is refused for a write and a removal");
+    }
+}
+
+#[test]
 fn search_finds_literal_and_regex_lines_skips_binary_and_stops_at_the_limit() {
     let (_dir, p) = project(&[
         ("a.rs", "let x = 1;\nfn detach() {}\nlet y = x.detach();\n"),

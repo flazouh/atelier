@@ -24,6 +24,19 @@ pub trait Project: Send + Sync {
     fn remove(&self, path: &str) -> io::Result<()> {
         Err(unsupported("remove", path))
     }
+    /// The file at `path`, a path on the project's host that may lie outside its folder: absolute, with no `..`. Only
+    /// the review uses it, for the files an agent changed beyond the project, and only for the ones it saw changed.
+    fn read_outside(&self, path: &str) -> io::Result<Vec<u8>> {
+        Err(unsupported("read_outside", path))
+    }
+    /// Writes the file at `path` whole, as [`Project::read_outside`] names it, and makes the folders above it.
+    fn write_outside(&self, path: &str, _bytes: &[u8]) -> io::Result<()> {
+        Err(unsupported("write_outside", path))
+    }
+    /// Removes the file at `path`, as [`Project::read_outside`] names it.
+    fn remove_outside(&self, path: &str) -> io::Result<()> {
+        Err(unsupported("remove_outside", path))
+    }
     /// Makes a folder, moves, copies or removes, as the file tree asks.
     fn apply(&self, op: &FsOp) -> io::Result<()> {
         Err(unsupported("apply", &format!("{op:?}")))

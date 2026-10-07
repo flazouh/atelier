@@ -11,7 +11,7 @@ use atelier_project::{
     Project, Query, Watch,
 };
 
-use crate::protocol::{Call, Event, Frame, Pid, Reply, VERSION, write_frame};
+use crate::protocol::{Call, Event, Frame, OutsideOp, Pid, Reply, VERSION, write_frame};
 use super::types::{Answer, Dial};
 use super::helpers::{attach, lock, not_connected, span, unexpected};
 use super::tracker;
@@ -299,6 +299,27 @@ impl Project for RemoteProject {
 
     fn remove(&self, path: &str) -> io::Result<()> {
         match self.call(Call::Remove { path: path.into() })? {
+            Reply::Done => Ok(()),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    fn read_outside(&self, path: &str) -> io::Result<Vec<u8>> {
+        match self.call(Call::Outside { op: OutsideOp::Read { path: path.into() } })? {
+            Reply::Bytes(bytes) => Ok(bytes),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    fn write_outside(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
+        match self.call(Call::Outside { op: OutsideOp::Write { path: path.into(), bytes: bytes.to_vec() } })? {
+            Reply::Done => Ok(()),
+            other => Err(unexpected(other)),
+        }
+    }
+
+    fn remove_outside(&self, path: &str) -> io::Result<()> {
+        match self.call(Call::Outside { op: OutsideOp::Remove { path: path.into() } })? {
             Reply::Done => Ok(()),
             other => Err(unexpected(other)),
         }

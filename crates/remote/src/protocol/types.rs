@@ -6,12 +6,12 @@ use super::structs::Failure;
 
 /// The protocol's version: both ends must agree, or the hello fails.
 /// 2: `Remove` and the data folder's calls. 3: `DataPath`. 4: `ReadDir`. 5: `Tracker`. 6: worktrees (`Open`, `At`,
-/// `ChangesAt`). 7: `Fs`.
-pub const VERSION: u32 = 7;
+/// `ChangesAt`). 7: `Fs`. 8: `Outside`.
+pub const VERSION: u32 = 8;
 
 /// The protocol, as bytes a helper binary carries, so the app reads a copy's protocol from the file
 /// with no need to run it (it may be built for another machine). Keep it in step with [`VERSION`].
-pub const STAMP: &[u8] = b"atelier-remote-protocol:7;";
+pub const STAMP: &[u8] = b"atelier-remote-protocol:8;";
 
 /// A frame longer than this is refused, so a garbled length cannot ask for gigabytes.
 pub const MAX_FRAME: usize = 256 << 20;
@@ -41,6 +41,8 @@ pub enum Call {
     Remove { path: String },
     /// A new folder, a move, a copy or a removal that the file tree asked for.
     Fs { op: FsOp },
+    /// A file beyond the project's folder, which the review reads, writes or removes by its absolute path.
+    Outside { op: OutsideOp },
     /// The project's data folder, on the host.
     DataRead { path: String },
     DataWrite { path: String, bytes: Vec<u8> },
@@ -56,6 +58,14 @@ pub enum Call {
     /// `call`, answered in the worktree `root` (as the host named it) instead of the project's folder. The host
     /// opens the worktree on first use, so a new connection needs no `Open` again.
     At { root: String, call: Box<Call> },
+}
+
+/// What a [`Call::Outside`] does to the file at `path`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum OutsideOp {
+    Read { path: String },
+    Write { path: String, bytes: Vec<u8> },
+    Remove { path: String },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

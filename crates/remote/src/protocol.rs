@@ -14,7 +14,7 @@ mod types;
 
 pub use helpers::{read_frame, write_frame};
 pub use structs::Failure;
-pub use types::{Call, Event, FailureKind, Frame, MAX_FRAME, Pid, Reply, STAMP, VERSION};
+pub use types::{Call, Event, FailureKind, Frame, MAX_FRAME, OutsideOp, Pid, Reply, STAMP, VERSION};
 
 #[cfg(test)]
 use helpers::frame_length;

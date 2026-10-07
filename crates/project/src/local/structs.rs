@@ -138,6 +138,22 @@ impl Project for LocalProject {
         fs::remove_file(host_path(&self.root, path)?)
     }
 
+    fn read_outside(&self, path: &str) -> io::Result<Vec<u8>> {
+        fs::read(crate::outside_path(path)?)
+    }
+
+    fn write_outside(&self, path: &str, bytes: &[u8]) -> io::Result<()> {
+        let at = crate::outside_path(path)?;
+        if let Some(folder) = at.parent() {
+            fs::create_dir_all(folder)?;
+        }
+        write_whole(&at, bytes)
+    }
+
+    fn remove_outside(&self, path: &str) -> io::Result<()> {
+        fs::remove_file(crate::outside_path(path)?)
+    }
+
     fn apply(&self, op: &crate::FsOp) -> io::Result<()> {
         apply_op(&self.root, op)
     }

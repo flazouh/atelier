@@ -216,6 +216,21 @@ fn a_remote_project_makes_moves_copies_and_removes_as_the_file_tree_asks() {
 }
 
 #[test]
+fn a_remote_project_reads_writes_and_removes_files_beyond_its_folder() {
+    let dir = folder(&[("a.txt", "a")]);
+    let outside = tempfile::tempdir().unwrap();
+    let file = outside.path().join("x.txt").display().to_string();
+    let (_host, dial) = host();
+    let remote = connect(&dir, dial);
+    remote.write_outside(&file, b"far").unwrap();
+    assert_eq!(std::fs::read(&file).unwrap(), b"far", "written on the host");
+    assert_eq!(remote.read_outside(&file).unwrap(), b"far");
+    assert_eq!(remote.read_outside("a.txt").unwrap_err().kind(), io::ErrorKind::InvalidInput, "a relative path is refused on the host");
+    remote.remove_outside(&file).unwrap();
+    assert_eq!(remote.read_outside(&file).unwrap_err().kind(), io::ErrorKind::NotFound);
+}
+
+#[test]
 fn a_remote_project_removes_files_and_keeps_its_data_on_the_host() {
     let dir = folder(&[("a.txt", "a")]);
     let data = tempfile::tempdir().unwrap();

@@ -8,7 +8,7 @@ use std::{
 
 use atelier_project::{Control, LocalProject, Project};
 
-use crate::protocol::{Call, Event, Failure, Frame, Pid, Reply, VERSION, read_frame, write_frame};
+use crate::protocol::{Call, Event, Failure, Frame, OutsideOp, Pid, Reply, VERSION, read_frame, write_frame};
 use super::structs::{Running, State};
 use super::types::{Out, UPDATE_WORDS};
 use super::tracker;
@@ -128,6 +128,11 @@ fn answer_in(call: Call, scope: Option<&str>, state: &Arc<State>, out: &Out) -> 
         Call::Write { path, bytes } => here()?.write(&path, &bytes).map(|()| Reply::Done),
         Call::Remove { path } => here()?.remove(&path).map(|()| Reply::Done),
         Call::Fs { op } => here()?.apply(&op).map(|()| Reply::Done),
+        Call::Outside { op } => match op {
+            OutsideOp::Read { path } => Ok(Reply::Bytes(here()?.read_outside(&path)?)),
+            OutsideOp::Write { path, bytes } => here()?.write_outside(&path, &bytes).map(|()| Reply::Done),
+            OutsideOp::Remove { path } => here()?.remove_outside(&path).map(|()| Reply::Done),
+        },
         Call::DataRead { path } => Ok(Reply::Bytes(here()?.data_read(&path)?)),
         Call::DataWrite { path, bytes } => here()?.data_write(&path, &bytes).map(|()| Reply::Done),
         Call::DataList { prefix } => Ok(Reply::DataEntries(here()?.data_list(&prefix)?)),

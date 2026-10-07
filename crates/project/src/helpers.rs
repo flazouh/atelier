@@ -38,6 +38,14 @@ pub(super) fn unsupported(call: &str, path: &str) -> io::Error {
     io::Error::new(io::ErrorKind::Unsupported, format!("this project has no {call} ({path})"))
 }
 
+/// `path` as a host path, when it is absolute with no `..` or `.` part: the one shape the files beyond a project's folder
+/// may be named in.
+pub fn outside_path(path: &str) -> io::Result<PathBuf> {
+    let at = Path::new(path);
+    let plain = at.is_absolute() && !path.contains('\\') && path.split('/').all(|part| part != ".." && part != ".");
+    if plain { Ok(at.to_path_buf()) } else { Err(io::Error::new(io::ErrorKind::InvalidInput, format!("{path} is not an absolute path"))) }
+}
+
 /// The host path of a root-relative `path`. A path that climbs out of the root (`..`), or names a
 /// host path itself, is refused: a project reads and writes inside its folder only.
 pub fn host_path(root: &Path, path: &str) -> io::Result<PathBuf> {
