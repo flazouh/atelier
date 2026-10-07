@@ -47,37 +47,20 @@ fn question_size(call: &atelier_agents::session::Call) -> usize {
         .sum()
 }
 
-/// The rows for `items` conversation items, with each turn's changed files after the item it ended at:
-/// `marks` holds `(items before the card, turn)`, in order; one past the last item goes at the end.
-pub fn rows(items: usize, marks: &[(usize, usize)]) -> Vec<Row> {
-    let mut out = Vec::with_capacity(items + marks.len());
-    let mut marks = marks.iter().peekable();
-    for ix in 0..=items {
-        while let Some(&&(at, turn)) = marks.peek()
-            && at <= ix
-        {
-            out.push(Row::Changes { turn });
-            marks.next();
-        }
-        if ix < items {
-            out.push(Row::Item(ix));
-        }
-    }
-    // A card kept for an item the list no longer has (a resumed history keeps no questions) goes last.
-    out.extend(marks.map(|&(_, turn)| Row::Changes { turn }));
-    out
+/// The rows for `items` conversation items, one each.
+pub fn rows(items: usize) -> Vec<Row> {
+    (0..items).map(Row::Item).collect()
 }
-
 /// Whether an item belongs in an activity group: the agent's own work, not what is said or asked.
 pub fn is_activity(item: &Item) -> bool {
     matches!(item, Item::Thinking { .. } | Item::Tool(_) | Item::Subagent { .. })
 }
 
-/// The rows with each run of two or more drawn activity items joined into one [`Row::Activity`]. A card of a
-/// turn's files, or an item that is not activity, ends a run. `visible` says whether an item draws a row at
+/// The rows with each run of two or more drawn activity items joined into one [`Row::Activity`]. An item that is not
+/// activity ends a run. `visible` says whether an item draws a row at
 /// all (a tool call waiting on its approval does not): a run with fewer than two that draw stays as it is.
-pub fn grouped(items: &[Item], visible: &dyn Fn(usize) -> bool, marks: &[(usize, usize)]) -> Vec<Row> {
-    let plain = rows(items.len(), marks);
+pub fn grouped(items: &[Item], visible: &dyn Fn(usize) -> bool) -> Vec<Row> {
+    let plain = rows(items.len());
     let mut out = Vec::with_capacity(plain.len());
     let mut run: Vec<usize> = Vec::new();
     let flush = |run: &mut Vec<usize>, out: &mut Vec<Row>| {
@@ -109,11 +92,6 @@ pub fn activity_fingerprint(items: &[Item], from: usize, to: usize, live: bool, 
         [usize::from(a), b, c].into_iter().fold(h, |h, n| h.wrapping_mul(1_000_003).wrapping_add(n))
     });
     (8, from, digest)
-}
-
-/// A turn's card draws the same files once the turn is kept: its turn is its fingerprint.
-pub fn changes_fingerprint(turn: usize) -> (u8, usize, usize) {
-    (7, turn, 0)
 }
 
 /// The fingerprint of the waiting row: it draws the same until it goes.

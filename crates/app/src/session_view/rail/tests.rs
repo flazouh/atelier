@@ -24,8 +24,8 @@ fn each_message_of_the_reader_is_an_entry_of_its_own_words() {
 #[test]
 fn an_entrys_row_is_where_the_list_shows_its_message() {
     let items = [said("one"), wrote("a"), said("two")];
-    let shown = [Row::Item(0), Row::Item(1), Row::Changes { turn: 0 }, Row::Item(2)];
-    assert_eq!(entries(&items, &shown).iter().map(|e| e.1).collect::<Vec<_>>(), [0, 3]);
+    let shown = [Row::Item(0), Row::Item(1), Row::Item(2)];
+    assert_eq!(entries(&items, &shown).iter().map(|e| e.1).collect::<Vec<_>>(), [0, 2]);
 }
 
 #[test]

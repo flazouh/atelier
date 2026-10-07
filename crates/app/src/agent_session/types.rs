@@ -13,8 +13,6 @@ pub enum SessionEvent {
     Changed,
     /// The reader asked to review a turn (`None` for the whole session) at a file.
     Review { turn: Option<usize>, path: Option<String> },
-    /// The reader asked to open a file in the editor.
-    OpenFile(String),
     /// The reader picked another agent for this session before its first message, by its backend's name.
     ChooseAgent(String),
     /// The reader pressed a pull request's chip in the agent's text.

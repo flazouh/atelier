@@ -24,22 +24,11 @@ fn a_streaming_text_changes_its_fingerprint() {
 }
 
 #[test]
-fn a_turns_card_follows_the_item_its_turn_ended_at() {
+fn a_row_is_drawn_for_each_item() {
     use Row::*;
-    assert_eq!(rows(0, &[]), []);
-    assert_eq!(rows(3, &[(2, 0), (3, 1)]), [Item(0), Item(1), Changes { turn: 0 }, Item(2), Changes { turn: 1 }]);
-    // Two turns that ended at the same item keep their order.
-    assert_eq!(rows(1, &[(1, 0), (1, 1)]), [Item(0), Changes { turn: 0 }, Changes { turn: 1 }]);
+    assert_eq!(rows(0), []);
+    assert_eq!(rows(3), [Item(0), Item(1), Item(2)]);
 }
-
-/// A resumed session's history can hold fewer items than the live turn did (it keeps no questions), so
-/// a card kept for a later item goes at the end rather than nowhere.
-#[test]
-fn a_card_past_the_last_item_goes_at_the_end() {
-    use Row::*;
-    assert_eq!(rows(2, &[(5, 0)]), [Item(0), Item(1), Changes { turn: 0 }]);
-}
-
 fn tool(name: &str) -> Item {
     use atelier_agents::session::{Call, ToolCall, ToolId, ToolKind, ToolStatus};
     Item::Tool(Call {
@@ -62,15 +51,7 @@ fn said() -> Item {
 fn a_run_of_activity_is_one_row_and_a_lone_item_is_not() {
     use Row::{Activity, Item as At};
     let items = [Item::User { text: "go".into() }, think(), tool("a"), tool("b"), said(), tool("c"), said()];
-    assert_eq!(grouped(&items, &|_| true, &[]), [At(0), Activity { from: 1, to: 4 }, At(4), At(5), At(6)]);
-}
-
-/// A turn's card of changed files ends a group, since it sits between two items.
-#[test]
-fn a_changes_card_ends_a_group() {
-    use Row::{Activity, Changes};
-    let items = [think(), tool("a"), tool("b"), tool("c")];
-    assert_eq!(grouped(&items, &|_| true, &[(2, 0)]), [Activity { from: 0, to: 2 }, Changes { turn: 0 }, Activity { from: 2, to: 4 }]);
+    assert_eq!(grouped(&items, &|_| true), [At(0), Activity { from: 1, to: 4 }, At(4), At(5), At(6)]);
 }
 
 /// An item that draws no row (a call waiting on its approval) does not count toward the two.
@@ -78,7 +59,7 @@ fn a_changes_card_ends_a_group() {
 fn items_that_draw_nothing_do_not_make_a_group() {
     use Row::Item as At;
     let items = [tool("a"), tool("b")];
-    assert_eq!(grouped(&items, &|ix| ix == 0, &[]), [At(0), At(1)]);
+    assert_eq!(grouped(&items, &|ix| ix == 0), [At(0), At(1)]);
 }
 
 /// A group's fingerprint moves when an item in it changes, when it goes live, and when it opens.
@@ -96,8 +77,8 @@ fn a_groups_fingerprint_follows_its_items_and_its_state() {
 #[test]
 fn a_row_arrives_once_even_when_it_joins_a_group() {
     let before = [Row::Item(0), Row::Item(1)];
-    let after = [Row::Item(0), Row::Activity { from: 1, to: 3 }, Row::Changes { turn: 0 }, Row::Item(3)];
-    assert_eq!(arrivals(&before, &after), vec![Arrival::Card(0), Arrival::Item(3)]);
+    let after = [Row::Item(0), Row::Activity { from: 1, to: 3 }, Row::Item(3)];
+    assert_eq!(arrivals(&before, &after), vec![Arrival::Item(3)]);
     assert!(arrivals(&after, &after).is_empty(), "a group that grows is the same row");
 }
 

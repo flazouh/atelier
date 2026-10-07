@@ -22,7 +22,6 @@ use atelier_ui::{
     ToolCall as ToolRow,
     ToolStatus as RowToolStatus,
     button::{Button, ButtonVariant},
-    changed_files::ChangedFiles,
     icon::{Icon, IconName},
     message_rail::MessageRail,
     preview_clamp::PREVIEW_ROWS,
@@ -139,7 +138,6 @@ fn edit_diff(session: &Entity<AgentSession>, id: impl Into<gpui_kit::ElementId>,
 pub(super) fn row(session: &Entity<AgentSession>, ix: usize, cx: &App) -> AnyElement {
     match session.read(cx).shown.get(ix).copied() {
         Some(Row::Item(item)) => item_row(session, item, ix, cx),
-        Some(Row::Changes { turn }) => changes_row(session, turn, cx),
         Some(Row::Activity { from, to }) => activity_row(session, from, to, cx),
         Some(Row::Waiting) => waiting_row(session, cx),
         None => div().into_any_element(),
@@ -153,30 +151,6 @@ fn waiting_row(session: &Entity<AgentSession>, cx: &App) -> AnyElement {
     let loading = if look.mark.working == atelier_agents::claude::mark().working { atelier_agents::claude::loading_strips() } else { Vec::new() };
     let id = gpui_kit::ElementId::Name(format!("{}-waiting", s.key).into());
     div().px(px(16.)).pb(px(14.)).child(Thinking::new(id, look, ThinkingPhase::Waiting).loading(loading)).into_any_element()
-}
-
-/// The files turn `turn` changed, with its `+a −r`: Review opens the review at a file, and a file's
-/// name opens it in the editor.
-fn changes_row(session: &Entity<AgentSession>, turn: usize, cx: &App) -> AnyElement {
-    let s = session.read(cx);
-    let Some(files) = s.reviews.turns.turns().get(turn).map(|t| atelier_review::present::changed_files(t.files())) else {
-        return div().into_any_element();
-    };
-    let (review, open) = (session.clone(), session.clone());
-    let card = ChangedFiles::new(gpui_kit::ElementId::Name(format!("{}-changes-{turn}", s.key).into()), files)
-        .on_review(move |path, _, cx| {
-            review.update(cx, |_, cx| cx.emit(SessionEvent::Review { turn: Some(turn), path: Some(path.to_string()) }))
-        })
-        .on_open_file(move |path, _, cx| {
-            // The editor holds the project's files. A file beyond the project is read in the review.
-            let event = if atelier_review::place::is_outside(path) {
-                SessionEvent::Review { turn: Some(turn), path: Some(path.to_string()) }
-            } else {
-                SessionEvent::OpenFile(path.to_string())
-            };
-            open.update(cx, |_, cx| cx.emit(event))
-        });
-    div().px(px(16.)).pb(px(14.)).child(card).into_any_element()
 }
 
 /// One item of the conversation, in its row's padding. `row` is its place in the list: what follows it sets the room below.

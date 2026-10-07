@@ -729,8 +729,8 @@ impl AgentSession {
     pub(crate) fn refresh_rows(&mut self) {
         let items = self.conversation.items();
         let mut shown = match self.density {
-            ToolDensity::Grouped => list_diff::grouped(items, &|ix| crate::session_view::calls::shows(items, ix), &self.reviews.turn_marks),
-            ToolDensity::Lines | ToolDensity::Detailed => list_diff::rows(items.len(), &self.reviews.turn_marks),
+            ToolDensity::Grouped => list_diff::grouped(items, &|ix| crate::session_view::calls::shows(items, ix)),
+            ToolDensity::Lines | ToolDensity::Detailed => list_diff::rows(items.len()),
         };
         // Until the agent says anything, a status line holds its place; otherwise a sent message shows nothing at all.
         if list_diff::waits(items, self.conversation.working()) {
@@ -740,7 +740,6 @@ impl AgentSession {
             .iter()
             .map(|row| match *row {
                 list_diff::Row::Item(ix) => list_diff::fingerprint(&items[ix]),
-                list_diff::Row::Changes { turn } => list_diff::changes_fingerprint(turn),
                 list_diff::Row::Waiting => list_diff::waiting_fingerprint(),
                 list_diff::Row::Activity { from, to } => list_diff::activity_fingerprint(items, from, to, self.group_is_live(to), self.group_is_open(from, to)),
             })
