@@ -439,7 +439,7 @@ impl Shell {
     pub(super) fn pulls_main(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let p = project.read(cx);
         if let Some(pulls) = &p.pulls {
-            return div().debug_selector(|| "code-pulls".into()).size_full().pl(px(atelier_ui::panel_layout::GAP)).pr(px(8.)).pb(px(8.)).child(pulls.hub.clone()).into_any_element();
+            return div().debug_selector(|| "code-pulls".into()).size_full().pl(px(super::types::PANE_GAP)).pr(px(8.)).pb(px(8.)).child(pulls.hub.clone()).into_any_element();
         }
         let muted = cx.theme().muted_foreground;
         let words: SharedString = match p.pulls_unavailable() {
@@ -455,7 +455,7 @@ impl Shell {
         let card = cx.theme().card;
         div()
             .size_full()
-            .pl(px(atelier_ui::panel_layout::GAP))
+            .pl(px(super::types::PANE_GAP))
             .pr(px(8.))
             .pb(px(8.))
             .child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(card).child(child))

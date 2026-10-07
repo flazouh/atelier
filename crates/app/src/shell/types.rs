@@ -15,8 +15,10 @@ pub(super) const AGE_TICK: std::time::Duration = std::time::Duration::from_secs(
 /// it, since the agent panel keeps its least width.
 pub(super) const WIDE_RIGHT: f32 = 860.;
 
+/// The room between the sidebar and the pane beside it, and round the panes: the same on every side.
+pub(super) const PANE_GAP: f32 = 8.;
 /// What a wide right pane leaves the agent panel: a session panel at its default width, and its margins.
-pub(super) const AGENT_BESIDE_RIGHT: f32 = atelier_ui::panel_layout::DEFAULT_WIDTH + 2. * atelier_ui::panel_layout::GAP + 4.;
+pub(super) const AGENT_BESIDE_RIGHT: f32 = atelier_ui::panel_layout::DEFAULT_WIDTH + 2. * PANE_GAP + 4.;
 
 /// What the first launch says atelier is, in one line.
 pub(super) const WHAT_ATELIER_IS: &str = "Run coding agents on your code, review every change they make, and commit what you keep.";
