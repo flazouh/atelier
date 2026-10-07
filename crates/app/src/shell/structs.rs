@@ -1779,8 +1779,11 @@ impl Shell {
     pub(super) fn files_tree(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         let menu = project.clone();
+        let ends_name = project.clone();
         div()
             .debug_selector(|| "files-tree".into())
+            // A press anywhere in the tree ends a name being typed; the name's own row keeps its presses.
+            .on_mouse_down(gpui_kit::MouseButton::Left, move |_, _, cx| ends_name.update(cx, |p, cx| p.cancel_tree_edit(cx)))
             // A press with the other button where there is no row opens the project's folder's menu.
             .on_mouse_down(gpui_kit::MouseButton::Right, move |event, _, cx| {
                 let at = event.position;
