@@ -246,8 +246,9 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
     let id = |what: &str| gpui_kit::ElementId::Name(format!("{key}-{what}-{ix}").into());
     let body = match item {
         // The bubble aligns itself to the end of the row.
+        // In the dark theme a light bubble outshouts the reply; the card tone sets it apart from the panel instead.
         Item::User { text } => MessageBubble::text(id("user"), text.clone())
-            .variant(MessageBubbleVariant::Solid)
+            .variant(if cx.theme().appearance == atelier_ui::theme::Appearance::Dark { MessageBubbleVariant::Borderless } else { MessageBubbleVariant::Solid })
             .align(MessageBubbleAlign::End)
             .into_any_element(),
         Item::Text { text, .. } => {
