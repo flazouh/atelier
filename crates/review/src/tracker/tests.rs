@@ -214,7 +214,7 @@ fn a_file_named_by_its_real_path_in_a_project_opened_through_a_symlink_is_the_pr
     let link = tempfile::tempdir().unwrap();
     let through = link.path().join("through");
     std::os::unix::fs::symlink(repo.root(), &through).unwrap();
-    let project = Arc::new(LocalProject::open(&through.join("sub")).unwrap());
+    let project = Arc::new(LocalProject::open(through.join("sub")).unwrap());
     let real = fs::canonicalize(repo.root()).unwrap().join("sub/a.txt");
     let mut tracker = TurnTracker::begin(project.as_ref());
     tracker.observe(project.as_ref(), &Event::ToolStarted(ToolCall {
