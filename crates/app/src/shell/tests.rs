@@ -1417,6 +1417,14 @@ fn the_foot_of_the_window_has_the_status_bar_once_a_project_is_open(cx: &mut Tes
     settle(&shell, cx);
     let bar = cx.debug_bounds("status-bar").expect("the bar is drawn");
     assert!(cx.debug_bounds("status-cpu").is_some() && cx.debug_bounds("status-memory").is_some(), "the machine shows after a sample");
+    let cpu = cx.debug_bounds("status-cpu").expect("the processor is drawn");
+    let panes = cx.debug_bounds("sessions-view").expect("the panes are drawn");
+    // The first card starts past the rail and the panels' gap, where the panes start: it does not run under the rail.
+    assert!(
+        f32::from(cpu.left()) >= f32::from(panes.left()) + atelier_ui::view_rail::WIDTH + super::types::PANE_GAP,
+        "the bar's first item starts at {:?}, under the rail",
+        cpu.left()
+    );
     let height = cx.update(|window, _| window.viewport_size().height);
     assert_eq!(bar.bottom(), height, "at the foot: {bar:?} in a window {height:?} tall");
 }
