@@ -41,14 +41,22 @@ fn a_look_the_reader_asked_for_says_when_there_is_nothing_newer_and_the_daily_lo
     assert_eq!((state, said.last().cloned()), (UpdateState::Idle, Some(Reaction::Nothing)));
 }
 
+/// The share of the work done, as the chip shows it.
+fn fraction(state: &UpdateState) -> Option<f64> {
+    match state {
+        UpdateState::Downloading { fraction, .. } => Some(*fraction),
+        _ => None,
+    }
+}
+
 #[test]
 fn progress_runs_from_the_download_through_the_unpacking() {
     let (state, _) = run(vec![UpdateEvent::Checking { user: false }, found(false), UpdateEvent::Downloading { fraction: 0.5 }]);
-    assert_eq!(state.progress(), Some(0.45));
+    assert_eq!(fraction(&state), Some(0.45));
     let (state, _) = run(vec![UpdateEvent::Checking { user: false }, found(false), UpdateEvent::Extracting { fraction: 0.5 }]);
-    assert_eq!(state.progress(), Some(0.95));
+    assert_eq!(fraction(&state), Some(0.95));
     let (state, _) = run(vec![UpdateEvent::Checking { user: false }, found(false), UpdateEvent::Downloading { fraction: 7. }]);
-    assert_eq!(state.progress(), Some(0.9), "a fraction past 1 stops at the end of the download");
+    assert_eq!(fraction(&state), Some(0.9), "a fraction past 1 stops at the end of the download");
 }
 
 #[test]

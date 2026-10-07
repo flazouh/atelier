@@ -12,14 +12,6 @@ impl UpdateState {
         }
     }
 
-    /// The share of the work done, 0 to 1, while the update downloads and unpacks.
-    pub fn progress(&self) -> Option<f64> {
-        match self {
-            Self::Downloading { fraction, .. } => Some(*fraction),
-            _ => None,
-        }
-    }
-
     /// The state after `event`, and what the window does about it. A look the reader asked for says how it ended, and
     /// opens the update when it is ready; the daily look says nothing unless an update waits.
     pub fn apply(self, event: UpdateEvent) -> (UpdateState, Reaction) {
