@@ -1498,7 +1498,7 @@ impl Shell {
             .flex()
             .flex_none()
             .items_center()
-            .gap(px(8.))
+            .gap(px(super::types::PANE_GAP))
             .h(gpui_kit::px(TITLE_BAR))
             .pl(gpui_kit::px(TRAFFIC_LIGHTS))
             .pr(px(12.))
@@ -1940,7 +1940,7 @@ impl Shell {
                 cx.notify();
             }))
             .child(self.view_rail(widths.sidebar.is_some(), cx))
-            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pb(px(8.)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
+            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pl(px(super::types::PANE_GAP)).pb(px(8.)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
             .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, window, cx))))
             .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
