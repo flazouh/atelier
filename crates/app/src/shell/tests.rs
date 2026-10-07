@@ -796,6 +796,33 @@ fn a_tree_row_has_a_button_for_its_menu(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("editor-tab-0").is_none(), "and the file did not open");
 }
 
+/// A name typed in the tree ends when the reader presses Escape, or presses anywhere in the tree but on the name itself.
+#[gpui_kit::test]
+fn a_name_in_the_tree_ends_on_escape_and_on_a_press_elsewhere(cx: &mut TestAppContext) {
+    use crate::open_project::tree_edit::TreeEditKind;
+    let (shell, cx, dir) = with_a_session(cx, 1600.);
+    open_files_from_the_menu(&shell, cx);
+    let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+    let editing = |cx: &mut gpui_kit::VisualTestContext| project.read_with(cx, |p, _| p.tree_edit.is_some());
+    project.update_in(cx, |p, window, cx| p.start_tree_edit(TreeEditKind::Rename { path: "a.txt".into() }, window, cx));
+    settle(&shell, cx);
+    assert!(editing(cx), "the name is being typed");
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    assert!(!editing(cx), "Escape ends it");
+    assert!(dir.path().join("a.txt").exists(), "and nothing was renamed");
+    project.update_in(cx, |p, window, cx| p.start_tree_edit(TreeEditKind::NewFile { parent: String::new() }, window, cx));
+    settle(&shell, cx);
+    let name = cx.debug_bounds("tree-edit-row").expect("the name has a row");
+    cx.simulate_click(name.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(editing(cx), "a press on the name itself keeps it");
+    let row = cx.debug_bounds("tree-row-a.txt").expect("the tree lists a.txt");
+    cx.simulate_click(row.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(!editing(cx), "a press on another row ends it");
+}
+
 /// The tabs leave room for the ⋯ of the layout menu, where it stands.
 #[test]
 fn the_tabs_leave_room_for_the_layout_menu() {

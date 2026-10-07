@@ -65,10 +65,20 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                 if let (Some(at), Some((_, input))) = (edit_at, &edit)
                     && at == i
                 {
+                    let escape = project.clone();
                     return slot
                         .child(
                             div()
                                 .debug_selector(|| "tree-edit-row".into())
+                                // Escape ends the name, before the input sees the key.
+                                .capture_key_down(move |event, _, cx| {
+                                    if event.keystroke.key == "escape" {
+                                        cx.stop_propagation();
+                                        escape.update(cx, |p, cx| p.cancel_tree_edit(cx));
+                                    }
+                                })
+                                // A press on the name is the name's: the tree's own press, which ends the name, never sees it.
+                                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                                 .flex()
                                 .items_center()
                                 .gap(px(6.))
