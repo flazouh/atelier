@@ -627,9 +627,7 @@ pub fn session_view_with(session: &Entity<AgentSession>, rows: Option<AnyElement
         .size_full()
         .child(header)
         .child(body)
-        .children(failure)
-        .children(sign_in)
-        .children(limit)
+        .child(reading_width(div().flex().flex_col().children(failure).children(sign_in).children(limit).into_any_element()))
         .child(reading_width(
             div()
                 .debug_selector(|| "session-foot".into())
