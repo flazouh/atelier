@@ -1472,6 +1472,9 @@ impl Shell {
                 .flex_1()
                 .min_w_0()
                 .h_full()
+                // The window's own line takes the bar's top pixel on a Mac: the tabs centre in what is left, so the room above
+                // them (line to tab) is the room below them (tab to panes).
+                .when(cfg!(target_os = "macos"), |d| d.pt(px(1.)))
                 .mr(px(tab_room(self.width, self.session_right)))
                 .child(self.tab_strip.clone()),
             TitleTabs::Files => match self.active() {
@@ -1899,7 +1902,7 @@ impl Shell {
         self.session_right = Some(rail + widths.sidebar.unwrap_or(0.) + widths.agent);
         // The strip lays its columns out from this width in this frame; the strip keeps 8 px each side.
         // The strip pads its sides by 8; next to the sidebar's card the left pad is the panels' own gap.
-        let inset = if widths.sidebar.is_some() { atelier_ui::panel_layout::GAP } else { 8. };
+        let inset = super::types::PANE_GAP;
         self.panels.update(cx, |p, cx| {
             p.set_inset_left(inset, cx);
             p.fit_to(widths.agent - inset - 8., cx)
