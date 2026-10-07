@@ -24,7 +24,7 @@ mod types;
 
 pub use helpers::{
     candidates, connect, connect_at_home, deploy, dial, first_matching, hosts_in_config,
-    known_hosts, local_binary, missing_words, probe, remote_binary, short_hash, speaks,
+    first_found, known_hosts, local_binary, missing_words, outdated_words, probe, remote_binary, short_hash, speaks,
     version_line,
 };
 pub use structs::Platform;
