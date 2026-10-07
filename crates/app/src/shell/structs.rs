@@ -122,6 +122,11 @@ pub struct Shell {
     files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
     layout_menu: bool,
+    /// Where an update stands, and whether its changelog is open in front of the reader.
+    pub(super) update: crate::updater::UpdateState,
+    pub(super) update_modal: bool,
+    /// What the changelog panel holds focus with, so Escape reaches it.
+    pub(super) update_focus: FocusHandle,
     /// The sessions the reader archived, by the agent's id.
     pub(super) archived: std::collections::BTreeSet<String>,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
@@ -188,6 +193,9 @@ impl Shell {
             view: ShellView::from_words(saved.view.as_deref()),
             files_narrow: FilesPane::default(),
             layout_menu: false,
+            update: crate::updater::UpdateState::default(),
+            update_modal: false,
+            update_focus: cx.focus_handle(),
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             session_filter: None,
             switcher_open: false,
@@ -1509,6 +1517,7 @@ impl Shell {
             .relative()
             .children(self.layout_button(cx))
             .child(room)
+            .children(self.update_chip(cx).map(|chip| div().flex_none().mr(px(4.)).child(chip)))
             .child(self.settings_button(cx))
     }
 
@@ -2140,6 +2149,7 @@ impl Shell {
                     )
             }))
             .children(self.tree_menu(cx))
+            .children(self.update_panel(cx))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(gpui_kit::px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {

@@ -8,9 +8,9 @@ mod helpers;
 mod impls;
 mod structs;
 mod traits;
-pub use consts::{RequestSender, Requests, UNAVAILABLE_NOTICE, UPDATE_WAITS_NOTICE};
+pub use consts::{CHECKING_NOTICE, DOWNLOADING_NOTICE, RequestSender, Requests, UNAVAILABLE_NOTICE, UP_TO_DATE_NOTICE, UPDATE_LATER_NOTICE, UPDATE_WAITS_NOTICE, UpdateEvents, UpdateSender};
 pub use helpers::driver;
-pub use enums::CheckOutcome;
+pub use enums::{CheckOutcome, Reaction, UpdateEvent, UpdateState};
 pub use structs::{Held, NoDriver, Question, Updater};
 #[cfg(target_os = "macos")]
 pub use structs::{NativeRelaunch, SparkleDriver};

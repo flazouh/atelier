@@ -16,13 +16,23 @@ impl Updater {
         self.driver.available()
     }
 
-    /// Asks the driver to look for an update, when this build can update itself.
+    /// Asks the driver to look for an update the reader asked for, when this build can update itself.
     pub fn check_now(&self) -> CheckOutcome {
         if !self.driver.available() {
             return CheckOutcome::Unavailable;
         }
-        self.driver.check();
+        self.driver.check(true);
         CheckOutcome::Started
+    }
+
+    /// The reader chose to restart now: the downloaded update installs.
+    pub fn install(&self) {
+        self.driver.install();
+    }
+
+    /// The reader chose to wait: the update installs when the app quits.
+    pub fn later(&self) {
+        self.driver.later();
     }
 
     /// Takes the updater's wait for a restart. With nothing unsaved the restart goes ahead at once and nothing is held;

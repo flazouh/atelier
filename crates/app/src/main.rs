@@ -81,7 +81,8 @@ fn main() {
         cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));
         cx.set_global(providers::ProviderServices::system());
         let (relaunches, relaunch_requests) = futures_channel::mpsc::unbounded();
-        cx.set_global(updater::Updater::new(updater::driver(relaunches)));
+        let (update_sender, update_events) = futures_channel::mpsc::unbounded();
+        cx.set_global(updater::Updater::new(updater::driver(relaunches, update_sender)));
         shell::bind_keys(cx);
         // The reader's primary colour first, so every theme that follows wears it; then the theme; then light, dark
         // or the system's, which keeps the pick.
@@ -115,7 +116,10 @@ fn main() {
             window.observe_window_appearance(|window, cx| settings_pane::Mode::system_changed(window.appearance(), cx)).detach();
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
-            shell.update(cx, |s, cx| s.serve_relaunches(relaunch_requests, window, cx));
+            shell.update(cx, |s, cx| {
+                s.serve_relaunches(relaunch_requests, window, cx);
+                s.serve_updates(update_events, window, cx);
+            });
             if let Some(path) = control::socket_path() {
                 control::serve(shell.downgrade(), window.window_handle(), path, cx);
             }

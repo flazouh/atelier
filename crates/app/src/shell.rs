@@ -17,6 +17,7 @@ mod restore;
 mod structs;
 mod tree_menu;
 mod types;
+mod update_view;
 mod updates;
 mod view;
 

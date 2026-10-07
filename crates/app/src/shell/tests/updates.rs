@@ -6,8 +6,8 @@ use super::{open_shell, settle, with_a_session};
 use crate::{
     shell::{CheckForUpdates, Shell},
     updater::{
-        NoDriver, RequestSender, Requests, Updater,
-        fakes::{Counting, waiting},
+        NoDriver, RequestSender, Requests, UpdateEvent, UpdateState, Updater,
+        fakes::{Calls, Counting, waiting},
     },
 };
 
@@ -41,13 +41,108 @@ fn asking_for_updates_in_a_build_that_cannot_update_says_so_in_a_notice(cx: &mut
 }
 
 #[gpui_kit::test]
-fn asking_for_updates_hands_the_check_to_the_updater_and_adds_no_notice(cx: &mut TestAppContext) {
+fn asking_for_updates_hands_the_check_to_the_updater_and_says_it_looks(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
-    let (driver, checks) = Counting::new(true);
+    let (driver, calls) = Counting::recording(true);
     cx.update(|_, cx| cx.set_global(Updater::new(Rc::new(driver))));
     ask_for_updates(&shell, cx);
-    assert_eq!(checks.get(), 1);
-    assert!(cx.debug_bounds("notice").is_none(), "the updater shows its own window");
+    assert_eq!(calls.counts(), (1, 1, 0, 0), "one look, and the reader asked for it");
+    assert!(cx.debug_bounds("notice").is_some(), "a notice says it looks, since the updater has no window of its own");
+    assert_eq!(shell.read_with(cx, |s, _| s.update.clone()), UpdateState::Checking { asked: true });
+}
+
+/// A shell with a recording updater.
+fn with_an_updater(cx: &mut TestAppContext) -> (Entity<Shell>, &mut VisualTestContext, Calls, tempfile::TempDir) {
+    let (shell, cx, dir) = with_a_session(cx, 1400.);
+    let (driver, calls) = Counting::recording(true);
+    cx.update(|_, cx| cx.set_global(Updater::new(Rc::new(driver))));
+    (shell, cx, calls, dir)
+}
+
+fn tell(shell: &Entity<Shell>, cx: &mut VisualTestContext, event: UpdateEvent) {
+    shell.update(cx, |s, cx| s.update_event(event, cx));
+    settle(shell, cx);
+}
+
+/// The daily look finds an update: it downloads with a quiet percentage in the title bar, and when it is ready a button waits.
+fn found_by_the_daily_look(shell: &Entity<Shell>, cx: &mut VisualTestContext) {
+    tell(shell, cx, UpdateEvent::Checking { user: false });
+    tell(shell, cx, UpdateEvent::Found { version: "0.2.0".into(), notes: Some("## What is new\n\n- A thing".into()), user: false });
+}
+
+#[gpui_kit::test]
+fn an_update_the_daily_look_finds_downloads_in_silence_and_then_waits_behind_a_button(cx: &mut TestAppContext) {
+    let (shell, cx, _calls, _dir) = with_an_updater(cx);
+    found_by_the_daily_look(&shell, cx);
+    tell(&shell, cx, UpdateEvent::Downloading { fraction: 0.5 });
+    assert!(cx.debug_bounds("update-progress").is_some(), "the download shows a percentage");
+    assert!(cx.debug_bounds("update-chip").is_none() && cx.debug_bounds("update-notes").is_none() && cx.debug_bounds("notice").is_none(), "and nothing else");
+    tell(&shell, cx, UpdateEvent::Extracting { fraction: 1. });
+    tell(&shell, cx, UpdateEvent::Ready);
+    assert!(cx.debug_bounds("update-chip").is_some(), "a button says the update is ready");
+    assert!(cx.debug_bounds("update-progress").is_none() && cx.debug_bounds("update-notes").is_none(), "the changelog does not open by itself");
+}
+
+#[gpui_kit::test]
+fn the_button_opens_the_changelog_and_restart_installs_the_update(cx: &mut TestAppContext) {
+    let (shell, cx, calls, _dir) = with_an_updater(cx);
+    found_by_the_daily_look(&shell, cx);
+    tell(&shell, cx, UpdateEvent::Ready);
+    let chip = cx.debug_bounds("update-chip").expect("the button is there");
+    cx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("update-notes").is_some(), "the changelog opens");
+    let restart = cx.debug_bounds("update-restart").expect("with a button to restart");
+    cx.simulate_click(restart.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(calls.counts(), (0, 0, 1, 0), "the updater was told to install");
+    assert!(cx.debug_bounds("update-notes").is_none(), "the panel is gone");
+    assert_eq!(shell.read_with(cx, |s, _| s.update.clone()), UpdateState::Installing);
+}
+
+#[gpui_kit::test]
+fn later_keeps_the_update_for_the_next_quit_and_so_does_escape(cx: &mut TestAppContext) {
+    let (shell, cx, calls, _dir) = with_an_updater(cx);
+    found_by_the_daily_look(&shell, cx);
+    tell(&shell, cx, UpdateEvent::Ready);
+    shell.update(cx, |s, cx| s.show_update(cx));
+    settle(&shell, cx);
+    let later = cx.debug_bounds("update-later").expect("Later is there");
+    cx.simulate_click(later.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert_eq!(calls.counts(), (0, 0, 0, 1));
+    assert!(cx.debug_bounds("update-notes").is_none() && cx.debug_bounds("notice").is_some(), "the panel is gone and a notice says when it installs");
+    assert!(cx.debug_bounds("update-chip").is_none(), "nothing is left to press: the updater installs it when the app quits");
+    // Escape is Later too.
+    found_by_the_daily_look(&shell, cx);
+    tell(&shell, cx, UpdateEvent::Ready);
+    shell.update(cx, |s, cx| s.show_update(cx));
+    settle(&shell, cx);
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    assert_eq!(calls.counts(), (0, 0, 0, 2));
+}
+
+#[gpui_kit::test]
+fn a_look_the_reader_asked_for_opens_the_changelog_by_itself_and_says_when_nothing_is_newer(cx: &mut TestAppContext) {
+    let (shell, cx, _calls, _dir) = with_an_updater(cx);
+    ask_for_updates(&shell, cx);
+    tell(&shell, cx, UpdateEvent::UpToDate);
+    assert_eq!(shell.read_with(cx, |s, _| s.update.clone()), UpdateState::Idle);
+    ask_for_updates(&shell, cx);
+    tell(&shell, cx, UpdateEvent::Found { version: "0.2.0".into(), notes: None, user: true });
+    tell(&shell, cx, UpdateEvent::Ready);
+    assert!(cx.debug_bounds("update-notes").is_some(), "the reader asked, so the update opens by itself");
+}
+
+#[gpui_kit::test]
+fn asking_again_while_an_update_is_ready_opens_it_and_does_not_look_again(cx: &mut TestAppContext) {
+    let (shell, cx, calls, _dir) = with_an_updater(cx);
+    found_by_the_daily_look(&shell, cx);
+    tell(&shell, cx, UpdateEvent::Ready);
+    ask_for_updates(&shell, cx);
+    assert!(cx.debug_bounds("update-notes").is_some());
+    assert_eq!(calls.counts().0, 0, "no second look");
 }
 
 #[gpui_kit::test]
