@@ -131,9 +131,10 @@ fn a_file_changed_beyond_the_project_shows_by_its_path_and_a_press_reviews_it(cx
     let heard = Rc::new(RefCell::new(Vec::new()));
     let log = heard.clone();
     cx.update(|_, cx| {
-        cx.subscribe(&session, move |_, event: &crate::agent_session::SessionEvent, _| match event {
-            crate::agent_session::SessionEvent::Review { path, .. } => log.borrow_mut().push(("review", path.clone())),
-            _ => {}
+        cx.subscribe(&session, move |_, event: &crate::agent_session::SessionEvent, _| {
+            if let crate::agent_session::SessionEvent::Review { path, .. } = event {
+                log.borrow_mut().push(("review", path.clone()));
+            }
         })
         .detach()
     });
