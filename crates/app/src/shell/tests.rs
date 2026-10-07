@@ -778,6 +778,24 @@ fn the_tree_has_a_menu_on_a_right_press(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("tree-collapse").is_none(), "a file has no folders to collapse");
 }
 
+/// Each row has a ⋯ button that opens the row's menu, and the press does not open the folder or the file.
+#[gpui_kit::test]
+fn a_tree_row_has_a_button_for_its_menu(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    open_files_from_the_menu(&shell, cx);
+    let more = cx.debug_bounds("tree-more-a.txt").expect("the row has the button");
+    let row = cx.debug_bounds("tree-row-a.txt").expect("the tree lists a.txt");
+    assert!(more.right() <= row.right() && more.left() > row.center().x, "the button is at the row's right end");
+    cx.simulate_mouse_move(row.center(), None, gpui_kit::Modifiers::default());
+    cx.simulate_mouse_move(more.center(), None, gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    cx.simulate_mouse_down(more.center(), gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    cx.simulate_mouse_up(more.center(), gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("tree-mention").is_some(), "the menu opens, with Mention in session");
+    assert!(cx.debug_bounds("editor-tab-0").is_none(), "and the file did not open");
+}
+
 /// The tabs leave room for the ⋯ of the layout menu, where it stands.
 #[test]
 fn the_tabs_leave_room_for_the_layout_menu() {

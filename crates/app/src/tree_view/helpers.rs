@@ -88,8 +88,10 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                 let shown = active.as_deref() == Some(row.path.as_str());
                 let held = menu_on.as_deref() == Some(row.path.as_str());
                 let (path, dir) = (row.path.clone(), row.dir);
-                let (project, on_press) = (project.clone(), project.clone());
+                let (project, on_press, on_more) = (project.clone(), project.clone(), project.clone());
                 let menu_path = path.clone();
+                let (more, more_path) = (on_more.clone(), path.clone());
+                let group: gpui_kit::SharedString = format!("tree-group-{i}").into();
                 slot.child(
                     div()
                         .id(("tree-row", i))
@@ -97,13 +99,14 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                             let path = path.clone();
                             move || format!("tree-row-{path}")
                         })
+                        .group(group.clone())
                         .w_full()
                         .flex()
                         .items_center()
                         .gap(px(6.))
                         .h(px(ROW))
                         .pl(px(8. + STEP * row.depth as f32))
-                        .pr(px(8.))
+                        .pr(px(4.))
                         .rounded(radius::md())
                         .cursor_pointer()
                         .text_size(TextSize::Sm.font_size())
@@ -129,7 +132,32 @@ pub fn tree_view(project: &Entity<OpenProject>, cx: &App) -> impl IntoElement {
                             d.child(Icon::new(if row.open { IconName::ChevronDown } else { IconName::ChevronRight }).size(px(12.)).color(muted))
                         }))
                         .child(if row.dir { FileIcon::folder(&row.name, row.open).size(px(14.)) } else { FileIcon::file(&row.name).size(px(14.)) })
-                        .child(div().min_w_0().truncate().child(row.name.clone())),
+                        .child(div().flex_1().min_w_0().truncate().child(row.name.clone()))
+                        // The row's own menu, behind a button that shows while the pointer is on the row or its menu is open.
+                        .child(
+                            div()
+                                .id(("tree-more", i))
+                                .debug_selector({
+                                    let path = more_path.clone();
+                                    move || format!("tree-more-{path}")
+                                })
+                                .flex()
+                                .flex_none()
+                                .items_center()
+                                .justify_center()
+                                .size(px(20.))
+                                .rounded(radius::md())
+                                .text_color(muted)
+                                .when(!held, |d| d.invisible().group_hover(group, |s| s.visible()))
+                                .hover(|s| s.bg(theme.card_strong).text_color(theme.foreground))
+                                .on_mouse_down(MouseButton::Left, move |event, _, cx| {
+                                    cx.stop_propagation();
+                                    let (path, at) = (more_path.clone(), event.position);
+                                    more.update(cx, |p, cx| p.open_tree_menu(path, dir, at, cx));
+                                })
+                                .on_click(|_, _, cx| cx.stop_propagation())
+                                .child(Icon::new(IconName::MoreHoriz).size(px(14.))),
+                        ),
                 )
                 .into_any_element()
             })
