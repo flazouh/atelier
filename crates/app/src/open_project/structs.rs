@@ -368,7 +368,8 @@ impl OpenProject {
         self.location.name()
     }
 
-    pub(super) fn relist(&mut self, cx: &mut Context<Self>) {
+    /// Reads the file tree again.
+    pub fn relist(&mut self, cx: &mut Context<Self>) {
         let project = self.project.clone();
         let listed = cx.background_spawn(async move {
             let started = Instant::now();

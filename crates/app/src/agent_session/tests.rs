@@ -1159,3 +1159,40 @@ fn a_message_sent_over_a_waiting_question_leaves_the_session_needing_the_reader(
     cx.run_until_parked();
     assert_eq!(cx.update(|_, cx| session.read(cx).status.clone()), waiting, "the question still waits");
 }
+
+/// A session says which files it changed, and for a folder whether it changed one under it, by whole path parts.
+#[gpui_kit::test]
+fn a_session_touches_the_files_it_changed_and_the_folders_above_them(cx: &mut TestAppContext) {
+    use atelier_agents::session::{Event, ToolCall, ToolId, ToolKind, ToolStatus};
+    let dir = crate::fake_agent::git_project(&[("a.txt", "one\n")]);
+    let (session, _, cx) = crate::fake_agent::start_in(cx, dir.clone(), vec![vec![crate::fake_agent::ended()]], false);
+    let project: std::sync::Arc<dyn atelier_project::Project> = std::sync::Arc::new(atelier_project::LocalProject::open(&dir).unwrap());
+    let mut tracker = atelier_review::TurnTracker::begin(project.as_ref());
+    for (n, file) in ["src/deep/b.rs", "a.txt"].iter().enumerate() {
+        std::fs::create_dir_all(dir.join(file).parent().unwrap()).unwrap();
+        tracker.observe(project.as_ref(), &Event::ToolStarted(ToolCall {
+            id: ToolId::new(format!("t{n}")),
+            name: "Write".into(),
+            kind: ToolKind::Write,
+            input: serde_json::Value::Null,
+            file: Some(dir.join(file).display().to_string()),
+            parent: None,
+            status: ToolStatus::Running,
+        }));
+        std::fs::write(dir.join(file), "new\n").unwrap();
+    }
+    let turn = tracker.finish(project.as_ref());
+    cx.update(|_, cx| session.update(cx, |s, cx| {
+        s.reviews.turns.push(turn);
+        s.diff_session(cx);
+    }));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let s = session.read(cx);
+        assert!(s.touches("a.txt", false) && s.touches("src/deep/b.rs", false));
+        assert!(s.touches("src", true) && s.touches("src/deep", true), "a folder above a changed file");
+        assert!(!s.touches("src/deep/b.rs", true), "a file is not a folder");
+        assert!(!s.touches("sr", true) && !s.touches("src/de", true), "whole path parts only");
+        assert!(!s.touches("b.rs", false) && !s.touches("other", true));
+    });
+}

@@ -43,6 +43,18 @@ impl OpenProject {
         }
     }
 
+    /// The sessions that changed the file at `path`, or a file under the folder `path` when `dir`: the newest session first.
+    pub fn touched_by(&self, path: &str, dir: bool, cx: &gpui_kit::App) -> Vec<Entity<AgentSession>> {
+        self.sessions.iter().rev().filter(|s| s.read(cx).touches(path, dir)).cloned().collect()
+    }
+
+    /// Opens the review of the whole `session` on the file at `path` (its first file, for a folder).
+    pub fn review_changes_by(&mut self, session: &Entity<AgentSession>, path: Option<String>, cx: &mut Context<Self>) {
+        self.tree_menu = None;
+        session.update(cx, |_, cx| cx.emit(crate::agent_session::SessionEvent::Review { turn: None, path }));
+        cx.notify();
+    }
+
     /// Whether the tree lists `path`.
     fn lists(&self, path: &str) -> bool {
         matches!(&self.listing, Listing::Ready(tree) if tree.has(path))

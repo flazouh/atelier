@@ -73,6 +73,21 @@ impl Shell {
             let words = if cfg!(target_os = "macos") { "Reveal in Finder" } else { "Show in the file manager" };
             entries.push(MenuItem::new(words).icon(IconName::OpenInNew).debug_name("tree-reveal").on_select(reveal).into());
         }
+        let touching = if path.is_empty() { Vec::new() } else { project.read(cx).touched_by(&path, dir, cx) };
+        if !touching.is_empty() {
+            entries.push(Entry::Separator);
+            for session in &touching {
+                let title = session.read(cx).shown_title();
+                let (project, session, review_path) = (project.clone(), session.clone(), (!dir).then(|| path.clone()));
+                entries.push(
+                    MenuItem::new(format!("Review changes by {title}"))
+                        .icon(IconName::Description)
+                        .debug_name("tree-review-session")
+                        .on_select(move |_, cx| project.update(cx, |p, cx| p.review_changes_by(&session, review_path.clone(), cx)))
+                        .into(),
+                );
+            }
+        }
         if !path.is_empty() && !sessions.is_empty() {
             entries.push(Entry::Separator);
             let branches: Vec<Entry> = sessions
