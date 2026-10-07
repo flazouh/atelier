@@ -98,6 +98,8 @@ fn the_header_names_the_provider_in_a_pill(cx: &mut TestAppContext) {
     let pill = cx.debug_bounds("panel-provider").expect("the pill is drawn");
     let title = cx.debug_bounds("panel-project").expect("the project badge is drawn");
     assert!(pill.left() > title.right() && pill.size.height <= px(24.), "in the header row: {pill:?}");
+    let agent = cx.debug_bounds("panel-agent").expect("the agent mark is drawn");
+    assert!(agent.right() <= title.left(), "the agent mark stands left of the project badge: {agent:?} {title:?}");
 }
 
 /// The agent's question with choices is a card of its own: it waits for the reader's answers, the answers go back to the agent

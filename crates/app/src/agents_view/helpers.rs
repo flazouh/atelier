@@ -27,7 +27,7 @@ pub fn project_id(project: &OpenProject) -> SharedString {
 }
 
 pub(super) fn label(project: &OpenProject) -> ProjectLabel {
-    ProjectLabel { id: project_id(project), name: project.name().into(), location: row_location(&project.location) }
+    ProjectLabel { id: project_id(project), name: project.name().into(), location: row_location(&project.location), badge: None }
 }
 
 fn row_location(location: &Location) -> RowLocation {
@@ -124,7 +124,7 @@ pub fn panels(
             let s = session.read(cx);
             PanelData {
                 id: s.key.clone(),
-                project,
+                project: ProjectLabel { badge: s.badge.clone(), ..project },
                 title: s.shown_title(),
                 look: s.agent.look.clone(),
                 status: s.status.clone(),

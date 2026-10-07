@@ -766,8 +766,9 @@ pub(super) fn shows_stop(running: bool, status: &SessionStatus) -> bool {
 
 pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, task, project, badge, session_id) = {
+    let (key, renaming, shown_title, running, task, project, badge, session_id, agent) = {
         let s = session.read(cx);
+        let agent = atelier_ui::session_row::agent_icon(gpui_kit::ElementId::Name(format!("{}-agent-mark", s.key).into()), &s.agent.look, &s.status, &theme, true);
         (
             s.key.clone(),
             s.renaming.clone(),
@@ -777,6 +778,7 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             s.project_name(),
             s.badge.clone(),
             s.id.as_ref().map(|i| i.as_str().to_string()),
+            agent,
         )
     };
     let title = match &renaming {
@@ -871,6 +873,7 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
         .h(px(40.))
         .pl(px(16.))
         .pr(px(8.))
+        .child(div().debug_selector(|| "panel-agent".into()).flex_none().child(agent))
         // The project the session works in, as its badge (its name stands in until the shell has set the badge), so a
         // panel always says where it is; the name is its tooltip.
         .child(match badge {
