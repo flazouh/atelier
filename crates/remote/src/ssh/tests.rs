@@ -119,3 +119,21 @@ fn an_upload_writes_a_file_of_its_own_and_leaves_only_the_helper() {
     assert_eq!(names, ["atelier-remote"]);
     assert_eq!(std::fs::read(dir.path().join("bin/atelier-remote")).unwrap(), b"second");
 }
+
+/// A copy that is found but speaks another protocol is told as that, with both numbers, not as a copy that is missing.
+#[test]
+fn an_outdated_helper_is_told_as_outdated_not_as_missing() {
+    let dir = std::env::temp_dir().join(format!("atelier-helper-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let old = dir.join("atelier-remote");
+    std::fs::write(&old, b"junk atelier-remote-protocol:6; more").unwrap();
+    let none = dir.join("not-there");
+    assert_eq!(first_found(&[none.clone(), old.clone()]), Some((old.clone(), Some(6))));
+    assert_eq!(first_found(&[none]), None);
+    let linux = Platform { system: "linux".into(), arch: "x86_64".into() };
+    let words = outdated_words("hp-agent", &linux, &old, Some(6));
+    assert!(words.contains("protocol 6") && words.contains(&format!("protocol {}", crate::protocol::VERSION)), "{words}");
+    assert!(words.contains(&old.display().to_string()) && words.contains("build-remote.sh"), "{words}");
+    assert!(!words.contains("no helper built"), "{words}");
+    std::fs::remove_dir_all(&dir).ok();
+}
