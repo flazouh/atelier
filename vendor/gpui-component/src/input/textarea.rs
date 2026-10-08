@@ -7,7 +7,7 @@ use gpui::{
 
 use super::{Input, TextareaState};
 use crate::native_menu::NativeMenu;
-use crate::{RoleOverride, StyledExt as _};
+use crate::{RoleOverride, Size, Sizable, StyledExt as _};
 
 /// A styled ordinary multi-line text field.
 #[derive(IntoElement)]
@@ -16,6 +16,7 @@ pub struct Textarea {
     style: StyleRefinement,
     height: Option<DefiniteLength>,
     appearance: bool,
+    size: Size,
     bordered: bool,
     disabled: bool,
     readonly: bool,
@@ -39,6 +40,7 @@ impl Textarea {
             style: StyleRefinement::default(),
             height: None,
             appearance: true,
+            size: Size::default(),
             bordered: true,
             disabled: false,
             readonly: false,
@@ -129,6 +131,13 @@ impl Textarea {
     }
 }
 
+/// The size sets the padding inside the text: `XSmall` has none above or below it, for a slim pill.
+impl Sizable for Textarea {
+    fn with_size(mut self, size: impl Into<Size>) -> Self {
+        self.size = size.into();
+        self
+    }
+}
 impl Styled for Textarea {
     fn style(&mut self) -> &mut StyleRefinement {
         &mut self.style
@@ -141,6 +150,7 @@ impl Textarea {
     pub(crate) fn into_input(self) -> Input {
         Input::from_state(self.state.clone())
             .appearance(self.appearance)
+            .with_size(self.size)
             .bordered(self.bordered)
             .disabled(self.disabled)
             .readonly(self.readonly)
