@@ -16,6 +16,8 @@ pub struct Capabilities {
     pub models: Vec<ModelChoice>,
     /// The modes a session can switch to; empty when it cannot switch.
     pub permission_modes: Vec<PermissionMode>,
+    /// The mode a new session starts in, when it is not the backend's own default (the first of the list).
+    pub default_mode: Option<PermissionMode>,
     pub thinking: bool,
     pub subagents: bool,
     pub todos: bool,
