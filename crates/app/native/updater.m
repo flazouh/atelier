@@ -106,12 +106,14 @@ static BOOL can_notify(void) {
 // system asks whether Atelier may send notifications; a no is the end of it, and the title bar's button is still there.
 static void notify_ready(void) {
     if ([NSApp isActive] || !can_notify()) {
+        NSLog(@"atelier-notify: not sent (active=%d, packaged=%d)", [NSApp isActive], can_notify());
         return;
     }
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
     NSString *version = found_version.length > 0 ? found_version : @"";
     [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
                           completionHandler:^(BOOL granted, NSError *error) {
+        NSLog(@"atelier-notify: permission granted=%d error=%@", granted, error);
         if (!granted) {
             return;
         }
@@ -119,7 +121,9 @@ static void notify_ready(void) {
         content.title = version.length > 0 ? [NSString stringWithFormat:@"Atelier %@ is ready", version] : @"An Atelier update is ready";
         content.body = @"Open Atelier to read what is new and restart.";
         UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:NOTIFICATION_ID content:content trigger:nil];
-        [center addNotificationRequest:request withCompletionHandler:nil];
+        [center addNotificationRequest:request withCompletionHandler:^(NSError *posted) {
+            NSLog(@"atelier-notify: posted error=%@", posted);
+        }];
     }];
 }
 
