@@ -274,3 +274,21 @@ fn a_changelog_kept_for_another_version_shows_no_chip(cx: &mut TestAppContext) {
         assert!(cx.debug_bounds("whats-new-chip").is_none(), "{version}: not this version");
     }
 }
+
+#[gpui_kit::test]
+fn the_version_in_the_title_bar_opens_the_changelog_with_every_release_and_close_closes_it(cx: &mut TestAppContext) {
+    let (shell, cx) = open_shell(cx);
+    settle(&shell, cx);
+    let button = cx.debug_bounds("version-button").expect("the version is on the screen");
+    assert!(cx.debug_bounds("release-sheet").is_none());
+    cx.simulate_click(button.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("release-sheet").is_some(), "a press opens the changelog");
+    assert!(cx.debug_bounds("release-install").is_none(), "it has nothing to restart");
+    if crate::changelog::releases().len() > 1 {
+        assert!(cx.debug_bounds("release-earlier-0").is_some(), "the earlier releases are listed");
+    }
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("release-sheet").is_none(), "Escape closes it");
+}

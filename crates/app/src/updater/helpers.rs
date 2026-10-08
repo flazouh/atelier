@@ -19,26 +19,52 @@ pub fn driver(requests: RequestSender, events: UpdateSender) -> Rc<dyn UpdateDri
     Rc::new(NoDriver)
 }
 
+/// `text` with its first letter in capitals: a note is written after its lead ("**Fixes:** a row fills the width") and shown on a line of its own.
+fn capital(text: &str) -> String {
+    let mut letters = text.chars();
+    letters.next().map_or_else(String::new, |first| first.to_uppercase().chain(letters).collect())
+}
+
+/// Which kind a `###` heading names: "New", "Fixed", else "Improved".
+fn kind_of(heading: &str) -> atelier_ui::ReleaseKind {
+    let heading = heading.to_lowercase();
+    if heading.contains("new") {
+        atelier_ui::ReleaseKind::New
+    } else if heading.contains("fix") {
+        atelier_ui::ReleaseKind::Fixed
+    } else {
+        atelier_ui::ReleaseKind::Improved
+    }
+}
+
 /// The lines of a changelog written in markdown. A bullet that opens with a bold lead ("- **Fixes:** a row fills the
-/// width") gives its lead and its text. Headings are the sheet's own, so they are dropped. A changelog with no bullet
+/// width") gives its lead and its text, and takes its kind from the last `###` heading ("### New", "### Improved",
+/// "### Fixed"; Improved before any). Other headings are the sheet's own, so they are dropped. A changelog with no bullet
 /// is one line of its words, and none at all is none.
 pub fn release_notes(markdown: &str) -> Vec<NoteLine> {
-    let lines: Vec<&str> = markdown.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
-    let bullets: Vec<NoteLine> = lines
-        .iter()
-        .filter_map(|l| l.strip_prefix("- ").or_else(|| l.strip_prefix("* ")))
-        .map(|item| match item.strip_prefix("**").and_then(|rest| rest.split_once("**")) {
-            Some((lead, text)) => NoteLine {
-                lead: lead.trim().trim_end_matches(':').trim().to_string(),
-                text: text.trim().trim_start_matches(':').trim().to_string(),
-            },
-            None => NoteLine { lead: item.trim().to_string(), text: String::new() },
-        })
-        .collect();
-    if !bullets.is_empty() || lines.is_empty() {
+    let mut kind = atelier_ui::ReleaseKind::Improved;
+    let (mut bullets, mut words) = (Vec::new(), Vec::new());
+    for line in markdown.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        if let Some(heading) = line.strip_prefix("###") {
+            kind = kind_of(heading);
+        } else if !line.starts_with('#') {
+            words.push(line);
+            if let Some(item) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
+                bullets.push(match item.strip_prefix("**").and_then(|rest| rest.split_once("**")) {
+                    Some((lead, text)) => NoteLine {
+                        kind,
+                        lead: lead.trim().trim_end_matches(':').trim().to_string(),
+                        text: capital(text.trim().trim_start_matches(':').trim()),
+                    },
+                    None => NoteLine { kind, lead: item.trim().to_string(), text: String::new() },
+                });
+            }
+        }
+    }
+    if !bullets.is_empty() || words.is_empty() {
         return bullets;
     }
-    vec![NoteLine { lead: "What changed".into(), text: lines.join(" ") }]
+    vec![NoteLine { kind: atelier_ui::ReleaseKind::Improved, lead: "What changed".into(), text: words.join(" ") }]
 }
 
 /// The numbers of a version such as `0.1.4`, or none when it is not that.
