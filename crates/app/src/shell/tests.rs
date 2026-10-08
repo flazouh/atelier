@@ -942,7 +942,8 @@ fn the_tabs_leave_room_for_the_layout_menu() {
     // The session area reaches the window's edge: the ⋯ is left of the Settings button.
     assert_eq!(tab_room(1400., Some(1400.)), 32.);
     // A pane at the right shortens the area: the ⋯ is at its right edge, and the tabs end before it.
-    assert_eq!(tab_room(1400., Some(1000.)), 1400. - 48. - (1000. - 36. - 8.));
+    // The version label stands between the ⋯ and the Settings button: the room is that much less.
+    assert_eq!(tab_room(1400., Some(1000.)), 1400. - 48. - super::types::VERSION_ROOM - (1000. - 36. - 8.));
     assert_eq!(tab_room(1400., None), 36.);
 }
 
