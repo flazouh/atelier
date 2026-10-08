@@ -33,6 +33,9 @@ cargo build -q -p atelier-gallery
 CARGO_TARGET_DIR="$PWD/target/vendor" cargo test -q --manifest-path vendor/gpui-base/Cargo.toml --lib
 # gpui-component's own unit tests read files from its repository that the crate does not ship, so
 # only its patch test runs here.
+# Built alone, the crate would take gpui-base from crates.io, which lacks the patched table tiles it uses: the root's
+# [patch] does not apply to it here, so the same patch is given on the command line.
 CARGO_TARGET_DIR="$PWD/target/vendor-component" cargo test -q --manifest-path vendor/gpui-component/Cargo.toml \
+  --config "patch.crates-io.gpui-base.path=\"$PWD/vendor/gpui-base\"" \
   --features tree-sitter-languages --test injection_edits --test background_parse
 echo "all checks passed"
