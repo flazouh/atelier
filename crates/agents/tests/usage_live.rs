@@ -23,3 +23,20 @@ fn the_real_allowances_are_read() {
     show(&ClaudeUsage);
     show(&CodexUsage::new("codex"));
 }
+
+#[test]
+#[ignore = "asks Anthropic for the models of the Claude sign-in"]
+fn the_real_claude_models_are_listed() {
+    use atelier_agents::{claude_code::ClaudeCode, session::Backend};
+    let dir = tempfile::tempdir().unwrap();
+    let project = LocalProject::open(dir.path()).unwrap();
+    match ClaudeCode::new().list_models(&project, now()) {
+        Some(Ok(models)) => {
+            for model in &models {
+                println!("{} | {}", model.id, model.label);
+            }
+            assert!(models.iter().any(|m| m.label.starts_with("Opus")), "an Opus is listed");
+        }
+        other => panic!("the list: {other:?}"),
+    }
+}

@@ -256,3 +256,22 @@ fn a_new_claude_code_session_starts_in_auto() {
     assert_eq!(caps.default_mode, Some(PermissionMode::Auto));
     assert!(caps.permission_modes.contains(&PermissionMode::Auto), "the default is one the menu offers");
 }
+
+/// The models endpoint's answer becomes the picker's list: the id to start Claude Code with, and the name without "Claude ".
+#[test]
+fn the_models_endpoints_answer_names_the_real_versions() {
+    let answer = r#"{"data":[{"id":"claude-opus-5-5","display_name":"Claude Opus 5.5","created_at":"2026-09-21T00:00:00Z"},{"id":"claude-haiku-4-5-20251001","display_name":"Claude Haiku 4.5"},{"id":"odd"}],"has_more":false}"#;
+    let list = crate::claude_code::models::parse(answer).unwrap();
+    let pairs: Vec<(&str, &str)> = list.iter().map(|m| (m.id.as_str(), m.label.as_str())).collect();
+    assert_eq!(pairs, [("claude-opus-5-5", "Opus 5.5"), ("claude-haiku-4-5-20251001", "Haiku 4.5"), ("odd", "odd")], "opus, then haiku, then the others");
+    assert!(crate::claude_code::models::parse(r#"{"data":[]}"#).is_err(), "no models is a reason, not an empty picker");
+    assert!(crate::claude_code::models::parse("not json").is_err());
+}
+
+/// The first of the list is the agent's usual model: the newest Opus, not the newest model of any family.
+#[test]
+fn the_list_starts_on_the_newest_opus() {
+    let answer = r#"{"data":[{"id":"claude-haiku-5-5","display_name":"Claude Haiku 5.5"},{"id":"claude-sonnet-5-5","display_name":"Claude Sonnet 5.5"},{"id":"claude-opus-5-5","display_name":"Claude Opus 5.5"},{"id":"claude-fable-5-1","display_name":"Claude Fable 5.1"},{"id":"claude-opus-4-8","display_name":"Claude Opus 4.8"}]}"#;
+    let ids: Vec<String> = crate::claude_code::models::parse(answer).unwrap().into_iter().map(|m| m.id).collect();
+    assert_eq!(ids, ["claude-opus-5-5", "claude-opus-4-8", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"]);
+}

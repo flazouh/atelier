@@ -32,7 +32,7 @@ fn open<'a>(saved: &atelier_settings::Settings, cx: &'a mut TestAppContext) -> (
     let closed = Rc::new(Cell::new(0));
     let counter = closed.clone();
     let saved = saved.clone();
-    let agents = vec![AgentRow { name: "Claude Code".into(), mark: None, models: vec!["Opus".into(), "Sonnet".into()] }, AgentRow { name: "atelier".into(), mark: None, models: Vec::new() }];
+    let agents = vec![AgentRow { name: "Claude Code".into(), mark: None, backend: "claude-code".into() }, AgentRow { name: "atelier".into(), mark: None, backend: "atelier".into() }];
     let (pane, cx) = cx.add_window_view(move |_, cx| SettingsPane::new(&saved, agents, cx));
     cx.update(|window, cx| {
         let sub = cx.subscribe(&pane, move |_, event: &SettingsEvent, _| {
@@ -318,4 +318,28 @@ fn the_system_mode_follows_a_change_of_the_systems_appearance(cx: &mut gpui_kit:
         Mode::system_changed(WindowAppearance::Light, cx);
         assert_eq!(cx.theme().appearance, Appearance::Dark, "Dark stays dark");
     });
+}
+
+/// Agents lists each agent's models for the reader to sort and star: a press on a star makes that model the one new sessions start on, and
+/// the list drawn follows the new default.
+#[gpui_kit::test]
+fn a_star_in_agents_makes_a_model_the_default(cx: &mut TestAppContext) {
+    use atelier_settings::AgentModels;
+    cx.update(|cx| {
+        let mut all = crate::agent_models::ModelPrefs::default();
+        all.0.insert(
+            "claude-code".into(),
+            AgentModels { known: vec![("claude-opus-5-5".into(), "Opus 5.5".into()), ("claude-sonnet-5-5".into(), "Sonnet 5.5".into())], ..AgentModels::default() },
+        );
+        cx.set_global(all);
+    });
+    let (_pane, cx, _) = open(&atelier_settings::Settings::default(), cx);
+    click(cx, "section-agents");
+    assert!(cx.debug_bounds("model-row-claude-code-claude-sonnet-5-5").is_some(), "the models of Claude Code are listed by their names");
+    let start = |cx: &mut VisualTestContext| {
+        cx.update(|_, cx| crate::agent_models::start_model(&atelier_agents::registry::by_backend("claude-code").unwrap(), cx))
+    };
+    assert_eq!(start(cx).as_deref(), Some("claude-opus-5-5"), "the first, until one is starred");
+    click(cx, "model-star-claude-code-claude-sonnet-5-5");
+    assert_eq!(start(cx).as_deref(), Some("claude-sonnet-5-5"), "the starred model is the one new sessions start on");
 }

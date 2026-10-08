@@ -9,6 +9,7 @@ use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions,
 use atelier_ui::scale::px;
 
 mod activity;
+mod agent_models;
 mod agent_session;
 mod palette;
 mod project_icons;
@@ -84,6 +85,8 @@ fn main() {
         pr_glance::install(&saved.pr_card_off, cx);
         cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));
         cx.set_global(providers::ProviderServices::system());
+        cx.set_global(agent_models::ModelPrefs(saved.agent_models.clone()));
+        agent_models::refresh(cx);
         let (relaunches, relaunch_requests) = futures_channel::mpsc::unbounded();
         let (update_sender, update_events) = futures_channel::mpsc::unbounded();
         cx.set_global(updater::Updater::new(updater::driver(relaunches, update_sender)));
