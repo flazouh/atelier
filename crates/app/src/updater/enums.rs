@@ -1,8 +1,10 @@
 mod check_outcome;
 mod reaction;
+mod remembered;
 mod update_event;
 mod update_state;
 pub use check_outcome::CheckOutcome;
 pub use reaction::Reaction;
+pub use remembered::Remembered;
 pub use update_event::UpdateEvent;
 pub use update_state::UpdateState;

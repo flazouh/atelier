@@ -2,11 +2,12 @@
 //! the changelog and the restart), and the question put to the reader when an installed update wants to restart the app
 //! while a tab holds unsaved edits.
 use futures_util::StreamExt;
-use gpui_kit::{Context, PromptLevel, Window};
+use gpui_kit::{AppContext as _, Context, PromptLevel, Window};
 
-use super::structs::{CheckForUpdates, Shell};
+use super::{helpers::settings_path, structs::{CheckForUpdates, Shell}};
 use crate::updater::{
-    CHECKING_NOTICE, CheckOutcome, DOWNLOADING_NOTICE, Question, Reaction, RelaunchRequest, Requests, UNAVAILABLE_NOTICE,
+    remember_on_ready, remembered,
+    CHECKING_NOTICE, CheckOutcome, DOWNLOADING_NOTICE, Question, Reaction, Remembered, RelaunchRequest, Requests, UNAVAILABLE_NOTICE,
     UPDATE_LATER_NOTICE, UPDATE_WAITS_NOTICE, UpdateEvent, UpdateEvents, UpdateState, Updater,
 };
 
@@ -30,12 +31,60 @@ impl Shell {
 
     /// What the updater tells: the state moves, and the window says or shows what the move asks for.
     pub fn update_event(&mut self, event: UpdateEvent, cx: &mut Context<Self>) {
+        let before = self.update.clone();
         let (state, reaction) = std::mem::take(&mut self.update).apply(event);
         self.update = state;
+        // An update that is ready may install at the next quit: its changelog is kept, for that start to show once.
+        if let Some(record) = remember_on_ready(&before, &self.update) {
+            Self::keep_whats_new(Some(record), cx);
+        }
         match reaction {
             Reaction::Nothing => {}
             Reaction::Say(words) => self.say(words, cx),
             Reaction::Show => self.update_modal = true,
+        }
+        cx.notify();
+    }
+
+    /// What the settings kept of the update this version came from: shown once as a chip. A kept changelog of a version not
+    /// installed yet waits, and one of an older version goes.
+    pub(super) fn remembered_at_start(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Option<atelier_settings::WhatsNew> {
+        let kept = saved.whats_new.as_ref()?;
+        match remembered(&kept.version, env!("CARGO_PKG_VERSION")) {
+            Remembered::Show => Some(kept.clone()),
+            Remembered::Wait => None,
+            Remembered::Forget => {
+                Self::keep_whats_new(None, cx);
+                None
+            }
+        }
+    }
+
+    /// Writes the kept changelog (or its removal) to the settings, off the UI thread.
+    fn keep_whats_new(record: Option<atelier_settings::WhatsNew>, cx: &mut Context<Self>) {
+        if let Some(path) = settings_path() {
+            cx.background_spawn(async move {
+                if let Err(error) = atelier_settings::update(&path, |s| s.whats_new = record) {
+                    eprintln!("could not keep the changelog of the update: {error}");
+                }
+            })
+            .detach();
+        }
+    }
+
+    /// Opens the changelog of the update this version came from.
+    pub fn show_whats_new(&mut self, cx: &mut Context<Self>) {
+        if self.whats_new.is_some() {
+            self.whats_new_open = true;
+            cx.notify();
+        }
+    }
+
+    /// Closes it for good: the chip goes, and the settings forget the changelog.
+    pub fn dismiss_whats_new(&mut self, cx: &mut Context<Self>) {
+        self.whats_new_open = false;
+        if self.whats_new.take().is_some() {
+            Self::keep_whats_new(None, cx);
         }
         cx.notify();
     }

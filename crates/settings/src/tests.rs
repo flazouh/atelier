@@ -245,3 +245,14 @@ fn the_models_survive_a_save_and_an_older_file_has_none() {
     assert_eq!(back.agent_models, settings.agent_models);
     assert!(serde_json::from_str::<Settings>("{}").unwrap().agent_models.is_empty());
 }
+
+#[test]
+fn the_changelog_of_a_downloaded_update_is_kept_and_other_keys_stay() {
+    let text = r#"{"whats_new":{"version":"0.1.4","notes":"- **A:** b"},"future_key":1}"#;
+    let settings: Settings = serde_json::from_str(text).unwrap();
+    assert_eq!(settings.whats_new, Some(WhatsNew { version: "0.1.4".into(), notes: "- **A:** b".into() }));
+    let again: serde_json::Value = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+    assert_eq!(again["whats_new"]["version"], "0.1.4");
+    assert_eq!(again["future_key"], 1, "a key this version does not know is kept");
+    assert_eq!(Settings::default().whats_new, None);
+}

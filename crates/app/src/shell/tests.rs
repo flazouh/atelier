@@ -40,13 +40,17 @@ fn quit_has_its_key(cx: &mut TestAppContext) {
 }
 
 fn open_shell(cx: &mut TestAppContext) -> (Entity<Shell>, &mut gpui_kit::VisualTestContext) {
+    open_shell_with(cx, atelier_settings::Settings::default())
+}
+
+fn open_shell_with(cx: &mut TestAppContext, saved: atelier_settings::Settings) -> (Entity<Shell>, &mut gpui_kit::VisualTestContext) {
     crate::open_project::TEST_THREAD_ONLY.set(true);
     cx.update(|cx| {
         gpui_kit::init(cx);
         atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
-    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(&atelier_settings::Settings::default(), cx));
+    let (shell, cx) = cx.add_window_view(move |_, cx| Shell::new(&saved, cx));
     cx.simulate_resize(size(px(1200.), px(800.)));
     (shell, cx)
 }

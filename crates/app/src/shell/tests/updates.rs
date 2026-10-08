@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 
-use super::{open_shell, settle, with_a_session};
+use super::{open_shell, open_shell_with, settle, with_a_session};
 use crate::{
     shell::{CheckForUpdates, Shell},
     updater::{
@@ -229,4 +229,48 @@ fn the_updater_may_ask_for_a_restart_more_than_once_in_a_run(cx: &mut TestAppCon
     sender.unbounded_send(second).unwrap();
     settle(&shell, cx);
     assert_eq!((first_answers.counts(), second_answers.counts()), ((1, 0), (1, 0)));
+}
+
+fn kept(version: &str) -> atelier_settings::Settings {
+    atelier_settings::Settings {
+        whats_new: Some(atelier_settings::WhatsNew { version: version.into(), notes: "## What is new\n\n- **Fast:** it is faster".into() }),
+        ..Default::default()
+    }
+}
+
+#[gpui_kit::test]
+fn the_first_start_of_an_updated_version_shows_a_chip_whose_sheet_has_only_close_and_goes_for_good(cx: &mut TestAppContext) {
+    let (shell, cx) = open_shell_with(cx, kept(env!("CARGO_PKG_VERSION")));
+    settle(&shell, cx);
+    let chip = cx.debug_bounds("whats-new-chip").expect("the chip is there");
+    assert!(cx.debug_bounds("release-sheet").is_none(), "the sheet does not open by itself");
+    cx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("release-sheet").is_some(), "a press opens it");
+    assert!(cx.debug_bounds("release-install").is_none(), "with nothing to restart");
+    let close = cx.debug_bounds("release-later").expect("Close is there");
+    cx.simulate_click(close.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("release-sheet").is_none() && cx.debug_bounds("whats-new-chip").is_none(), "Close removes both");
+    assert!(shell.read_with(cx, |s, _| s.whats_new.is_none()));
+}
+
+#[gpui_kit::test]
+fn escape_closes_the_whats_new_sheet_too(cx: &mut TestAppContext) {
+    let (shell, cx) = open_shell_with(cx, kept(env!("CARGO_PKG_VERSION")));
+    shell.update(cx, |s, cx| s.show_whats_new(cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("release-sheet").is_some());
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("release-sheet").is_none() && shell.read_with(cx, |s, _| s.whats_new.is_none()));
+}
+
+#[gpui_kit::test]
+fn a_changelog_kept_for_another_version_shows_no_chip(cx: &mut TestAppContext) {
+    for version in ["99.0.0", "0.0.1"] {
+        let (shell, cx) = open_shell_with(cx, kept(version));
+        settle(&shell, cx);
+        assert!(cx.debug_bounds("whats-new-chip").is_none(), "{version}: not this version");
+    }
 }
