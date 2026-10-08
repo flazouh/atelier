@@ -1623,3 +1623,32 @@ fn dragging_the_sidebar_edge_at_a_zoom_follows_the_pointer(cx: &mut TestAppConte
     // 120 window pixels at a zoom of 1.5 are 80 design pixels (within the clamp the sidebar keeps).
     assert!((after - before - 80.).abs() < 3., "the sidebar went from {before} to {after}");
 }
+
+/// Zoomed, the layout keeps its gaps: the title bar grows with what it holds, the panes start under it, and the bar at the foot starts past
+/// the rail and the gap, all in the zoomed sizes.
+#[gpui_kit::test]
+fn zoomed_the_title_bar_and_the_foot_keep_their_gaps(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 2000.);
+    let zoom_in = if cfg!(target_os = "macos") { "cmd-=" } else { "ctrl-=" };
+    for _ in 0..5 {
+        cx.simulate_keystrokes(zoom_in);
+    }
+    let zoom = atelier_ui::scale::zoom();
+    assert!((zoom - 1.5).abs() < 1e-4, "five presses of the zoom key are 1.5: {zoom}");
+    shell.update(cx, |shell, cx| shell.sample_vitals(cx));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let near = |a: gpui_kit::Pixels, b: f32| (f32::from(a) - b).abs() < 1.0;
+    let panes = cx.debug_bounds("sessions-view").expect("the panes are drawn");
+    let bar = cx.debug_bounds("title-bar-room").or_else(|| cx.debug_bounds("title-tabs"));
+    assert!(near(panes.top(), super::types::TITLE_BAR * zoom), "the panes start under a title bar that grew with the zoom: {:?}", panes.top());
+    if let Some(tabs) = bar {
+        assert!(tabs.bottom() < panes.top(), "the tabs end above the panes: {:?} against {:?}", tabs.bottom(), panes.top());
+    }
+    let cpu = cx.debug_bounds("status-card-cpu").expect("the foot is drawn");
+    let first = (atelier_ui::view_rail::WIDTH + super::types::PANE_GAP) * zoom;
+    assert!(near(cpu.left(), first), "the first card of the foot starts past the rail and the gap, zoomed: {:?} against {first}", cpu.left());
+    for _ in 0..5 {
+        cx.simulate_keystrokes(if cfg!(target_os = "macos") { "cmd--" } else { "ctrl--" });
+    }
+}

@@ -92,7 +92,7 @@ impl Shell {
     pub(super) fn footer(&self) -> Option<AnyElement> {
         (self.active().is_some() && self.settings.is_none()).then(|| {
             // The bar starts where the panes start, past the rail and the panels' gap, and ends where they end.
-            div().flex_none().overflow_hidden().pl(gpui_kit::px(self.footer_plan.0)).pr(gpui_kit::px(8.)).pt(gpui_kit::px(super::types::PANE_GAP)).pb(gpui_kit::px(8.)).debug_selector(|| "footer".into()).child(self.vitals.clone()).into_any_element()
+            div().flex_none().overflow_hidden().pl(atelier_ui::scale::px(self.footer_plan.0)).pr(atelier_ui::scale::px(8.)).pt(atelier_ui::scale::px(super::types::PANE_GAP)).pb(atelier_ui::scale::px(8.)).debug_selector(|| "footer".into()).child(self.vitals.clone()).into_any_element()
         })
     }
 }
