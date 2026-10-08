@@ -227,7 +227,7 @@ impl Render for SettingsPane {
         });
 
         let pane = cx.entity().downgrade();
-        let agent_rows = self.agents.iter().enumerate().map(|(i, agent)| {
+        let agent_rows: Vec<gpui_kit::AnyElement> = self.agents.iter().enumerate().map(|(i, agent)| {
             let found = atelier_agents::registry::by_backend(&agent.backend);
             let (rows, default) = match &found {
                 Some(found) => {
@@ -278,7 +278,8 @@ impl Render for SettingsPane {
                         )
                         .into_any_element()
                 })
-        });
+                .into_any_element()
+        }).collect();
 
         let languages = {
             let this = this.clone();
