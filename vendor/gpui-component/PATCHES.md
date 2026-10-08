@@ -96,3 +96,10 @@ for one build. Each highlighter keeps its own parser.
 
 Test: `tests/shared_queries.rs`. A second Rust highlighter builds at least ten times faster than the
 first, which compiled the queries, and colours a text the same.
+
+## 4. A `Textarea` takes a size
+
+`Textarea` always drew its text with the medium input padding (8 px above and below), so a one-line note was
+36 px tall at a 20 px line, however its style was set. It now implements `Sizable`: `with_size(Size::XSmall)`
+has no padding above or below the text, which is what a slim one-line pill needs. The default is the medium size, so
+every other `Textarea` is as it was.
