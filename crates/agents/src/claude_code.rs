@@ -7,6 +7,7 @@ pub mod accounts;
 mod control;
 mod launch;
 mod map;
+mod models;
 mod session;
 mod store;
 mod tools;
@@ -94,6 +95,10 @@ impl Backend for ClaudeCode {
 
     fn session_account(&self, project: &dyn Project, session: &SessionId) -> Result<Option<String>, SessionError> {
         store::holder(project, session)
+    }
+
+    fn list_models(&self, project: &dyn Project, now: i64) -> Option<Result<Vec<ModelChoice>, String>> {
+        Some(models::fetch(project, now))
     }
 
     fn sign_in(&self, account: &str) -> Option<atelier_project::Command> {

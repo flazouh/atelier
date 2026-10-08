@@ -36,6 +36,13 @@ impl ClaudeUsage {
         Ok(token.to_string())
     }
 
+    /// The access token of the Claude sign-in on `project`'s host, for a call to Anthropic's API. It never leaves this process.
+    pub fn access_token(project: &dyn Project, now: i64) -> Result<String, String> {
+        let command = Command::new(SHELL).args(["-c", CLAUDE_CREDENTIALS]);
+        let credentials = subprocess::output(project, &command).map_err(|e| format!("Claude could not be reached: {e}"))?;
+        Self::token(&credentials, now)
+    }
+
     /// Reads the endpoint's answer.
     pub(in super::super) fn parse(text: &str, now: i64) -> Result<Reading, String> {
         let value: Value = serde_json::from_str(text).map_err(|_| "Claude's usage could not be read".to_string())?;

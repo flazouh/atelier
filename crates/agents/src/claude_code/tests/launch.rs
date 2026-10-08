@@ -256,3 +256,14 @@ fn a_new_claude_code_session_starts_in_auto() {
     assert_eq!(caps.default_mode, Some(PermissionMode::Auto));
     assert!(caps.permission_modes.contains(&PermissionMode::Auto), "the default is one the menu offers");
 }
+
+/// The models endpoint's answer becomes the picker's list: the id to start Claude Code with, and the name without "Claude ".
+#[test]
+fn the_models_endpoints_answer_names_the_real_versions() {
+    let answer = r#"{"data":[{"id":"claude-opus-5-5","display_name":"Claude Opus 5.5","created_at":"2026-09-21T00:00:00Z"},{"id":"claude-haiku-4-5-20251001","display_name":"Claude Haiku 4.5"},{"id":"odd"}],"has_more":false}"#;
+    let list = crate::claude_code::models::parse(answer).unwrap();
+    let pairs: Vec<(&str, &str)> = list.iter().map(|m| (m.id.as_str(), m.label.as_str())).collect();
+    assert_eq!(pairs, [("claude-opus-5-5", "Opus 5.5"), ("claude-haiku-4-5-20251001", "Haiku 4.5"), ("odd", "odd")]);
+    assert!(crate::claude_code::models::parse(r#"{"data":[]}"#).is_err(), "no models is a reason, not an empty picker");
+    assert!(crate::claude_code::models::parse("not json").is_err());
+}

@@ -49,6 +49,12 @@ pub trait Backend: Send + Sync {
         Ok(None)
     }
 
+    /// The models the agent offers now, asked of the agent's own service, for an agent whose list changes with its releases. `None`:
+    /// the agent has no such call, and [`Capabilities::models`] is its list. May be slow.
+    fn list_models(&self, _project: &dyn Project, _now: i64) -> Option<Result<Vec<super::structs::ModelChoice>, String>> {
+        None
+    }
+
     /// The command that signs in to `account` on the host, making it when it is new. It opens a browser.
     fn sign_in(&self, _account: &str) -> Option<atelier_project::Command> {
         None
