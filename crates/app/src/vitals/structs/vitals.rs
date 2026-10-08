@@ -8,4 +8,6 @@ pub struct Vitals {
     pub(in super::super) load: Option<SystemLoad>,
     pub(in super::super) providers: Vec<ProviderGauge>,
     pub(in super::super) work: Work,
+    /// The widths of the bar's cards under the sidebar and under the right pane, as the shell lays the columns out.
+    pub(in super::super) columns: (Option<f32>, Option<f32>),
 }
