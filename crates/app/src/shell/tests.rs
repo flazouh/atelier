@@ -1484,7 +1484,7 @@ fn a_long_project_name_on_a_long_host_stays_inside_the_sidebar_head(cx: &mut Tes
     let root = parent.path().join("fluentai-pro-with-a-name-that-is-long-indeed");
     std::fs::create_dir(&root).unwrap();
     let project = atelier_project::LocalProject::open(root.clone()).unwrap();
-    let location = atelier_settings::Location::Ssh { host: "hp-agent-on-the-other-side".into(), path: root };
+    let location = atelier_settings::Location::Ssh { host: "dev-host-on-the-other-side".into(), path: root };
     shell.update_in(cx, |s, window, cx| {
         s.add(location, std::sync::Arc::new(project), window, cx);
         s.active = s.projects.len() - 1;

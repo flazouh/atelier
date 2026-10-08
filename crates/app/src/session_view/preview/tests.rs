@@ -5,17 +5,17 @@ use super::*;
 fn call(name: &str, input: serde_json::Value) -> ToolCall {
     ToolCall { id: ToolId::new("t"), name: name.into(), kind: ToolKind::Other, input, file: None, parent: None, status: ToolStatus::Pending }
 }
-const ROOT: &str = "/home/alex/qa/m3";
+const ROOT: &str = "/home/user/qa/m3";
 /// An Edit is a diff under the path relative to the project.
 #[test]
 fn an_edit_is_a_diff_under_its_relative_path() {
-    let edit = call("Edit", json!({"file_path": "/home/alex/qa/m3/NOTES.md", "old_string": "a", "new_string": "a\nb", "replace_all": false}));
+    let edit = call("Edit", json!({"file_path": "/home/user/qa/m3/NOTES.md", "old_string": "a", "new_string": "a\nb", "replace_all": false}));
     assert_eq!(preview(&edit, ROOT), Some(ToolPreview::edit("NOTES.md", "a", "a\nb")));
 }
 /// A MultiEdit is its edits in order.
 #[test]
 fn a_multi_edit_is_its_edits_in_order() {
-    let multi = call("MultiEdit", json!({"file_path": "/home/alex/qa/m3/src/lib.rs", "edits": [
+    let multi = call("MultiEdit", json!({"file_path": "/home/user/qa/m3/src/lib.rs", "edits": [
         {"old_string": "one", "new_string": "ONE"},
         {"old_string": "two", "new_string": "TWO"}
     ]}));
@@ -32,6 +32,6 @@ fn a_write_is_all_new_and_a_shell_call_is_its_command() {
 /// A call with no preview, or with its input still unknown, has none.
 #[test]
 fn other_calls_have_no_preview() {
-    assert_eq!(preview(&call("Read", json!({"file_path": "/home/alex/qa/m3/a"})), ROOT), None);
+    assert_eq!(preview(&call("Read", json!({"file_path": "/home/user/qa/m3/a"})), ROOT), None);
     assert_eq!(preview(&call("Edit", serde_json::Value::Null), ROOT), None);
 }

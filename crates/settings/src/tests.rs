@@ -47,11 +47,11 @@ fn opening_a_project_moves_it_first_once_and_the_list_stays_short() {
     s.opened(local(5));
     assert_eq!(s.recent[0], local(5));
     assert_eq!(s.recent.iter().filter(|l| **l == local(5)).count(), 1);
-    let remote = Location::Ssh { host: "hp-agent".into(), path: "/home/alex/code/atelier".into() };
+    let remote = Location::Ssh { host: "dev-host".into(), path: "/home/user/code/atelier".into() };
     s.opened(remote.clone());
     assert_eq!(s.recent[0], remote);
     assert_eq!(remote.name(), "atelier");
-    assert_eq!(remote.place(), "hp-agent:/home/alex/code/atelier");
+    assert_eq!(remote.place(), "dev-host:/home/user/code/atelier");
 }
 
 #[test]

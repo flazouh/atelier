@@ -26,7 +26,7 @@ The editor's two patches to gpui-component:
    lands, each old colour stands where its text went. The background parse updates the injection
    layers in place too, over one span that all the coalesced edits wrote.
 
-Machine: `hp-agent`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release build, at commit
+Machine: `dev-host`, Intel i5-10500T (6 cores, 12 threads, 2.3 GHz), release build, at commit
 `e0e79a4`. The HP is shared with CI runners; this run started at a load average of 5.6 and ended at
 10.3. Each number is the median and p95 of 20 runs.
 
@@ -311,12 +311,12 @@ median and p95 of 15 runs. No network: the model is a scripted stand-in, so the 
 
 ## Remote projects
 
-`RemoteProject` over a real `ssh` from the HP to itself (`hp-agent`, loopback through sshd), the
+`RemoteProject` over a real `ssh` from the HP to itself (`dev-host`, loopback through sshd), the
 release atelier-remote, `/tmp/qa-atelier` (1,009 files). Load average 9 to 11. Three runs of 20
 samples each. The LAN row is alex-9c's run from Alex's Mac to the HP over Wi-Fi, a clone of
 1,150 files, the same bench.
 
-    ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=hp-agent ATELIER_TEST_SSH_ROOT=/tmp/qa-atelier \
+    ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=dev-host ATELIER_TEST_SSH_ROOT=/tmp/qa-atelier \
         cargo test --release -p atelier-remote --test over_ssh -- --ignored --nocapture remote_costs
 
 | Case | Target | Result | Passes |
@@ -466,7 +466,7 @@ number says nothing about the component; the Mac number is the one to read.
 A commit of 200 changed files from a review (`crates/app/src/ship/commit.rs`), release, on the HP at a load
 average of 39 to 48 from other builds; over ssh to the HP itself through atelier-remote.
 
-    ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=hp-agent cargo test --release -p atelier-app -- --ignored --nocapture commit_of_200_files
+    ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=dev-host cargo test --release -p atelier-app -- --ignored --nocapture commit_of_200_files
 
 | Case | Median | Worst | Runs |
 | --- | --- | --- | --- |

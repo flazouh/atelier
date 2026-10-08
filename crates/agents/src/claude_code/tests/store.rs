@@ -8,8 +8,8 @@ use crate::{
     session::SessionId,
 };
 
-const PROJECT_SLUG: &str = "-home-alex-code-atelier";
-const OTHER_PROJECT_SLUG: &str = "-home-alex-code-other";
+const PROJECT_SLUG: &str = "-home-user-code-atelier";
+const OTHER_PROJECT_SLUG: &str = "-home-user-code-other";
 const USUAL_FOLDER: &str = ".claude";
 const WORK_FOLDER: &str = ".claude-work";
 const WORK_ACCOUNT: &str = "work";
@@ -80,7 +80,7 @@ fn a_session_is_read_from_whichever_account_holds_it() {
 
 #[test]
 fn a_folder_becomes_claudes_project_name() {
-    assert_eq!(slug("/home/alex/code/local/atelier"), "-home-alex-code-local-atelier");
+    assert_eq!(slug("/home/user/code/local/atelier"), "-home-user-code-local-atelier");
     assert_eq!(slug("/tmp/a b.c"), "-tmp-a-b-c");
 }
 

@@ -145,7 +145,7 @@ locations, each with its line's text for display.
 
 - The fastest server per language, chosen on 2026-09-28. TypeScript 7 (`typescript@7.0.2`) is the
   native Go compiler, and it serves LSP itself, so there is no Node.js and no tsserver. For Python,
-  ty 0.0.84 and pyrefly 1.3.1 were timed on `hp-agent` with a full `check`: ty took 0.17s on `rich`
+  ty 0.0.84 and pyrefly 1.3.1 were timed on `dev-host` with a full `check`: ty took 0.17s on `rich`
   against 0.28s, and 1.58s on `django` against pyrefly's 1.72s at its `default` preset. ty is still
   0.0.x, so it can change under us.
 - tsgo sends its own requests with string ids (`"ts1"`) and answers nothing until it hears back. The
@@ -209,13 +209,13 @@ The numbers and targets are in [performance.md](performance.md).
 
 ## Checks
 
-- `tools/check.sh` on `hp-agent`: the workspace tests with live rust-analyzer, tsgo, ty and gopls,
+- `tools/check.sh` on `dev-host`: the workspace tests with live rust-analyzer, tsgo, ty and gopls,
   clippy, the gallery
   build, and the tests of the patched `vendor/gpui-base`, which the workspace excludes.
-- Gallery stories "Hunks" and "Editor", captured on `hp-agent` in both themes.
+- Gallery stories "Hunks" and "Editor", captured on `dev-host` in both themes.
 - Stage C: `ATELIER_REQUIRE_LSP=1 cargo test -p atelier-lsp --test rust_analyzer` on a box with the server,
-  so a missing server fails rather than skipping. Passed on `hp-agent` against rust-analyzer 1.98.1.
-- The Editor story, driven on `hp-agent`: Check reported "2 problems, first: mismatched types, expected
+  so a missing server fails rather than skipping. Passed on `dev-host` against rust-analyzer 1.98.1.
+- The Editor story, driven on `dev-host`: Check reported "2 problems, first: mismatched types, expected
   `u32`, found `&str`" and the editor underlined the range; Go to definition on `width()` answered
   "defined on line 5". Both were captured as screenshots.
 - Motion under software Vulkan redraws about 19 times a second, so a 260ms resolve gets 5 frames and

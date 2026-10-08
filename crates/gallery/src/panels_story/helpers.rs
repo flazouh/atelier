@@ -8,7 +8,7 @@ use super::types::TITLES;
 pub(super) fn projects() -> [ProjectLabel; 2] {
     [
         ProjectLabel { id: "atelier".into(), name: "atelier".into(), location: Location::Local, badge: Some(atelier_ui::sidebar_model::Badge { label: "A".into(), color: 0, icon: None }) },
-        ProjectLabel { id: "api".into(), name: "api-server".into(), location: Location::Ssh { host: "hp-agent".into() }, badge: Some(atelier_ui::sidebar_model::Badge { label: "B".into(), color: 3, icon: None }) },
+        ProjectLabel { id: "api".into(), name: "api-server".into(), location: Location::Ssh { host: "dev-host".into() }, badge: Some(atelier_ui::sidebar_model::Badge { label: "B".into(), color: 3, icon: None }) },
     ]
 }
 
