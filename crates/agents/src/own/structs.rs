@@ -139,6 +139,7 @@ impl Backend for OwnAgent {
             interrupt: true,
             models: self.options.models.clone(),
             permission_modes: vec![PermissionMode::Ask, PermissionMode::AcceptEdits, PermissionMode::Plan, PermissionMode::Bypass],
+            default_mode: None,
             thinking: true,
             subagents: false,
             todos: false,

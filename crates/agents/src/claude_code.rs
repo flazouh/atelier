@@ -67,6 +67,8 @@ impl Backend for ClaudeCode {
                 PermissionMode::Auto,
                 PermissionMode::Bypass,
             ],
+            // Claude Code asks nothing the reader has not allowed in Auto: a new session starts there, not in "ask first".
+            default_mode: Some(PermissionMode::Auto),
             thinking: true,
             subagents: true,
             todos: true,

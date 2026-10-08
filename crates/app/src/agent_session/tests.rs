@@ -1212,3 +1212,14 @@ fn the_reply_box_stop_and_cancel_do_nothing_without_a_press(cx: &mut TestAppCont
         assert_eq!(s.reply.read(cx).voice_mode(), atelier_ui::VoiceMode::Idle);
     });
 }
+
+/// A new session of an agent that starts in Auto (Claude Code) shows Auto in its composer and sends it with its first message; the
+/// agent's own default is not asked for.
+#[gpui_kit::test]
+fn a_new_session_starts_in_the_backends_default_mode(cx: &mut TestAppContext) {
+    use atelier_agents::session::PermissionMode;
+    let (session, _fake, cx) = crate::fake_agent::start_in_auto(cx);
+    let (word, mode) = cx.update(|_, cx| (session.read(cx).composer.read(cx).mode().map(|m| m.to_string()), session.read(cx).mode));
+    assert_eq!(word, Some(crate::agent_session::helpers::mode_word(PermissionMode::Auto).to_string()), "the composer shows Auto");
+    assert_eq!(mode, Some(PermissionMode::Auto), "and the session asks for it");
+}
