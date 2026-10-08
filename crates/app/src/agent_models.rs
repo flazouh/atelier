@@ -3,7 +3,7 @@
 //! the copy every session and the Settings page read at once.
 mod helpers;
 mod structs;
-pub use helpers::{choose_default, offered, refresh, reorder, start_model};
+pub use helpers::{all, choose_default, offered, refresh, reorder, set_hidden, start_model};
 pub use structs::ModelPrefs;
 #[cfg(test)]
 mod tests;

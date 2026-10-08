@@ -17,10 +17,18 @@ fn update(backend: &str, change: impl Fn(&mut AgentModels) + Send + 'static, cx:
     crate::settings_pane::save(cx, move |s| change(s.agent_models.entry(backend).or_default()));
 }
 
-/// The models to offer for `agent`: what it last reported else its built-in list, in the reader's order.
-pub fn offered(agent: &Agent, cx: &App) -> Vec<ModelChoice> {
+/// Every model of `agent` in the reader's order, with whether the reader hid it: what Settings lists.
+pub fn all(agent: &Agent, cx: &App) -> Vec<(ModelChoice, bool)> {
     let built_in: Vec<(String, String)> = agent.backend.capabilities().models.into_iter().map(|m| (m.id, m.label)).collect();
-    prefs_of(agent.backend.name(), cx).arranged(&built_in).into_iter().map(|(id, label)| ModelChoice { id, label }).collect()
+    let prefs = prefs_of(agent.backend.name(), cx);
+    let list = prefs.arranged(&built_in);
+    let shown = prefs.visible(&list);
+    list.into_iter().map(|(id, label)| { let hidden = !shown.iter().any(|(s, _)| *s == id); (ModelChoice { id, label }, hidden) }).collect()
+}
+
+/// The models to offer for `agent` in a picker: what it last reported else its built-in list, in the reader's order, without the hidden.
+pub fn offered(agent: &Agent, cx: &App) -> Vec<ModelChoice> {
+    all(agent, cx).into_iter().filter(|(_, hidden)| !hidden).map(|(model, _)| model).collect()
 }
 
 /// The model a new session of `agent` starts on, when the app names one: the reader's default, else the first of a list the agent
@@ -35,7 +43,22 @@ pub fn start_model(agent: &Agent, cx: &App) -> Option<String> {
 /// The reader starred `id`: new sessions of the agent start on it.
 pub fn choose_default(backend: &str, id: &str, cx: &mut App) {
     let id = id.to_string();
-    update(backend, move |p| p.default = Some(id.clone()), cx);
+    // A model started on is not left out of the picker.
+    update(backend, move |p| {
+        p.default = Some(id.clone());
+        p.hidden.retain(|h| *h != id);
+    }, cx);
+}
+
+/// The reader pressed an eye: `id` leaves the picker, or comes back to it.
+pub fn set_hidden(backend: &str, id: &str, hidden: bool, cx: &mut App) {
+    let id = id.to_string();
+    update(backend, move |p| {
+        p.hidden.retain(|h| *h != id);
+        if hidden {
+            p.hidden.push(id.clone());
+        }
+    }, cx);
 }
 
 /// The reader sorted the list: every id, first to last.
