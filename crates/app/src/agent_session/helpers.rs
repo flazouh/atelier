@@ -1,5 +1,6 @@
 use std::time::SystemTime;
 
+use crate::palette::Hue;
 use atelier_agents::session::{Event, PermissionMode, SessionError, TurnOutcome};
 
 /// Whether `event` is the agent at work, which stamps the session's row: its start on a resume is not.
@@ -32,16 +33,15 @@ pub fn mode_word(mode: PermissionMode) -> &'static str {
 /// A small icon for each mode and its colour, from the palette: a question for asking first, a pencil for edits, a list for the plan, a
 /// bulb for auto, a warning for no checks at all.
 pub fn mode_look(mode: PermissionMode) -> (atelier_ui::IconName, gpui_kit::Hsla) {
-    let (icon, hex) = match mode {
-        PermissionMode::Ask => (atelier_ui::IconName::Help, 0x4ACFFF),
-        PermissionMode::AcceptEdits => (atelier_ui::IconName::Edit, 0x15DB95),
-        PermissionMode::Plan => (atelier_ui::IconName::Checklist, 0x9758FF),
-        PermissionMode::Auto => (atelier_ui::IconName::Idea, 0xFF8D22),
-        PermissionMode::Bypass => (atelier_ui::IconName::Warning, 0xFF5C59),
+    let (icon, hue) = match mode {
+        PermissionMode::Ask => (atelier_ui::IconName::Help, Hue::Blue),
+        PermissionMode::AcceptEdits => (atelier_ui::IconName::Edit, Hue::Green),
+        PermissionMode::Plan => (atelier_ui::IconName::Checklist, Hue::Purple),
+        PermissionMode::Auto => (atelier_ui::IconName::Idea, Hue::Orange),
+        PermissionMode::Bypass => (atelier_ui::IconName::Warning, Hue::Red),
     };
-    (icon, gpui_kit::rgb(hex).into())
+    (icon, hue.hsla())
 }
-
 pub(super) fn mode_from(word: &str) -> Option<PermissionMode> {
     [PermissionMode::Ask, PermissionMode::AcceptEdits, PermissionMode::Plan, PermissionMode::Auto, PermissionMode::Bypass]
         .into_iter()

@@ -10,6 +10,7 @@ use atelier_ui::scale::px;
 
 mod activity;
 mod agent_session;
+mod palette;
 mod project_icons;
 mod providers;
 mod vitals;
