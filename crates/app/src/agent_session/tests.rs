@@ -1223,3 +1223,15 @@ fn a_new_session_starts_in_the_backends_default_mode(cx: &mut TestAppContext) {
     assert_eq!(word, Some(crate::agent_session::helpers::mode_word(PermissionMode::Auto).to_string()), "the composer shows Auto");
     assert_eq!(mode, Some(PermissionMode::Auto), "and the session asks for it");
 }
+
+/// Each mode has its own small icon and its own colour of the palette.
+#[test]
+fn each_mode_has_its_own_icon_and_colour() {
+    use atelier_agents::session::PermissionMode::{AcceptEdits, Auto, Ask, Bypass, Plan};
+    let looks: Vec<_> = [Ask, AcceptEdits, Plan, Auto, Bypass].into_iter().map(crate::agent_session::helpers::mode_look).collect();
+    for (i, (icon, color)) in looks.iter().enumerate() {
+        for (j, (other, other_color)) in looks.iter().enumerate().filter(|(j, _)| *j != i) {
+            assert!(icon != other && color != other_color, "modes {i} and {j} share an icon or a colour");
+        }
+    }
+}

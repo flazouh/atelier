@@ -26,7 +26,7 @@ use crate::{
     tool_density::{ToolDensity, tool_density},
 };
 use super::types::{ARRIVAL_KEPT, OVERDRAW, SAVE_AFTER, SessionEvent};
-use super::helpers::{is_activity, mode_from, mode_word, now, problem_words};
+use super::helpers::{is_activity, mode_from, mode_look, mode_word, now, problem_words};
 
 impl EventEmitter<SessionEvent> for AgentSession {}
 
@@ -261,9 +261,11 @@ impl AgentSession {
             })
             .collect();
         let start_mode = resume.is_none().then(|| agent.backend.capabilities().default_mode).flatten();
-        let modes: Vec<SharedString> = agent.backend.capabilities().permission_modes.into_iter().map(|m| mode_word(m).into()).collect();
+        let offered = agent.backend.capabilities().permission_modes;
+        let modes: Vec<SharedString> = offered.iter().map(|m| mode_word(*m).into()).collect();
+        let mode_icons: Vec<_> = offered.iter().map(|m| mode_look(*m)).collect();
         let composer = cx.new(|cx| {
-            let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
+            let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes).mode_icons(mode_icons);
             input.set_dictation(true, cx);
             if let Some(mode) = start_mode {
                 input.set_mode(mode_word(mode), cx);
