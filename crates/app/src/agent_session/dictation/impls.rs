@@ -88,8 +88,65 @@ impl AgentSession {
         }
     }
 
+    /// The reply box's microphone was pressed: the same engine and cue as the composer's, with the words going to the box.
+    pub(in super::super) fn reply_dictation_start(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match access::status() {
+            Access::Granted => play(&self.dictation.start),
+            // The engine asks for access itself; this press cannot record, so the box stays as it is.
+            Access::Unasked | Access::Refused => return,
+        }
+        let (engine, presses) = speech(cx);
+        let press = engine.start(prefs(cx).device, self.key.to_string());
+        presses.borrow_mut().insert(press, (cx.weak_entity(), window.window_handle()));
+        self.dictation.reply.insert(press);
+        self.dictation.reply_live = Some(press);
+        self.reply.update(cx, |r, cx| r.set_voice_listening(cx));
+    }
+    /// The reply box's press ended: the box goes quiet now, and its words join the note when the engine has them.
+    pub(in super::super) fn reply_dictation_stop(&mut self, cx: &mut Context<Self>) {
+        let Some(press) = self.dictation.reply_live.take() else { return };
+        play(&self.dictation.stop);
+        speech(cx).0.stop(press);
+        self.reply.update(cx, |r, cx| r.set_voice_idle(cx));
+    }
+    /// The reply box closed while it listened: no cue, no words.
+    pub(in super::super) fn reply_dictation_cancel(&mut self, cx: &mut Context<Self>) {
+        let Some(press) = self.dictation.reply_live.take() else { return };
+        self.dictation.reply.remove(&press);
+        speech(cx).0.cancel(press);
+    }
+    /// The engine said something about a press of the reply box.
+    fn reply_event(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
+        match event {
+            Event::Level(press, level) if self.dictation.reply_live == Some(press) => self.reply.update(cx, |r, cx| r.set_voice_level(level, cx)),
+            Event::Transcript(press, words) => {
+                self.reply_press_over(press);
+                self.reply.update(cx, |r, cx| r.insert_transcript(&words, window, cx));
+            }
+            Event::Failed(press, _) | Event::Cancelled(press) => {
+                self.reply_press_over(press);
+                self.reply.update(cx, |r, cx| r.set_voice_idle(cx));
+            }
+            _ => {}
+        }
+    }
+    fn reply_press_over(&mut self, press: atelier_voice::Press) {
+        self.dictation.reply.remove(&press);
+        if self.dictation.reply_live == Some(press) {
+            self.dictation.reply_live = None;
+        }
+    }
     /// The engine said something about one of this session's presses.
     pub(super) fn dictation_event(&mut self, event: Event, window: &mut Window, cx: &mut Context<Self>) {
+        let reply = match &event {
+            Event::Level(press, _) | Event::Partial(press, _) | Event::Transcript(press, _) | Event::Failed(press, _) | Event::Cancelled(press) | Event::Waiting(press) => {
+                self.dictation.reply.contains(press)
+            }
+            _ => false,
+        };
+        if reply {
+            return self.reply_event(event, window, cx);
+        }
         let listening = self.composer.read(cx).voice_mode() == VoiceMode::Listening;
         match event {
             Event::Level(press, level) if self.dictation.live == Some(press) => self.composer.update(cx, |c, cx| c.set_voice_level(level, cx)),
