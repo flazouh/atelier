@@ -67,7 +67,7 @@ too, since they read the same `gap_above`. Only the scroll height leaves it out,
 ## Checks
 
 - `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`.
-- A gallery story "Inline review", captured on `hp-agent` in both themes.
+- A gallery story "Inline review", captured on `dev-host` in both themes.
 - Sample the band pixel and prove it reaches the right edge of the text area on a one-character line.
 - Accept one hunk of three, then undo, and prove the text and the caret both come back.
 - Type inside a hunk, then accept it, and prove the typing survives.

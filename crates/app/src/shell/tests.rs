@@ -1488,7 +1488,7 @@ fn a_long_project_name_on_a_long_host_stays_inside_the_sidebar_head(cx: &mut Tes
     let root = parent.path().join("fluentai-pro-with-a-name-that-is-long-indeed");
     std::fs::create_dir(&root).unwrap();
     let project = atelier_project::LocalProject::open(root.clone()).unwrap();
-    let location = atelier_settings::Location::Ssh { host: "hp-agent-on-the-other-side".into(), path: root };
+    let location = atelier_settings::Location::Ssh { host: "dev-host-on-the-other-side".into(), path: root };
     shell.update_in(cx, |s, window, cx| {
         s.add(location, std::sync::Arc::new(project), window, cx);
         s.active = s.projects.len() - 1;
@@ -1580,4 +1580,31 @@ fn the_bar_has_a_card_under_the_right_pane(cx: &mut TestAppContext) {
     assert!(near(f32::from(providers.right()), f32::from(bar.right())), "the last card ends at the bar's edge");
     assert!(near(f32::from(main.left() - cpu.right()), super::types::PANE_GAP), "a panels' gap between the first cards");
     assert!(near(f32::from(providers.left() - main.right()), super::types::PANE_GAP), "and before the last");
+}
+
+/// At a zoom, dragging the sidebar's edge by some window pixels moves it by those pixels: the width is kept in design
+/// pixels, and the pointer is divided by the zoom first.
+#[gpui_kit::test]
+fn dragging_the_sidebar_edge_at_a_zoom_follows_the_pointer(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+    let (shell, cx) = open_shell(cx);
+    cx.simulate_resize(size(px(1800.), px(900.)));
+    shell.update_in(cx, |s, window, cx| s.open_local(dir.path().to_path_buf(), window, cx));
+    settle(&shell, cx);
+    atelier_ui::scale::set_zoom(1.5);
+    cx.update(|window, _| window.refresh());
+    settle(&shell, cx);
+    let edge = cx.debug_bounds("edge-sidebar").expect("the sidebar has a drag edge");
+    let at = edge.center();
+    let before = shell.read_with(cx, |s, _| s.sidebar_width);
+    cx.simulate_mouse_down(at, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    cx.simulate_mouse_move(at + gpui_kit::point(px(60.), px(0.)), gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    cx.simulate_mouse_move(at + gpui_kit::point(px(120.), px(0.)), gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    cx.simulate_mouse_up(at + gpui_kit::point(px(120.), px(0.)), gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    let after = shell.read_with(cx, |s, _| s.sidebar_width);
+    atelier_ui::scale::set_zoom(1.);
+    // 120 window pixels at a zoom of 1.5 are 80 design pixels (within the clamp the sidebar keeps).
+    assert!((after - before - 80.).abs() < 3., "the sidebar went from {before} to {after}");
 }

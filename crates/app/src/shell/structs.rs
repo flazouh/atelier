@@ -85,7 +85,7 @@ pub struct Shell {
     meter: Option<Rc<std::cell::RefCell<crate::frame_meter::Meter>>>,
     /// The sidebar's and the right pane's widths as the reader dragged them; the window's width may
     /// show them narrower (`fit::widths`).
-    sidebar_width: f32,
+    pub(super) sidebar_width: f32,
     pub(super) right_width: f32,
     /// Where the bar at the foot starts, and the widths of its cards under the sidebar and the right pane: set as the panes are laid out.
     pub(super) footer_plan: (f32, Option<f32>, Option<f32>),
@@ -1947,7 +1947,11 @@ impl Shell {
                 Edge::Sidebar => d.right(px(-4.)),
                 Edge::Right => d.left(px(-4.)),
             };
-            d.absolute()
+            d.debug_selector(match edge {
+                Edge::Sidebar => || "edge-sidebar".into(),
+                Edge::Right => || "edge-right".into(),
+            })
+            .absolute()
                 .top_0()
                 .bottom_0()
                 .w(px(8.))
@@ -1962,10 +1966,11 @@ impl Shell {
             .size_full()
             .min_h_0()
             .on_drag_move::<Edge>(cx.listener(|this, event: &gpui_kit::DragMoveEvent<Edge>, _, cx| {
-                let x = f32::from(event.event.position.x - event.bounds.origin.x) - atelier_ui::view_rail::WIDTH;
+                // The pointer is in window pixels; the widths are design pixels, which the zoom turns into window pixels.
+                let x = atelier_ui::scale::design(event.event.position.x - event.bounds.origin.x) - atelier_ui::view_rail::WIDTH;
                 match event.drag(cx) {
                     Edge::Sidebar => this.sidebar_width = x.clamp(super::fit::SIDEBAR_LEAST, super::fit::SIDEBAR_MOST),
-                    Edge::Right => this.right_width = (f32::from(event.bounds.size.width) - x).clamp(super::fit::RIGHT_LEAST, super::fit::RIGHT_MOST),
+                    Edge::Right => this.right_width = (atelier_ui::scale::design(event.bounds.size.width) - x).clamp(super::fit::RIGHT_LEAST, super::fit::RIGHT_MOST),
                 }
                 cx.notify();
             }))

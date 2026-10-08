@@ -12,8 +12,8 @@ fn a_host_is_named_as_builds_are() {
 
 #[test]
 fn the_config_offers_named_hosts_not_patterns() {
-    let config = "Host *\n  ServerAliveInterval 30\nHost hp-agent hp\n  HostName 10.0.0.2\nhost air\nHost !bad *.corp pro\n# Host commented\n";
-    assert_eq!(hosts_in_config(config), ["hp-agent", "hp", "air", "pro"]);
+    let config = "Host *\n  ServerAliveInterval 30\nHost dev-host hp\n  HostName 10.0.0.2\nhost air\nHost !bad *.corp pro\n# Host commented\n";
+    assert_eq!(hosts_in_config(config), ["dev-host", "hp", "air", "pro"]);
 }
 /// The helper for a host is looked for, in order: the folder a developer names, next to the app by the
 /// host's platform, in the Mac bundle's resources, the plain copy next to the app for a host of its own
@@ -43,8 +43,8 @@ fn the_helper_is_looked_for_without_setup() {
 #[test]
 fn no_helper_says_what_to_do() {
     let linux = Platform { system: "linux".into(), arch: "x86_64".into() };
-    let words = missing_words("hp-agent", &linux);
-    assert!(words.contains("hp-agent") && words.contains("Linux x86_64"), "{words}");
+    let words = missing_words("dev-host", &linux);
+    assert!(words.contains("dev-host") && words.contains("Linux x86_64"), "{words}");
     assert!(!words.contains("ATELIER_REMOTE_DIR"), "{words}");
     assert!(words.contains("tools/build-remote.sh"), "{words}");
 }
@@ -131,7 +131,7 @@ fn an_outdated_helper_is_told_as_outdated_not_as_missing() {
     assert_eq!(first_found(&[none.clone(), old.clone()]), Some((old.clone(), Some(6))));
     assert_eq!(first_found(&[none]), None);
     let linux = Platform { system: "linux".into(), arch: "x86_64".into() };
-    let words = outdated_words("hp-agent", &linux, &old, Some(6));
+    let words = outdated_words("dev-host", &linux, &old, Some(6));
     assert!(words.contains("protocol 6") && words.contains(&format!("protocol {}", crate::protocol::VERSION)), "{words}");
     assert!(words.contains(&old.display().to_string()) && words.contains("build-remote.sh"), "{words}");
     assert!(!words.contains("no helper built"), "{words}");

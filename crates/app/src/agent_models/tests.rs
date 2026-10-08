@@ -31,8 +31,26 @@ fn a_reported_list_is_ordered_and_the_default_starts_new_sessions(cx: &mut TestA
     let known = vec![("claude-opus-5-5".to_string(), "Opus 5.5".to_string()), ("claude-sonnet-5-5".to_string(), "Sonnet 5.5".to_string())];
     with(AgentModels { known: known.clone(), ..AgentModels::default() }, cx);
     assert_eq!(cx.update(|cx| start_model(&claude(), cx)), Some("claude-opus-5-5".into()), "the first, with no default");
-    with(AgentModels { known, default: Some("claude-sonnet-5-5".into()), order: vec!["claude-sonnet-5-5".into()] }, cx);
+    with(AgentModels { known, default: Some("claude-sonnet-5-5".into()), order: vec!["claude-sonnet-5-5".into()], ..AgentModels::default() }, cx);
     let (list, start) = cx.update(|cx| (offered(&claude(), cx), start_model(&claude(), cx)));
     assert_eq!(list.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["claude-sonnet-5-5", "claude-opus-5-5"]);
     assert_eq!(start, Some("claude-sonnet-5-5".into()));
+}
+
+/// A hidden model leaves the picker's list and stays in Settings' list; starring a hidden one brings it back.
+#[gpui_kit::test]
+fn a_hidden_model_is_in_settings_and_not_in_the_picker(cx: &mut TestAppContext) {
+    let known = vec![("claude-opus-5-5".to_string(), "Opus 5.5".to_string()), ("claude-sonnet-5-5".to_string(), "Sonnet 5.5".to_string())];
+    cx.update(|cx| {
+        let mut all = ModelPrefs::default();
+        all.0.insert("claude-code".into(), AgentModels { known, ..AgentModels::default() });
+        cx.set_global(all);
+        super::set_hidden("claude-code", "claude-sonnet-5-5", true, cx);
+    });
+    let (picker, settings) = cx.update(|cx| (offered(&claude(), cx), super::all(&claude(), cx)));
+    assert_eq!(picker.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["claude-opus-5-5"], "the picker leaves it out");
+    assert_eq!(settings.iter().map(|(m, hidden)| (m.id.as_str(), *hidden)).collect::<Vec<_>>(), [("claude-opus-5-5", false), ("claude-sonnet-5-5", true)]);
+    cx.update(|cx| super::choose_default("claude-code", "claude-sonnet-5-5", cx));
+    let picker = cx.update(|cx| offered(&claude(), cx));
+    assert_eq!(picker.len(), 2, "starring it brings it back");
 }

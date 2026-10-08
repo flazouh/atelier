@@ -12,7 +12,7 @@ for dir in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
 done
 export PATH
 # The tests make their temporary folders in a folder of this run, not in the shared /tmp, and must remove them:
-# a run that leaves any behind fails. (A leak once filled the inodes of /tmp on hp-agent.) The folder is outside
+# a run that leaves any behind fails. (A leak once filled the inodes of /tmp on dev-host.) The folder is outside
 # the checkout, because a test that expects "no git repository" would find this one above it. The gallery keeps
 # fixtures under fixed names on purpose, and the claude program and rust-analyzer keep their own folders; none of these count.
 run_tmp=$(mktemp -d /tmp/atelier-check.XXXXXX)

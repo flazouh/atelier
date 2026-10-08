@@ -150,7 +150,7 @@ setup (see `crates/remote/src/ssh.rs`, `candidates`).
 2. On the Mac, copy both files, then build the bundle from a checkout:
 
    ```
-   scp 'alex@hp-agent:shots/release/atelier-remote-linux-x86_64*' /tmp/
+   scp 'user@dev-host:shots/release/atelier-remote-linux-x86_64*' /tmp/
    tools/bundle-mac.sh /tmp/atelier-remote-linux-x86_64
    ```
 
@@ -266,7 +266,7 @@ servers all go through the same calls. The servers run on the host, started thro
 - The host runs each request on a thread of its own, so a slow search never holds up a read. A
   process's stdin is fed in order by a thread of its own. Its stderr's last 64 KB is kept.
 - Every call has a timeout: 60 s for a listing, a search or git, 30 s for the rest. A timeout is an
-  error that names the host ("hp-agent did not answer in 30 s").
+  error that names the host ("dev-host did not answer in 30 s").
 
 ### Connecting
 
@@ -287,7 +287,7 @@ The copy to upload comes from `$ATELIER_REMOTE_DIR/<system>-<arch>/atelier-remot
 development the HP builds the linux-x86_64 copy (`cargo build --release -p atelier-remote`); a Mac
 app that opens a project on the HP points `ATELIER_REMOTE_DIR` at a folder holding that file as
 `linux-x86_64/atelier-remote`. `tools/build-remote.sh` builds it and prints that folder; it sets its
-own PATH, so a plain `ssh hp-agent ~/code/local/atelier/tools/build-remote.sh` works.
+own PATH, so a plain `ssh dev-host ~/code/local/atelier/tools/build-remote.sh` works.
 
 ### Failures
 
@@ -295,7 +295,7 @@ own PATH, so a plain `ssh hp-agent ~/code/local/atelier/tools/build-remote.sh` w
 | --- | --- |
 | Host unreachable | The form shows ssh's words: "ssh: Could not resolve hostname …". |
 | Auth fails | The form shows "Permission denied (publickey)." |
-| The connection drops, or atelier-remote crashes | Every waiting call fails at once. A banner says "Lost hp-agent:/path (why). Reconnecting; your unsaved edits are kept here." The client dials again, backing off from 0.5 s to 30 s; back, it says hello, restores the watch, lists the tree, and starts each open file's language server again. Tabs keep their text and dirty marks, and a save after the reconnect writes them. |
+| The connection drops, or atelier-remote crashes | Every waiting call fails at once. A banner says "Lost dev-host:/path (why). Reconnecting; your unsaved edits are kept here." The client dials again, backing off from 0.5 s to 30 s; back, it says hello, restores the watch, lists the tree, and starts each open file's language server again. Tabs keep their text and dirty marks, and a save after the reconnect writes them. |
 | A slow link | A file being read shows as a pending tab with a spinner; a call that runs out of time says so in the status line. |
 
 Opening: the start screen's "Open over SSH…" (⌘⇧O) offers the hosts in `~/.ssh/config` as chips
@@ -304,16 +304,16 @@ command line. Recent remote projects reopen from the start screen.
 
 ## QA, M1b
 
-On the HP under Xvfb, the app opening `/tmp/qa-atelier` over `ssh hp-agent` (the HP to itself).
+On the HP under Xvfb, the app opening `/tmp/qa-atelier` over `ssh dev-host` (the HP to itself).
 The shots and recordings are in `~/shots/m1b/` on the HP.
 
 | What | Seen |
 | --- | --- |
-| Open over ssh | `remote-open.png`: `hp-agent:/tmp/qa-atelier`, main, 1008 files listed in 12 ms |
+| Open over ssh | `remote-open.png`: `dev-host:/tmp/qa-atelier`, main, 1008 files listed in 12 ms |
 | Open a file, hover, definition, edit, save | `qa-remote.mp4`, `qa-*.png`: rust-analyzer running on the host; `Instant`'s card; `bind_keys` opens `shell.rs`; "Saved crates/app/src/shell.rs"; `git diff` on the host shows the line |
 | The connection drops mid-edit (atelier-remote killed with -9) | `failures.mp4`, `f-1-down.png` (the banner), `f-2-back.png` ("Reconnected", the dirty dot kept), `f-3-saved.png` (the edit saved after), `f-6-server-back.png` (rust-analyzer ready again) |
-| A stalled host (SIGSTOP) | `f-4-pending.png` (the pending tab), `f-5-timeout.png` ("hp-agent did not answer in 30 s") |
-| The form | `form-*.png`: the config's hosts; an unknown host; `nobody@hp-agent` refused; connecting; open |
+| A stalled host (SIGSTOP) | `f-4-pending.png` (the pending tab), `f-5-timeout.png` ("dev-host did not answer in 30 s") |
+| The form | `form-*.png`: the config's hosts; an unknown host; `nobody@dev-host` refused; connecting; open |
 
 ## Agent sessions (M2)
 
@@ -361,7 +361,7 @@ agent's past sessions (`Backend::sessions`, read off the UI thread); a session o
 ## QA, M2
 
 A real Claude Code session on the HP (claude 2.1.284, logged in), in `/tmp/qa-m2`, and one on
-`ssh://hp-agent/tmp/qa-m2-remote`. The shots and recordings are in `~/shots/m2/` on the HP.
+`ssh://dev-host/tmp/qa-m2-remote`. The shots and recordings are in `~/shots/m2/` on the HP.
 
 | What | Seen |
 | --- | --- |

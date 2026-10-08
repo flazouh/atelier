@@ -6,7 +6,7 @@ const NOW: i64 = 1_791_000_000;
 fn output(limits: &str) -> String {
     format!(
         "{}\n{}\n{}\n",
-        r#"{"id":1,"result":{"userAgent":"atelier/0.160.0","codexHome":"/home/alex/.codex"}}"#,
+        r#"{"id":1,"result":{"userAgent":"atelier/0.160.0","codexHome":"/home/user/.codex"}}"#,
         r#"{"method":"account/updated","params":{"authMode":"chatgpt","planType":"free"}}"#,
         format_args!(r#"{{"id":2,"result":{{"rateLimits":{limits}}}}}"#),
     )

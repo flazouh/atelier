@@ -47,11 +47,11 @@ fn opening_a_project_moves_it_first_once_and_the_list_stays_short() {
     s.opened(local(5));
     assert_eq!(s.recent[0], local(5));
     assert_eq!(s.recent.iter().filter(|l| **l == local(5)).count(), 1);
-    let remote = Location::Ssh { host: "hp-agent".into(), path: "/home/alex/code/atelier".into() };
+    let remote = Location::Ssh { host: "dev-host".into(), path: "/home/user/code/atelier".into() };
     s.opened(remote.clone());
     assert_eq!(s.recent[0], remote);
     assert_eq!(remote.name(), "atelier");
-    assert_eq!(remote.place(), "hp-agent:/home/alex/code/atelier");
+    assert_eq!(remote.place(), "dev-host:/home/user/code/atelier");
 }
 
 #[test]
@@ -240,7 +240,7 @@ fn a_default_that_the_list_no_longer_has_is_none() {
 #[test]
 fn the_models_survive_a_save_and_an_older_file_has_none() {
     let mut settings = Settings::default();
-    settings.agent_models.insert("claude-code".into(), AgentModels { default: Some("x".into()), order: vec!["x".into()], known: pairs(&[("x", "X")]) });
+    settings.agent_models.insert("claude-code".into(), AgentModels { default: Some("x".into()), order: vec!["x".into()], known: pairs(&[("x", "X")]), hidden: vec!["y".into()] });
     let back: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
     assert_eq!(back.agent_models, settings.agent_models);
     assert!(serde_json::from_str::<Settings>("{}").unwrap().agent_models.is_empty());
@@ -255,4 +255,13 @@ fn the_changelog_of_a_downloaded_update_is_kept_and_other_keys_stay() {
     assert_eq!(again["whats_new"]["version"], "0.1.4");
     assert_eq!(again["future_key"], 1, "a key this version does not know is kept");
     assert_eq!(Settings::default().whats_new, None);
+}
+
+#[test]
+fn a_hidden_model_leaves_the_picker_but_the_default_and_the_last_one_stay() {
+    let list = pairs(&[("a", "A"), ("b", "B"), ("c", "C")]);
+    let prefs = AgentModels { hidden: vec!["b".into(), "c".into()], default: Some("c".into()), ..AgentModels::default() };
+    assert_eq!(prefs.visible(&list), pairs(&[("a", "A"), ("c", "C")]), "b is hidden, the default c is not");
+    let all_hidden = AgentModels { hidden: vec!["a".into(), "b".into(), "c".into()], ..AgentModels::default() };
+    assert_eq!(all_hidden.visible(&list), list, "a picker is never empty");
 }

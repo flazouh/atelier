@@ -136,6 +136,8 @@ pub struct AgentModels {
     pub order: Vec<String>,
     /// `(id, name)` for each model the agent last reported; empty until it has.
     pub known: Vec<(String, String)>,
+    /// Ids the reader left out of the picker. The list in Settings keeps them, to be shown again.
+    pub hidden: Vec<String>,
 }
 
 impl AgentModels {
@@ -145,6 +147,13 @@ impl AgentModels {
         let mut out: Vec<(String, String)> = self.order.iter().filter_map(|id| base.iter().find(|(b, _)| b == id).cloned()).collect();
         out.extend(base.iter().filter(|(id, _)| !self.order.contains(id)).cloned());
         out
+    }
+
+    /// `list` without what the reader hid. The default is never left out, and a list that would be empty stays whole.
+    pub fn visible(&self, list: &[(String, String)]) -> Vec<(String, String)> {
+        let shown: Vec<(String, String)> =
+            list.iter().filter(|(id, _)| !self.hidden.contains(id) || self.default.as_ref() == Some(id)).cloned().collect();
+        if shown.is_empty() { list.to_vec() } else { shown }
     }
 
     /// The default, when it is a model of `list`.
