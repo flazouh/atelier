@@ -6,6 +6,7 @@ mod consts;
 mod impls;
 mod structs;
 mod traits;
+mod types;
 
 pub use consts::{LOAD_EVERY, PROVIDERS_EVERY};
 pub use structs::{SysinfoProbe, Vitals};

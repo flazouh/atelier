@@ -88,10 +88,10 @@ pub(super) fn changes_badge(uncommitted: Option<&crate::history::Read<Vec<crate:
 /// at the right of the session area, or left of the Settings button when that area reaches the window's edge.
 pub(super) fn tab_room(width: f32, session_right: Option<f32>) -> f32 {
     // The room ends 48 px short of the window's edge (the Settings button, its gap and the bar's padding); the ⋯ is 28 wide.
-    let region_right = width - 48. - super::types::VERSION_ROOM;
+    let region_right = width - 48.;
     let more_left = match session_right {
-        Some(right) => (right - 36.).min(width - 72. - super::types::VERSION_ROOM),
-        None => width - 48. - super::types::VERSION_ROOM - 28.,
+        Some(right) => (right - 36.).min(width - 72.),
+        None => width - 48. - 28.,
     };
     (region_right - (more_left - 8.)).max(0.)
 }
