@@ -54,13 +54,3 @@ fn every_heading_word_names_one_of_the_six_kinds() {
     assert_eq!(kind("Design"), Design);
     assert_eq!(kind("Something else"), Improved, "an unknown heading is improved");
 }
-#[test]
-fn each_kind_has_its_own_palette_colour() {
-    let kinds = ReleaseKind::ALL;
-    for (i, a) in kinds.iter().enumerate() {
-        for b in &kinds[i + 1..] {
-            let theme = atelier_ui::theme::Theme::light();
-            assert_ne!(super::super::kind_color(*a, &theme), super::super::kind_color(*b, &theme), "{a:?} and {b:?} share a colour");
-        }
-    }
-}

@@ -2,7 +2,7 @@
 //! goes back to the pool when its subagent ends (the subagent keeps showing it), and only when every colour is in use does one repeat (the least used).
 use gpui_kit::Hsla;
 
-use crate::palette::{Hue, hue_at};
+use atelier_palette::{Hue, hue_at};
 #[cfg(test)]
 mod tests;
 

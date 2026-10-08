@@ -489,6 +489,7 @@ dependencies = [
  "atelier-forge",
  "atelier-i18n",
  "atelier-lsp",
+ "atelier-palette",
  "atelier-pr-view",
  "atelier-project",
  "atelier-remote",
@@ -545,6 +546,7 @@ dependencies = [
  "atelier-agents",
  "atelier-editor",
  "atelier-lsp",
+ "atelier-palette",
  "atelier-pr-view",
  "atelier-project",
  "atelier-settings",
@@ -573,6 +575,14 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
+]
+
+[[package]]
+name = "atelier-palette"
+version = "0.1.5"
+dependencies = [
+ "atelier-ui",
+ "gpui-kit",
 ]
 
 [[package]]

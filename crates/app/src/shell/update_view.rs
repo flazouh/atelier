@@ -80,7 +80,7 @@ impl Shell {
         }
         let sheet = ReleaseSheet::new("update-sheet", version)
             .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)))
-            .kind_colors(crate::updater::kind_color)
+            .kind_colors(atelier_palette::kind_color)
             .on_later(move |_, cx| drop(later.update(cx, |shell, cx| shell.update_later(cx))))
             .on_install(move |_, cx| drop(install.update(cx, |shell, cx| shell.update_install(cx))));
         Some(
@@ -104,7 +104,7 @@ impl Shell {
         }
         let sheet = ReleaseSheet::new("whats-new-sheet", SharedString::from(record.version.clone()))
             .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)))
-            .kind_colors(crate::updater::kind_color)
+            .kind_colors(atelier_palette::kind_color)
             .labels("Close", "")
             .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.dismiss_whats_new(cx))));
         Some(
@@ -136,7 +136,7 @@ impl Shell {
         let sheet = ReleaseSheet::new("changelog-sheet", SharedString::from(running.clone()))
             .notes(current)
             .earlier(earlier)
-            .kind_colors(crate::updater::kind_color)
+            .kind_colors(atelier_palette::kind_color)
             .labels("Close", "")
             .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.close_changelog(cx))));
         Some(

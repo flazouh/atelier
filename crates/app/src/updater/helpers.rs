@@ -45,21 +45,6 @@ fn kind_of(heading: &str) -> atelier_ui::ReleaseKind {
         Improved
     }
 }
-/// The colour of a kind of note, from the app's palette: green for added, purple for improved, orange for faster, red for
-/// fixed, blue for changed and pink for design, each as dark as the page needs for it to read.
-pub fn kind_color(kind: atelier_ui::ReleaseKind, theme: &atelier_ui::theme::Theme) -> gpui_kit::Hsla {
-    use crate::palette::Hue;
-    use atelier_ui::ReleaseKind::{Added, Changed, Design, Faster, Fixed, Improved};
-    match kind {
-        Added => Hue::Green,
-        Improved => Hue::Purple,
-        Faster => Hue::Orange,
-        Fixed => Hue::Red,
-        Changed => Hue::Blue,
-        Design => Hue::Pink,
-    }
-    .on(theme.popover)
-}
 /// The lines of a changelog written in markdown. A bullet that opens with a bold lead ("- **Fixes:** a row fills the
 /// width") gives its lead and its text, and takes its kind from the last `###` heading ("### New", "### Improved",
 /// "### Faster", "### Fixed", "### Changed", "### Design"; Improved before any). Other headings are the sheet's own, so they are dropped. A changelog with no bullet

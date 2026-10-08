@@ -12,7 +12,6 @@ mod activity;
 mod changelog;
 mod agent_models;
 mod agent_session;
-mod palette;
 mod project_icons;
 mod providers;
 mod vitals;
