@@ -11,12 +11,17 @@ fn an_index_past_the_end_wraps_round() {
     assert_eq!(hue_at(11), Hue::Blue);
 }
 #[test]
-fn a_hue_on_a_light_page_is_made_darker_until_it_reads_and_on_a_dark_one_it_is_left_alone() {
-    let light = atelier_ui::theme::Theme::light().background;
-    let dark = atelier_ui::theme::Theme::dark().background;
+fn a_hue_reads_on_every_page_it_is_used_on_and_moves_the_way_the_page_needs() {
+    let (light, dark) = (atelier_ui::theme::Theme::light(), atelier_ui::theme::Theme::dark());
     for hue in Hue::ALL {
-        assert!(atelier_ui::theme::contrast(hue.on(light), light) >= 4.5, "{hue:?} reads on a light page");
-        assert!(atelier_ui::theme::contrast(hue.on(dark), dark) >= 4.5, "{hue:?} reads on a dark page");
-        assert_eq!(hue.on(dark), hue.hsla(), "{hue:?} is as it is on a dark page");
+        for page in [light.background, light.popover, light.card, dark.background, dark.popover, dark.card] {
+            let ink = hue.on(page);
+            assert!(atelier_ui::theme::contrast(ink, page) >= 4.5, "{hue:?} reads on {page:?}");
+            if page.l > 0.5 {
+                assert!(ink.l <= hue.hsla().l, "{hue:?} is no lighter on a light page");
+            } else {
+                assert!(ink.l >= hue.hsla().l, "{hue:?} is no darker on a dark page");
+            }
+        }
     }
 }
