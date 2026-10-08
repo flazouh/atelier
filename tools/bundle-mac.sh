@@ -78,7 +78,7 @@ if [ "$release" = 1 ]; then
   <key>SUEnableAutomaticChecks</key><true/>
   <key>SUAutomaticallyUpdate</key><false/>
   <key>SUAllowsAutomaticUpdates</key><false/>
-  <key>SUScheduledCheckInterval</key><integer>86400</integer>"
+  <key>SUScheduledCheckInterval</key><integer>3600</integer>"
   case "$feed" in
     http://*) update_keys="$update_keys
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>" ;;

@@ -43,13 +43,25 @@ impl Shell {
             UpdateState::Installing => {
                 Some(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("Installing…").into_any_element())
             }
-            UpdateState::Idle | UpdateState::Checking { .. } => None,
+            UpdateState::Idle | UpdateState::Checking { .. } => self.whats_new.as_ref().map(|_| {
+                let this = cx.entity().downgrade();
+                Button::new("whats-new-chip")
+                    .debug_name("whats-new-chip")
+                    .label("What's new")
+                    .variant(ButtonVariant::Ghost)
+                    .size(ButtonSize::Sm)
+                    .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.show_whats_new(cx))))
+                    .into_any_element()
+            }),
         }
     }
 
     /// The panel over the window while the reader reads the changelog: Later keeps the update for the next quit, and
     /// Restart installs it now. Escape and a press outside are Later.
     pub(super) fn update_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.whats_new_open {
+            return self.whats_new_panel(cx);
+        }
         let UpdateState::Ready { version, notes } = &self.update else { return None };
         if !self.update_modal {
             return None;
@@ -70,6 +82,29 @@ impl Shell {
                 .flush()
                 .focus(&self.update_focus)
                 .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.update_later(cx))))
+                .child(div().track_focus(&self.update_focus).child(sheet))
+                .into_any_element(),
+        )
+    }
+
+    /// The changelog of the update this version came from, after the restart: the same sheet with only Close.
+    fn whats_new_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let record = self.whats_new.as_ref()?;
+        let (close, done) = (cx.entity().downgrade(), cx.entity().downgrade());
+        let mut lines = release_notes(&record.notes);
+        if lines.is_empty() {
+            lines.push(crate::updater::NoteLine { lead: NO_NOTES.into(), text: String::new() });
+        }
+        let sheet = ReleaseSheet::new("whats-new-sheet", SharedString::from(record.version.clone()))
+            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text)))
+            .labels("Close", "")
+            .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.dismiss_whats_new(cx))));
+        Some(
+            Modal::new("whats-new")
+                .width(520.)
+                .flush()
+                .focus(&self.update_focus)
+                .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.dismiss_whats_new(cx))))
                 .child(div().track_focus(&self.update_focus).child(sheet))
                 .into_any_element(),
         )

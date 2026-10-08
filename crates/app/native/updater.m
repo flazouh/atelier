@@ -6,10 +6,14 @@
 // Sparkle is found at run time, not at link time, so a build from source (which has no Sparkle) runs and says it cannot
 // update. The Rust side is src/updater/impls/sparkle_driver.rs.
 //
-// An update found is downloaded at once: the reader chooses only when to restart. The events, in the order they come:
+// An update found is downloaded at once: the reader chooses only when to restart. When it is ready and Atelier is in the
+// background, the system shows a notification; a press on it brings Atelier forward and opens the update (the `focus`
+// event). Besides Sparkle's own hourly look, the app looks again each time the reader comes back to it, at most once in ten
+// minutes. The events, in the order they come:
 //   checking {user}, found {version, notes, user}, downloading {fraction}, extracting {fraction}, ready, installing,
 //   up_to_date, failed {message}, idle, focus.
 #import <AppKit/AppKit.h>
+#import <UserNotifications/UserNotifications.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #include <stdbool.h>
@@ -31,6 +35,13 @@ static void (^ready_reply)(NSInteger);
 static uint64_t expected_length;
 static uint64_t received_length;
 static double last_fraction;
+static NSString *found_version;
+static NSDate *last_activation_check;
+static id notification_delegate;
+static id activation_observer;
+// The shortest time between two looks that the reader's return to the app causes.
+static const NSTimeInterval ACTIVATION_GAP = 600;
+static NSString *const NOTIFICATION_ID = @"atelier-update-ready";
 // Whether Sparkle may restart the app. Sparkle asks the app once, through the postpone call below, and after that it
 // installs on any press of Install and Relaunch, so a no must also stop that second press: this is NO from the moment
 // the app is asked until it says yes, or until the update ends.
@@ -61,6 +72,71 @@ static void emit_download(BOOL force) {
     }
 }
 
+// Whether this process is the packaged app: the system's notifications refuse a process that is not one.
+static BOOL can_notify(void) {
+    NSBundle *main = [NSBundle mainBundle];
+    return main.bundleIdentifier != nil && [main.bundlePath hasSuffix:@".app"];
+}
+
+@interface AtelierNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
+@end
+
+@implementation AtelierNotificationDelegate
+// A press on the notification: Atelier comes forward and shows the update.
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+    didReceiveNotificationResponse:(UNNotificationResponse *)response
+             withCompletionHandler:(void (^)(void))completionHandler {
+    [NSApp activateIgnoringOtherApps:YES];
+    emit(@{@"kind": @"focus"});
+    completionHandler();
+}
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
+    if (@available(macOS 11.0, *)) {
+        completionHandler(UNNotificationPresentationOptionBanner);
+    } else {
+        completionHandler(UNNotificationPresentationOptionAlert);
+    }
+}
+@end
+
+// Tells the reader, through the system, that the update is ready, when Atelier is not the app in front. The first time, the
+// system asks whether Atelier may send notifications; a no is the end of it, and the title bar's button is still there.
+static void notify_ready(void) {
+    if ([NSApp isActive] || !can_notify()) {
+        NSLog(@"atelier-notify: not sent (active=%d, packaged=%d)", [NSApp isActive], can_notify());
+        return;
+    }
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+    NSString *version = found_version.length > 0 ? found_version : @"";
+    [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
+                          completionHandler:^(BOOL granted, NSError *error) {
+        NSLog(@"atelier-notify: permission granted=%d error=%@", granted, error);
+        if (!granted) {
+            return;
+        }
+        UNMutableNotificationContent *content = [UNMutableNotificationContent new];
+        content.title = version.length > 0 ? [NSString stringWithFormat:@"Atelier %@ is ready", version] : @"An Atelier update is ready";
+        content.body = @"Open Atelier to read what is new and restart.";
+        UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:NOTIFICATION_ID content:content trigger:nil];
+        [center addNotificationRequest:request withCompletionHandler:^(NSError *posted) {
+            NSLog(@"atelier-notify: posted error=%@", posted);
+        }];
+    }];
+}
+
+// The notification is stale once the update is installed or put aside.
+static void clear_notification(void) {
+    if (!can_notify()) {
+        return;
+    }
+    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+    [center removeDeliveredNotificationsWithIdentifiers:@[NOTIFICATION_ID]];
+    [center removePendingNotificationRequestsWithIdentifiers:@[NOTIFICATION_ID]];
+}
+
 @interface AtelierUserDriver : NSObject
 @end
 
@@ -85,6 +161,7 @@ static void emit_download(BOOL force) {
         return;
     }
     NSString *version = [item valueForKey:@"displayVersionString"] ?: @"";
+    found_version = version;
     NSString *notes = [item valueForKey:@"itemDescription"];
     BOOL user = [[state valueForKey:@"userInitiated"] boolValue];
     emit(@{@"kind": @"found", @"version": version, @"notes": notes ?: [NSNull null], @"user": @(user)});
@@ -130,6 +207,7 @@ static void emit_download(BOOL force) {
 - (void)showReadyToInstallAndRelaunch:(void (^)(NSInteger))reply {
     ready_reply = [reply copy];
     emit(@{@"kind": @"ready"});
+    notify_ready();
 }
 
 - (void)showInstallingUpdateWithApplicationTerminated:(BOOL)applicationTerminated retryTerminatingApplication:(void (^)(void))retryTerminatingApplication {
@@ -142,6 +220,7 @@ static void emit_download(BOOL force) {
 
 - (void)dismissUpdateInstallation {
     ready_reply = nil;
+    clear_notification();
     emit(@{@"kind": @"idle"});
 }
 
@@ -210,12 +289,27 @@ bool atelier_updater_start(atelier_relaunch_callback relaunch, atelier_event_cal
     if (updater == nil) {
         return false;
     }
+    if (can_notify()) {
+        notification_delegate = [AtelierNotificationDelegate new];
+        [UNUserNotificationCenter currentNotificationCenter].delegate = notification_delegate;
+    }
     NSError *error = nil;
     BOOL started = ((BOOL (*)(id, SEL, NSError **))objc_msgSend)(updater, NSSelectorFromString(@"startUpdater:"), &error);
     if (!started) {
         updater = nil;
         return false;
     }
+    // Sparkle looks on its own timer (hourly). Coming back to the app is a good moment too: look then, quietly.
+    activation_observer = [[NSNotificationCenter defaultCenter] addObserverForName:NSApplicationDidBecomeActiveNotification
+                                                                            object:nil
+                                                                             queue:[NSOperationQueue mainQueue]
+                                                                        usingBlock:^(NSNotification *note) {
+        if (updater == nil || (last_activation_check != nil && -[last_activation_check timeIntervalSinceNow] < ACTIVATION_GAP)) {
+            return;
+        }
+        last_activation_check = [NSDate date];
+        ((void (*)(id, SEL))objc_msgSend)(updater, NSSelectorFromString(@"checkForUpdatesInBackground"));
+    }];
     return true;
 }
 
@@ -230,6 +324,7 @@ void atelier_updater_check(bool asked) {
 
 // The reader chose to restart: the downloaded update installs.
 void atelier_updater_install(void) {
+    clear_notification();
     void (^reply)(NSInteger) = ready_reply;
     ready_reply = nil;
     if (reply != nil) {
@@ -259,4 +354,11 @@ void atelier_updater_proceed(void) {
 // The app stays as it is: the update does not install, even on another press of Install and Relaunch.
 void atelier_updater_decline(void) {
     pending_install = nil;
+}
+
+// The version of the running bundle (CFBundleShortVersionString), the one the update feed is compared with; NULL when this
+// process is not a bundle.
+const char *atelier_bundle_version(void) {
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    return version.length > 0 ? version.UTF8String : NULL;
 }

@@ -127,6 +127,9 @@ pub struct Shell {
     /// Where an update stands, and whether its changelog is open in front of the reader.
     pub(super) update: crate::updater::UpdateState,
     pub(super) update_modal: bool,
+    /// The changelog of the update this version came from, shown once as a chip, and whether its sheet is open.
+    pub(super) whats_new: Option<atelier_settings::WhatsNew>,
+    pub(super) whats_new_open: bool,
     /// What the changelog panel holds focus with, so Escape reaches it.
     pub(super) update_focus: FocusHandle,
     /// The sessions the reader archived, by the agent's id.
@@ -198,6 +201,8 @@ impl Shell {
             layout_menu: false,
             update: crate::updater::UpdateState::default(),
             update_modal: false,
+            whats_new: Self::remembered_at_start(saved, cx),
+            whats_new_open: false,
             update_focus: cx.focus_handle(),
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             session_filter: None,

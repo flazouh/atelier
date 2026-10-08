@@ -247,6 +247,17 @@ fn the_models_survive_a_save_and_an_older_file_has_none() {
 }
 
 #[test]
+fn the_changelog_of_a_downloaded_update_is_kept_and_other_keys_stay() {
+    let text = r#"{"whats_new":{"version":"0.1.4","notes":"- **A:** b"},"future_key":1}"#;
+    let settings: Settings = serde_json::from_str(text).unwrap();
+    assert_eq!(settings.whats_new, Some(WhatsNew { version: "0.1.4".into(), notes: "- **A:** b".into() }));
+    let again: serde_json::Value = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+    assert_eq!(again["whats_new"]["version"], "0.1.4");
+    assert_eq!(again["future_key"], 1, "a key this version does not know is kept");
+    assert_eq!(Settings::default().whats_new, None);
+}
+
+#[test]
 fn a_hidden_model_leaves_the_picker_but_the_default_and_the_last_one_stay() {
     let list = pairs(&[("a", "A"), ("b", "B"), ("c", "C")]);
     let prefs = AgentModels { hidden: vec!["b".into(), "c".into()], default: Some("c".into()), ..AgentModels::default() };

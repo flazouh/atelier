@@ -75,9 +75,19 @@ pub struct Settings {
     pub sidebar_layout: SidebarSaved,
     /// What the reader chose for each agent's models, and the list the agent last reported, by the agent's backend name.
     pub agent_models: std::collections::BTreeMap<String, AgentModels>,
+    /// The changelog of the update the app downloaded last, kept so that the first start of that version can show it once.
+    pub whats_new: Option<WhatsNew>,
     /// Keys a newer or older atelier wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
+}
+
+/// An update the app downloaded: its version and its changelog.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WhatsNew {
+    pub version: String,
+    pub notes: String,
 }
 
 /// The agent panels' layout, as the window left it.

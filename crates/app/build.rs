@@ -7,4 +7,5 @@ fn main() {
     }
     cc::Build::new().file("native/updater.m").flag("-fobjc-arc").compile("atelier_updater");
     println!("cargo:rustc-link-lib=framework=AppKit");
+    println!("cargo:rustc-link-lib=framework=UserNotifications");
 }
