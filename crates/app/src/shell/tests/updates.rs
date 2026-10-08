@@ -248,7 +248,7 @@ fn the_first_start_of_an_updated_version_shows_a_chip_whose_sheet_has_only_close
     settle(&shell, cx);
     assert!(cx.debug_bounds("release-sheet").is_some(), "a press opens it");
     assert!(cx.debug_bounds("release-install").is_none(), "with nothing to restart");
-    let close = cx.debug_bounds("release-later").expect("Close is there");
+    let close = cx.debug_bounds("release-close").expect("Close is there");
     cx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("release-sheet").is_none() && cx.debug_bounds("whats-new-chip").is_none(), "Close removes both");
