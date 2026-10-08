@@ -1196,3 +1196,19 @@ fn a_session_touches_the_files_it_changed_and_the_folders_above_them(cx: &mut Te
         assert!(!s.touches("b.rs", false) && !s.touches("other", true));
     });
 }
+/// The reply box has a microphone, and its stop and cancel events do nothing when no press of its own is recording.
+#[gpui_kit::test]
+fn the_reply_box_stop_and_cancel_do_nothing_without_a_press(cx: &mut TestAppContext) {
+    use atelier_ui::{SelectionReplyEvent, VoiceInputEvent};
+    let (session, _fake, cx) = start(cx, vec![vec![ended()]], false);
+    cx.update(|_, cx| {
+        let reply = session.read(cx).reply.clone();
+        reply.update(cx, |_, cx| cx.emit(SelectionReplyEvent::Dictate(VoiceInputEvent::Stop)));
+        reply.update(cx, |_, cx| cx.emit(SelectionReplyEvent::DictationCancel));
+    });
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        let s = session.read(cx);
+        assert_eq!(s.reply.read(cx).voice_mode(), atelier_ui::VoiceMode::Idle);
+    });
+}
