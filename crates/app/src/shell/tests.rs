@@ -106,6 +106,30 @@ fn settings_opens_from_the_top_right_and_back_closes_it(cx: &mut TestAppContext)
     assert!(shell.read_with(cx, |s, _| s.settings.is_none()), "Back closes it");
 }
 
+/// A drag inside the conversation offers the reply box. A drag on the Settings page, which lies over the conversation, does
+/// not: the box belongs to the words under the reader's pointer, not to a window the page covers.
+#[gpui_kit::test]
+fn a_drag_on_the_settings_page_does_not_offer_a_reply_to_the_conversation_under_it(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let (from, to) = (gpui_kit::point(px(700.), px(400.)), gpui_kit::point(px(900.), px(500.)));
+    let drag = |cx: &mut gpui_kit::VisualTestContext| {
+        cx.simulate_mouse_down(from, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+        cx.simulate_mouse_move(to, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+        cx.simulate_mouse_up(to, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+        settle(&shell, cx);
+    };
+    drag(cx);
+    assert!(cx.debug_bounds("selection-reply-box").is_some(), "a drag in the conversation offers the reply box");
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("selection-reply-box").is_none(), "Escape drops it");
+    let gear = cx.debug_bounds("settings-entry").expect("the Settings button is drawn");
+    cx.simulate_click(gear.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(shell.read_with(cx, |s, _| s.settings.is_some()));
+    drag(cx);
+    assert!(cx.debug_bounds("selection-reply-box").is_none(), "no reply box over the Settings page");
+}
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
 fn a_notice_floats_and_goes_after_a_few_seconds(cx: &mut TestAppContext) {
