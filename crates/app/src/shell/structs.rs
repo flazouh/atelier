@@ -130,6 +130,8 @@ pub struct Shell {
     /// The changelog of the update this version came from, shown once as a chip, and whether its sheet is open.
     pub(super) whats_new: Option<atelier_settings::WhatsNew>,
     pub(super) whats_new_open: bool,
+    /// The changelog the version in the title bar opens.
+    pub(super) changelog_open: bool,
     /// What the changelog panel holds focus with, so Escape reaches it.
     pub(super) update_focus: FocusHandle,
     /// The sessions the reader archived, by the agent's id.
@@ -203,6 +205,7 @@ impl Shell {
             update_modal: false,
             whats_new: Self::remembered_at_start(saved, cx),
             whats_new_open: false,
+            changelog_open: false,
             update_focus: cx.focus_handle(),
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             session_filter: None,
@@ -1526,6 +1529,7 @@ impl Shell {
             .children(self.layout_button(cx))
             .child(room)
             .children(self.update_chip(cx).map(|chip| div().flex_none().mr(px(4.)).child(chip)))
+            .child(self.version_button(cx))
             .child(self.settings_button(cx))
     }
 

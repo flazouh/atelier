@@ -9,6 +9,7 @@ use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions,
 use atelier_ui::scale::px;
 
 mod activity;
+mod changelog;
 mod agent_models;
 mod agent_session;
 mod palette;

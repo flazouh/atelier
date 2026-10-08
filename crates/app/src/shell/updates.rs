@@ -72,6 +72,17 @@ impl Shell {
         }
     }
 
+    /// Opens the changelog from the version in the title bar.
+    pub fn show_changelog(&mut self, cx: &mut Context<Self>) {
+        self.changelog_open = true;
+        cx.notify();
+    }
+
+    pub fn close_changelog(&mut self, cx: &mut Context<Self>) {
+        self.changelog_open = false;
+        cx.notify();
+    }
+
     /// Opens the changelog of the update this version came from.
     pub fn show_whats_new(&mut self, cx: &mut Context<Self>) {
         if self.whats_new.is_some() {

@@ -1,16 +1,20 @@
 //! The update's own look: a chip in the title bar while an update downloads and when it is ready, and one panel with the
 //! changelog and the choice to restart or wait. Sparkle's own windows are not used.
 use atelier_ui::{
-    ReleaseNote, ReleaseSheet,
+    ReleaseNote, ReleaseSheet, ReleaseVersion,
     button::{Button, ButtonSize, ButtonVariant},
     modal::Modal,
     theme::ActiveTheme,
     typography::TextSize,
 };
+use atelier_ui::scale::px;
 use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, div};
 
 use super::structs::Shell;
-use crate::updater::{UpdateState, release_notes};
+use crate::{
+    changelog,
+    updater::{UpdateState, release_notes, running_version},
+};
 
 /// What a changelog the feed did not carry says.
 const NO_NOTES: &str = "This version has no release notes.";
@@ -62,6 +66,9 @@ impl Shell {
         if self.whats_new_open {
             return self.whats_new_panel(cx);
         }
+        if self.changelog_open && !matches!(self.update, UpdateState::Ready { .. }) {
+            return self.changelog_panel(cx);
+        }
         let UpdateState::Ready { version, notes } = &self.update else { return None };
         if !self.update_modal {
             return None;
@@ -105,6 +112,50 @@ impl Shell {
                 .flush()
                 .focus(&self.update_focus)
                 .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.dismiss_whats_new(cx))))
+                .child(div().track_focus(&self.update_focus).child(sheet))
+                .into_any_element(),
+        )
+    }
+
+    /// The version that runs, small, at the right of the title bar. A press opens the changelog.
+    pub(super) fn version_button(&self, cx: &mut Context<Self>) -> AnyElement {
+        let this = cx.entity().downgrade();
+        let button = Button::new("version-button")
+            .debug_name("version-button")
+            .label(running_version())
+            .variant(ButtonVariant::Ghost)
+            .size(ButtonSize::Sm)
+            .tooltip("What is new in this version")
+            .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.show_changelog(cx))));
+        div().flex_none().mr(px(2.)).child(button).into_any_element()
+    }
+
+    /// The notes of the version that runs, with every earlier version under them.
+    fn changelog_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (close, done) = (cx.entity().downgrade(), cx.entity().downgrade());
+        let running = running_version();
+        let notes = |markdown: &str| -> Vec<ReleaseNote> {
+            release_notes(markdown).into_iter().map(|line| ReleaseNote::new(line.lead, line.text)).collect()
+        };
+        let mut current = notes(changelog::notes_of(&running).unwrap_or_default());
+        if current.is_empty() {
+            current.push(ReleaseNote::new(NO_NOTES, ""));
+        }
+        let earlier = changelog::releases()
+            .iter()
+            .filter(|(version, _)| *version != running.as_str())
+            .map(|(version, markdown)| ReleaseVersion::new(SharedString::from(version.to_string()), notes(markdown)));
+        let sheet = ReleaseSheet::new("changelog-sheet", SharedString::from(running.clone()))
+            .notes(current)
+            .earlier(earlier)
+            .labels("Close", "")
+            .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.close_changelog(cx))));
+        Some(
+            Modal::new("changelog")
+                .width(520.)
+                .flush()
+                .focus(&self.update_focus)
+                .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.close_changelog(cx))))
                 .child(div().track_focus(&self.update_focus).child(sheet))
                 .into_any_element(),
         )
