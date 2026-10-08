@@ -19,6 +19,12 @@ pub fn driver(requests: RequestSender, events: UpdateSender) -> Rc<dyn UpdateDri
     Rc::new(NoDriver)
 }
 
+/// `text` with its first letter in capitals: a note is written after its lead ("**Fixes:** a row fills the width") and shown on a line of its own.
+fn capital(text: &str) -> String {
+    let mut letters = text.chars();
+    letters.next().map_or_else(String::new, |first| first.to_uppercase().chain(letters).collect())
+}
+
 /// Which kind a `###` heading names: "New", "Fixed", else "Improved".
 fn kind_of(heading: &str) -> atelier_ui::ReleaseKind {
     let heading = heading.to_lowercase();
@@ -48,7 +54,7 @@ pub fn release_notes(markdown: &str) -> Vec<NoteLine> {
                     Some((lead, text)) => NoteLine {
                         kind,
                         lead: lead.trim().trim_end_matches(':').trim().to_string(),
-                        text: text.trim().trim_start_matches(':').trim().to_string(),
+                        text: capital(text.trim().trim_start_matches(':').trim()),
                     },
                     None => NoteLine { kind, lead: item.trim().to_string(), text: String::new() },
                 });
