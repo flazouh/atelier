@@ -159,6 +159,28 @@ fn a_press_on_the_version_opens_the_changelog(cx: &mut TestAppContext) {
     settle(&shell, cx);
     assert!(shell.read_with(cx, |s, _| s.changelog_open), "the changelog is open");
 }
+/// A press on the usage chips in the status bar opens the usage dashboard, and Escape closes it.
+#[gpui_kit::test]
+fn a_press_on_the_usage_chips_opens_the_dashboard_and_escape_closes_it(cx: &mut TestAppContext) {
+    use atelier_agents::usage::{Reading, Window};
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    shell.update(cx, |shell, cx| {
+        shell.vitals.update(cx, |vitals, cx| {
+            let reading = Reading { windows: vec![Window { label: "7d".into(), used: 0.4, resets_in: Some(60) }], note: None };
+            vitals.settle("Claude", atelier_ui::menu::Lead::Monogram, Ok(reading));
+            cx.notify();
+        })
+    });
+    settle(&shell, cx);
+    let chips = cx.debug_bounds("status-usage").expect("the usage chips are drawn");
+    assert!(cx.debug_bounds("usage-dashboard").is_none());
+    cx.simulate_click(chips.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("usage-dashboard").is_some(), "a press opens the dashboard");
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("usage-dashboard").is_none(), "Escape closes it");
+}
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
 fn a_notice_floats_and_goes_after_a_few_seconds(cx: &mut TestAppContext) {

@@ -15,6 +15,7 @@ mod agent_session;
 mod palette;
 mod project_icons;
 mod providers;
+mod usage_view;
 mod vitals;
 mod agents_view;
 mod file_glyphs;

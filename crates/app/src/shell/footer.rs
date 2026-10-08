@@ -37,12 +37,14 @@ impl Shell {
     pub(super) fn start_vitals(cx: &mut Context<Self>) -> (Entity<Vitals>, Vec<Task<()>>) {
         let vitals = cx.new(|_| Vitals::new(Box::new(SysinfoProbe::new())));
         // The version at the left of the bar opens the changelog.
-        let shell = cx.weak_entity();
+        let (shell, usage) = (cx.weak_entity(), cx.weak_entity());
         vitals.update(cx, |vitals, _| {
             vitals.set_version(
                 running_version(),
                 Rc::new(move |_, cx| drop(shell.update(cx, |shell, cx| shell.show_changelog(cx)))),
-            )
+            );
+            // The usage chips open the dashboard.
+            vitals.set_on_usage(Rc::new(move |_, cx| drop(usage.update(cx, |shell, cx| shell.show_usage(cx)))));
         });
         let load = cx.spawn(async move |this, cx| {
             loop {

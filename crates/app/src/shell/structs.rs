@@ -134,6 +134,12 @@ pub struct Shell {
     pub(super) changelog_open: bool,
     /// What the changelog panel holds focus with, so Escape reaches it.
     pub(super) update_focus: FocusHandle,
+    /// The usage dashboard while it is open, what the logs said the last time it read them, and the cache that makes
+    /// the next reading cheap.
+    pub(super) usage: Option<crate::usage_view::UsageState>,
+    pub(super) usage_seen: std::sync::Arc<atelier_agents::usage_history::UsageHistory>,
+    pub(super) usage_cache: std::sync::Arc<std::sync::Mutex<atelier_agents::usage_history::Cache>>,
+    pub(super) usage_focus: FocusHandle,
     /// The sessions the reader archived, by the agent's id.
     pub(super) archived: std::collections::BTreeSet<String>,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
@@ -207,6 +213,10 @@ impl Shell {
             whats_new_open: false,
             changelog_open: false,
             update_focus: cx.focus_handle(),
+            usage: None,
+            usage_seen: Default::default(),
+            usage_cache: Default::default(),
+            usage_focus: cx.focus_handle(),
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             session_filter: None,
             switcher_open: false,
@@ -2187,6 +2197,7 @@ impl Shell {
             }))
             .children(self.tree_menu(cx))
             .children(self.update_panel(cx))
+            .children(self.usage_panel(cx))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().occlude().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {

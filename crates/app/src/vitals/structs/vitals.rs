@@ -14,4 +14,6 @@ pub struct Vitals {
     /// The version that runs, at the left of the bar, and what a press on it does.
     pub(in super::super) version: Option<SharedString>,
     pub(in super::super) on_version: Option<Handler>,
+    /// What a press on the usage chips does. None leaves them as marks.
+    pub(in super::super) on_usage: Option<Handler>,
 }
