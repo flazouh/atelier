@@ -5,12 +5,11 @@ use atelier_ui::{
     button::{Button, ButtonSize, ButtonVariant},
     modal::Modal,
     theme::ActiveTheme,
-    typography::{MONO_FONT_FAMILY, TextSize},
+    typography::TextSize,
 };
-use atelier_ui::scale::px;
-use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled, div};
+use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, div};
 
-use super::{structs::Shell, types::VERSION_ROOM};
+use super::structs::Shell;
 use crate::{
     changelog,
     updater::{UpdateState, release_notes, running_version},
@@ -115,32 +114,6 @@ impl Shell {
                 .child(div().track_focus(&self.update_focus).child(sheet))
                 .into_any_element(),
         )
-    }
-
-    /// The version that runs, small, at the right of the title bar. A press opens the changelog. It is set in the mono font,
-    /// where the dots between the numbers stay apart at this size.
-    pub(super) fn version_button(&self, cx: &mut Context<Self>) -> AnyElement {
-        let this = cx.entity().downgrade();
-        let theme = cx.theme().clone();
-        div()
-            .id("version-button")
-            .debug_selector(|| "version-button".into())
-            .flex_none()
-            .flex()
-            .items_center()
-            .justify_center()
-            .h(px(24.))
-            .w(px(VERSION_ROOM - 4.))
-            .mr(px(4.))
-            .rounded(px(6.))
-            .font_family(MONO_FONT_FAMILY)
-            .text_size(TextSize::Xs.font_size())
-            .text_color(theme.muted_foreground)
-            .cursor_pointer()
-            .hover(move |style| style.bg(theme.card).text_color(theme.foreground))
-            .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.show_changelog(cx))))
-            .child(running_version())
-            .into_any_element()
     }
 
     /// The notes of the version that runs, with every earlier version under them.

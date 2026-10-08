@@ -4,13 +4,13 @@ use atelier_agents::{
 };
 use atelier_project::Project;
 use atelier_ui::{Gauge, GaugeState, ProviderGauge, StatusBar, SystemLoad, Work, menu::Lead};
-use gpui_kit::{Context, IntoElement, Render, Window};
+use gpui_kit::{Context, IntoElement, Render, SharedString, Window};
 
-use super::super::{consts::HISTORY, structs::Vitals, traits::LoadProbe};
+use super::super::{consts::HISTORY, structs::Vitals, traits::LoadProbe, types::Handler};
 
 impl Vitals {
     pub fn new(probe: Box<dyn LoadProbe>) -> Self {
-        Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None) }
+        Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None), version: None, on_version: None }
     }
 
     #[cfg(test)]
@@ -45,6 +45,11 @@ impl Vitals {
         sources.iter().map(|(lead, source)| (source.name().to_string(), lead.clone(), source.read(project, now))).collect()
     }
 
+    /// The version at the left of the bar, and what a press on it does.
+    pub fn set_version(&mut self, version: impl Into<SharedString>, on_press: Handler) {
+        self.version = Some(version.into());
+        self.on_version = Some(on_press);
+    }
     /// Where the bar's cards stand: under the sidebar, under the right pane. Whether it changed is the answer.
     pub fn set_columns(&mut self, lead: Option<f32>, tail: Option<f32>) -> bool {
         std::mem::replace(&mut self.columns, (lead, tail)) != (lead, tail)
@@ -105,6 +110,15 @@ fn failed(last: ProviderGauge, why: String) -> ProviderGauge {
 
 impl Render for Vitals {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        StatusBar::new("status-bar").load(self.load.clone()).work(self.work).providers(self.providers.clone()).columns(self.columns.0, self.columns.1)
+        let bar = StatusBar::new("status-bar")
+            .load(self.load.clone())
+            .work(self.work)
+            .providers(self.providers.clone())
+            .columns(self.columns.0, self.columns.1)
+            .version(self.version.clone());
+        match self.on_version.clone() {
+            Some(press) => bar.on_version(move |window, cx| press(window, cx)),
+            None => bar,
+        }
     }
 }
