@@ -290,7 +290,8 @@ impl AgentSession {
         let reply = cx.new(|cx| SelectionReply::new(window, cx).add_label("Add"));
         let _reply = cx.subscribe(&reply, |this, _, event: &SelectionReplyEvent, cx| match event {
             SelectionReplyEvent::Reply { quote, note, key } => this.quoted(quote, note, key.clone(), cx),
-            // QA stub only: the microphone of the reply box is wired in the reply-box-dictation work. Remove when that lands.
+            // The microphone of the reply box (atelier-ui #60) is wired in the reply-box-dictation work, which is not merged yet;
+            // until it lands the press does nothing. Replace these arms with that work's.
             SelectionReplyEvent::Dictate(_) | SelectionReplyEvent::DictationCancel => {}
         });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
