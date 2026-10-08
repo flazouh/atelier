@@ -6,7 +6,7 @@ use gpui_kit::{AppContext as _, Context, PromptLevel, Window};
 
 use super::{helpers::settings_path, structs::{CheckForUpdates, Shell}};
 use crate::updater::{
-    remember_on_ready, remembered,
+    remember_on_ready, remembered, running_version,
     CHECKING_NOTICE, CheckOutcome, DOWNLOADING_NOTICE, Question, Reaction, Remembered, RelaunchRequest, Requests, UNAVAILABLE_NOTICE,
     UPDATE_LATER_NOTICE, UPDATE_WAITS_NOTICE, UpdateEvent, UpdateEvents, UpdateState, Updater,
 };
@@ -50,7 +50,7 @@ impl Shell {
     /// installed yet waits, and one of an older version goes.
     pub(super) fn remembered_at_start(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Option<atelier_settings::WhatsNew> {
         let kept = saved.whats_new.as_ref()?;
-        match remembered(&kept.version, env!("CARGO_PKG_VERSION")) {
+        match remembered(&kept.version, &running_version()) {
             Remembered::Show => Some(kept.clone()),
             Remembered::Wait => None,
             Remembered::Forget => {

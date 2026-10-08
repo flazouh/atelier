@@ -351,3 +351,10 @@ void atelier_updater_proceed(void) {
 void atelier_updater_decline(void) {
     pending_install = nil;
 }
+
+// The version of the running bundle (CFBundleShortVersionString), the one the update feed is compared with; NULL when this
+// process is not a bundle.
+const char *atelier_bundle_version(void) {
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    return version.length > 0 ? version.UTF8String : NULL;
+}

@@ -66,3 +66,22 @@ pub fn remember_on_ready(before: &UpdateState, after: &UpdateState) -> Option<at
         _ => None,
     }
 }
+
+#[cfg(all(target_os = "macos", not(test)))]
+unsafe extern "C" {
+    fn atelier_bundle_version() -> *const std::ffi::c_char;
+}
+
+/// The version that runs: the bundle's on the Mac, which is the one the update feed is compared with, else the one this
+/// build was made with.
+pub fn running_version() -> String {
+    #[cfg(all(target_os = "macos", not(test)))]
+    {
+        // SAFETY: the native side returns NULL or a NUL-terminated string that lives as long as the bundle's dictionary.
+        let bundled = unsafe { atelier_bundle_version() };
+        if !bundled.is_null() {
+            return unsafe { std::ffi::CStr::from_ptr(bundled) }.to_string_lossy().into_owned();
+        }
+    }
+    env!("CARGO_PKG_VERSION").to_string()
+}
