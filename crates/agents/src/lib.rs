@@ -19,6 +19,7 @@ pub mod session;
 mod strings;
 pub mod subprocess;
 pub mod usage;
+pub mod usage_history;
 
 pub use assets::Assets;
 
