@@ -127,6 +127,8 @@ fn a_file_changed_beyond_the_project_shows_by_its_path_and_a_press_reviews_it(cx
     let far = crate::test_dirs::path().join("far.txt");
     std::fs::write(&far, "one\n").unwrap();
     let (session, _, cx) = crate::fake_agent::start_shown_in(cx, dir.clone(), vec![vec![crate::fake_agent::ended()]]);
+    // The list opens with an animation; with Reduce Motion it opens at once, so the row is where the press goes however busy the machine.
+    cx.update(|_, cx| cx.set_reduce_motion(true));
     cx.simulate_resize(gpui_kit::size(px(600.), px(800.)));
     let heard = Rc::new(RefCell::new(Vec::new()));
     let log = heard.clone();
