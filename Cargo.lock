@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-agents"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-i18n",
  "atelier-project",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-app"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-agents",
  "atelier-editor",
@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-editor"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "atelier-lsp",
@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-forge"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-forge",
  "atelier-project",
@@ -540,7 +540,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-gallery"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-agents",
  "atelier-editor",
@@ -557,7 +557,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-i18n"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde_json",
  "ureq",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-lsp"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-project",
  "lsp-types",
@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-pr-view"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-editor",
  "atelier-forge",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-project"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-tracker",
  "dirs 6.0.0",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-remote"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-project",
  "atelier-tracker",
@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-review"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atelier-agents",
  "atelier-project",
@@ -635,7 +635,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-settings"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "dirs 6.0.0",
  "keyring",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-tracker"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "rusqlite",
  "serde",
@@ -657,7 +657,7 @@ dependencies = [
 [[package]]
 name = "atelier-ui"
 version = "0.1.0"
-source = "git+https://github.com/flazouh/atelier-ui#65f58119272adfa56cb0811411b12cc5bb650b48"
+source = "git+https://github.com/flazouh/atelier-ui#74fa8459f75f76a41f17675e58fb917fa6251150"
 dependencies = [
  "core-foundation 0.9.4",
  "core-foundation-sys",
@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-voice"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "block2 0.6.2",
  "cpal",

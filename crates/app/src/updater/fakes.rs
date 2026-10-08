@@ -3,16 +3,37 @@ use std::{cell::Cell, rc::Rc};
 
 use super::{RelaunchRequest, UpdateDriver};
 
-/// A driver that counts the checks it is asked for.
+/// How many times a driver was asked to look, to install and to wait.
+#[derive(Clone, Default)]
+pub struct Calls {
+    checks: Rc<Cell<u32>>,
+    asked: Rc<Cell<u32>>,
+    installs: Rc<Cell<u32>>,
+    laters: Rc<Cell<u32>>,
+}
+
+impl Calls {
+    /// `(looks, looks the reader asked for, installs, waits)`.
+    pub fn counts(&self) -> (u32, u32, u32, u32) {
+        (self.checks.get(), self.asked.get(), self.installs.get(), self.laters.get())
+    }
+}
+
+/// A driver that counts what it is asked.
 pub struct Counting {
     available: bool,
-    checks: Rc<Cell<u32>>,
+    calls: Calls,
 }
 
 impl Counting {
     pub fn new(available: bool) -> (Self, Rc<Cell<u32>>) {
-        let checks = Rc::new(Cell::new(0));
-        (Counting { available, checks: checks.clone() }, checks)
+        let (driver, calls) = Self::recording(available);
+        (driver, calls.checks)
+    }
+
+    pub fn recording(available: bool) -> (Self, Calls) {
+        let calls = Calls::default();
+        (Counting { available, calls: calls.clone() }, calls)
     }
 }
 
@@ -21,8 +42,19 @@ impl UpdateDriver for Counting {
         self.available
     }
 
-    fn check(&self) {
-        self.checks.set(self.checks.get() + 1);
+    fn check(&self, asked: bool) {
+        self.calls.checks.set(self.calls.checks.get() + 1);
+        if asked {
+            self.calls.asked.set(self.calls.asked.get() + 1);
+        }
+    }
+
+    fn install(&self) {
+        self.calls.installs.set(self.calls.installs.get() + 1);
+    }
+
+    fn later(&self) {
+        self.calls.laters.set(self.calls.laters.get() + 1);
     }
 }
 

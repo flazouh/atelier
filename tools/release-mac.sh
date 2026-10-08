@@ -73,7 +73,7 @@ feed() {
   sparkle=$(tools/mac/sparkle.sh)
   [ -e "$archive" ] || { echo "No archive for $version in $releases; run build first." >&2; exit 1; }
   if [ -f "docs/release-notes/$version.md" ]; then cp "docs/release-notes/$version.md" "${archive%.zip}.md"; fi
-  "$sparkle/bin/generate_appcast" --account "$account" --download-url-prefix "$base" "$releases"
+  "$sparkle/bin/generate_appcast" --embed-release-notes --account "$account" --download-url-prefix "$base" "$releases"
   check_feed
 }
 

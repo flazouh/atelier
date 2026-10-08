@@ -39,8 +39,10 @@ prepare() {
   mkdir -p "$qa/feed" "$qa/install" "$qa/state"
   build_version "$first"
   build_version "$second"
+  printf '## What is new in %s\n\n- **Check:** this changelog came inside the feed.\n- **Check:** it shows in our window.\n' "$second" \
+    > "$qa/feed/atelier-$second-macos-arm64.md"
   sparkle=$(tools/mac/sparkle.sh)
-  "$sparkle/bin/generate_appcast" --account "${ATELIER_SPARKLE_ACCOUNT:-dev.atelier.app}" \
+  "$sparkle/bin/generate_appcast" --embed-release-notes --account "${ATELIER_SPARKLE_ACCOUNT:-dev.atelier.app}" \
     --download-url-prefix "http://127.0.0.1:$port/" "$qa/feed"
   deltas=$(grep -c '<enclosure' "$qa/feed/appcast.xml" || true)
   ls -la "$qa/feed"

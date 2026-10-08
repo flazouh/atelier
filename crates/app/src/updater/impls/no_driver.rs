@@ -5,5 +5,9 @@ impl UpdateDriver for NoDriver {
         false
     }
 
-    fn check(&self) {}
+    fn check(&self, _: bool) {}
+
+    fn install(&self) {}
+
+    fn later(&self) {}
 }
