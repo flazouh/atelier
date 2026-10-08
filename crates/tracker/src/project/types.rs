@@ -18,7 +18,7 @@ impl ProjectKey {
         }
     }
 
-    /// The last part of the path: "atelier" for "/Users/alex/code/atelier".
+    /// The last part of the path: "atelier" for "/Users/user/code/atelier".
     pub fn folder(&self) -> &str {
         let (Self::Local { path } | Self::Ssh { path, .. }) = self;
         trim_slash(path).rsplit('/').find(|part| !part.is_empty()).unwrap_or("project")

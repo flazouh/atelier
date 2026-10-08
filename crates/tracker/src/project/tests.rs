@@ -32,13 +32,13 @@ fn one_project_gives_one_file_and_two_projects_give_two() {
 #[test]
 fn the_file_name_is_stable_and_readable() {
     // A fixed value: the name must not change between runs or versions, or a project loses its tasks.
-    assert_eq!(local("/Users/alex/code/atelier").file_name(), "atelier-541e69b49ecbabc5.sqlite");
+    assert_eq!(local("/Users/user/code/atelier").file_name(), "atelier-3f1cfab3c39046f0.sqlite");
     assert!(local("/x/my project!").file_name().starts_with("my-project--"));
 }
 
 #[test]
 fn the_database_is_in_the_data_folder() {
-    let path = local("/Users/alex/code/atelier").path_in(Path::new("/data/atelier"));
+    let path = local("/Users/user/code/atelier").path_in(Path::new("/data/atelier"));
     assert!(path.starts_with("/data/atelier/tracker"));
     assert!(path.extension().is_some_and(|e| e == "sqlite"));
 }
@@ -46,6 +46,6 @@ fn the_database_is_in_the_data_folder() {
 #[test]
 fn the_folder_is_the_last_part_of_the_path() {
     assert_eq!(local("/a/b/atelier").folder(), "atelier");
-    assert_eq!(ssh("hp", "/home/alex/code/atelier-2/").folder(), "atelier-2");
+    assert_eq!(ssh("hp", "/home/user/code/atelier-2/").folder(), "atelier-2");
     assert_eq!(local("/").folder(), "project");
 }

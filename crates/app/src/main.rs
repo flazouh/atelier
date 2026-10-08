@@ -1,5 +1,5 @@
 //! atelier, the app. `atelier [folder…]` opens the window, with each folder named as a project in it;
-//! `ssh://host/path` names a folder on an SSH host (`ssh://hp-agent/~/code/atelier`).
+//! `ssh://host/path` names a folder on an SSH host (`ssh://dev-host/~/code/atelier`).
 //!
 //! `ATELIER_TIMINGS=1` prints when the first frame showed, counted from the start of the process.
 
@@ -204,8 +204,8 @@ enum Opening {
 }
 
 impl From<PathBuf> for Opening {
-    /// `ssh://host/path` is a folder on a host: `ssh://hp-agent/~/code` is `~/code` there, and
-    /// `ssh://hp-agent/home/alex` is `/home/alex`.
+    /// `ssh://host/path` is a folder on a host: `ssh://dev-host/~/code` is `~/code` there, and
+    /// `ssh://dev-host/home/user` is `/home/user`.
     fn from(arg: PathBuf) -> Self {
         let text = arg.to_string_lossy();
         let Some(rest) = text.strip_prefix("ssh://") else { return Opening::Local(arg) };

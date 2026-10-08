@@ -1,7 +1,7 @@
 //! The whole path over a real `ssh`: probe, deploy, dial, and a project that answers. It needs a
 //! host that takes the user's key, and a atelier-remote built for it in `$ATELIER_REMOTE_DIR/<platform>/`:
 //!     cargo build -p atelier-remote && mkdir -p /tmp/remote/linux-x86_64 && cp target/debug/atelier-remote /tmp/remote/linux-x86_64/
-//!     ATELIER_REMOTE_DIR=/tmp/remote ATELIER_TEST_SSH_HOST=hp-agent cargo test -p atelier-remote --test over_ssh -- --ignored --nocapture
+//!     ATELIER_REMOTE_DIR=/tmp/remote ATELIER_TEST_SSH_HOST=dev-host cargo test -p atelier-remote --test over_ssh -- --ignored --nocapture
 
 use atelier_project::Project;
 
@@ -37,7 +37,7 @@ fn a_host_that_does_not_exist_says_so() {
 /// What a remote project costs over a real ssh: the connect (probe, the copy's check, the dial and
 /// the hello), a file open (the read of a 10,000-line file), and the listing of `ATELIER_TEST_SSH_ROOT`.
 /// Targets: connect < 3 s, file open < 150 ms on a LAN, listing a 1,000-file tree < 500 ms.
-///     ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=hp-agent ATELIER_TEST_SSH_ROOT=/home/alex/code/local/atelier \
+///     ATELIER_REMOTE_DIR=… ATELIER_TEST_SSH_HOST=dev-host ATELIER_TEST_SSH_ROOT=/home/user/code/local/atelier \
 ///         cargo test --release -p atelier-remote --test over_ssh -- --ignored --nocapture remote_costs
 #[test]
 #[ignore]

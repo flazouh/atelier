@@ -17,7 +17,7 @@ const FAKE_CLAUDE_SCRIPT: &str = "#!/bin/sh\nprintf '%s\\n%s' \"$CLAUDE_CONFIG_D
 const FAKE_CLAUDE_FILE: &str = "fake-claude";
 const EXECUTABLE: u32 = 0o755;
 const USUAL_FOLDER: &str = ".claude";
-const SOME_PROJECT: &str = "-home-alex-code-atelier";
+const SOME_PROJECT: &str = "-home-user-code-atelier";
 
 /// What the fake `claude` saw.
 #[derive(Debug, PartialEq, Eq)]

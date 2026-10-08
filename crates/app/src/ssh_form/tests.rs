@@ -21,7 +21,7 @@ fn open<'a>(hosts: &[&str], cx: &'a mut TestAppContext) -> (Entity<SshForm>, &'a
 
 #[gpui_kit::test]
 fn the_hosts_wrap_under_the_first_chip_and_not_under_the_label(cx: &mut TestAppContext) {
-    let (_, cx) = open(&["phone", "phone-usb", "phone-termux", "air", "pro", "hp-agent"], cx);
+    let (_, cx) = open(&["phone", "phone-usb", "phone-termux", "air", "pro", "dev-host"], cx);
     let chips: Vec<_> = (0..6).map(|i| cx.debug_bounds(HOST_CHIPS[i]).unwrap_or_else(|| panic!("chip {i} is not drawn"))).collect();
     let first = chips[0];
     let wrapped: Vec<_> = chips.iter().filter(|c| c.top() > first.top() + px(1.)).collect();
@@ -33,18 +33,18 @@ fn the_hosts_wrap_under_the_first_chip_and_not_under_the_label(cx: &mut TestAppC
 
 #[gpui_kit::test]
 fn a_host_chip_is_a_filled_button_and_a_press_puts_its_name_in_the_field(cx: &mut TestAppContext) {
-    let (form, cx) = open(&["phone", "hp-agent"], cx);
+    let (form, cx) = open(&["phone", "dev-host"], cx);
     let at = cx.debug_bounds("ssh-host-1").expect("drawn").center();
     cx.simulate_click(at, Modifiers::default());
     cx.run_until_parked();
     let value = form.read_with(cx, |f, cx| f.host.read(cx).value().to_string());
-    assert_eq!(value, "hp-agent");
+    assert_eq!(value, "dev-host");
 }
 
 /// A14: the Host field starts empty. The first host of the ssh config is not a good guess.
 #[gpui_kit::test]
 fn the_host_field_starts_empty_though_the_config_has_hosts(cx: &mut TestAppContext) {
-    let (form, cx) = open(&["phone", "hp-agent"], cx);
+    let (form, cx) = open(&["phone", "dev-host"], cx);
     assert_eq!(form.read_with(cx, |f, cx| f.host.read(cx).value().to_string()), "");
     form.update_in(cx, |f, window, cx| f.set_hosts(vec!["air".into()], window, cx));
     assert_eq!(form.read_with(cx, |f, cx| f.host.read(cx).value().to_string()), "", "late hosts do not fill it either");

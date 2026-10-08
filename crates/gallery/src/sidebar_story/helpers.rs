@@ -55,7 +55,7 @@ pub(super) fn sample(other: &AgentLook) -> Vec<ProjectData> {
     let api = ProjectData {
         id: "api".into(),
         name: "api-server".into(),
-        location: Location::Ssh { host: "hp-agent".into() },
+        location: Location::Ssh { host: "dev-host".into() },
         connection: Connection::Connected,
         pulls_unavailable: None,
         badge: Default::default(),
