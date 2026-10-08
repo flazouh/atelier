@@ -7,8 +7,7 @@ use atelier_ui::{
     theme::ActiveTheme,
     typography::TextSize,
 };
-use atelier_ui::scale::px;
-use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled, div};
+use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, div};
 
 use super::structs::Shell;
 use crate::updater::{UpdateState, release_notes};
