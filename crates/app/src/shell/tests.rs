@@ -1418,7 +1418,7 @@ fn the_foot_of_the_window_has_the_status_bar_once_a_project_is_open(cx: &mut Tes
     let bar = cx.debug_bounds("status-bar").expect("the bar is drawn");
     assert!(cx.debug_bounds("status-cpu").is_some() && cx.debug_bounds("status-memory").is_some(), "the machine shows after a sample");
     let panes = cx.debug_bounds("sessions-view").expect("the panes are drawn");
-    let (machine, main) = (cx.debug_bounds("status-card-machine").expect("a card under the sidebar"), cx.debug_bounds("status-card-main").expect("a card under the session"));
+    let (machine, main) = (cx.debug_bounds("status-card-cpu").expect("a card under the sidebar"), cx.debug_bounds("status-card-main").expect("a card under the session"));
     // The first card stands under the sidebar: past the rail and the panels' gap, not under the rail. The next is a panels' gap on.
     let first = f32::from(panes.left()) + atelier_ui::view_rail::WIDTH + super::types::PANE_GAP;
     assert!((f32::from(machine.left()) - first).abs() < 0.6, "the first card starts at {:?}, not past the rail", machine.left());
