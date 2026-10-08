@@ -2173,7 +2173,7 @@ impl Shell {
             }))
             .children(self.tree_menu(cx))
             .children(self.update_panel(cx))
-            .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(gpui_kit::px(TITLE_BAR)).left_0().right_0().bottom_0().child(pane.clone())))
+            .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(gpui_kit::px(TITLE_BAR)).left_0().right_0().bottom_0().occlude().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {
                 let this = cx.entity().downgrade();
