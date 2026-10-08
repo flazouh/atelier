@@ -33,6 +33,11 @@ pub fn start_with_modes(cx: &mut TestAppContext) -> (Entity<AgentSession>, Arc<F
     start_with(cx, crate::test_dirs::path(), Fake { modes: true, ..Fake::default() }, false)
 }
 
+/// A session on an agent that offers Ask and Auto and starts a new session in Auto.
+pub fn start_in_auto(cx: &mut TestAppContext) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+    start_with(cx, crate::test_dirs::path(), Fake { modes: true, starts_in_auto: true, ..Fake::default() }, false)
+}
+
 /// A session on an agent that runs on providers and forks past sessions, as Claude Code does.
 pub fn start_forking(cx: &mut TestAppContext) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
     start_with(cx, crate::test_dirs::path(), Fake { providers: true, forks: true, ..Fake::default() }, false)

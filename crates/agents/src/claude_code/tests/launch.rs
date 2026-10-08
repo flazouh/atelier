@@ -247,3 +247,12 @@ fn an_account_session_streams_tool_input_unless_the_environment_says() {
     assert!(!streams_tool_input(Some(&account), true), "the reader's own setting stands");
     assert!(!streams_tool_input(Some(&router), false));
 }
+
+/// A new Claude Code session starts in Auto, which its own menu offers, and not in "ask first"; no other backend names a default.
+#[test]
+fn a_new_claude_code_session_starts_in_auto() {
+    use crate::{claude_code::ClaudeCode, session::Backend};
+    let caps = ClaudeCode::new().capabilities();
+    assert_eq!(caps.default_mode, Some(PermissionMode::Auto));
+    assert!(caps.permission_modes.contains(&PermissionMode::Auto), "the default is one the menu offers");
+}

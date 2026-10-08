@@ -27,6 +27,8 @@ pub struct Fake {
     pub forks: bool,
     /// It offers the permission modes Ask and Auto.
     pub modes: bool,
+    /// A new session of it starts in Auto, as Claude Code's does.
+    pub starts_in_auto: bool,
     /// The sink of every session it opened, in order, for a test to speak as an agent that was replaced.
     pub sinks: Mutex<Vec<EventSink>>,
     /// What it reads back as any past session's history.
@@ -80,6 +82,7 @@ impl Backend for FakeBackend {
             providers: self.0.providers,
             forks: self.0.forks,
             permission_modes: if self.0.modes { vec![PermissionMode::Ask, PermissionMode::Auto] } else { Vec::new() },
+            default_mode: self.0.starts_in_auto.then_some(PermissionMode::Auto),
             ..Capabilities::default()
         }
     }

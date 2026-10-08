@@ -260,10 +260,14 @@ impl AgentSession {
                 }
             })
             .collect();
+        let start_mode = resume.is_none().then(|| agent.backend.capabilities().default_mode).flatten();
         let modes: Vec<SharedString> = agent.backend.capabilities().permission_modes.into_iter().map(|m| mode_word(m).into()).collect();
         let composer = cx.new(|cx| {
             let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes);
             input.set_dictation(true, cx);
+            if let Some(mode) = start_mode {
+                input.set_mode(mode_word(mode), cx);
+            }
             // A paste or a drop is a chip: the session keeps what it stands for.
             input.set_paste_chips(true);
             super::dictation::start_up(&mut input, cx);
@@ -362,7 +366,7 @@ impl AgentSession {
             signer: Default::default(),
             seen: false,
             model: None,
-            mode: None,
+            mode: start_mode,
             provider: agent_has_providers.then(|| provider.or_else(|| resume.is_none().then(|| crate::providers::default_choice(cx)))).flatten(),
             handoff: None,
             task: None,

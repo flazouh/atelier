@@ -92,6 +92,7 @@ impl Backend for Acp {
             interrupt: true,
             models: self.agent.models.clone(),
             permission_modes: self.agent.modes.iter().map(|(mode, _)| *mode).collect(),
+            default_mode: None,
             thinking: self.agent.thinking,
             subagents: false,
             todos: self.agent.todos,
