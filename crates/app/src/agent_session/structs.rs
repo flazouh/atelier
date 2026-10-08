@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
 use futures_util::StreamExt;
-use atelier_ui::{PromptInput, PromptInputEvent, PromptModel, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
+use atelier_ui::{ReplyPreset, VoiceInputEvent, PromptInput, PromptInputEvent, PromptModel, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString,
     Subscription, Task, Window,
@@ -287,9 +287,17 @@ impl AgentSession {
             this.arrived.clear();
             cx.notify();
         });
-        let reply = cx.new(|cx| SelectionReply::new(window, cx).add_label("Add"));
-        let _reply = cx.subscribe(&reply, |this, _, event: &SelectionReplyEvent, cx| match event {
+        let reply = cx.new(|cx| SelectionReply::new(window, cx).add_label("Add").dictation(true).presets(vec![
+            ReplyPreset::new("Explain", "Explain this."),
+            ReplyPreset::new("Why?", "Why is it this way?"),
+            ReplyPreset::new("Fix", "Fix this."),
+            ReplyPreset::new("Shorter", "Make this shorter."),
+        ]));
+        let _reply = cx.subscribe_in(&reply, window, |this, _, event: &SelectionReplyEvent, window, cx| match event {
             SelectionReplyEvent::Reply { quote, note, key } => this.quoted(quote, note, key.clone(), cx),
+            SelectionReplyEvent::Dictate(VoiceInputEvent::Start) => this.reply_dictation_start(window, cx),
+            SelectionReplyEvent::Dictate(VoiceInputEvent::Stop) => this.reply_dictation_stop(cx),
+            SelectionReplyEvent::DictationCancel => this.reply_dictation_cancel(cx),
         });
         let _composer = cx.subscribe_in(&composer, window, |this, _, event: &PromptInputEvent, window, cx| match event {
             PromptInputEvent::Submit(message) => {

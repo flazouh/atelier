@@ -69,12 +69,16 @@ pub struct Dictation {
     pub(super) live: Option<Press>,
     /// This session's presses whose words wait for the model.
     pub(super) waiting: HashSet<Press>,
+    /// The presses recorded for the reply box: their words go to it, not to the composer.
+    pub(super) reply: HashSet<Press>,
+    /// The reply box's press that still records, if any.
+    pub(super) reply_live: Option<Press>,
     /// Clears a failed press's words after a while; dropping it cancels that.
     pub(super) dismiss: Task<()>,
 }
 
 impl Dictation {
     pub fn new() -> Self {
-        Self { start: Cue::new(START), stop: Cue::new(STOP), live: None, waiting: HashSet::new(), dismiss: Task::ready(()) }
+        Self { start: Cue::new(START), stop: Cue::new(STOP), live: None, waiting: HashSet::new(), reply: HashSet::new(), reply_live: None, dismiss: Task::ready(()) }
     }
 }

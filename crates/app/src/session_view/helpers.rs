@@ -297,9 +297,7 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
             let mut card = SubagentCard::new(id("sub"), look, name, subagent.task.clone())
                 .tool_calls(calls.len() as u64)
                 .calls(calls.iter().enumerate().map(|(n, c)| tool_row(id(&format!("sub-call-{n}")), c, &root, None, false)).collect());
-            if matches!(status, SubagentStatus::Running) {
-                card = card.tint(super::tint::colour(running_tint(s, subagent.id.as_str())));
-            }
+            card = card.tint(super::tint::colour(tint_of(s, subagent.id.as_str())));
             if let Some(model) = &subagent.model {
                 card = card.model(model.clone());
                 if let Some(mark) = atelier_agents::registry::model_mark(model) {
@@ -793,7 +791,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
         Button::new(gpui_kit::ElementId::Name(format!("{key}-stop").into()))
             .label("Stop")
             .variant(ButtonVariant::Ghost)
-            .tooltip("Stop the agent. The session stays in the list and can be resumed.")
             .on_click(move |_, _, cx| stop.update(cx, |s, cx| s.stop(cx)))
     });
     // The task the session began from: a press opens it in the Tasks pane.
@@ -953,9 +950,9 @@ fn short_title(title: &str) -> String {
     }
 }
 
-/// The pool index the running subagent `call` holds: the one it took when it first ran, else the next free one. The ones that ended
-/// give theirs back.
-fn running_tint(s: &AgentSession, call: &str) -> usize {
+/// The pool index the subagent `call` holds: the one it took when it first showed, else the next free one. Its colour stays with it
+/// when it is done, but only the running ones hold a colour against a new subagent.
+fn tint_of(s: &AgentSession, call: &str) -> usize {
     let running: Vec<&str> = s
         .conversation
         .items()
@@ -966,11 +963,11 @@ fn running_tint(s: &AgentSession, call: &str) -> usize {
         })
         .collect();
     let mut held = s.subagent_tints.borrow_mut();
-    held.retain(|(id, _)| running.contains(&id.as_str()));
     if let Some((_, index)) = held.iter().find(|(id, _)| id == call) {
         return *index;
     }
-    let index = super::tint::next(&held.iter().map(|(_, i)| *i).collect::<Vec<_>>());
+    let taken: Vec<usize> = held.iter().filter(|(id, _)| running.contains(&id.as_str())).map(|(_, i)| *i).collect();
+    let index = super::tint::next(&taken);
     held.push((call.to_string(), index));
     index
 }

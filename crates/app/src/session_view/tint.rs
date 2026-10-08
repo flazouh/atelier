@@ -1,5 +1,5 @@
 //! The colour of a running subagent's mark. Colours come from a pool of seven, so two subagents that run together differ; a colour
-//! goes back to the pool when its subagent ends, and only when every colour is in use does one repeat (the least used).
+//! goes back to the pool when its subagent ends (the subagent keeps showing it), and only when every colour is in use does one repeat (the least used).
 use gpui_kit::Hsla;
 #[cfg(test)]
 mod tests;

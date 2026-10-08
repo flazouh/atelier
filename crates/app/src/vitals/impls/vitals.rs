@@ -10,7 +10,7 @@ use super::super::{consts::HISTORY, structs::Vitals, traits::LoadProbe};
 
 impl Vitals {
     pub fn new(probe: Box<dyn LoadProbe>) -> Self {
-        Self { probe, load: None, providers: Vec::new(), work: Work::default() }
+        Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None) }
     }
 
     #[cfg(test)]
@@ -43,6 +43,11 @@ impl Vitals {
         now: i64,
     ) -> Vec<(String, Lead, Result<Reading, String>)> {
         sources.iter().map(|(lead, source)| (source.name().to_string(), lead.clone(), source.read(project, now))).collect()
+    }
+
+    /// Where the bar's cards stand: under the sidebar, under the right pane. Whether it changed is the answer.
+    pub fn set_columns(&mut self, lead: Option<f32>, tail: Option<f32>) -> bool {
+        std::mem::replace(&mut self.columns, (lead, tail)) != (lead, tail)
     }
 
     /// What the agents do now. Whether it changed is the answer, so the caller draws again only then.
@@ -100,6 +105,6 @@ fn failed(last: ProviderGauge, why: String) -> ProviderGauge {
 
 impl Render for Vitals {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        StatusBar::new("status-bar").load(self.load.clone()).work(self.work).providers(self.providers.clone())
+        StatusBar::new("status-bar").load(self.load.clone()).work(self.work).providers(self.providers.clone()).columns(self.columns.0, self.columns.1)
     }
 }

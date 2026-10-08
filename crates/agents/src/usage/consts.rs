@@ -8,9 +8,10 @@ pub(super) const CLAUDE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 pub(super) const CLAUDE_BETA: (&str, &str) = ("anthropic-beta", "oauth-2025-04-20");
 pub(super) const CLAUDE_TIMEOUT_SECS: u64 = 10;
 
-/// Prints the sign-in Claude Code keeps: its file, or on a Mac its Keychain item. The token stays in this process.
+/// Prints the sign-in Claude Code keeps: its file when that file holds the sign-in, else on a Mac its Keychain item. A file can
+/// exist and hold only the MCP servers' sign-ins, so its existing is not enough. The token stays in this process.
 pub(super) const CLAUDE_CREDENTIALS: &str = r#"f="$HOME/.claude/.credentials.json"
-if [ -f "$f" ]; then cat "$f"
+if [ -f "$f" ] && grep -q claudeAiOauth "$f"; then cat "$f"
 elif command -v security >/dev/null 2>&1; then security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null
 fi"#;
 

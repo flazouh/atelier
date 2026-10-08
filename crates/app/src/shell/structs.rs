@@ -87,6 +87,8 @@ pub struct Shell {
     /// show them narrower (`fit::widths`).
     sidebar_width: f32,
     pub(super) right_width: f32,
+    /// Where the bar at the foot starts, and the widths of its cards under the sidebar and the right pane: set as the panes are laid out.
+    pub(super) footer_plan: (f32, Option<f32>, Option<f32>),
     /// Whether the sidebar shows in a window too narrow for it by default, after ⌘B.
     pub(super) sidebar_in_medium: bool,
     /// The pane a narrow window shows.
@@ -182,6 +184,7 @@ impl Shell {
             meter: crate::frame_meter::enabled().then(Default::default),
             sidebar_width: super::fit::SIDEBAR_DEFAULT,
             right_width: super::fit::RIGHT_DEFAULT,
+            footer_plan: (8., None, None),
             sidebar_in_medium: false,
             narrow: Pane::Session,
             restoring: Vec::new(),
@@ -1506,7 +1509,7 @@ impl Shell {
             .flex()
             .flex_none()
             .items_center()
-            .gap(px(8.))
+            .gap(px(super::types::PANE_GAP))
             .h(gpui_kit::px(TITLE_BAR))
             .pl(gpui_kit::px(TRAFFIC_LIGHTS))
             .pr(px(12.))
@@ -1912,8 +1915,21 @@ impl Shell {
         // The strip lays its columns out from this width in this frame; the strip keeps 8 px each side.
         // The strip pads its sides by 8; next to the sidebar's card the left pad is the panels' own gap.
         let inset = super::types::PANE_GAP;
+        // The bar's cards stand under the columns: the sidebar's, the session's and the right pane's, a panels' gap below them.
+        self.footer_plan = (
+            rail + super::types::PANE_GAP,
+            widths.sidebar.map(|w| w - super::types::PANE_GAP),
+            widths.right.map(|w| w - 8. - super::types::PANE_GAP),
+        );
+        let (lead, tail) = (self.footer_plan.1, self.footer_plan.2);
+        self.vitals.update(cx, |v, cx| {
+            if v.set_columns(lead, tail) {
+                cx.notify();
+            }
+        });
         self.panels.update(cx, |p, cx| {
             p.set_inset_left(inset, cx);
+            p.set_inset_bottom(0., cx);
             p.fit_to(widths.agent - inset - 8., cx)
         });
         let wash = cx.theme().muted_hover();
@@ -1949,7 +1965,7 @@ impl Shell {
                 cx.notify();
             }))
             .child(self.view_rail(widths.sidebar.is_some(), cx))
-            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pb(px(8.)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
+            .children(widths.sidebar.map(|w| div().relative().flex_none().w(px(w)).h_full().pl(px(super::types::PANE_GAP)).child(div().size_full().rounded(radius::xl()).overflow_hidden().bg(cx.theme().card).child(self.part("sidebar", self.sidebar(cx).into_any_element()))).child(handle(Edge::Sidebar))))
             .child(div().flex_1().min_w_0().h_full().child(self.part("panels", self.center(project, window, cx))))
             .children(widths.right.map(|w| div().relative().flex_none().w(px(w)).h_full().child(self.part("right", self.right_pane(project, cx))).child(handle(Edge::Right))))
             .into_any_element()
@@ -2001,8 +2017,15 @@ impl Shell {
             Pane::Projects => self.sidebar(cx).into_any_element(),
             Pane::Session => {
                 let total = atelier_ui::scale::design(window.viewport_size().width);
+                self.footer_plan = (8., None, None);
+                self.vitals.update(cx, |v, cx| {
+                    if v.set_columns(None, None) {
+                        cx.notify();
+                    }
+                });
                 self.panels.update(cx, |p, cx| {
                     p.set_inset_left(8., cx);
+                    p.set_inset_bottom(0., cx);
                     p.fit_to(total - 16., cx)
                 });
                 self.center(project, window, cx)

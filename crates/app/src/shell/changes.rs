@@ -104,7 +104,7 @@ impl Shell {
     pub(super) fn changes_main(&self, project: &Entity<OpenProject>, cx: &mut Context<Self>) -> AnyElement {
         let p = project.read(cx);
         if let Some((pane, _)) = p.review.as_ref() {
-            return div().debug_selector(|| "review-in-place".into()).size_full().pl(px(super::types::PANE_GAP)).pr(px(8.)).pb(px(8.)).child(pane.clone()).into_any_element();
+            return div().debug_selector(|| "review-in-place".into()).size_full().pl(px(super::types::PANE_GAP)).pr(px(8.)).child(pane.clone()).into_any_element();
         }
         let muted = cx.theme().muted_foreground;
         let this = cx.entity().downgrade();
@@ -117,7 +117,7 @@ impl Shell {
                     .flex()
                     .flex_col()
                     .gap(px(4.))
-                    .pb(px(8.))
+                    
                     .child(div().text_size(TextSize::Base.font_size()).font_weight(FontWeight::MEDIUM).child(format!("Uncommitted on {branch}")))
                     .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(match files.len() {
                         1 => "1 file".to_string(),
