@@ -130,19 +130,34 @@ fn a_drag_on_the_settings_page_does_not_wake_the_reply_box_of_the_conversation_u
     assert!(cx.debug_bounds("selection-reply-box").is_none(), "no reply box over the Settings page");
     assert_eq!(cx.update(|window, cx| window.focused(cx)), focus_before, "and the focus stays where it was");
 }
-/// The title bar's right side is a row of controls, none over another: the layout menu, the version and the Settings button.
+/// The title bar's right side is a row of controls, none over another: the layout menu and the Settings button. The
+/// version is not there: it stands at the left of the status bar, left of the CPU.
 #[gpui_kit::test]
-fn the_version_does_not_lie_over_the_layout_menu_or_the_settings_button(cx: &mut TestAppContext) {
+fn the_title_bar_holds_no_version_and_the_status_bar_leads_with_it(cx: &mut TestAppContext) {
     for width in [1400., 1000., 760.] {
         let (shell, cx, _dir) = with_a_session(cx, width);
+        shell.update(cx, |shell, cx| shell.sample_vitals(cx));
         settle(&shell, cx);
-        let version = cx.debug_bounds("version-button").expect("the version is drawn");
+        assert!(cx.debug_bounds("version-button").is_none(), "{width}: the title bar has no version");
         let gear = cx.debug_bounds("settings-entry").expect("the Settings button is drawn");
-        assert!(version.right() <= gear.left(), "{width}: the version {version:?} stands left of the gear {gear:?}");
         if let Some(layout) = cx.debug_bounds("layout-menu") {
-            assert!(layout.right() <= version.left() || layout.left() >= version.right(), "{width}: the layout menu {layout:?} and the version {version:?} do not overlap");
+            assert!(layout.right() <= gear.left(), "{width}: the layout menu {layout:?} stands left of the gear {gear:?}");
         }
+        let version = cx.debug_bounds("status-version").expect("the version is drawn in the status bar");
+        let cpu = cx.debug_bounds("status-cpu").expect("the CPU is drawn");
+        assert!(version.right() <= cpu.left(), "{width}: the version {version:?} stands left of the CPU {cpu:?}");
+        assert!(cpu.left() > version.center().x, "{width}: the CPU is at the right of the bar");
     }
+}
+/// A press on the version in the status bar opens the changelog.
+#[gpui_kit::test]
+fn a_press_on_the_version_opens_the_changelog(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1200.);
+    settle(&shell, cx);
+    let version = cx.debug_bounds("status-version").expect("the version is drawn in the status bar");
+    cx.simulate_click(version.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(shell.read_with(cx, |s, _| s.changelog_open), "the changelog is open");
 }
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
@@ -942,8 +957,7 @@ fn the_tabs_leave_room_for_the_layout_menu() {
     // The session area reaches the window's edge: the ⋯ is left of the Settings button.
     assert_eq!(tab_room(1400., Some(1400.)), 32.);
     // A pane at the right shortens the area: the ⋯ is at its right edge, and the tabs end before it.
-    // The version label stands between the ⋯ and the Settings button: the room is that much less.
-    assert_eq!(tab_room(1400., Some(1000.)), 1400. - 48. - super::types::VERSION_ROOM - (1000. - 36. - 8.));
+    assert_eq!(tab_room(1400., Some(1000.)), 1400. - 48. - (1000. - 36. - 8.));
     assert_eq!(tab_room(1400., None), 36.);
 }
 
@@ -1457,7 +1471,7 @@ fn the_foot_of_the_window_has_the_status_bar_once_a_project_is_open(cx: &mut Tes
     let bar = cx.debug_bounds("status-bar").expect("the bar is drawn");
     assert!(cx.debug_bounds("status-cpu").is_some() && cx.debug_bounds("status-memory").is_some(), "the machine shows after a sample");
     let panes = cx.debug_bounds("sessions-view").expect("the panes are drawn");
-    let (machine, main) = (cx.debug_bounds("status-card-cpu").expect("a card under the sidebar"), cx.debug_bounds("status-card-main").expect("a card under the session"));
+    let (machine, main) = (cx.debug_bounds("status-card-version").expect("the version card under the sidebar"), cx.debug_bounds("status-card-main").expect("a card under the session"));
     // The first card stands under the sidebar: past the rail and the panels' gap, not under the rail. The next is a panels' gap on.
     let first = f32::from(panes.left()) + atelier_ui::view_rail::WIDTH + super::types::PANE_GAP;
     assert!((f32::from(machine.left()) - first).abs() < 0.6, "the first card starts at {:?}, not past the rail", machine.left());
@@ -1586,9 +1600,9 @@ fn the_bar_has_a_card_under_the_right_pane(cx: &mut TestAppContext) {
     let (lead, tail) = (lead.expect("a sidebar"), tail.expect("a right pane"));
     let bar = cx.debug_bounds("status-bar").expect("the bar is drawn");
     let (cpu, main, providers) = (
-        cx.debug_bounds("status-card-cpu").unwrap(),
+        cx.debug_bounds("status-card-version").unwrap(),
         cx.debug_bounds("status-card-main").unwrap(),
-        cx.debug_bounds("status-card-providers").expect("a card under the right pane"),
+        cx.debug_bounds("status-card-load").expect("the CPU and RAM card under the right pane"),
     );
     let near = |a: f32, b: f32| (a - b).abs() < 0.6;
     assert!(near(f32::from(cpu.size.width), lead) && near(f32::from(providers.size.width), tail), "the cards are the columns' widths");
@@ -1645,7 +1659,7 @@ fn zoomed_the_title_bar_and_the_foot_keep_their_gaps(cx: &mut TestAppContext) {
     if let Some(tabs) = bar {
         assert!(tabs.bottom() < panes.top(), "the tabs end above the panes: {:?} against {:?}", tabs.bottom(), panes.top());
     }
-    let cpu = cx.debug_bounds("status-card-cpu").expect("the foot is drawn");
+    let cpu = cx.debug_bounds("status-card-version").expect("the foot is drawn");
     let first = (atelier_ui::view_rail::WIDTH + super::types::PANE_GAP) * zoom;
     assert!(near(cpu.left(), first), "the first card of the foot starts past the rail and the gap, zoomed: {:?} against {first}", cpu.left());
     for _ in 0..5 {

@@ -1530,7 +1530,6 @@ impl Shell {
             .children(self.layout_button(cx))
             .child(room)
             .children(self.update_chip(cx).map(|chip| div().flex_none().mr(px(4.)).child(chip)))
-            .child(self.version_button(cx))
             .child(self.settings_button(cx))
     }
 
@@ -1656,8 +1655,8 @@ impl Shell {
         // The Settings button holds the window's top right corner; the layout menu stands left of it.
         let at = div().absolute().top(px(7.));
         let at = match self.session_right {
-            Some(right) => at.left(px((right - 36.).min(self.width - 72. - super::types::VERSION_ROOM))),
-            None => at.right(px(48. + super::types::VERSION_ROOM)),
+            Some(right) => at.left(px((right - 36.).min(self.width - 72.))),
+            None => at.right(px(48.)),
         };
         Some(at.child(div().relative().child(button).children(menu)).into_any_element())
     }
