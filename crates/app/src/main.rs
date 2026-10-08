@@ -30,6 +30,7 @@ mod handoff_targets;
 mod history;
 mod key_table;
 mod list_diff;
+mod login_path;
 mod look_rules;
 mod memory;
 mod open_project;
@@ -62,6 +63,8 @@ mod view_cache;
 mod worktrees;
 
 fn main() {
+    // Before any thread: an app opened from the Finder, or restarted by the updater, has a bare PATH.
+    login_path::adopt();
     exit_log::install();
     let started = timings::mark_start();
     if let Err(error) = atelier_project::adopt_old_data(None) {
