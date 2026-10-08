@@ -1,4 +1,6 @@
 use gpui_kit::Hsla;
+/// The least contrast for ink on a page: WCAG AA for normal text.
+const READABLE: f32 = 4.5;
 /// One colour of the app's palette, in the order they are handed out to things that need a run of different ones.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Hue {
@@ -26,5 +28,14 @@ impl Hue {
     }
     pub fn hsla(self) -> Hsla {
         gpui_kit::rgb(self.rgb()).into()
+    }
+    /// The hue as ink on `background`: the hue itself when it reads there (4.5 to 1, as text needs), else the same hue made
+    /// darker a step at a time until it does. The palette is made for a dark page; on a light one the pale hues need this.
+    pub fn on(self, background: Hsla) -> Hsla {
+        let mut ink = self.hsla();
+        while atelier_ui::theme::contrast(ink, background) < READABLE && ink.l > 0.05 {
+            ink.l -= 0.01;
+        }
+        ink
     }
 }

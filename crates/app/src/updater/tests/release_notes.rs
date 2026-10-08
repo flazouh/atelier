@@ -59,7 +59,8 @@ fn each_kind_has_its_own_palette_colour() {
     let kinds = ReleaseKind::ALL;
     for (i, a) in kinds.iter().enumerate() {
         for b in &kinds[i + 1..] {
-            assert_ne!(super::super::kind_color(*a), super::super::kind_color(*b), "{a:?} and {b:?} share a colour");
+            let theme = atelier_ui::theme::Theme::light();
+            assert_ne!(super::super::kind_color(*a, &theme), super::super::kind_color(*b, &theme), "{a:?} and {b:?} share a colour");
         }
     }
 }
