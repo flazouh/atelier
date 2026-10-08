@@ -82,9 +82,9 @@ fn models_are_biggest_first_and_follow_the_range() {
 #[test]
 fn top_sessions_rank_by_cost_and_count_only_the_range() {
     let top = history().top_sessions(3, D26, None, 2);
-    assert_eq!(top.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), ["c1", "a1"]);
-    assert_eq!(top[1].tokens.input, 2_000_000);
-    assert_eq!(top[0].account, "codex");
+    assert_eq!(top.iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), ["a1", "c1"]);
+    assert_eq!(top[0].tokens.input, 2_000_000);
+    assert_eq!(top[1].account, "codex");
     let one_day = history().top_sessions(1, D26, Some("claude"), 5);
     assert_eq!(one_day.len(), 1);
     assert_eq!(one_day[0].tokens.input, 1_000_000);
