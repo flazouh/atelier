@@ -1,7 +1,7 @@
 //! The update's own look: a chip in the title bar while an update downloads and when it is ready, and one panel with the
 //! changelog and the choice to restart or wait. Sparkle's own windows are not used.
 use atelier_ui::{
-    AgentText,
+    ReleaseNote, ReleaseSheet,
     button::{Button, ButtonSize, ButtonVariant},
     modal::Modal,
     theme::ActiveTheme,
@@ -11,7 +11,7 @@ use atelier_ui::scale::px;
 use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled, div};
 
 use super::structs::Shell;
-use crate::updater::UpdateState;
+use crate::updater::{UpdateState, release_notes};
 
 /// What a changelog the feed did not carry says.
 const NO_NOTES: &str = "This version has no release notes.";
@@ -48,57 +48,30 @@ impl Shell {
         }
     }
 
-    /// The panel over the window while the reader reads the changelog: Later keeps the update for the next quit, and Restart
-    /// installs it now. Escape and a press outside are Later.
+    /// The panel over the window while the reader reads the changelog: Later keeps the update for the next quit, and
+    /// Restart installs it now. Escape and a press outside are Later.
     pub(super) fn update_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let UpdateState::Ready { version, notes } = &self.update else { return None };
         if !self.update_modal {
             return None;
         }
-        let theme = cx.theme().clone();
         let (later, close, install) = (cx.entity().downgrade(), cx.entity().downgrade(), cx.entity().downgrade());
-        let title = if version.is_empty() { "A new version of atelier is ready".to_string() } else { format!("atelier {version} is ready") };
-        let notes: SharedString = if notes.trim().is_empty() { NO_NOTES.into() } else { notes.clone().into() };
-        let body = div()
-            .debug_selector(|| "update-notes".into())
-            .id("update-notes")
-            .max_h(px(320.))
-            .overflow_y_scroll()
-            .child(AgentText::new("update-notes-text", notes));
-        let actions = div()
-            .flex()
-            .justify_end()
-            .gap(px(8.))
-            .child(
-                Button::new("update-later")
-                    .debug_name("update-later")
-                    .label("Later")
-                    .variant(ButtonVariant::Ghost)
-                    .on_click(move |_, _, cx| drop(later.update(cx, |shell, cx| shell.update_later(cx)))),
-            )
-            .child(
-                Button::new("update-restart")
-                    .debug_name("update-restart")
-                    .label("Restart and update")
-                    .variant(ButtonVariant::Primary)
-                    .on_click(move |_, _, cx| drop(install.update(cx, |shell, cx| shell.update_install(cx)))),
-            );
+        let version: SharedString = if version.is_empty() { "the new version".into() } else { version.clone().into() };
+        let mut lines = release_notes(notes);
+        if lines.is_empty() {
+            lines.push(crate::updater::NoteLine { lead: NO_NOTES.into(), text: String::new() });
+        }
+        let sheet = ReleaseSheet::new("update-sheet", version)
+            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text)))
+            .on_later(move |_, cx| drop(later.update(cx, |shell, cx| shell.update_later(cx))))
+            .on_install(move |_, cx| drop(install.update(cx, |shell, cx| shell.update_install(cx))));
         Some(
             Modal::new("update-ready")
                 .width(520.)
+                .flush()
                 .focus(&self.update_focus)
                 .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.update_later(cx))))
-                .child(
-                    div()
-                        .track_focus(&self.update_focus)
-                        .flex()
-                        .flex_col()
-                        .gap(px(14.))
-                        .p(px(20.))
-                        .child(div().text_size(TextSize::Lg.font_size()).text_color(theme.foreground).child(title))
-                        .child(body)
-                        .child(actions),
-                )
+                .child(div().track_focus(&self.update_focus).child(sheet))
                 .into_any_element(),
         )
     }
