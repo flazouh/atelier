@@ -58,7 +58,12 @@ fn replay(name: &str, goal: Goal) -> Replay {
 }
 
 fn request(line: &Value) -> Value {
-    serde_json::json!({ "method": line["method"], "params": line["params"] })
+    // The version atelier names itself by is the crate's, which a release changes: the capture was made at another one.
+    let mut params = line["params"].clone();
+    if let Some(version) = params.pointer_mut("/clientInfo/version") {
+        *version = Value::String("-".into());
+    }
+    serde_json::json!({ "method": line["method"], "params": params })
 }
 
 /// The command of atelier's that writes what the capture's client wrote. The handshake and the answers to
