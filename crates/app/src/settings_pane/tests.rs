@@ -32,7 +32,7 @@ fn open<'a>(saved: &atelier_settings::Settings, cx: &'a mut TestAppContext) -> (
     let closed = Rc::new(Cell::new(0));
     let counter = closed.clone();
     let saved = saved.clone();
-    let agents = vec![AgentRow { name: "Claude Code".into(), mark: None, models: vec!["Opus".into(), "Sonnet".into()] }, AgentRow { name: "atelier".into(), mark: None, models: Vec::new() }];
+    let agents = vec![AgentRow { name: "Claude Code".into(), mark: None, backend: "claude-code".into() }, AgentRow { name: "atelier".into(), mark: None, backend: "atelier".into() }];
     let (pane, cx) = cx.add_window_view(move |_, cx| SettingsPane::new(&saved, agents, cx));
     cx.update(|window, cx| {
         let sub = cx.subscribe(&pane, move |_, event: &SettingsEvent, _| {

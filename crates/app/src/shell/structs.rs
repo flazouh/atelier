@@ -719,7 +719,7 @@ impl Shell {
             .map(|agent| crate::settings_pane::AgentRow {
                 name: agent.name.into(),
                 mark: agent.mark.clone(),
-                models: agent.backend.capabilities().models.into_iter().map(|m| SharedString::from(m.label)).collect(),
+                backend: agent.backend.name().to_string().into(),
             })
             .collect();
         let pane = cx.new(|cx| crate::settings_pane::SettingsPane::new(&saved, agents, cx));

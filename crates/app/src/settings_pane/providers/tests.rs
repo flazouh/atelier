@@ -48,7 +48,7 @@ fn open(services: ProviderServices, cx: &mut TestAppContext) -> (Entity<Settings
         cx.set_reduce_motion(true);
         cx.set_global(services);
     });
-    let agents = vec![AgentRow { name: "Claude Code".into(), mark: None, models: Vec::new() }];
+    let agents = vec![AgentRow { name: "Claude Code".into(), mark: None, backend: "claude-code".into() }];
     let (pane, cx) = cx.add_window_view(move |_, cx| SettingsPane::new(&atelier_settings::Settings::default(), agents, cx));
     cx.simulate_resize(gpui_kit::size(px(900.), px(900.)));
     settle(cx);

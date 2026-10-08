@@ -32,7 +32,8 @@ pub struct AgentRow {
     pub name: SharedString,
     /// Its mark, or `None` for a monogram.
     pub mark: Option<atelier_ui::BrandMark>,
-    pub models: Vec<SharedString>,
+    /// The agent's backend name, which its models are kept under.
+    pub backend: SharedString,
 }
 
 pub struct SettingsPane {
@@ -225,10 +226,23 @@ impl Render for SettingsPane {
                 .children(chord.map(|c| Kbd::new(keys::cap(c))))
         });
 
+        let pane = cx.entity().downgrade();
         let agent_rows = self.agents.iter().enumerate().map(|(i, agent)| {
+            let found = atelier_agents::registry::by_backend(&agent.backend);
+            let (rows, default) = match &found {
+                Some(found) => {
+                    let list = crate::agent_models::offered(found, cx);
+                    let rows: Vec<atelier_ui::ModelRow> = list.iter().map(|m| atelier_ui::ModelRow::new(m.id.clone(), m.label.clone())).collect();
+                    (rows, crate::agent_models::start_model(found, cx).map(SharedString::from))
+                }
+                None => (Vec::new(), None),
+            };
+            let (star_pane, drag_pane) = (pane.clone(), pane.clone());
+            let (star_backend, drag_backend) = (agent.backend.to_string(), agent.backend.to_string());
             div()
                 .debug_selector(move || format!("agent-row-{i}"))
                 .flex()
+                .items_start()
                 .gap(px(12.))
                 .py(px(8.))
                 .child(
@@ -237,17 +251,33 @@ impl Render for SettingsPane {
                         .flex_none()
                         .flex()
                         .items_center()
+                        .h(px(32.))
                         .gap(px(8.))
                         .text_size(TextSize::Sm.font_size())
                         .text_color(theme.foreground)
-                        .child(atelier_ui::menu::lead_icon(&agent.name, atelier_ui::menu::Lead::of(agent.mark.clone()), 14., &theme))
+                        .child(atelier_ui::menu::lead_icon(&agent.name, atelier_ui::menu::Lead::of(agent.mark.clone()), 16., &theme))
                         .child(agent.name.clone()),
                 )
-                .child(div().flex_1().min_w_0().text_size(TextSize::Xs.font_size()).text_color(muted).child(if agent.models.is_empty() {
-                    SharedString::from(t(&words::NO_MODEL_TO_PICK))
+                .child(if rows.is_empty() {
+                    div().flex_1().min_w_0().h(px(32.)).flex().items_center().text_size(TextSize::Xs.font_size()).text_color(muted).child(SharedString::from(t(&words::NO_MODEL_TO_PICK))).into_any_element()
                 } else {
-                    SharedString::from(agent.models.iter().map(|m| m.as_ref()).collect::<Vec<_>>().join(", "))
-                }))
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .child(
+                            atelier_ui::ModelList::new(format!("agent-models-{i}"), agent.backend.clone(), rows)
+                                .default(default)
+                                .on_default(move |id, _, cx| {
+                                    crate::agent_models::choose_default(&star_backend, id, cx);
+                                    star_pane.update(cx, |_, cx| cx.notify()).ok();
+                                })
+                                .on_reorder(move |order, _, cx| {
+                                    crate::agent_models::reorder(&drag_backend, order.iter().map(|s| s.to_string()).collect(), cx);
+                                    drag_pane.update(cx, |_, cx| cx.notify()).ok();
+                                }),
+                        )
+                        .into_any_element()
+                })
         });
 
         let languages = {

@@ -27,7 +27,20 @@ pub(super) fn parse(text: &str) -> Result<Vec<ModelChoice>, String> {
                 .collect()
         })
         .unwrap_or_default();
-    if models.is_empty() { Err("Anthropic listed no models".into()) } else { Ok(models) }
+    if models.is_empty() {
+        return Err("Anthropic listed no models".into());
+    }
+    // Grouped as the plain names were (Opus, Sonnet, Haiku, then the others), the newest of each first: the first of the list is the
+    // agent's usual model, and a list sorted by date alone would start on a Haiku.
+    let family = |id: &str| match id.strip_prefix("claude-").and_then(|r| r.split('-').next()) {
+        Some("opus") => 0,
+        Some("sonnet") => 1,
+        Some("haiku") => 2,
+        _ => 3,
+    };
+    let mut models = models;
+    models.sort_by_key(|m| family(&m.id));
+    Ok(models)
 }
 
 /// Asks for the models, with the sign-in of `project`'s host.

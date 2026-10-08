@@ -247,10 +247,7 @@ impl AgentSession {
                 }
             }
         });
-        let models: Vec<PromptModel> = agent
-            .backend
-            .capabilities()
-            .models
+        let models: Vec<PromptModel> = crate::agent_models::offered(&agent, cx)
             .iter()
             .map(|m| {
                 let model = PromptModel::new(m.id.clone(), m.label.clone());
@@ -260,12 +257,16 @@ impl AgentSession {
                 }
             })
             .collect();
+        let start_model = resume.is_none().then(|| crate::agent_models::start_model(&agent, cx)).flatten();
         let start_mode = resume.is_none().then(|| agent.backend.capabilities().default_mode).flatten();
         let offered = agent.backend.capabilities().permission_modes;
         let modes: Vec<SharedString> = offered.iter().map(|m| mode_word(*m).into()).collect();
         let mode_icons: Vec<_> = offered.iter().map(|m| mode_look(*m)).collect();
         let composer = cx.new(|cx| {
             let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes).mode_icons(mode_icons);
+            if let Some(model) = &start_model {
+                input = input.model(model.clone());
+            }
             input.set_dictation(true, cx);
             if let Some(mode) = start_mode {
                 input.set_mode(mode_word(mode), cx);
@@ -367,7 +368,7 @@ impl AgentSession {
             limit_clock: Task::ready(()),
             signer: Default::default(),
             seen: false,
-            model: None,
+            model: start_model,
             mode: start_mode,
             provider: agent_has_providers.then(|| provider.or_else(|| resume.is_none().then(|| crate::providers::default_choice(cx)))).flatten(),
             handoff: None,
