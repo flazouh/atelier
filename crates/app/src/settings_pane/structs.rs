@@ -231,14 +231,15 @@ impl Render for SettingsPane {
             let found = atelier_agents::registry::by_backend(&agent.backend);
             let (rows, default) = match &found {
                 Some(found) => {
-                    let list = crate::agent_models::offered(found, cx);
-                    let rows: Vec<atelier_ui::ModelRow> = list.iter().map(|m| atelier_ui::ModelRow::new(m.id.clone(), m.label.clone())).collect();
+                    let list = crate::agent_models::all(found, cx);
+                    let rows: Vec<atelier_ui::ModelRow> =
+                        list.iter().map(|(m, hidden)| atelier_ui::ModelRow::new(m.id.clone(), m.label.clone()).hidden(*hidden)).collect();
                     (rows, crate::agent_models::start_model(found, cx).map(SharedString::from))
                 }
                 None => (Vec::new(), None),
             };
-            let (star_pane, drag_pane) = (pane.clone(), pane.clone());
-            let (star_backend, drag_backend) = (agent.backend.to_string(), agent.backend.to_string());
+            let (star_pane, drag_pane, eye_pane) = (pane.clone(), pane.clone(), pane.clone());
+            let (star_backend, drag_backend, eye_backend) = (agent.backend.to_string(), agent.backend.to_string(), agent.backend.to_string());
             div()
                 .debug_selector(move || format!("agent-row-{i}"))
                 .flex()
@@ -270,6 +271,10 @@ impl Render for SettingsPane {
                                 .on_default(move |id, _, cx| {
                                     crate::agent_models::choose_default(&star_backend, id, cx);
                                     star_pane.update(cx, |_, cx| cx.notify()).ok();
+                                })
+                                .on_hide(move |id, hidden, _, cx| {
+                                    crate::agent_models::set_hidden(&eye_backend, id, hidden, cx);
+                                    eye_pane.update(cx, |_, cx| cx.notify()).ok();
                                 })
                                 .on_reorder(move |order, _, cx| {
                                     crate::agent_models::reorder(&drag_backend, order.iter().map(|s| s.to_string()).collect(), cx);

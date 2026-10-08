@@ -240,8 +240,17 @@ fn a_default_that_the_list_no_longer_has_is_none() {
 #[test]
 fn the_models_survive_a_save_and_an_older_file_has_none() {
     let mut settings = Settings::default();
-    settings.agent_models.insert("claude-code".into(), AgentModels { default: Some("x".into()), order: vec!["x".into()], known: pairs(&[("x", "X")]) });
+    settings.agent_models.insert("claude-code".into(), AgentModels { default: Some("x".into()), order: vec!["x".into()], known: pairs(&[("x", "X")]), hidden: vec!["y".into()] });
     let back: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
     assert_eq!(back.agent_models, settings.agent_models);
     assert!(serde_json::from_str::<Settings>("{}").unwrap().agent_models.is_empty());
+}
+
+#[test]
+fn a_hidden_model_leaves_the_picker_but_the_default_and_the_last_one_stay() {
+    let list = pairs(&[("a", "A"), ("b", "B"), ("c", "C")]);
+    let prefs = AgentModels { hidden: vec!["b".into(), "c".into()], default: Some("c".into()), ..AgentModels::default() };
+    assert_eq!(prefs.visible(&list), pairs(&[("a", "A"), ("c", "C")]), "b is hidden, the default c is not");
+    let all_hidden = AgentModels { hidden: vec!["a".into(), "b".into(), "c".into()], ..AgentModels::default() };
+    assert_eq!(all_hidden.visible(&list), list, "a picker is never empty");
 }
