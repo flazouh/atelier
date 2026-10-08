@@ -1235,3 +1235,21 @@ fn each_mode_has_its_own_icon_and_colour() {
         }
     }
 }
+
+/// The star, the eye and the drag of the composer's model picker reach the reader's arrangement: the default is the one starred, and
+/// the picker follows.
+#[gpui_kit::test]
+fn the_pickers_star_sets_the_default_model(cx: &mut TestAppContext) {
+    use atelier_ui::PromptInputEvent;
+    let (session, _fake, cx) = crate::fake_agent::start_in_auto(cx);
+    let name = cx.update(|_, cx| session.read(cx).agent.backend.name().to_string());
+    let composer = cx.update(|_, cx| session.read(cx).composer.clone());
+    cx.update(|_, cx| composer.update(cx, |_, cx| cx.emit(PromptInputEvent::ModelStarred("starred-model".into()))));
+    cx.run_until_parked();
+    let default = cx.update(|_, cx| cx.try_global::<crate::agent_models::ModelPrefs>().and_then(|p| p.0.get(&name)).and_then(|p| p.default.clone()));
+    assert_eq!(default.as_deref(), Some("starred-model"));
+    cx.update(|_, cx| composer.update(cx, |_, cx| cx.emit(PromptInputEvent::ModelHidden("hidden-model".into()))));
+    cx.run_until_parked();
+    let hidden = cx.update(|_, cx| cx.try_global::<crate::agent_models::ModelPrefs>().and_then(|p| p.0.get(&name)).map(|p| p.hidden.clone()));
+    assert_eq!(hidden, Some(vec!["hidden-model".to_string()]));
+}

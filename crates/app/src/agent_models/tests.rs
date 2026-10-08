@@ -54,3 +54,19 @@ fn a_hidden_model_is_in_settings_and_not_in_the_picker(cx: &mut TestAppContext) 
     let picker = cx.update(|cx| offered(&claude(), cx));
     assert_eq!(picker.len(), 2, "starring it brings it back");
 }
+
+/// A drag in the picker lists the visible models only: the hidden ones keep their places among the others in Settings.
+#[gpui_kit::test]
+fn dragging_the_visible_models_leaves_the_hidden_where_they_were(cx: &mut TestAppContext) {
+    let known: Vec<(String, String)> =
+        ["a", "b", "c", "d"].iter().map(|id| (format!("claude-{id}"), id.to_uppercase())).collect();
+    cx.update(|cx| {
+        let mut all = ModelPrefs::default();
+        all.0.insert("claude-code".into(), AgentModels { known, hidden: vec!["claude-b".into()], ..AgentModels::default() });
+        cx.set_global(all);
+        // The picker lists a, c, d; the reader drags d to the top.
+        super::reorder_visible(&claude(), vec!["claude-d".into(), "claude-a".into(), "claude-c".into()], cx);
+    });
+    let settings: Vec<String> = cx.update(|cx| super::all(&claude(), cx).into_iter().map(|(m, _)| m.id).collect());
+    assert_eq!(settings, ["claude-d", "claude-b", "claude-a", "claude-c"], "b stays in the second place, which was b's");
+}
