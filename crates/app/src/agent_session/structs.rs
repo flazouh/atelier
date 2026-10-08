@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
 use futures_util::StreamExt;
-use atelier_ui::{ReplyPreset, VoiceInputEvent, PromptInput, PromptInputEvent, PromptModel, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
+use atelier_ui::{IconName, ReplyPreset, badge::Tone, VoiceInputEvent, PromptInput, PromptInputEvent, PromptModel, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString,
     Subscription, Task, Window,
@@ -292,10 +292,10 @@ impl AgentSession {
             cx.notify();
         });
         let reply = cx.new(|cx| SelectionReply::new(window, cx).add_label("Add").dictation(true).presets(vec![
-            ReplyPreset::new("Explain", "Explain this."),
-            ReplyPreset::new("Why?", "Why is it this way?"),
-            ReplyPreset::new("Fix", "Fix this."),
-            ReplyPreset::new("Shorter", "Make this shorter."),
+            ReplyPreset::new("Explain", "Explain this.").icon(IconName::Idea).tone(Tone::Info),
+            ReplyPreset::new("Why?", "Why is it this way?").icon(IconName::Help).tone(Tone::Warning),
+            ReplyPreset::new("Fix", "Fix this.").icon(IconName::Build).tone(Tone::Success),
+            ReplyPreset::new("Shorter", "Make this shorter.").icon(IconName::CloseFullscreen).tone(Tone::Neutral),
         ]));
         let _reply = cx.subscribe_in(&reply, window, |this, _, event: &SelectionReplyEvent, window, cx| match event {
             SelectionReplyEvent::Reply { quote, note, key } => this.quoted(quote, note, key.clone(), cx),
