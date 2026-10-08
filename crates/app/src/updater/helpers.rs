@@ -25,21 +25,44 @@ fn capital(text: &str) -> String {
     letters.next().map_or_else(String::new, |first| first.to_uppercase().chain(letters).collect())
 }
 
-/// Which kind a `###` heading names: "New", "Fixed", else "Improved".
+/// Which kind a `###` heading names, by a word in it: "New" or "Added", "Faster" or "Performance", "Fixed" or "Bug", "Changed",
+/// "Design"; else "Improved".
 fn kind_of(heading: &str) -> atelier_ui::ReleaseKind {
+    use atelier_ui::ReleaseKind::{Added, Changed, Design, Faster, Fixed, Improved};
     let heading = heading.to_lowercase();
-    if heading.contains("new") {
-        atelier_ui::ReleaseKind::New
-    } else if heading.contains("fix") {
-        atelier_ui::ReleaseKind::Fixed
+    let has = |words: &[&str]| words.iter().any(|word| heading.contains(word));
+    if has(&["new", "add"]) {
+        Added
+    } else if has(&["fix", "bug"]) {
+        Fixed
+    } else if has(&["fast", "perf", "speed"]) {
+        Faster
+    } else if has(&["chang"]) {
+        Changed
+    } else if has(&["design", "look"]) {
+        Design
     } else {
-        atelier_ui::ReleaseKind::Improved
+        Improved
     }
 }
-
+/// The colour of a kind of note, from the app's palette: green for added, purple for improved, orange for faster, red for
+/// fixed, blue for changed and pink for design.
+pub fn kind_color(kind: atelier_ui::ReleaseKind) -> gpui_kit::Hsla {
+    use crate::palette::Hue;
+    use atelier_ui::ReleaseKind::{Added, Changed, Design, Faster, Fixed, Improved};
+    match kind {
+        Added => Hue::Green,
+        Improved => Hue::Purple,
+        Faster => Hue::Orange,
+        Fixed => Hue::Red,
+        Changed => Hue::Blue,
+        Design => Hue::Pink,
+    }
+    .hsla()
+}
 /// The lines of a changelog written in markdown. A bullet that opens with a bold lead ("- **Fixes:** a row fills the
 /// width") gives its lead and its text, and takes its kind from the last `###` heading ("### New", "### Improved",
-/// "### Fixed"; Improved before any). Other headings are the sheet's own, so they are dropped. A changelog with no bullet
+/// "### Faster", "### Fixed", "### Changed", "### Design"; Improved before any). Other headings are the sheet's own, so they are dropped. A changelog with no bullet
 /// is one line of its words, and none at all is none.
 pub fn release_notes(markdown: &str) -> Vec<NoteLine> {
     let mut kind = atelier_ui::ReleaseKind::Improved;

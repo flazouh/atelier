@@ -1,0 +1,2 @@
+[patch."https://github.com/flazouh/atelier-ui"]
+atelier-ui = { path = "/home/alex/code/local/atelier-ui.wt/slot-11" }
