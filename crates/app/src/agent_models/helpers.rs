@@ -40,6 +40,12 @@ pub fn start_model(agent: &Agent, cx: &App) -> Option<String> {
     prefs.default_in(&pairs).or_else(|| (!prefs.known.is_empty()).then(|| list.first().map(|m| m.id.clone())).flatten())
 }
 
+/// The model of the reader's star for `agent`, when the list has it: what the picker draws filled.
+pub fn default_model(agent: &Agent, cx: &App) -> Option<String> {
+    let pairs: Vec<(String, String)> = offered(agent, cx).into_iter().map(|m| (m.id, m.label)).collect();
+    prefs_of(agent.backend.name(), cx).default_in(&pairs)
+}
+
 /// The reader starred `id`: new sessions of the agent start on it.
 pub fn choose_default(backend: &str, id: &str, cx: &mut App) {
     let id = id.to_string();
@@ -64,6 +70,20 @@ pub fn set_hidden(backend: &str, id: &str, hidden: bool, cx: &mut App) {
 /// The reader sorted the list: every id, first to last.
 pub fn reorder(backend: &str, order: Vec<String>, cx: &mut App) {
     update(backend, move |p| p.order = order.clone(), cx);
+}
+
+/// The reader dragged the picker's list: `visible` is every model it lists, in the new order. The hidden ones keep their places among
+/// the others, so Settings still lists them where they were.
+pub fn reorder_visible(agent: &Agent, visible: Vec<String>, cx: &mut App) {
+    let all = all(agent, cx);
+    let mut next = visible.into_iter();
+    let order: Vec<String> = all
+        .iter()
+        .map(|(model, hidden)| if *hidden { Some(model.id.clone()) } else { next.next() })
+        .map(|id| id.unwrap_or_default())
+        .filter(|id| !id.is_empty())
+        .collect();
+    reorder(agent.backend.name(), order, cx);
 }
 
 /// Asks each agent that has a service of its own for its models, off the main thread, and keeps what comes. A failure keeps what was there.
