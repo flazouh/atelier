@@ -5,10 +5,10 @@ use atelier_ui::{
     button::{Button, ButtonSize, ButtonVariant},
     modal::Modal,
     theme::ActiveTheme,
-    typography::TextSize,
+    typography::{MONO_FONT_FAMILY, TextSize},
 };
 use atelier_ui::scale::px;
-use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, div};
+use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled, div};
 
 use super::structs::Shell;
 use crate::{
@@ -117,17 +117,29 @@ impl Shell {
         )
     }
 
-    /// The version that runs, small, at the right of the title bar. A press opens the changelog.
+    /// The version that runs, small, at the right of the title bar. A press opens the changelog. It is set in the mono font,
+    /// where the dots between the numbers stay apart at this size.
     pub(super) fn version_button(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity().downgrade();
-        let button = Button::new("version-button")
-            .debug_name("version-button")
-            .label(running_version())
-            .variant(ButtonVariant::Ghost)
-            .size(ButtonSize::Sm)
-            .tooltip("What is new in this version")
-            .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.show_changelog(cx))));
-        div().flex_none().mr(px(2.)).child(button).into_any_element()
+        let theme = cx.theme().clone();
+        div()
+            .id("version-button")
+            .debug_selector(|| "version-button".into())
+            .flex_none()
+            .flex()
+            .items_center()
+            .h(px(24.))
+            .px(px(8.))
+            .mr(px(2.))
+            .rounded(px(6.))
+            .font_family(MONO_FONT_FAMILY)
+            .text_size(TextSize::Xs.font_size())
+            .text_color(theme.muted_foreground)
+            .cursor_pointer()
+            .hover(move |style| style.bg(theme.card).text_color(theme.foreground))
+            .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.show_changelog(cx))))
+            .child(running_version())
+            .into_any_element()
     }
 
     /// The notes of the version that runs, with every earlier version under them.
