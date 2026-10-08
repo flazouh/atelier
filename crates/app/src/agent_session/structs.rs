@@ -7,7 +7,7 @@ use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
 use futures_util::StreamExt;
 use crate::palette::Hue;
-use atelier_ui::{IconName, ReplyPreset, VoiceInputEvent, PromptInput, PromptInputEvent, PromptModel, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
+use atelier_ui::{IconName, ReplyPreset, VoiceInputEvent, PromptInput, PromptInputEvent, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString,
     Subscription, Task, Window,
@@ -27,7 +27,7 @@ use crate::{
     tool_density::{ToolDensity, tool_density},
 };
 use super::types::{ARRIVAL_KEPT, OVERDRAW, SAVE_AFTER, SessionEvent};
-use super::helpers::{is_activity, mode_from, mode_look, mode_word, now, problem_words};
+use super::helpers::{is_activity, picker_models, mode_from, mode_look, mode_word, now, problem_words};
 
 impl EventEmitter<SessionEvent> for AgentSession {}
 
@@ -155,6 +155,7 @@ pub struct AgentSession {
     pub thinking_since: HashMap<atelier_agents::session::BlockId, Instant>,
     _composer: Subscription,
     _skills: Subscription,
+    _arranged: Subscription,
     _key: Subscription,
     _away: Subscription,
     /// How the list shows tool calls, as the Settings page set it: [`ToolDensity::Grouped`] folds a run of work into one row.
@@ -248,23 +249,14 @@ impl AgentSession {
                 }
             }
         });
-        let models: Vec<PromptModel> = crate::agent_models::offered(&agent, cx)
-            .iter()
-            .map(|m| {
-                let model = PromptModel::new(m.id.clone(), m.label.clone());
-                match atelier_agents::registry::model_mark(&m.id) {
-                    Some(mark) => model.mark(mark),
-                    None => model,
-                }
-            })
-            .collect();
+        let (models, _) = picker_models(&agent, cx);
         let start_model = resume.is_none().then(|| crate::agent_models::start_model(&agent, cx)).flatten();
         let start_mode = resume.is_none().then(|| agent.backend.capabilities().default_mode).flatten();
         let offered = agent.backend.capabilities().permission_modes;
         let modes: Vec<SharedString> = offered.iter().map(|m| mode_word(*m).into()).collect();
         let mode_icons: Vec<_> = offered.iter().map(|m| mode_look(*m)).collect();
         let composer = cx.new(|cx| {
-            let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes).mode_icons(mode_icons);
+            let mut input = PromptInput::new(format!("Ask {}", agent.name), "", window, cx).models(models).modes(modes).mode_icons(mode_icons).manage_models(true);
             if let Some(model) = &start_model {
                 input = input.model(model.clone());
             }
@@ -278,6 +270,8 @@ impl AgentSession {
             input.set_run_picked_skills(runs_picked_skills(cx));
             input
         });
+        // The reader arranges the models in a picker or in Settings: every session of the agent follows.
+        let _arranged = cx.observe_global::<crate::agent_models::ModelPrefs>(|this: &mut Self, cx| this.show_models(cx));
         let _skills = cx.observe_global::<RunPickedSkills>(|this: &mut Self, cx| {
             let run = runs_picked_skills(cx);
             this.composer.update(cx, |c, _| c.set_run_picked_skills(run));
@@ -322,6 +316,11 @@ impl AgentSession {
             PromptInputEvent::Unqueue(place) => this.unqueue(*place, cx),
             PromptInputEvent::SendQueued(place) => this.send_queued(*place, cx),
             PromptInputEvent::ModelChanged(model) => this.set_model(model.to_string(), cx),
+            PromptInputEvent::ModelStarred(model) => crate::agent_models::choose_default(this.agent.backend.name(), model, cx),
+            PromptInputEvent::ModelHidden(model) => crate::agent_models::set_hidden(this.agent.backend.name(), model, true, cx),
+            PromptInputEvent::ModelsMoved(order) => {
+                crate::agent_models::reorder_visible(&this.agent, order.iter().map(|s| s.to_string()).collect(), cx)
+            }
             PromptInputEvent::ModeChanged(mode) => {
                 if let Some(mode) = mode_from(mode) {
                     this.set_mode(mode, cx)
@@ -418,6 +417,7 @@ impl AgentSession {
             thinking_since: HashMap::new(),
             _composer,
             _skills,
+            _arranged,
             _key,
             _away,
             density: tool_density(cx),
@@ -941,6 +941,12 @@ impl AgentSession {
         self.refresh_rows();
         self.command(Command::AnswerQuestions { request: request.clone(), answers }, cx);
         cx.emit(SessionEvent::Changed);
+    }
+
+    /// Gives the composer's picker the models as the reader arranged them, and the star to the model new sessions start on.
+    fn show_models(&mut self, cx: &mut Context<Self>) {
+        let (models, default) = picker_models(&self.agent, cx);
+        self.composer.update(cx, |c, cx| c.set_models(models, default, cx));
     }
 
     pub fn set_model(&mut self, model: String, cx: &mut Context<Self>) {

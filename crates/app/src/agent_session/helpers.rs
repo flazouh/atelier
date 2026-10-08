@@ -57,3 +57,19 @@ pub(super) fn problem_words(error: &SessionError) -> String {
         other => other.to_string(),
     }
 }
+
+/// The models of `agent` as its composer's picker lists them, with the one that has the filled star: the reader's default when the list
+/// has it.
+pub(super) fn picker_models(agent: &atelier_agents::registry::Agent, cx: &gpui_kit::App) -> (Vec<atelier_ui::PromptModel>, Option<gpui_kit::SharedString>) {
+    let models: Vec<atelier_ui::PromptModel> = crate::agent_models::offered(agent, cx)
+        .iter()
+        .map(|m| {
+            let model = atelier_ui::PromptModel::new(m.id.clone(), m.label.clone());
+            match atelier_agents::registry::model_mark(&m.id) {
+                Some(mark) => model.mark(mark),
+                None => model,
+            }
+        })
+        .collect();
+    (models, crate::agent_models::default_model(agent, cx).map(gpui_kit::SharedString::from))
+}
