@@ -73,6 +73,8 @@ pub struct Settings {
     pub tool_density: Option<String>,
     /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
     pub sidebar_layout: SidebarSaved,
+    /// What the reader chose for each agent's models, and the list the agent last reported, by the agent's backend name.
+    pub agent_models: std::collections::BTreeMap<String, AgentModels>,
     /// Keys a newer or older atelier wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
@@ -110,5 +112,33 @@ impl Settings {
         self.recent.retain(|l| *l != location);
         self.recent.insert(0, location);
         self.recent.truncate(RECENT_LIMIT);
+    }
+}
+
+/// An agent's models as the reader arranged them: the one new sessions start on, the order they are listed in, and the list the
+/// agent last reported (its models change with its releases, so they are not written into the app).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AgentModels {
+    /// The id of the model new sessions start on. Unset: the agent's own default.
+    pub default: Option<String>,
+    /// Ids, first to last. A model not in it is listed after these, in the agent's order.
+    pub order: Vec<String>,
+    /// `(id, name)` for each model the agent last reported; empty until it has.
+    pub known: Vec<(String, String)>,
+}
+
+impl AgentModels {
+    /// The list to offer: what the agent last reported, else `offered` (its built-in list), in the reader's order.
+    pub fn arranged(&self, offered: &[(String, String)]) -> Vec<(String, String)> {
+        let base: &[(String, String)] = if self.known.is_empty() { offered } else { &self.known };
+        let mut out: Vec<(String, String)> = self.order.iter().filter_map(|id| base.iter().find(|(b, _)| b == id).cloned()).collect();
+        out.extend(base.iter().filter(|(id, _)| !self.order.contains(id)).cloned());
+        out
+    }
+
+    /// The default, when it is a model of `list`.
+    pub fn default_in(&self, list: &[(String, String)]) -> Option<String> {
+        self.default.clone().filter(|d| list.iter().any(|(id, _)| id == d))
     }
 }

@@ -211,3 +211,37 @@ fn an_open_session_with_no_provider_writes_none_and_reads_back() {
     assert!(!text.contains("provider"), "{text}");
     assert_eq!(serde_json::from_str::<OpenSession>(&text).unwrap(), saved);
 }
+
+fn pairs(of: &[(&str, &str)]) -> Vec<(String, String)> {
+    of.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect()
+}
+
+#[test]
+fn the_models_follow_the_readers_order_then_the_agents() {
+    let prefs = AgentModels { order: vec!["c".into(), "a".into(), "gone".into()], ..AgentModels::default() };
+    let list = prefs.arranged(&pairs(&[("a", "A"), ("b", "B"), ("c", "C")]));
+    assert_eq!(list, pairs(&[("c", "C"), ("a", "A"), ("b", "B")]), "c and a first; b after; an id the agent dropped is skipped");
+}
+
+#[test]
+fn what_the_agent_reported_replaces_its_built_in_list() {
+    let prefs = AgentModels { known: pairs(&[("claude-opus-5-5", "Opus 5.5"), ("claude-sonnet-5-5", "Sonnet 5.5")]), ..AgentModels::default() };
+    assert_eq!(prefs.arranged(&pairs(&[("opus", "Opus")])), prefs.known, "the three plain names give way to the real ones");
+    assert_eq!(AgentModels::default().arranged(&pairs(&[("opus", "Opus")])), pairs(&[("opus", "Opus")]), "until it has reported");
+}
+
+#[test]
+fn a_default_that_the_list_no_longer_has_is_none() {
+    let list = pairs(&[("a", "A"), ("b", "B")]);
+    assert_eq!(AgentModels { default: Some("b".into()), ..AgentModels::default() }.default_in(&list), Some("b".into()));
+    assert_eq!(AgentModels { default: Some("z".into()), ..AgentModels::default() }.default_in(&list), None);
+}
+
+#[test]
+fn the_models_survive_a_save_and_an_older_file_has_none() {
+    let mut settings = Settings::default();
+    settings.agent_models.insert("claude-code".into(), AgentModels { default: Some("x".into()), order: vec!["x".into()], known: pairs(&[("x", "X")]) });
+    let back: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+    assert_eq!(back.agent_models, settings.agent_models);
+    assert!(serde_json::from_str::<Settings>("{}").unwrap().agent_models.is_empty());
+}
