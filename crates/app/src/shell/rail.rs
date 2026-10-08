@@ -93,7 +93,7 @@ impl Shell {
             project.update(cx, |p, cx| p.mount_tasks(window, cx));
         }
         match project.read(cx).tasks.as_ref() {
-            Some(slot) => div().debug_selector(|| "tasks-view".into()).size_full().pl(px(super::types::PANE_GAP)).pr(px(8.)).pb(px(8.)).child(slot.pane.clone()).into_any_element(),
+            Some(slot) => div().debug_selector(|| "tasks-view".into()).size_full().pl(px(super::types::PANE_GAP)).pr(px(8.)).child(slot.pane.clone()).into_any_element(),
             None => div().into_any_element(),
         }
     }

@@ -1417,16 +1417,16 @@ fn the_foot_of_the_window_has_the_status_bar_once_a_project_is_open(cx: &mut Tes
     settle(&shell, cx);
     let bar = cx.debug_bounds("status-bar").expect("the bar is drawn");
     assert!(cx.debug_bounds("status-cpu").is_some() && cx.debug_bounds("status-memory").is_some(), "the machine shows after a sample");
-    let cpu = cx.debug_bounds("status-cpu").expect("the processor is drawn");
     let panes = cx.debug_bounds("sessions-view").expect("the panes are drawn");
-    // The first card starts past the rail and the panels' gap, where the panes start: it does not run under the rail.
-    assert!(
-        f32::from(cpu.left()) >= f32::from(panes.left()) + atelier_ui::view_rail::WIDTH + super::types::PANE_GAP,
-        "the bar's first item starts at {:?}, under the rail",
-        cpu.left()
-    );
+    let (machine, main) = (cx.debug_bounds("status-card-cpu").expect("a card under the sidebar"), cx.debug_bounds("status-card-main").expect("a card under the session"));
+    // The first card stands under the sidebar: past the rail and the panels' gap, not under the rail. The next is a panels' gap on.
+    let first = f32::from(panes.left()) + atelier_ui::view_rail::WIDTH + super::types::PANE_GAP;
+    assert!((f32::from(machine.left()) - first).abs() < 0.6, "the first card starts at {:?}, not past the rail", machine.left());
+    assert!((f32::from(main.left() - machine.right()) - super::types::PANE_GAP).abs() < 0.6, "a panels' gap between the cards");
+    assert!((f32::from(bar.right()) - (f32::from(panes.right()) - 8.)).abs() < 0.6, "the last card ends 8 px from the window's right edge");
+    // The bar's room at the foot is the room at the right edge.
     let height = cx.update(|window, _| window.viewport_size().height);
-    assert_eq!(bar.bottom(), height, "at the foot: {bar:?} in a window {height:?} tall");
+    assert_eq!(bar.bottom(), height - gpui_kit::px(8.), "8 px above the foot: {bar:?} in a window {height:?} tall");
 }
 
 #[gpui_kit::test]
@@ -1518,4 +1518,42 @@ fn the_project_picker_and_the_sidebar_options_share_one_row(cx: &mut TestAppCont
     let (a, b) = (f32::from(picker.center().y), f32::from(options.center().y));
     assert!((a - b).abs() <= 2., "the picker's middle is at {a} and the ⋯'s at {b}");
     assert!(picker.right() < options.left(), "the picker is left of the ⋯: {picker:?} {options:?}");
+}
+
+/// With the right pane open the bar has a card under it, as wide as the pane's own card and ending where it ends; the cards stand a
+/// panels' gap apart.
+#[gpui_kit::test]
+fn the_bar_has_a_card_under_the_right_pane(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1600.);
+    shell.update(cx, |shell, cx| {
+        shell.vitals.update(cx, |v, _| {
+            v.settle("Claude", atelier_ui::menu::Lead::Monogram, Ok({
+                let mut reading = atelier_agents::usage::Reading::default();
+                reading.windows.push(atelier_agents::usage::Window { label: "5h".into(), used: 0.4, resets_in: None });
+                reading
+            }));
+        });
+        shell.sample_vitals(cx);
+    });
+    shell.update_in(cx, |s, window, cx| {
+        let project = s.active().cloned().unwrap();
+        project.update(cx, |p, cx| p.toggle_tasks(window, cx));
+        s.right = true;
+        cx.notify();
+    });
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let (_, lead, tail) = shell.read_with(cx, |s, _| s.footer_plan);
+    let (lead, tail) = (lead.expect("a sidebar"), tail.expect("a right pane"));
+    let bar = cx.debug_bounds("status-bar").expect("the bar is drawn");
+    let (cpu, main, providers) = (
+        cx.debug_bounds("status-card-cpu").unwrap(),
+        cx.debug_bounds("status-card-main").unwrap(),
+        cx.debug_bounds("status-card-providers").expect("a card under the right pane"),
+    );
+    let near = |a: f32, b: f32| (a - b).abs() < 0.6;
+    assert!(near(f32::from(cpu.size.width), lead) && near(f32::from(providers.size.width), tail), "the cards are the columns' widths");
+    assert!(near(f32::from(providers.right()), f32::from(bar.right())), "the last card ends at the bar's edge");
+    assert!(near(f32::from(main.left() - cpu.right()), super::types::PANE_GAP), "a panels' gap between the first cards");
+    assert!(near(f32::from(providers.left() - main.right()), super::types::PANE_GAP), "and before the last");
 }

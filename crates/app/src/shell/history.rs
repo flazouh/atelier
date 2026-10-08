@@ -190,7 +190,7 @@ impl Shell {
                     .flex()
                     .flex_col()
                     .gap(px(4.))
-                    .pb(px(8.))
+                    
                     .child(div().text_size(TextSize::Base.font_size()).font_weight(FontWeight::MEDIUM).child(subject.to_string()))
                     .children(byline.map(|b| div().text_size(TextSize::Xs.font_size()).text_color(muted).child(b)))
                     .when(!rest.trim().is_empty(), |d| {
