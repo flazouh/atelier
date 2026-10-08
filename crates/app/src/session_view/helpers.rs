@@ -791,7 +791,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
         Button::new(gpui_kit::ElementId::Name(format!("{key}-stop").into()))
             .label("Stop")
             .variant(ButtonVariant::Ghost)
-            .tooltip("Stop the agent. The session stays in the list and can be resumed.")
             .on_click(move |_, _, cx| stop.update(cx, |s, cx| s.stop(cx)))
     });
     // The task the session began from: a press opens it in the Tasks pane.

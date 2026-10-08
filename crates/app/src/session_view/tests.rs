@@ -179,9 +179,9 @@ fn a_read_shows_no_file_content_and_only_its_error_when_it_fails() {
     assert!(shows_output(ToolKind::Search, ToolStatus::Done));
 }
 
-/// An edit's diff shows a few rows that do not scroll; pressing it opens the review on that file.
+/// An edit's diff shows a few rows that do not scroll; pressing it opens it in place and does not open the review.
 #[gpui_kit::test]
-fn pressing_an_edits_diff_opens_the_review_on_its_file(cx: &mut TestAppContext) {
+fn pressing_an_edits_diff_opens_it_in_place_and_not_the_review(cx: &mut TestAppContext) {
     use std::{cell::RefCell, rc::Rc};
     use atelier_agents::session::{Event, FileEdit, ToolCall, ToolId, ToolKind, ToolOutput, ToolStatus};
     let dir = crate::fake_agent::git_project(&[("a.rs", "one\n")]);
@@ -213,5 +213,6 @@ fn pressing_an_edits_diff_opens_the_review_on_its_file(cx: &mut TestAppContext) 
     assert!(heard.borrow().is_empty());
     cx.simulate_click(rows.center(), gpui_kit::Modifiers::default());
     cx.run_until_parked();
-    assert_eq!(heard.borrow().as_slice(), [(None, Some("a.rs".to_string()))]);
+    assert!(heard.borrow().is_empty(), "the press opens the diff in place");
+    assert!(cx.debug_bounds("diff-rows").is_none(), "the clipped rows give way to the taller view");
 }
