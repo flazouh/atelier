@@ -10,7 +10,7 @@ use atelier_ui::{
 use atelier_ui::scale::px;
 use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, StatefulInteractiveElement, Styled, div};
 
-use super::structs::Shell;
+use super::{structs::Shell, types::VERSION_ROOM};
 use crate::{
     changelog,
     updater::{UpdateState, release_notes, running_version},
@@ -77,10 +77,10 @@ impl Shell {
         let version: SharedString = if version.is_empty() { "the new version".into() } else { version.clone().into() };
         let mut lines = release_notes(notes);
         if lines.is_empty() {
-            lines.push(crate::updater::NoteLine { lead: NO_NOTES.into(), text: String::new() });
+            lines.push(crate::updater::NoteLine { kind: atelier_ui::ReleaseKind::Improved, lead: NO_NOTES.into(), text: String::new() });
         }
         let sheet = ReleaseSheet::new("update-sheet", version)
-            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text)))
+            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)))
             .on_later(move |_, cx| drop(later.update(cx, |shell, cx| shell.update_later(cx))))
             .on_install(move |_, cx| drop(install.update(cx, |shell, cx| shell.update_install(cx))));
         Some(
@@ -100,10 +100,10 @@ impl Shell {
         let (close, done) = (cx.entity().downgrade(), cx.entity().downgrade());
         let mut lines = release_notes(&record.notes);
         if lines.is_empty() {
-            lines.push(crate::updater::NoteLine { lead: NO_NOTES.into(), text: String::new() });
+            lines.push(crate::updater::NoteLine { kind: atelier_ui::ReleaseKind::Improved, lead: NO_NOTES.into(), text: String::new() });
         }
         let sheet = ReleaseSheet::new("whats-new-sheet", SharedString::from(record.version.clone()))
-            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text)))
+            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)))
             .labels("Close", "")
             .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.dismiss_whats_new(cx))));
         Some(
@@ -128,9 +128,10 @@ impl Shell {
             .flex_none()
             .flex()
             .items_center()
+            .justify_center()
             .h(px(24.))
-            .px(px(8.))
-            .mr(px(2.))
+            .w(px(VERSION_ROOM - 4.))
+            .mr(px(4.))
             .rounded(px(6.))
             .font_family(MONO_FONT_FAMILY)
             .text_size(TextSize::Xs.font_size())
@@ -147,7 +148,7 @@ impl Shell {
         let (close, done) = (cx.entity().downgrade(), cx.entity().downgrade());
         let running = running_version();
         let notes = |markdown: &str| -> Vec<ReleaseNote> {
-            release_notes(markdown).into_iter().map(|line| ReleaseNote::new(line.lead, line.text)).collect()
+            release_notes(markdown).into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)).collect()
         };
         let mut current = notes(changelog::notes_of(&running).unwrap_or_default());
         if current.is_empty() {

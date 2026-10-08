@@ -130,6 +130,20 @@ fn a_drag_on_the_settings_page_does_not_wake_the_reply_box_of_the_conversation_u
     assert!(cx.debug_bounds("selection-reply-box").is_none(), "no reply box over the Settings page");
     assert_eq!(cx.update(|window, cx| window.focused(cx)), focus_before, "and the focus stays where it was");
 }
+/// The title bar's right side is a row of controls, none over another: the layout menu, the version and the Settings button.
+#[gpui_kit::test]
+fn the_version_does_not_lie_over_the_layout_menu_or_the_settings_button(cx: &mut TestAppContext) {
+    for width in [1400., 1000., 760.] {
+        let (shell, cx, _dir) = with_a_session(cx, width);
+        settle(&shell, cx);
+        let version = cx.debug_bounds("version-button").expect("the version is drawn");
+        let gear = cx.debug_bounds("settings-entry").expect("the Settings button is drawn");
+        assert!(version.right() <= gear.left(), "{width}: the version {version:?} stands left of the gear {gear:?}");
+        if let Some(layout) = cx.debug_bounds("layout-menu") {
+            assert!(layout.right() <= version.left() || layout.left() >= version.right(), "{width}: the layout menu {layout:?} and the version {version:?} do not overlap");
+        }
+    }
+}
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
 fn a_notice_floats_and_goes_after_a_few_seconds(cx: &mut TestAppContext) {
