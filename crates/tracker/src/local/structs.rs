@@ -1,20 +1,22 @@
 use std::{
     collections::HashMap,
     path::Path,
-    sync::{Mutex, mpsc::{Sender, channel}},
+    sync::{
+        Mutex,
+        mpsc::{Sender, channel},
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter, types::Value};
 
-use crate::{
-    Activity, ActivityKind, Entry, Event, NewTask, Patch, PrLink, ProjectKey, Query,
-    SessionLink, StopFlag, Subscription, Task, TaskId, Tracker, TrackerError, TrackerResult,
-    prefix_for,
-};
-use super::types::TASK_COLUMNS;
 use super::helpers::{assignee_parts, insert, like_pattern, load_one, log, read_task, row_id};
 use super::migrations;
+use super::types::TASK_COLUMNS;
+use crate::{
+    Activity, ActivityKind, Entry, Event, NewTask, Patch, PrLink, ProjectKey, Query, SessionLink,
+    StopFlag, Subscription, Task, TaskId, Tracker, TrackerError, TrackerResult, prefix_for,
+};
 
 pub struct LocalTracker {
     pub(super) conn: Mutex<Connection>,
@@ -29,7 +31,9 @@ impl LocalTracker {
     /// project that is renamed keeps its ids.
     pub fn open(path: &Path, prefix: &str) -> TrackerResult<Self> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| TrackerError::Storage(format!("cannot make {}: {e}", parent.display())))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                TrackerError::Storage(format!("cannot make {}: {e}", parent.display()))
+            })?;
         }
         Self::with_connection(Connection::open(path)?, prefix)
     }
@@ -52,19 +56,30 @@ impl LocalTracker {
         let _ = conn.pragma_update_and_check(None, "journal_mode", "WAL", |_| Ok(()));
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         migrations::run(&mut conn)?;
-        let stored: Option<String> = conn.query_row("SELECT value FROM meta WHERE key = 'prefix'", [], |r| r.get(0)).optional()?;
+        let stored: Option<String> = conn
+            .query_row("SELECT value FROM meta WHERE key = 'prefix'", [], |r| {
+                r.get(0)
+            })
+            .optional()?;
         let prefix = match stored {
             Some(stored) => stored,
             None => {
                 let prefix = prefix.to_uppercase();
-                conn.execute("INSERT INTO meta (key, value) VALUES ('prefix', ?1)", [&prefix])?;
+                conn.execute(
+                    "INSERT INTO meta (key, value) VALUES ('prefix', ?1)",
+                    [&prefix],
+                )?;
                 prefix
             }
         };
         Ok(Self {
             conn: Mutex::new(conn),
             prefix,
-            clock: Box::new(|| SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)),
+            clock: Box::new(|| {
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_or(0, |d| d.as_secs() as i64)
+            }),
             subscribers: Mutex::new(Vec::new()),
         })
     }
@@ -85,13 +100,16 @@ impl LocalTracker {
     }
 
     pub(super) fn conn(&self) -> TrackerResult<std::sync::MutexGuard<'_, Connection>> {
-        self.conn.lock().map_err(|_| TrackerError::Storage("the task store lock was poisoned".into()))
+        self.conn
+            .lock()
+            .map_err(|_| TrackerError::Storage("the task store lock was poisoned".into()))
     }
 
     fn emit(&self, events: Vec<Event>) {
         if let Ok(mut subscribers) = self.subscribers.lock() {
             for event in events {
-                subscribers.retain(|(send, stop)| !stop.is_stopped() && send.send(event.clone()).is_ok());
+                subscribers
+                    .retain(|(send, stop)| !stop.is_stopped() && send.send(event.clone()).is_ok());
             }
         }
     }
@@ -106,17 +124,34 @@ pub(super) struct Links {
 impl Links {
     pub(super) fn load(conn: &Connection, scope: &str, binds: &[Value]) -> rusqlite::Result<Links> {
         let mut sessions: HashMap<i64, Vec<SessionLink>> = HashMap::new();
-        let mut stmt = conn.prepare_cached(&format!("SELECT task, session_id, title, agent FROM session_links{scope} ORDER BY rowid"))?;
+        let mut stmt = conn.prepare_cached(&format!(
+            "SELECT task, session_id, title, agent FROM session_links{scope} ORDER BY rowid"
+        ))?;
         for row in stmt.query_map(params_from_iter(binds), |r| {
-            Ok((r.get::<_, i64>(0)?, SessionLink { session_id: r.get(1)?, title: r.get(2)?, agent: r.get(3)? }))
+            Ok((
+                r.get::<_, i64>(0)?,
+                SessionLink {
+                    session_id: r.get(1)?,
+                    title: r.get(2)?,
+                    agent: r.get(3)?,
+                },
+            ))
         })? {
             let (task, link) = row?;
             sessions.entry(task).or_default().push(link);
         }
         let mut prs: HashMap<i64, Vec<PrLink>> = HashMap::new();
-        let mut stmt = conn.prepare_cached(&format!("SELECT task, number, repo FROM pr_links{scope} ORDER BY number"))?;
+        let mut stmt = conn.prepare_cached(&format!(
+            "SELECT task, number, repo FROM pr_links{scope} ORDER BY number"
+        ))?;
         for row in stmt.query_map(params_from_iter(binds), |r| {
-            Ok((r.get::<_, i64>(0)?, PrLink { number: r.get::<_, i64>(1)? as u64, repo: r.get(2)? }))
+            Ok((
+                r.get::<_, i64>(0)?,
+                PrLink {
+                    number: r.get::<_, i64>(1)? as u64,
+                    repo: r.get(2)?,
+                },
+            ))
         })? {
             let (task, link) = row?;
             prs.entry(task).or_default().push(link);
@@ -143,14 +178,22 @@ impl Tracker for LocalTracker {
         if !query.statuses.is_empty() {
             let marks = vec!["?"; query.statuses.len()].join(", ");
             conditions.push(format!("status IN ({marks})"));
-            binds.extend(query.statuses.iter().map(|s| Value::Text(s.as_str().into())));
+            binds.extend(
+                query
+                    .statuses
+                    .iter()
+                    .map(|s| Value::Text(s.as_str().into())),
+            );
         }
         if let Some(name) = &query.assignee {
             conditions.push("assignee_name = ?".into());
             binds.push(Value::Text(name.clone()));
         }
         if let Some(label) = &query.label {
-            conditions.push("EXISTS (SELECT 1 FROM task_labels l WHERE l.task = tasks.id AND l.label = ?)".into());
+            conditions.push(
+                "EXISTS (SELECT 1 FROM task_labels l WHERE l.task = tasks.id AND l.label = ?)"
+                    .into(),
+            );
             binds.push(Value::Text(label.clone()));
         }
         if let Some(priority) = query.priority {
@@ -158,19 +201,37 @@ impl Tracker for LocalTracker {
             binds.push(Value::Integer(priority.number()));
         }
         if let Some(text) = query.text.as_deref().filter(|t| !t.trim().is_empty()) {
-            conditions.push("(title LIKE ? ESCAPE '\\' OR (? || '-' || number) LIKE ? ESCAPE '\\')".into());
+            conditions.push(
+                "(title LIKE ? ESCAPE '\\' OR (? || '-' || number) LIKE ? ESCAPE '\\')".into(),
+            );
             let pattern = like_pattern(text.trim());
-            binds.extend([Value::Text(pattern.clone()), Value::Text(self.prefix.clone()), Value::Text(pattern)]);
+            binds.extend([
+                Value::Text(pattern.clone()),
+                Value::Text(self.prefix.clone()),
+                Value::Text(pattern),
+            ]);
         }
         if let Some(parent) = &query.parent {
             conditions.push("parent = ?".into());
             binds.push(Value::Integer(row_id(parent)?));
         }
-        let filter = if conditions.is_empty() { String::new() } else { format!(" WHERE {}", conditions.join(" AND ")) };
+        let filter = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", conditions.join(" AND "))
+        };
         let conn = self.conn()?;
-        let mut stmt = conn.prepare_cached(&format!("SELECT {TASK_COLUMNS} FROM tasks{filter} ORDER BY updated_at DESC, id DESC"))?;
-        let mut tasks = stmt.query_map(params_from_iter(&binds), |r| read_task(&self.prefix, r))?.collect::<Result<Vec<_>, _>>()?;
-        let scope = if conditions.is_empty() { String::new() } else { format!(" WHERE task IN (SELECT id FROM tasks{filter})") };
+        let mut stmt = conn.prepare_cached(&format!(
+            "SELECT {TASK_COLUMNS} FROM tasks{filter} ORDER BY updated_at DESC, id DESC"
+        ))?;
+        let mut tasks = stmt
+            .query_map(params_from_iter(&binds), |r| read_task(&self.prefix, r))?
+            .collect::<Result<Vec<_>, _>>()?;
+        let scope = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE task IN (SELECT id FROM tasks{filter})")
+        };
         let mut links = Links::load(&conn, &scope, &binds)?;
         for task in &mut tasks {
             links.fill(task);
@@ -185,7 +246,9 @@ impl Tracker for LocalTracker {
 
     fn create(&self, new: &NewTask, by: &str) -> TrackerResult<Task> {
         let mut created = self.create_many(std::slice::from_ref(new), by)?;
-        created.pop().ok_or_else(|| TrackerError::Storage("no task was made".into()))
+        created
+            .pop()
+            .ok_or_else(|| TrackerError::Storage("no task was made".into()))
     }
 
     fn create_many(&self, new: &[NewTask], by: &str) -> TrackerResult<Vec<Task>> {
@@ -212,7 +275,8 @@ impl Tracker for LocalTracker {
         let row = row_id(id)?;
         let at = self.now();
         let mut conn = self.conn()?;
-        let before = load_one(&conn, &self.prefix, row)?.ok_or_else(|| TrackerError::NotFound(id.clone()))?;
+        let before = load_one(&conn, &self.prefix, row)?
+            .ok_or_else(|| TrackerError::NotFound(id.clone()))?;
         let mut after = before.clone();
         let mut entries: Vec<ActivityKind> = Vec::new();
         if let Some(title) = &patch.title {
@@ -221,38 +285,51 @@ impl Tracker for LocalTracker {
             }
             if title.trim() != before.title {
                 after.title = title.trim().to_string();
-                entries.push(ActivityKind::Edited { field: "title".into() });
+                entries.push(ActivityKind::Edited {
+                    field: "title".into(),
+                });
             }
         }
         if let Some(description) = &patch.description
             && *description != before.description
         {
             after.description = description.clone();
-            entries.push(ActivityKind::Edited { field: "description".into() });
+            entries.push(ActivityKind::Edited {
+                field: "description".into(),
+            });
         }
         if let Some(status) = patch.status
             && status != before.status
         {
             after.status = status;
-            entries.push(ActivityKind::StatusChanged { from: before.status, to: status });
+            entries.push(ActivityKind::StatusChanged {
+                from: before.status,
+                to: status,
+            });
         }
         if let Some(priority) = patch.priority
             && priority != before.priority
         {
             after.priority = priority;
-            entries.push(ActivityKind::Edited { field: "priority".into() });
+            entries.push(ActivityKind::Edited {
+                field: "priority".into(),
+            });
         }
         if let Some(assignee) = &patch.assignee
             && *assignee != before.assignee
         {
             after.assignee = assignee.clone();
-            entries.push(ActivityKind::Assigned { to: assignee.clone() });
+            entries.push(ActivityKind::Assigned {
+                to: assignee.clone(),
+            });
         }
         if let Some(project) = &patch.project
             && *project != before.project
         {
             after.project = project.clone();
-            entries.push(ActivityKind::Edited { field: "project".into() });
+            entries.push(ActivityKind::Edited {
+                field: "project".into(),
+            });
         }
         if let Some(parent) = &patch.parent
             && *parent != before.parent
@@ -262,10 +339,18 @@ impl Tracker for LocalTracker {
                 let mut steps = 0;
                 while let Some(at_row) = walk {
                     if at_row == row {
-                        return Err(TrackerError::Invalid("a task cannot be its own ancestor".into()));
+                        return Err(TrackerError::Invalid(
+                            "a task cannot be its own ancestor".into(),
+                        ));
                     }
-                    let up: Option<Option<i64>> = conn.query_row("SELECT parent FROM tasks WHERE id = ?1", [at_row], |r| r.get(0)).optional()?;
-                    let Some(up) = up else { return Err(TrackerError::NotFound(parent.clone())) };
+                    let up: Option<Option<i64>> = conn
+                        .query_row("SELECT parent FROM tasks WHERE id = ?1", [at_row], |r| {
+                            r.get(0)
+                        })
+                        .optional()?;
+                    let Some(up) = up else {
+                        return Err(TrackerError::NotFound(parent.clone()));
+                    };
                     walk = up;
                     steps += 1;
                     if steps > 64 {
@@ -274,7 +359,9 @@ impl Tracker for LocalTracker {
                 }
             }
             after.parent = parent.clone();
-            entries.push(ActivityKind::Edited { field: "parent".into() });
+            entries.push(ActivityKind::Edited {
+                field: "parent".into(),
+            });
         }
         let mut labels = before.labels.clone();
         for label in &patch.add_labels {
@@ -287,7 +374,9 @@ impl Tracker for LocalTracker {
         labels.sort();
         if labels != before.labels {
             after.labels = labels;
-            entries.push(ActivityKind::Edited { field: "labels".into() });
+            entries.push(ActivityKind::Edited {
+                field: "labels".into(),
+            });
         }
         if entries.is_empty() {
             return Ok(before);
@@ -313,10 +402,14 @@ impl Tracker for LocalTracker {
         ])?;
         if after.labels != before.labels {
             for label in before.labels.iter().filter(|l| !after.labels.contains(l)) {
-                tx.prepare_cached("DELETE FROM task_labels WHERE task = ?1 AND label = ?2")?.execute(params![row, label])?;
+                tx.prepare_cached("DELETE FROM task_labels WHERE task = ?1 AND label = ?2")?
+                    .execute(params![row, label])?;
             }
             for label in after.labels.iter().filter(|l| !before.labels.contains(l)) {
-                tx.prepare_cached("INSERT OR IGNORE INTO task_labels (task, label) VALUES (?1, ?2)")?.execute(params![row, label])?;
+                tx.prepare_cached(
+                    "INSERT OR IGNORE INTO task_labels (task, label) VALUES (?1, ?2)",
+                )?
+                .execute(params![row, label])?;
             }
         }
         let mut events = vec![Event::Updated(after.clone())];
@@ -337,15 +430,26 @@ impl Tracker for LocalTracker {
                 if text.trim().is_empty() {
                     return Err(TrackerError::Invalid("a comment needs words".into()));
                 }
-                ActivityKind::Commented { text: text.trim().to_string() }
+                ActivityKind::Commented {
+                    text: text.trim().to_string(),
+                }
             }
-            Entry::SessionStarted(session) => ActivityKind::SessionStarted { session: session.clone() },
+            Entry::SessionStarted(session) => ActivityKind::SessionStarted {
+                session: session.clone(),
+            },
             Entry::PrOpened(pr) => ActivityKind::PrOpened { pr: pr.clone() },
             Entry::PrMerged(pr) => ActivityKind::PrMerged { pr: pr.clone() },
-            Entry::Commit { sha, subject } => ActivityKind::Commit { sha: sha.clone(), subject: subject.clone() },
+            Entry::Commit { sha, subject } => ActivityKind::Commit {
+                sha: sha.clone(),
+                subject: subject.clone(),
+            },
         };
         let mut conn = self.conn()?;
-        let exists: bool = conn.query_row("SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1)", [row], |r| r.get(0))?;
+        let exists: bool = conn.query_row(
+            "SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1)",
+            [row],
+            |r| r.get(0),
+        )?;
         if !exists {
             return Err(TrackerError::NotFound(id.clone()));
         }
@@ -356,12 +460,15 @@ impl Tracker for LocalTracker {
                     .execute(params![row, session.session_id, session.title, session.agent])?;
             }
             Entry::PrOpened(pr) | Entry::PrMerged(pr) => {
-                tx.prepare_cached("INSERT OR IGNORE INTO pr_links (task, number, repo) VALUES (?1, ?2, ?3)")?
-                    .execute(params![row, pr.number as i64, pr.repo])?;
+                tx.prepare_cached(
+                    "INSERT OR IGNORE INTO pr_links (task, number, repo) VALUES (?1, ?2, ?3)",
+                )?
+                .execute(params![row, pr.number as i64, pr.repo])?;
             }
             Entry::Comment(_) | Entry::Commit { .. } => {}
         }
-        tx.prepare_cached("UPDATE tasks SET updated_at = ?2 WHERE id = ?1")?.execute(params![row, at])?;
+        tx.prepare_cached("UPDATE tasks SET updated_at = ?2 WHERE id = ?1")?
+            .execute(params![row, at])?;
         let activity = log(&tx, row, at, by, &kind)?;
         tx.commit()?;
         let task = load_one(&conn, &self.prefix, row)?;
@@ -376,32 +483,59 @@ impl Tracker for LocalTracker {
     fn activity(&self, id: &TaskId) -> TrackerResult<Vec<Activity>> {
         let row = row_id(id)?;
         let conn = self.conn()?;
-        let mut stmt = conn.prepare_cached("SELECT id, at, actor, data FROM activity WHERE task = ?1 ORDER BY id")?;
-        let rows = stmt.query_map([row], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?, r.get::<_, String>(3)?)))?;
+        let mut stmt = conn.prepare_cached(
+            "SELECT id, at, actor, data FROM activity WHERE task = ?1 ORDER BY id",
+        )?;
+        let rows = stmt.query_map([row], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
+        })?;
         let mut out = Vec::new();
         for entry in rows {
             let (entry_id, at, by, data) = entry?;
-            out.push(Activity { id: entry_id, task: id.clone(), at, by, kind: serde_json::from_str(&data)? });
+            out.push(Activity {
+                id: entry_id,
+                task: id.clone(),
+                at,
+                by,
+                kind: serde_json::from_str(&data)?,
+            });
         }
         Ok(out)
     }
 
     fn tasks_of_session(&self, session_id: &str) -> TrackerResult<Vec<TaskId>> {
         let conn = self.conn()?;
-        let mut stmt = conn.prepare_cached("SELECT DISTINCT task FROM session_links WHERE session_id = ?1 ORDER BY task")?;
-        Ok(stmt.query_map([session_id], |r| r.get::<_, i64>(0))?.map(|r| r.map(|n| TaskId(n.to_string()))).collect::<Result<_, _>>()?)
+        let mut stmt = conn.prepare_cached(
+            "SELECT DISTINCT task FROM session_links WHERE session_id = ?1 ORDER BY task",
+        )?;
+        Ok(stmt
+            .query_map([session_id], |r| r.get::<_, i64>(0))?
+            .map(|r| r.map(|n| TaskId(n.to_string())))
+            .collect::<Result<_, _>>()?)
     }
 
     fn tasks_of_pr(&self, number: u64) -> TrackerResult<Vec<TaskId>> {
         let conn = self.conn()?;
-        let mut stmt = conn.prepare_cached("SELECT DISTINCT task FROM pr_links WHERE number = ?1 ORDER BY task")?;
-        Ok(stmt.query_map([number as i64], |r| r.get::<_, i64>(0))?.map(|r| r.map(|n| TaskId(n.to_string()))).collect::<Result<_, _>>()?)
+        let mut stmt = conn
+            .prepare_cached("SELECT DISTINCT task FROM pr_links WHERE number = ?1 ORDER BY task")?;
+        Ok(stmt
+            .query_map([number as i64], |r| r.get::<_, i64>(0))?
+            .map(|r| r.map(|n| TaskId(n.to_string())))
+            .collect::<Result<_, _>>()?)
     }
 
     fn labels(&self) -> TrackerResult<Vec<String>> {
         let conn = self.conn()?;
-        let mut stmt = conn.prepare_cached("SELECT DISTINCT label FROM task_labels ORDER BY label")?;
-        Ok(stmt.query_map([], |r| r.get(0))?.collect::<Result<_, _>>()?)
+        let mut stmt =
+            conn.prepare_cached("SELECT DISTINCT label FROM task_labels ORDER BY label")?;
+        Ok(stmt
+            .query_map([], |r| r.get(0))?
+            .collect::<Result<_, _>>()?)
     }
 
     fn subscribe(&self) -> Subscription {

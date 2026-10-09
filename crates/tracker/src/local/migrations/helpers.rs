@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 
-use crate::{TrackerError, TrackerResult};
 use super::types::{CURRENT, STEPS};
+use crate::{TrackerError, TrackerResult};
 
 /// Applies the steps the database has not had, each in its own transaction. A database written by a newer
 /// build is refused rather than misread.
