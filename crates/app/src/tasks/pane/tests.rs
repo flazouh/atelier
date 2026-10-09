@@ -1,31 +1,63 @@
 use gpui_kit::Focusable;
 use std::sync::Arc;
 
+use atelier_capabilities::{
+    Actor, Ref,
+    tasks::{Category, MemoryTasks, NewTask, Query, TasksProvider},
+};
 use atelier_ui::task_model::TaskStatus;
 use gpui_kit::{Entity, TestAppContext, VisualTestContext, px, size};
-use atelier_tracker::{LocalTracker, NewTask, Query, Tracker};
 
 use super::*;
+use crate::tasks::source::TasksSource;
 
-fn open(width: f32, cx: &mut TestAppContext) -> (Entity<TasksPane>, Arc<LocalTracker>, &mut VisualTestContext) {
+mod fake;
+mod providers;
+
+fn me() -> Actor {
+    Actor::person("me", "me")
+}
+
+/// The titles and statuses of what the provider holds.
+fn held(provider: &dyn TasksProvider) -> Vec<(String, Category)> {
+    provider.list(&Query::default()).unwrap().items.into_iter().map(|t| (t.title, t.status.category)).collect()
+}
+
+fn first_status(provider: &dyn TasksProvider) -> Category {
+    held(provider).into_iter().find(|(title, _)| title == "Fix the scroll").unwrap().1
+}
+
+fn open(width: f32, cx: &mut TestAppContext) -> (Entity<TasksPane>, Arc<MemoryTasks>, &mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         atelier_ui::init(cx);
         atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
     });
-    let tracker = Arc::new(LocalTracker::in_memory("LAT").unwrap());
-    tracker.create(&NewTask::titled("Fix the scroll"), "me").unwrap();
-    tracker.create(&NewTask::titled("Write the docs"), "me").unwrap();
-    let handle: Arc<dyn Tracker> = tracker.clone();
+    let provider = Arc::new(MemoryTasks::new("test"));
+    provider.create(&NewTask::titled("Fix the scroll"), &me()).unwrap();
+    provider.create(&NewTask::titled("Write the docs"), &me()).unwrap();
+    let source = TasksSource::from_providers([provider.clone() as Arc<dyn TasksProvider>]);
+    let (pane, cx) = open_with(source, width, cx);
+    (pane, provider, cx)
+}
+
+/// A pane over `source`, drawn `width` wide.
+fn open_with(source: TasksSource, width: f32, cx: &mut TestAppContext) -> (Entity<TasksPane>, &mut VisualTestContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
+        cx.set_reduce_motion(true);
+    });
     let (pane, cx) = cx.add_window_view(move |window, cx| {
         let mut pane = TasksPane::new("me", vec![("Claude".into(), atelier_agents::claude::look())], window, cx);
-        pane.attach(Ok(handle), cx);
+        pane.attach(Ok(source), cx);
         pane
     });
     cx.simulate_resize(size(px(width), px(700.)));
     settle(&pane, cx);
-    (pane, tracker, cx)
+    (pane, cx)
 }
 
 fn settle(pane: &Entity<TasksPane>, cx: &mut VisualTestContext) {
@@ -45,15 +77,16 @@ fn the_pane_reads_the_projects_tasks_off_the_ui_thread(cx: &mut TestAppContext) 
 }
 
 #[gpui_kit::test]
-fn a_change_in_the_pane_reaches_the_tracker(cx: &mut TestAppContext) {
-    let (pane, tracker, cx) = open(900., cx);
+fn a_change_in_the_pane_reaches_the_provider(cx: &mut TestAppContext) {
+    let (pane, provider, cx) = open(900., cx);
     let id = pane.read_with(cx, |p, _| p.tasks()[0].id.clone());
     pane.update(cx, |p, cx| p.changed(std::slice::from_ref(&id), &Change::Status(TaskStatus::Done), Source::None, cx));
     settle(&pane, cx);
-    let saved = tracker.get(&TaskId(id.to_string())).unwrap().unwrap();
-    assert_eq!(saved.status, atelier_tracker::Status::Done);
-    let line = tracker.activity(&saved.id).unwrap();
-    assert!(line.iter().any(|a| a.by == "me"), "the change is logged as the reader's");
+    let task: Ref = id.parse().unwrap();
+    let saved = provider.get(&task).unwrap();
+    assert_eq!(saved.status.category, Category::Done);
+    let line = provider.activity(&task, None).unwrap().items;
+    assert!(line.iter().any(|a| a.by.name == "me"), "the change is logged as the reader's");
 }
 
 #[gpui_kit::test]
@@ -93,7 +126,6 @@ fn a_project_with_no_tracker_says_why(cx: &mut TestAppContext) {
     cx.simulate_resize(size(px(600.), px(400.)));
     settle(&pane, cx);
     assert!(pane.read_with(cx, |p, _| matches!(p.load, Load::Failed(_))));
-    let _ = Query::default();
 }
 
 /// The keys of the list work as soon as the pane has the focus: the pane hands the focus to its list.
@@ -134,10 +166,6 @@ fn focus_body(pane: &Entity<TasksPane>, cx: &mut VisualTestContext) {
     settle(pane, cx);
 }
 
-fn first_status(tracker: &LocalTracker) -> atelier_tracker::Status {
-    tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Fix the scroll").unwrap().status
-}
-
 #[gpui_kit::test]
 fn a_press_on_a_picker_row_chooses_it_in_the_list(cx: &mut TestAppContext) {
     let (pane, tracker, cx) = open(900., cx);
@@ -147,8 +175,8 @@ fn a_press_on_a_picker_row_chooses_it_in_the_list(cx: &mut TestAppContext) {
     settle(&pane, cx);
     press_row(cx, 4);
     settle(&pane, cx);
-    let statuses: Vec<_> = tracker.list(&Query::default()).unwrap().into_iter().map(|t| t.status).collect();
-    assert!(statuses.contains(&atelier_tracker::Status::Done), "one task is Done now: {statuses:?}");
+    let statuses: Vec<_> = held(tracker.as_ref()).into_iter().map(|(_, status)| status).collect();
+    assert!(statuses.contains(&Category::Done), "one task is Done now: {statuses:?}");
     assert!(cx.debug_bounds("picker-row-0").is_none(), "the picker closed");
 }
 
@@ -165,8 +193,8 @@ fn a_press_on_a_picker_row_chooses_it_in_the_board(cx: &mut TestAppContext) {
     settle(&pane, cx);
     press_row(cx, 4);
     settle(&pane, cx);
-    let statuses: Vec<_> = tracker.list(&Query::default()).unwrap().into_iter().map(|t| t.status).collect();
-    assert!(statuses.contains(&atelier_tracker::Status::Done), "{statuses:?}");
+    let statuses: Vec<_> = held(tracker.as_ref()).into_iter().map(|(_, status)| status).collect();
+    assert!(statuses.contains(&Category::Done), "{statuses:?}");
 }
 
 #[gpui_kit::test]
@@ -180,7 +208,7 @@ fn a_press_on_a_picker_row_chooses_it_in_the_task_in_full(cx: &mut TestAppContex
     settle(&pane, cx);
     press_row(cx, 4);
     settle(&pane, cx);
-    assert_eq!(first_status(&tracker), atelier_tracker::Status::Done);
+    assert_eq!(first_status(tracker.as_ref()), Category::Done);
 }
 
 #[gpui_kit::test]
@@ -222,7 +250,7 @@ fn command_enter_creates_from_the_description_too(cx: &mut TestAppContext) {
     settle(&pane, cx);
     cx.simulate_keystrokes("ctrl-enter");
     settle(&pane, cx);
-    let made = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Ship it").expect("the task was made");
+    let made = tracker.list(&Query::default()).unwrap().items.into_iter().find(|t| t.title == "Ship it").expect("the task was made");
     assert_eq!(made.description, "with a description");
     assert!(!pane.read_with(cx, |p, _| p.creating), "the dialog closed");
 }
@@ -280,8 +308,8 @@ fn after_create_the_cursor_is_on_the_new_task(cx: &mut TestAppContext) {
     settle(&pane, cx);
     press_row(cx, 4);
     settle(&pane, cx);
-    let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new").unwrap();
-    assert_eq!(new.status, atelier_tracker::Status::Done, "the key acted on the new task");
+    let new = tracker.list(&Query::default()).unwrap().items.into_iter().find(|t| t.title == "Brand new").unwrap();
+    assert_eq!(new.status.category, Category::Done, "the key acted on the new task");
 }
 
 /// The board has the same default cursor: on the first card when it opens, and on the new card after Create.
@@ -315,8 +343,8 @@ fn after_create_the_board_cursor_is_on_the_new_card(cx: &mut TestAppContext) {
     settle(&pane, cx);
     press_row(cx, 4);
     settle(&pane, cx);
-    let new = tracker.list(&Query::default()).unwrap().into_iter().find(|t| t.title == "Brand new card").unwrap();
-    assert_eq!(new.status, atelier_tracker::Status::Done, "the key acted on the new card");
+    let new = tracker.list(&Query::default()).unwrap().items.into_iter().find(|t| t.title == "Brand new card").unwrap();
+    assert_eq!(new.status.category, Category::Done, "the key acted on the new card");
 }
 
 fn picker_rows(cx: &mut VisualTestContext) -> usize {

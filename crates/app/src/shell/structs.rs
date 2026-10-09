@@ -1016,6 +1016,7 @@ impl Shell {
                 }
                 this.show_view(ShellView::Files, window, cx)
             }
+            ProjectEvent::OpenSettings => this.open_settings(&OpenSettings, window, cx),
             ProjectEvent::ShowTasks => {
                 if let Some(i) = this.projects.iter().position(|p| p == project) {
                     this.active = i;

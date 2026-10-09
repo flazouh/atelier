@@ -301,7 +301,7 @@ impl OpenProject {
                 SessionEvent::Task(event) => return this.task_event(session, event.clone(), cx),
                 SessionEvent::OpenTask => {
                     if let Some(task) = session.read(cx).task.clone() {
-                        this.show_task(task.id, window, cx);
+                        this.show_task(&task.key, window, cx);
                     }
                     return;
                 }
@@ -826,7 +826,8 @@ impl OpenProject {
         .detach();
     }
 
-    /// Lets the rules hear of `signal`, one after the other.
+    /// Lets the rules hear of `signal`, one after the other. The rules act on the local tracker only, until they
+    /// move to the capability.
     fn send_signal(&mut self, signal: atelier_tracker::Signal, cx: &mut Context<Self>) {
         // The tracker of the pane if it is open. Else the project has one only if it kept a file: a session of
         // a project that never used tasks makes none.
@@ -854,22 +855,34 @@ impl OpenProject {
     }
 
     /// Starts a session for a task: the task gets the project's agent if it has no assignee, the session
-    /// opens with the task as its first message, and the two are linked when the agent says its id.
-    pub fn start_from_task(&mut self, id: atelier_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(tracker) = self.tasks.as_ref().and_then(|t| t.pane.read(cx).tracker()) else { return };
+    /// opens with the task as its first message, and the two are linked when the agent says its id. The task is
+    /// read and assigned through the provider that holds it; the link is the local tracker's, so a task of another
+    /// provider starts a session with no link until links move to the capability.
+    pub fn start_from_task(&mut self, task: atelier_capabilities::Ref, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(pane) = self.tasks.as_ref().map(|t| t.pane.read(cx)) else { return };
+        let (Some(provider), local) = (pane.provider(), pane.tracker()) else { return };
         let agent = self.agent.name.to_string();
         let reading = cx.background_spawn(async move {
-            let task = tracker.get(&id)?.ok_or_else(|| atelier_tracker::TrackerError::NotFound(id.clone()))?;
-            if task.assignee.is_some() {
-                return atelier_tracker::TrackerResult::Ok(task);
-            }
-            let patch = atelier_tracker::Patch { assignee: Some(Some(atelier_tracker::Assignee::Agent(agent))), ..Default::default() };
-            tracker.update(&id, &patch, "atelier")
+            let found = provider.get(&task)?;
+            let found = if found.assignees.is_empty() {
+                let patch = atelier_capabilities::tasks::Patch { assignees: Some(vec![crate::tasks::map::agent_id(&agent)]), ..Default::default() };
+                let by = atelier_capabilities::Actor::person("atelier", "atelier");
+                match provider.update(&task, &patch, &found.version, &by) {
+                    Ok(assigned) => assigned,
+                    // The assignment is a courtesy: the local provider tells of a failure, another may not know the agent.
+                    Err(error) if task.provider == "local" => return Err(error),
+                    Err(_) => found,
+                }
+            } else {
+                found
+            };
+            let link = local.filter(|_| task.provider == "local").and_then(|t| crate::tasks::map::local_id(t.as_ref(), &found.key));
+            atelier_capabilities::CapResult::Ok((found, link))
         });
         cx.spawn_in(window, async move |this, cx| {
             let result = reading.await;
             this.update_in(cx, |this, window, cx| match result {
-                Ok(task) => this.begin_session_for(task, window, cx),
+                Ok((task, link)) => this.begin_session_for(task, link, window, cx),
                 Err(error) => cx.emit(ProjectEvent::Said(format!("Could not start a session: {error}").into())),
             })
             .ok();
@@ -877,12 +890,12 @@ impl OpenProject {
         .detach();
     }
 
-    fn begin_session_for(&mut self, task: atelier_tracker::Task, window: &mut Window, cx: &mut Context<Self>) {
+    fn begin_session_for(&mut self, task: atelier_capabilities::tasks::Task, link: Option<atelier_tracker::TaskId>, window: &mut Window, cx: &mut Context<Self>) {
         let session = self.open_session(None, None, window, cx);
         let text = crate::tasks::map::first_message(&task);
-        let reference = crate::tasks::TaskRef { id: task.id.clone(), key: task.key.clone().into() };
+        let reference = link.map(|id| crate::tasks::TaskRef { id, key: task.key.clone().into() });
         session.update(cx, |s, cx| {
-            s.task = Some(reference);
+            s.task = reference;
             s.send(text, cx);
         });
         if let Some(slot) = &self.tasks {
@@ -891,8 +904,8 @@ impl OpenProject {
         cx.emit(ProjectEvent::ShowSession(session));
     }
 
-    /// Shows one task in the Tasks pane, opening the pane first when it is not there.
-    pub fn show_task(&mut self, id: atelier_tracker::TaskId, window: &mut Window, cx: &mut Context<Self>) {
+    /// Shows the task with this key in the Tasks pane, opening the pane first when it is not there.
+    pub fn show_task(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.tasks.as_ref().is_none_or(|t| !t.shown) || self.front() != super::front::Front::Tasks {
             if self.tasks.is_some() {
                 self.right_asked = super::front::Front::Tasks;
@@ -905,7 +918,7 @@ impl OpenProject {
             }
         }
         if let Some(slot) = &self.tasks {
-            slot.pane.update(cx, |pane, cx| pane.show(id.0.into(), window, cx));
+            slot.pane.update(cx, |pane, cx| pane.show_key(key, window, cx));
         }
         cx.notify();
     }
