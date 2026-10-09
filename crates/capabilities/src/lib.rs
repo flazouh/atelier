@@ -12,6 +12,7 @@ mod actor;
 mod capability;
 pub mod card;
 mod error;
+pub mod messaging;
 mod reference;
 mod registry;
 mod subscription;
