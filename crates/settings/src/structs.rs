@@ -75,6 +75,8 @@ pub struct Settings {
     pub sidebar_layout: SidebarSaved,
     /// What the app's capabilities do for agents: `{ "capabilities": { "agent_tools": false } }`.
     pub capabilities: CapabilitiesSaved,
+    /// The accounts the reader connected, as plain facts. Never a key: those are in the keychain.
+    pub accounts: AccountsSaved,
     /// What the reader chose for each agent's models, and the list the agent last reported, by the agent's backend name.
     pub agent_models: std::collections::BTreeMap<String, AgentModels>,
     /// The changelog of the update the app downloaded last, kept so that the first start of that version can show it once.
@@ -90,6 +92,33 @@ pub struct Settings {
 pub struct CapabilitiesSaved {
     /// Agents get the app's tools, such as the tasks, through the gateway. Unset: on.
     pub agent_tools: Option<bool>,
+}
+
+/// The `accounts` settings: which outside services the reader connected for their tasks. A key is not here; the Linear
+/// entry only says that one is kept, so the app reads the keychain only for a reader who connected Linear.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AccountsSaved {
+    pub linear: Option<LinearSaved>,
+    pub github_issues: Option<GithubIssuesSaved>,
+}
+
+/// Linear, connected with an API key kept in the keychain (see `secrets::LINEAR_KEY`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LinearSaved {
+    /// The name of the person the key belongs to, as Linear last said it. Shown while the app checks again.
+    pub person: Option<String>,
+}
+
+/// GitHub Issues of one repository, read with the reader's `gh` login.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GithubIssuesSaved {
+    /// `owner/repo`.
+    pub repo: String,
+    /// The `gh` login's name, as GitHub last said it.
+    pub person: Option<String>,
 }
 
 /// An update the app downloaded: its version and its changelog.

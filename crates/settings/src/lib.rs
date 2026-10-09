@@ -13,7 +13,7 @@ mod structs;
 mod types;
 
 pub use helpers::{load, path, update};
-pub use structs::{AgentModels, CapabilitiesSaved, OpenSession, Panels, Settings, SidebarSaved, WhatsNew};
+pub use structs::{AccountsSaved, AgentModels, CapabilitiesSaved, GithubIssuesSaved, LinearSaved, OpenSession, Panels, Settings, SidebarSaved, WhatsNew};
 pub use types::{Location, RECENT_LIMIT};
 
 
