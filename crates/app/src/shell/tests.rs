@@ -1083,14 +1083,17 @@ fn the_sign_in_button_of_the_tasks_screen_opens_the_accounts_section(cx: &mut Te
     let section = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.settings.as_ref().map(|(pane, _)| pane.read(cx).section()));
     assert_eq!(section(&shell, cx), None);
 
-    shell.update_in(cx, |s, window, cx| s.open_accounts(window, cx));
-    settle(&shell, cx);
+    let ask = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| {
+        let project = shell.read_with(cx, |s, _| s.active().cloned().unwrap());
+        project.update(cx, |_, cx| cx.emit(crate::open_project::ProjectEvent::OpenAccounts));
+        settle(shell, cx);
+    };
+    ask(&shell, cx);
     assert_eq!(section(&shell, cx), Some(Section::Accounts));
 
     // Asked again with Settings open on another section, it shows Accounts and does not close the page.
     shell.update_in(cx, |s, _, cx| s.settings.as_ref().unwrap().0.update(cx, |p, cx| p.show(Section::Tasks, cx)));
-    shell.update_in(cx, |s, window, cx| s.open_accounts(window, cx));
-    settle(&shell, cx);
+    ask(&shell, cx);
     assert_eq!(section(&shell, cx), Some(Section::Accounts));
 }
 

@@ -379,6 +379,7 @@ impl SettingsPane {
                         div()
                             .flex()
                             .gap(px(6.))
+                            .flex_wrap()
                             .child(marked(
                                 "linear-test",
                                 Button::new("linear-test")
@@ -460,13 +461,14 @@ impl SettingsPane {
                                     .child("System keychain"),
                             ),
                     )
-                    .children(row_note(Kind::Linear, row, theme))
+                    .children(row_note(Kind::Linear, row, &page.linear_check, theme))
                     .children(check_line(&page.linear_check, theme))
                     .child(
                         div()
                             .flex()
                             .items_center()
                             .gap(px(6.))
+                            .flex_wrap()
                             .child(marked(
                                 "linear-test",
                                 Button::new("linear-test")
@@ -573,13 +575,14 @@ impl SettingsPane {
                     .gap(px(8.))
                     .child(TextInput::new("github-repo", &field).surface(theme.background))
                     .child(div().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child("Uses the account you signed in with gh auth login. No key is kept here."))
-                    .children(row_note(Kind::GithubIssues, row, theme))
+                    .children(row_note(Kind::GithubIssues, row, &page.github_check, theme))
                     .children(check_line(&page.github_check, theme))
                     .child(
                         div()
                             .flex()
                             .items_center()
                             .gap(px(6.))
+                            .flex_wrap()
                             .child(marked(
                                 "github-test",
                                 Button::new("github-test").label("Test").variant(ButtonVariant::Secondary).disabled(page.github_check == Checked::Checking).on_click(move |_, _, cx| {
@@ -631,13 +634,17 @@ fn badge_of(row: &Row, connected: bool) -> Option<Badge> {
 }
 
 /// The words under a row that is not working, so a badge is never the only thing said.
-fn row_note(kind: Kind, row: &Row, theme: &Theme) -> Option<AnyElement> {
+fn row_note(kind: Kind, row: &Row, check: &Checked, theme: &Theme) -> Option<AnyElement> {
     let words = match row {
         Row::NotSignedIn => accounts::plain_words(kind, &CapError::NotSignedIn),
         Row::Offline => accounts::plain_words(kind, &CapError::Offline),
         Row::Failed(words) => words.clone(),
         Row::Off | Row::Checking | Row::Connected(_) => return None,
     };
+    // A Test that just said the same thing says it once.
+    if *check == Checked::Refused(words.clone()) {
+        return None;
+    }
     Some(
         div()
             .text_size(TextSize::Xs.font_size())

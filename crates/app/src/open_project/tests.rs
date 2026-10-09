@@ -554,6 +554,26 @@ fn a_task_of_another_provider_starts_a_session_with_no_link(cx: &mut TestAppCont
     assert!(cx.update(|_, cx| session.read(cx).task.is_none()), "no link to a tracker that does not hold it");
 }
 
+/// The sign-in button of the Tasks screen reaches the window as one event that asks for the Accounts section.
+#[gpui_kit::test]
+fn the_tasks_sign_in_button_asks_the_window_for_the_accounts_section(cx: &mut TestAppContext) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let (_dir, project, _, cx) = open(cx, &[]);
+    cx.update(|window, cx| project.update(cx, |p, cx| p.toggle_tasks(window, cx)));
+    cx.run_until_parked();
+    let asked = Arc::new(AtomicBool::new(false));
+    let seen = asked.clone();
+    cx.update(|_, cx| {
+        cx.subscribe(&project, move |_, event: &ProjectEvent, _| seen.store(matches!(event, ProjectEvent::OpenAccounts), Ordering::SeqCst)).detach();
+    });
+    let pane = cx.update(|_, cx| project.read(cx).tasks.as_ref().unwrap().pane.clone());
+
+    cx.update(|_, cx| pane.update(cx, |_, cx| cx.emit(crate::tasks::pane::TasksEvent::OpenAccounts)));
+    cx.run_until_parked();
+
+    assert!(asked.load(Ordering::SeqCst));
+}
+
 /// A pull request that reads as merged moves the task it is linked to to Done, and a second reading of it
 /// adds nothing.
 #[gpui_kit::test]
