@@ -62,11 +62,19 @@ impl Registry {
 
     /// Adds a mail provider. A second one for the same provider and account replaces the first.
     pub fn add_mail(&mut self, provider: Arc<dyn MailProvider>) {
-        self.mail.insert((provider.provider().to_string(), provider.account().to_string()), provider);
+        self.mail.insert(
+            (
+                provider.provider().to_string(),
+                provider.account().to_string(),
+            ),
+            provider,
+        );
     }
 
     pub fn mail(&self, provider: &str, account: &str) -> Option<Arc<dyn MailProvider>> {
-        self.mail.get(&(provider.to_string(), account.to_string())).cloned()
+        self.mail
+            .get(&(provider.to_string(), account.to_string()))
+            .cloned()
     }
 
     /// Every mail provider, in provider and account order.
