@@ -94,6 +94,7 @@ impl SettingsPane {
 
     /// Reads whether a Linear key is kept, off the UI thread. The keychain is asked only when Linear is connected.
     pub(crate) fn read_accounts(&mut self, cx: &mut Context<Self>) {
+        self.accounts.problem = None;
         if self.accounts.saved.linear.is_none() {
             self.accounts.linear_tail = None;
             return;
@@ -122,6 +123,7 @@ impl SettingsPane {
             .map(|key| key.trim().to_string())
             .filter(|key| !key.is_empty());
         self.accounts.linear_check = Checked::Checking;
+        self.accounts.problem = None;
         let work = cx.background_spawn(async move {
             let key = match typed {
                 Some(key) => key,
@@ -154,6 +156,7 @@ impl SettingsPane {
         }
         let services = accounts::services(cx);
         self.accounts.linear_check = Checked::Checking;
+        self.accounts.problem = None;
         self.accounts.linear_field = None;
         let work = cx.background_spawn(async move {
             services
@@ -189,6 +192,7 @@ impl SettingsPane {
     }
 
     pub(crate) fn forget_linear(&mut self, cx: &mut Context<Self>) {
+        self.accounts.problem = None;
         let secrets = accounts::services(cx).secrets;
         let work = cx.background_spawn(async move { secrets.forget(LINEAR_KEY) });
         self.accounts._linear = Some(cx.spawn(async move |this, cx| {

@@ -337,3 +337,54 @@ fn the_projects_repository_is_offered_and_fills_the_field(cx: &mut TestAppContex
         Some("acme/web".into())
     );
 }
+
+/// A keychain that is there but refuses to keep anything.
+struct Locked;
+
+impl Secrets for Locked {
+    fn read(&self, _: &str) -> std::io::Result<Option<String>> {
+        Ok(None)
+    }
+    fn write(&self, _: &str, _: &str) -> std::io::Result<()> {
+        Err(std::io::Error::other("the keychain is locked"))
+    }
+    fn forget(&self, _: &str) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[gpui_kit::test]
+fn a_keychain_that_will_not_keep_the_key_is_said_in_words_and_nothing_is_connected_until_the_next_try_clears_it(
+    cx: &mut TestAppContext,
+) {
+    let (pane, hub, cx) = open(&Arc::new(InMemory::default()), cx);
+    cx.update(|_, cx| {
+        cx.set_global(AccountServices {
+            secrets: Arc::new(Locked),
+            linear,
+            github,
+        })
+    });
+
+    pane.update(cx, |p, cx| p.save_linear(KEY.into(), cx));
+    settle(cx);
+
+    let problem = pane.read_with(cx, |p, _| p.accounts.problem.clone());
+    assert_eq!(
+        problem.as_deref(),
+        Some("The keychain could not keep the key: the keychain is locked")
+    );
+    assert!(
+        pane.read_with(cx, |p, _| p.accounts.saved.linear.is_none()),
+        "not connected: the key is not kept"
+    );
+    assert!(hub.accounts().is_empty());
+
+    pane.update(cx, |p, cx| p.test_linear(Some(KEY.into()), cx));
+    settle(cx);
+    assert_eq!(
+        pane.read_with(cx, |p, _| p.accounts.problem.clone()),
+        None,
+        "an old complaint does not outlive the next try"
+    );
+}

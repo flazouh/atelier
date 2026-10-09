@@ -89,41 +89,62 @@ fn row_of(kind: Kind, error: &CapError) -> Row {
 fn settle(
     kind: Kind,
     connected: CapResult<(Arc<dyn TasksProvider>, String)>,
-    providers: &mut Vec<Arc<dyn TasksProvider>>,
-) -> Row {
+) -> (Row, Option<Arc<dyn TasksProvider>>) {
     match connected {
-        Ok((provider, name)) => {
-            providers.push(provider);
-            Row::Connected(name)
-        }
-        Err(error) => row_of(kind, &error),
+        Ok((provider, name)) => (Row::Connected(name), Some(provider)),
+        Err(error) => (row_of(kind, &error), None),
     }
 }
 
 /// The providers for what is saved, and the state of each row. Reads the keychain and asks the network: never on the UI
-/// thread. A kind that cannot be built is left out and says why in its row.
+/// thread. A kind that cannot be built is left out and says why in its row. The two kinds are asked at the same time, so
+/// a slow Linear does not hold GitHub back.
 pub(crate) fn build(saved: &AccountsSaved, services: &AccountServices) -> Built {
-    let mut providers = Vec::new();
-    // The keychain is read only for a person who connected Linear, so no one else sees a keychain prompt.
-    let linear = match &saved.linear {
-        None => Row::Off,
-        Some(_) => match services.secrets.read(LINEAR_KEY) {
-            Ok(Some(key)) => settle(Kind::Linear, connect_linear(services, &key), &mut providers),
-            Ok(None) => Row::NotSignedIn,
-            Err(why) => Row::Failed(format!("The keychain could not be read: {why}")),
-        },
-    };
-    let github = match &saved.github_issues {
-        None => Row::Off,
-        Some(github) => settle(
-            Kind::GithubIssues,
-            connect_github(services, &github.repo),
-            &mut providers,
-        ),
-    };
+    let (linear, github) = std::thread::scope(|scope| {
+        let linear = scope.spawn(|| build_linear(saved, services));
+        let github = build_github(saved, services);
+        (
+            linear
+                .join()
+                .unwrap_or_else(|_| (Row::Failed("Linear stopped unexpectedly.".into()), None)),
+            github,
+        )
+    });
+    let providers = [linear.1, github.1].into_iter().flatten().collect();
     Built {
-        rows: Rows { linear, github },
+        rows: Rows {
+            linear: linear.0,
+            github: github.0,
+        },
         providers,
+    }
+}
+
+fn build_linear(
+    saved: &AccountsSaved,
+    services: &AccountServices,
+) -> (Row, Option<Arc<dyn TasksProvider>>) {
+    // The keychain is read only for a person who connected Linear, so no one else sees a keychain prompt.
+    match &saved.linear {
+        None => (Row::Off, None),
+        Some(_) => match services.secrets.read(LINEAR_KEY) {
+            Ok(Some(key)) => settle(Kind::Linear, connect_linear(services, &key)),
+            Ok(None) => (Row::NotSignedIn, None),
+            Err(why) => (
+                Row::Failed(format!("The keychain could not be read: {why}")),
+                None,
+            ),
+        },
+    }
+}
+
+fn build_github(
+    saved: &AccountsSaved,
+    services: &AccountServices,
+) -> (Row, Option<Arc<dyn TasksProvider>>) {
+    match &saved.github_issues {
+        None => (Row::Off, None),
+        Some(github) => settle(Kind::GithubIssues, connect_github(services, &github.repo)),
     }
 }
 
