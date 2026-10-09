@@ -1,0 +1,11 @@
+[package]
+name = "atelier-capabilities"
+description = "Capabilities with one shared screen and many providers: references, the tasks contract, a provider registry, and the tool card resolver."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

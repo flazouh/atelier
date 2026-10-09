@@ -14,6 +14,7 @@ license = "Apache-2.0"
 gpui-kit = "0.6.6"
 atelier-ui = { git = "https://github.com/flazouh/atelier-ui" }
 atelier-agents = { path = "crates/agents" }
+atelier-capabilities = { path = "crates/capabilities" }
 atelier-editor = { path = "crates/editor" }
 atelier-forge = { path = "crates/forge" }
 atelier-i18n = { path = "crates/i18n" }
