@@ -245,8 +245,9 @@ impl MessagesPane {
         self.accounts.get(self.shown)
     }
 
+    /// Whether to offer `operation`: the provider lists it, and it is not a write on a read-only account.
     fn can(&self, operation: Operation) -> bool {
-        self.account().is_some_and(|a| a.caps.can(operation))
+        self.account().is_some_and(|a| a.caps.offers(operation))
     }
 
     /// Whether the provider has replies under messages, and a call to read them.
@@ -267,7 +268,8 @@ impl MessagesPane {
         }
     }
 
-    /// The composer is there only when the provider lists `send`, and the open channel or thread is read.
+    /// The composer, and the reply box of a thread, are there only when the provider offers `send` (it lists it, and is not
+    /// read-only), and the open channel or thread is read.
     pub fn composer_shown(&self) -> bool {
         self.channel.is_some()
             && self.can(Operation::Send)
@@ -363,7 +365,7 @@ impl MessagesPane {
             .rows
             .iter()
             .any(|r| r.reference == channel && r.unread);
-        if !unread || !account.caps.can(Operation::MarkRead) {
+        if !unread || !account.caps.offers(Operation::MarkRead) {
             return;
         }
         let (provider, at, epoch) = (account.provider.clone(), self.shown, self.epoch);
@@ -620,7 +622,7 @@ impl MessagesPane {
         let (Some(account), Some(channel)) = (self.account(), self.channel.clone()) else {
             return;
         };
-        if self.sending || !account.caps.can(Operation::Send) {
+        if self.sending || !account.caps.offers(Operation::Send) {
             self.composer_now()
                 .clone()
                 .update(cx, |c, cx| c.set_text(text, window, cx));
@@ -744,7 +746,7 @@ impl MessagesPane {
     /// Tells the provider the open channel is read, when it keeps that.
     fn mark_open_read(&mut self, cx: &mut Context<Self>) {
         if let (Some(account), Some(channel)) = (self.account(), self.channel.clone())
-            && account.caps.can(Operation::MarkRead)
+            && account.caps.offers(Operation::MarkRead)
         {
             let provider = account.provider.clone();
             cx.background_spawn(async move { provider.mark_read(&channel, None).ok() })

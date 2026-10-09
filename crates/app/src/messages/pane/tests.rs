@@ -241,6 +241,64 @@ fn the_composer_is_there_only_when_the_provider_lists_send(cx: &mut TestAppConte
 }
 
 #[gpui_kit::test]
+fn a_read_only_provider_shows_no_composer_and_no_reply_box(cx: &mut TestAppContext) {
+    for read_only in [false, true] {
+        let (provider, channel) = Fake::seeded("acme", &["the root"]);
+        let root = provider
+            .memory()
+            .history(&channel, None, None)
+            .unwrap()
+            .items
+            .remove(0);
+        provider
+            .memory()
+            .send(
+                &NewMessage::reply(&root.reference, &channel, "a reply"),
+                &Actor::person("ana", "Ana"),
+            )
+            .unwrap();
+        if read_only {
+            provider.read_only();
+        }
+        let (pane, cx) = one(&provider, cx);
+        assert!(
+            provider.can(Operation::Send),
+            "send is listed in both, so the screen must look at ReadOnly"
+        );
+        assert_eq!(
+            cx.debug_bounds("messages-composer").is_some(),
+            !read_only,
+            "channel, read_only {read_only}"
+        );
+        assert_eq!(pane.read_with(cx, |p, _| p.composer_shown()), !read_only);
+        assert_eq!(lines(&pane, cx), ["the root"], "the history reads");
+        press("message-replies-0", &pane, cx);
+        assert_eq!(lines(&pane, cx), ["the root", "a reply"], "the thread reads");
+        assert_eq!(
+            cx.debug_bounds("messages-composer").is_some(),
+            !read_only,
+            "thread reply box, read_only {read_only}"
+        );
+        // The screen draws no reaction, edit or delete control for any provider yet; a read-only one must keep it so.
+        for name in ["message-react-0", "message-edit-0", "message-delete-0"] {
+            assert!(cx.debug_bounds(name).is_none(), "{name} is not drawn");
+        }
+    }
+}
+
+#[gpui_kit::test]
+fn a_read_only_provider_is_not_told_a_channel_is_read(cx: &mut TestAppContext) {
+    let (provider, _) = Fake::seeded("acme", &["hi"]);
+    provider.read_only();
+    let (_pane, _cx) = one(&provider, cx);
+    assert_eq!(
+        provider.calls(Operation::MarkRead),
+        0,
+        "marking read changes the service, so a read-only account is not asked"
+    );
+}
+
+#[gpui_kit::test]
 fn the_thread_link_is_there_only_where_the_provider_has_threads(cx: &mut TestAppContext) {
     let (with, channel) = Fake::seeded("acme", &["root"]);
     let root = with
