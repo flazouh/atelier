@@ -39,11 +39,19 @@ impl Registry {
 
     /// Adds a messaging provider. A second one for the same provider and account replaces the first.
     pub fn add_messaging(&mut self, provider: Arc<dyn MessagingProvider>) {
-        self.messaging.insert((provider.provider().to_string(), provider.account().to_string()), provider);
+        self.messaging.insert(
+            (
+                provider.provider().to_string(),
+                provider.account().to_string(),
+            ),
+            provider,
+        );
     }
 
     pub fn messaging(&self, provider: &str, account: &str) -> Option<Arc<dyn MessagingProvider>> {
-        self.messaging.get(&(provider.to_string(), account.to_string())).cloned()
+        self.messaging
+            .get(&(provider.to_string(), account.to_string()))
+            .cloned()
     }
 
     /// Every messaging provider, in provider and account order.
