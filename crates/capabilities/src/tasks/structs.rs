@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use super::types::{ActivityKind, Category, Change, EntityKind, EventKind, LinkKind, Priority, Sort};
+use super::types::{
+    ActivityKind, Category, Change, EntityKind, EventKind, LinkKind, Priority, Sort,
+};
 use crate::{Actor, Ref};
 
 /// A status as a team names it, and the category it belongs to.
@@ -22,7 +24,11 @@ impl Status {
             Category::Done => "done",
             Category::Canceled => "canceled",
         };
-        Self { id: name.into(), name: name.into(), category }
+        Self {
+            id: name.into(),
+            name: name.into(),
+            category,
+        }
     }
 }
 
@@ -170,7 +176,10 @@ pub struct NewTask {
 
 impl NewTask {
     pub fn titled(title: impl Into<String>) -> Self {
-        Self { title: title.into(), ..Self::default() }
+        Self {
+            title: title.into(),
+            ..Self::default()
+        }
     }
 }
 

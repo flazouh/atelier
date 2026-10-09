@@ -9,8 +9,8 @@
 //!
 //! The crate has no UI and no network. Every call blocks and may be slow, so none is made on the UI thread.
 mod actor;
-pub mod card;
 mod capability;
+pub mod card;
 mod error;
 mod reference;
 mod registry;

@@ -7,7 +7,10 @@ mod traits;
 mod types;
 
 pub use memory::MemoryTasks;
-pub use structs::{Activity, Comment, Envelope, Event, Label, NewTask, Page, Patch, Project, Query, Status, Task, TaskLink};
+pub use structs::{
+    Activity, Comment, Envelope, Event, Label, NewTask, Page, Patch, Project, Query, Status, Task,
+    TaskLink,
+};
 pub use traits::TasksProvider;
 pub use types::{ActivityKind, Category, Change, EntityKind, EventKind, LinkKind, Priority, Sort};
 

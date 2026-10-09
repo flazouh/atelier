@@ -24,7 +24,7 @@
             "gap": "xs",
             "children": [
               { "type": "text", "value": { "path": "$.title" }, "style": "title", "max_lines": 1 },
-              { "type": "text", "value": { "template": "{$.project} · last seen {$.last_seen}" }, "style": "muted" }
+              { "type": "text", "value": { "template": "{$.project} · last seen {$.last_seen|relative_time}" }, "style": "muted" }
             ]
           },
           { "type": "badge", "value": { "template": "{$.events} events" }, "tone": "neutral" },

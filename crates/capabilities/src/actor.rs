@@ -20,11 +20,25 @@ pub enum ActorKind {
 
 impl Actor {
     pub fn person(id: impl Into<String>, name: impl Into<String>) -> Self {
-        Self { kind: ActorKind::Person, id: id.into(), name: name.into(), on_behalf_of: None }
+        Self {
+            kind: ActorKind::Person,
+            id: id.into(),
+            name: name.into(),
+            on_behalf_of: None,
+        }
     }
 
-    pub fn agent(id: impl Into<String>, name: impl Into<String>, on_behalf_of: impl Into<String>) -> Self {
-        Self { kind: ActorKind::Agent, id: id.into(), name: name.into(), on_behalf_of: Some(on_behalf_of.into()) }
+    pub fn agent(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        on_behalf_of: impl Into<String>,
+    ) -> Self {
+        Self {
+            kind: ActorKind::Agent,
+            id: id.into(),
+            name: name.into(),
+            on_behalf_of: Some(on_behalf_of.into()),
+        }
     }
 }
 

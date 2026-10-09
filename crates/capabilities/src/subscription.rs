@@ -28,7 +28,13 @@ impl<T> Subscription<T> {
     /// The reader's end, and the flag for the provider that sends to `events`.
     pub fn new(events: Receiver<T>) -> (Self, StopFlag) {
         let stop = Arc::new(AtomicBool::new(false));
-        (Self { events, stop: stop.clone() }, StopFlag(stop))
+        (
+            Self {
+                events,
+                stop: stop.clone(),
+            },
+            StopFlag(stop),
+        )
     }
 }
 

@@ -1,4 +1,6 @@
-use super::structs::{Activity, Comment, Envelope, Event, Label, NewTask, Page, Patch, Project, Query, Status, Task};
+use super::structs::{
+    Activity, Comment, Envelope, Event, Label, NewTask, Page, Patch, Project, Query, Status, Task,
+};
 use crate::{Actor, CapError, CapResult, Capabilities, Operation, Ref, Subscription};
 
 /// A provider of tasks: Atelier's own, Linear, GitHub Issues. The one tasks screen and the agent tools talk to this and

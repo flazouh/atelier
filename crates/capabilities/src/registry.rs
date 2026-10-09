@@ -16,11 +16,19 @@ impl Registry {
 
     /// Adds a tasks provider. A second one for the same provider and account replaces the first.
     pub fn add_tasks(&mut self, provider: Arc<dyn TasksProvider>) {
-        self.tasks.insert((provider.provider().to_string(), provider.account().to_string()), provider);
+        self.tasks.insert(
+            (
+                provider.provider().to_string(),
+                provider.account().to_string(),
+            ),
+            provider,
+        );
     }
 
     pub fn tasks(&self, provider: &str, account: &str) -> Option<Arc<dyn TasksProvider>> {
-        self.tasks.get(&(provider.to_string(), account.to_string())).cloned()
+        self.tasks
+            .get(&(provider.to_string(), account.to_string()))
+            .cloned()
     }
 
     /// Every tasks provider, in provider and account order.
