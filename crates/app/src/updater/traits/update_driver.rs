@@ -7,6 +7,6 @@ pub trait UpdateDriver {
     fn check(&self, asked: bool);
     /// The reader chose to restart: the update, downloaded already, installs.
     fn install(&self);
-    /// The reader chose to wait: the update installs when the app quits.
+    /// The app quits with an update ready that nobody pressed: the update installs when the app quits.
     fn later(&self);
 }

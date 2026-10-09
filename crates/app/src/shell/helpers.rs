@@ -5,6 +5,12 @@ use super::structs::{
     Save, ShowSessions, ToggleRight, ToggleSidebar, ZoomIn, ZoomOut, ZoomReset,
 };
 
+/// How wide the changelog sheet is in a window `viewport` design pixels wide: its own width, or the window's less a margin at
+/// each side when that is narrower, and never narrower than it can read.
+pub(super) fn sheet_width(viewport: f32) -> f32 {
+    (viewport - 2. * super::types::SHEET_MARGIN).clamp(super::types::SHEET_MIN, super::types::SHEET_WIDTH)
+}
+
 /// Where the shell keeps what it saves. A test writes only where `ATELIER_SETTINGS` points, never the
 /// reader's own settings.
 pub(super) fn settings_path() -> Option<std::path::PathBuf> {

@@ -12,8 +12,8 @@ impl UpdateState {
         }
     }
 
-    /// The state after `event`, and what the window does about it. A look the reader asked for says how it ended, and
-    /// opens the update when it is ready; the daily look says nothing unless an update waits.
+    /// The state after `event`, and what the window does about it. A look the reader asked for says how it ended; the
+    /// daily look says nothing. A ready update shows as a button in the title bar, never by itself.
     pub fn apply(self, event: UpdateEvent) -> (UpdateState, Reaction) {
         let asked = self.asked();
         match (self, event) {
@@ -30,8 +30,8 @@ impl UpdateState {
                 let done = DOWNLOAD_SHARE + fraction.clamp(0., 1.) * (1. - DOWNLOAD_SHARE);
                 (Self::Downloading { version, notes, fraction: done, asked }, Reaction::Nothing)
             }
-            (Self::Downloading { version, notes, asked, .. }, UpdateEvent::Ready) => {
-                (Self::Ready { version, notes }, if asked { Reaction::Show } else { Reaction::Nothing })
+            (Self::Downloading { version, notes, .. }, UpdateEvent::Ready) => {
+                (Self::Ready { version, notes }, Reaction::Nothing)
             }
             (Self::Idle | Self::Checking { .. }, UpdateEvent::Ready) => (Self::Ready { version: String::new(), notes: String::new() }, Reaction::Nothing),
             (state @ Self::Ready { .. }, UpdateEvent::Ready) => (state, Reaction::Nothing),
@@ -43,8 +43,6 @@ impl UpdateState {
                 (Self::Idle, if told { Reaction::Say(format!("Could not update: {message}")) } else { Reaction::Nothing })
             }
             (_, UpdateEvent::Idle) => (Self::Idle, Reaction::Nothing),
-            (state @ Self::Ready { .. }, UpdateEvent::Focus) => (state, Reaction::Show),
-            (state, UpdateEvent::Focus) => (state, Reaction::Nothing),
             (state, UpdateEvent::Downloading { .. } | UpdateEvent::Extracting { .. } | UpdateEvent::Ready) => (state, Reaction::Nothing),
         }
     }

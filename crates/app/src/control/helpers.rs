@@ -163,6 +163,10 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
             shell.check_for_updates(&crate::shell::CheckForUpdates, window, cx);
             json!({ "ok": true })
         }
+        Request::Update { event } => {
+            shell.update_event(event, cx);
+            json!({ "ok": true, "update": shell.update_state_word() })
+        }
         Request::Edit { path, text } => {
             if shell.edit_file(&path, text, window, cx) {
                 json!({ "ok": true })
@@ -202,7 +206,7 @@ fn state(shell: &Shell, cx: &App) -> Value {
         .collect();
     let theme = atelier_ui::theme::ActiveTheme::theme(cx);
     let updates = cx.try_global::<crate::updater::Updater>().is_some_and(crate::updater::Updater::available);
-    json!({ "settings": shell.settings_section(cx), "unsaved": shell.unsaved(cx), "updates": { "available": updates }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
+    json!({ "settings": shell.settings_section(cx), "unsaved": shell.unsaved(cx), "updates": { "available": updates, "state": shell.update_state_word(), "changelog_open": shell.changelog_shown() }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
 }
 
 /// One session: who the agent is, how it stands, and the rows its list shows.

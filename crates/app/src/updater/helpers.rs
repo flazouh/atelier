@@ -25,59 +25,67 @@ fn capital(text: &str) -> String {
     letters.next().map_or_else(String::new, |first| first.to_uppercase().chain(letters).collect())
 }
 
-/// Which kind a `###` heading names, by a word in it: "New" or "Added", "Faster" or "Performance", "Fixed" or "Bug", "Changed",
-/// "Design"; else "Improved".
-fn kind_of(heading: &str) -> atelier_ui::ReleaseKind {
-    use atelier_ui::ReleaseKind::{Added, Changed, Design, Faster, Fixed, Improved};
-    let heading = heading.to_lowercase();
-    let has = |words: &[&str]| words.iter().any(|word| heading.contains(word));
-    if has(&["new", "add"]) {
-        Added
-    } else if has(&["fix", "bug"]) {
-        Fixed
-    } else if has(&["fast", "perf", "speed"]) {
-        Faster
-    } else if has(&["chang"]) {
-        Changed
-    } else if has(&["design", "look"]) {
-        Design
-    } else {
-        Improved
-    }
-}
 /// The lines of a changelog written in markdown. A bullet that opens with a bold lead ("- **Fixes:** a row fills the
-/// width") gives its lead and its text, and takes its kind from the last `###` heading ("### New", "### Improved",
-/// "### Faster", "### Fixed", "### Changed", "### Design"; Improved before any). Other headings are the sheet's own, so they are dropped. A changelog with no bullet
-/// is one line of its words, and none at all is none.
+/// width") gives its lead and its text. Headings are the sheet's own, so they are dropped (older files still carry `###`
+/// ones), and so is the `Released:` line. A changelog with no bullet is one line of its words, and none at all is none.
 pub fn release_notes(markdown: &str) -> Vec<NoteLine> {
-    let mut kind = atelier_ui::ReleaseKind::Improved;
     let (mut bullets, mut words) = (Vec::new(), Vec::new());
-    for line in markdown.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        if let Some(heading) = line.strip_prefix("###") {
-            kind = kind_of(heading);
-        } else if !line.starts_with('#') {
-            words.push(line);
-            if let Some(item) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
-                bullets.push(match item.strip_prefix("**").and_then(|rest| rest.split_once("**")) {
-                    Some((lead, text)) => NoteLine {
-                        kind,
-                        lead: lead.trim().trim_end_matches(':').trim().to_string(),
-                        text: capital(text.trim().trim_start_matches(':').trim()),
-                    },
-                    None => NoteLine { kind, lead: item.trim().to_string(), text: String::new() },
-                });
-            }
+    for line in markdown.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#') && !l.starts_with(RELEASED)) {
+        words.push(line);
+        if let Some(item) = line.strip_prefix("- ").or_else(|| line.strip_prefix("* ")) {
+            bullets.push(match item.strip_prefix("**").and_then(|rest| rest.split_once("**")) {
+                Some((lead, text)) => NoteLine {
+                    lead: lead.trim().trim_end_matches(':').trim().to_string(),
+                    text: capital(text.trim().trim_start_matches(':').trim()),
+                },
+                None => NoteLine { lead: item.trim().to_string(), text: String::new() },
+            });
         }
     }
     if !bullets.is_empty() || words.is_empty() {
         return bullets;
     }
-    vec![NoteLine { kind: atelier_ui::ReleaseKind::Improved, lead: "What changed".into(), text: words.join(" ") }]
+    vec![NoteLine { lead: "What changed".into(), text: words.join(" ") }]
+}
+
+/// The line of a changelog that dates it: `Released: 2026-10-09`, under the heading.
+const RELEASED: &str = "Released:";
+
+/// The date a changelog gives with its `Released:` line, as the sheet shows it ("Oct 9, 2026"). None when the line is
+/// missing or is not a real date.
+pub fn release_date(markdown: &str) -> Option<String> {
+    let line = markdown.lines().map(str::trim).find_map(|line| line.strip_prefix(RELEASED))?;
+    written_date(line.trim())
+}
+
+/// `2026-10-09` as "Oct 9, 2026". None when it is not a date of the calendar.
+pub fn written_date(iso: &str) -> Option<String> {
+    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let mut parts = iso.split('-');
+    let (year, month, day) = (parts.next()?, parts.next()?, parts.next()?);
+    if parts.next().is_some() || year.len() != 4 || month.len() != 2 || day.len() != 2 {
+        return None;
+    }
+    let (year, month, day): (u32, usize, u32) = (year.parse().ok()?, month.parse().ok()?, day.parse().ok()?);
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let last = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        1..=12 => 31,
+        _ => return None,
+    };
+    (1..=last).contains(&day).then(|| format!("{} {day}, {year}", MONTHS[month - 1]))
 }
 
 /// The numbers of a version such as `0.1.4`, or none when it is not that.
 fn numbers(version: &str) -> Option<Vec<u32>> {
     version.trim().split('.').map(|part| part.parse().ok()).collect()
+}
+
+/// Whether `version` is an older release than `than`. False when either is not a version.
+pub fn is_older(version: &str, than: &str) -> bool {
+    matches!((numbers(version), numbers(than)), (Some(version), Some(than)) if version < than)
 }
 
 /// What to do at start with the changelog kept for `kept`, when `running` is the version that runs.

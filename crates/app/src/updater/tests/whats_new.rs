@@ -7,7 +7,7 @@ fn the_changelog_is_shown_once_when_its_version_starts() {
 
 #[test]
 fn a_changelog_for_a_version_not_installed_yet_is_kept_and_an_older_one_is_dropped() {
-    assert_eq!(remembered("0.1.4", "0.1.3"), Remembered::Wait, "Later: it installs at quit, and the next start shows it");
+    assert_eq!(remembered("0.1.4", "0.1.3"), Remembered::Wait, "it installs at quit or on a press, and the next start shows it");
     assert_eq!(remembered("0.1.4", "0.1.10"), Remembered::Forget, "numbers, not letters: 0.1.10 is after 0.1.4");
     assert_eq!(remembered("0.1.3", "0.2.0"), Remembered::Forget);
     assert_eq!(remembered("soon", "0.1.3"), Remembered::Forget);

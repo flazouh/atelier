@@ -1,12 +1,7 @@
-use super::super::{NoteLine, release_notes};
-use atelier_ui::ReleaseKind::{self, Added, Changed, Design, Faster, Fixed, Improved};
+use super::super::{NoteLine, helpers::written_date, is_older, release_date, release_notes};
 
 fn line(lead: &str, text: &str) -> NoteLine {
-    NoteLine { kind: Improved, lead: lead.into(), text: text.into() }
-}
-
-fn typed(kind: ReleaseKind, lead: &str, text: &str) -> NoteLine {
-    NoteLine { kind, ..line(lead, text) }
+    NoteLine { lead: lead.into(), text: text.into() }
 }
 
 #[test]
@@ -18,6 +13,18 @@ fn a_bullet_with_a_bold_lead_gives_the_lead_and_the_text() {
 #[test]
 fn the_headings_and_the_blank_lines_are_not_notes() {
     assert_eq!(release_notes("# Title\n\n## Part\n\n- **A:** b"), vec![line("A", "B")]);
+}
+
+#[test]
+fn the_older_kind_headings_are_ignored_and_every_bullet_stays() {
+    let notes = release_notes("## What is new in 1\n\n### New\n\n- **A:** a\n\n### Fixed\n- **B:** b");
+    assert_eq!(notes, vec![line("A", "A"), line("B", "B")]);
+}
+
+#[test]
+fn the_released_line_is_not_a_note() {
+    assert_eq!(release_notes("## What is new in 1\nReleased: 2026-10-09\n- **A:** a"), vec![line("A", "A")]);
+    assert!(release_notes("## What is new in 1\nReleased: 2026-10-09\n").is_empty(), "a date alone is no note");
 }
 
 #[test]
@@ -33,24 +40,38 @@ fn words_with_no_bullet_are_one_note_and_nothing_is_none() {
 }
 
 #[test]
-fn a_bullet_takes_its_kind_from_the_heading_above_it() {
-    let notes = release_notes("## What is new in 1\n\n### New\n\n- **A:** a\n- **B:** b\n\n### Fixed\n\n- **C:** c\n\n### Improved\n- **D:** d");
-    assert_eq!(notes, vec![typed(Added, "A", "A"), typed(Added, "B", "B"), typed(Fixed, "C", "C"), typed(Improved, "D", "D")]);
-    assert_eq!(release_notes("- **A:** a"), vec![typed(Improved, "A", "A")], "with no heading: improved");
-    assert_eq!(release_notes("### Fixes\n- **A:** a")[0].kind, Fixed, "the word decides: fix");
+fn the_released_line_gives_the_date_as_the_sheet_writes_it() {
+    assert_eq!(release_date("## What is new in 1\nReleased: 2026-10-09\n- **A:** a").as_deref(), Some("Oct 9, 2026"));
+    assert_eq!(release_date("## What is new in 1\nReleased:2026-01-31").as_deref(), Some("Jan 31, 2026"), "a space after the colon is optional");
+    assert_eq!(release_date("## What is new in 1\n- **A:** a"), None, "no line, no date");
+    assert_eq!(release_date("Released: soon"), None, "words are no date");
 }
 
 #[test]
-fn every_heading_word_names_one_of_the_six_kinds() {
-    let kind = |heading: &str| release_notes(&format!("### {heading}\n- **A:** a"))[0].kind;
-    assert_eq!(kind("New"), Added);
-    assert_eq!(kind("Added"), Added);
-    assert_eq!(kind("Improved"), Improved);
-    assert_eq!(kind("Faster"), Faster);
-    assert_eq!(kind("Performance"), Faster);
-    assert_eq!(kind("Fixed"), Fixed);
-    assert_eq!(kind("Bug fixes"), Fixed);
-    assert_eq!(kind("Changed"), Changed);
-    assert_eq!(kind("Design"), Design);
-    assert_eq!(kind("Something else"), Improved, "an unknown heading is improved");
+fn a_date_is_written_with_an_english_month_and_no_zero_on_the_day() {
+    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    for (at, name) in months.iter().enumerate() {
+        assert_eq!(written_date(&format!("2027-{:02}-05", at + 1)), Some(format!("{name} 5, 2027")));
+    }
+    assert_eq!(written_date("2026-12-31").as_deref(), Some("Dec 31, 2026"));
+}
+
+#[test]
+fn a_day_that_the_calendar_does_not_have_is_no_date() {
+    assert_eq!(written_date("2026-02-29"), None, "2026 is not a leap year");
+    assert_eq!(written_date("2028-02-29").as_deref(), Some("Feb 29, 2028"));
+    assert_eq!(written_date("1900-02-29"), None, "a century is not a leap year");
+    assert_eq!(written_date("2000-02-29").as_deref(), Some("Feb 29, 2000"));
+    for bad in ["2026-04-31", "2026-13-01", "2026-00-10", "2026-10-00", "2026-10-32", "26-10-09", "2026-1-9", "2026-10", "2026-10-09-01", "", "x-y-z"] {
+        assert_eq!(written_date(bad), None, "{bad:?}");
+    }
+}
+
+#[test]
+fn versions_compare_by_number() {
+    assert!(is_older("0.1.8", "0.1.9"));
+    assert!(is_older("0.1.9", "0.1.10"), "numbers, not letters");
+    assert!(!is_older("0.1.9", "0.1.9"));
+    assert!(!is_older("0.2.0", "0.1.9"));
+    assert!(!is_older("dev", "0.1.9") && !is_older("0.1.9", "dev"), "a word is no version");
 }

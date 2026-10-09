@@ -30,7 +30,7 @@ impl Updater {
         self.driver.install();
     }
 
-    /// The reader chose to wait: the update installs when the app quits.
+    /// The app quits with an update ready that nobody pressed: the update installs when the app quits.
     pub fn later(&self) {
         self.driver.later();
     }

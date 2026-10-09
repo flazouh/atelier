@@ -28,6 +28,11 @@ fn leave_an_edit_unsaved(shell: &Entity<Shell>, cx: &mut VisualTestContext) {
     assert_eq!(shell.read_with(cx, |s, cx| s.unsaved(cx)), 1);
 }
 
+/// Whether the element marked `name` was drawn on the last frame.
+fn drawn(cx: &mut VisualTestContext, name: String) -> bool {
+    cx.debug_bounds(Box::leak(name.into_boxed_str())).is_some()
+}
+
 fn requests() -> (RequestSender, Requests) {
     futures_channel::mpsc::unbounded()
 }
@@ -71,7 +76,7 @@ fn found_by_the_daily_look(shell: &Entity<Shell>, cx: &mut VisualTestContext) {
 }
 
 #[gpui_kit::test]
-fn an_update_the_daily_look_finds_downloads_in_silence_and_then_waits_behind_a_button(cx: &mut TestAppContext) {
+fn an_update_the_daily_look_finds_shows_its_percentage_and_then_a_button_and_opens_no_sheet(cx: &mut TestAppContext) {
     let (shell, cx, _calls, _dir) = with_an_updater(cx);
     found_by_the_daily_look(&shell, cx);
     tell(&shell, cx, UpdateEvent::Downloading { fraction: 0.5 });
@@ -80,51 +85,60 @@ fn an_update_the_daily_look_finds_downloads_in_silence_and_then_waits_behind_a_b
     tell(&shell, cx, UpdateEvent::Extracting { fraction: 1. });
     tell(&shell, cx, UpdateEvent::Ready);
     assert!(cx.debug_bounds("update-chip").is_some(), "a button says the update is ready");
-    assert!(cx.debug_bounds("update-progress").is_none() && cx.debug_bounds("release-sheet").is_none(), "the changelog does not open by itself");
+    assert!(cx.debug_bounds("update-progress").is_none() && cx.debug_bounds("release-sheet").is_none(), "no sheet opens by itself");
 }
 
 #[gpui_kit::test]
-fn the_button_opens_the_changelog_and_restart_installs_the_update(cx: &mut TestAppContext) {
+fn the_ready_button_names_the_version_and_a_press_installs_the_update_with_no_sheet(cx: &mut TestAppContext) {
     let (shell, cx, calls, _dir) = with_an_updater(cx);
     found_by_the_daily_look(&shell, cx);
     tell(&shell, cx, UpdateEvent::Ready);
     let chip = cx.debug_bounds("update-chip").expect("the button is there");
     cx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    assert!(cx.debug_bounds("release-sheet").is_some(), "the changelog opens");
-    let restart = cx.debug_bounds("release-install").expect("with a button to restart");
-    cx.simulate_click(restart.center(), gpui_kit::Modifiers::default());
-    settle(&shell, cx);
-    assert_eq!(calls.counts(), (0, 0, 1, 0), "the updater was told to install");
-    assert!(cx.debug_bounds("release-sheet").is_none(), "the panel is gone");
+    assert_eq!(calls.counts(), (0, 0, 1, 0), "the updater was told to install, and not to wait");
+    assert!(cx.debug_bounds("release-sheet").is_none(), "no sheet opened");
     assert_eq!(shell.read_with(cx, |s, _| s.update.clone()), UpdateState::Installing);
+    assert!(cx.debug_bounds("update-chip").is_none(), "the button is gone: it says Installing instead");
 }
 
 #[gpui_kit::test]
-fn later_keeps_the_update_for_the_next_quit_and_so_does_escape(cx: &mut TestAppContext) {
+fn a_press_on_the_button_with_no_update_ready_does_nothing(cx: &mut TestAppContext) {
     let (shell, cx, calls, _dir) = with_an_updater(cx);
-    found_by_the_daily_look(&shell, cx);
-    tell(&shell, cx, UpdateEvent::Ready);
-    shell.update(cx, |s, cx| s.show_update(cx));
-    settle(&shell, cx);
-    let later = cx.debug_bounds("release-later").expect("Later is there");
-    cx.simulate_click(later.center(), gpui_kit::Modifiers::default());
-    settle(&shell, cx);
-    assert_eq!(calls.counts(), (0, 0, 0, 1));
-    assert!(cx.debug_bounds("release-sheet").is_none() && cx.debug_bounds("notice").is_some(), "the panel is gone and a notice says when it installs");
-    assert!(cx.debug_bounds("update-chip").is_none(), "nothing is left to press: the updater installs it when the app quits");
-    // Escape is Later too.
-    found_by_the_daily_look(&shell, cx);
-    tell(&shell, cx, UpdateEvent::Ready);
-    shell.update(cx, |s, cx| s.show_update(cx));
-    settle(&shell, cx);
-    cx.simulate_keystrokes("escape");
-    settle(&shell, cx);
-    assert_eq!(calls.counts(), (0, 0, 0, 2));
+    shell.update(cx, |s, cx| s.update_install(cx));
+    assert_eq!(calls.counts(), (0, 0, 0, 0));
+    assert_eq!(shell.read_with(cx, |s, _| s.update.clone()), UpdateState::Idle);
 }
 
 #[gpui_kit::test]
-fn a_look_the_reader_asked_for_opens_the_changelog_by_itself_and_says_when_nothing_is_newer(cx: &mut TestAppContext) {
+fn quitting_with_an_update_ready_that_was_never_pressed_installs_it_at_quit(cx: &mut TestAppContext) {
+    let (shell, cx, calls, _dir) = with_an_updater(cx);
+    let (_sender, events) = futures_channel::mpsc::unbounded();
+    shell.update_in(cx, |s, window, cx| s.serve_updates(events, window, cx));
+    found_by_the_daily_look(&shell, cx);
+    tell(&shell, cx, UpdateEvent::Ready);
+    assert_eq!(calls.counts(), (0, 0, 0, 0), "nothing yet");
+    // What the platform does when the app quits: it runs every quit observer.
+    cx.cx.update(|cx| cx.shutdown());
+    assert_eq!(calls.counts(), (0, 0, 0, 1), "the updater was told to install at quit, once");
+}
+
+#[gpui_kit::test]
+fn quitting_with_no_update_ready_or_one_already_installing_tells_the_updater_nothing(cx: &mut TestAppContext) {
+    for events in [vec![], vec![UpdateEvent::Checking { user: false }, UpdateEvent::Installing]] {
+        let (shell, cx, calls, _dir) = with_an_updater(cx);
+        shell.update(cx, |s, cx| {
+            for event in events {
+                s.update_event(event, cx);
+            }
+            s.update_at_quit(cx);
+        });
+        assert_eq!(calls.counts(), (0, 0, 0, 0));
+    }
+}
+
+#[gpui_kit::test]
+fn a_look_the_reader_asked_for_opens_no_sheet_and_says_when_nothing_is_newer(cx: &mut TestAppContext) {
     let (shell, cx, _calls, _dir) = with_an_updater(cx);
     ask_for_updates(&shell, cx);
     tell(&shell, cx, UpdateEvent::UpToDate);
@@ -132,16 +146,18 @@ fn a_look_the_reader_asked_for_opens_the_changelog_by_itself_and_says_when_nothi
     ask_for_updates(&shell, cx);
     tell(&shell, cx, UpdateEvent::Found { version: "0.2.0".into(), notes: None, user: true });
     tell(&shell, cx, UpdateEvent::Ready);
-    assert!(cx.debug_bounds("release-sheet").is_some(), "the reader asked, so the update opens by itself");
+    assert!(cx.debug_bounds("release-sheet").is_none(), "the update waits behind its button");
+    assert!(cx.debug_bounds("update-chip").is_some());
 }
 
 #[gpui_kit::test]
-fn asking_again_while_an_update_is_ready_opens_it_and_does_not_look_again(cx: &mut TestAppContext) {
+fn asking_again_while_an_update_is_ready_says_so_and_does_not_look_again(cx: &mut TestAppContext) {
     let (shell, cx, calls, _dir) = with_an_updater(cx);
     found_by_the_daily_look(&shell, cx);
     tell(&shell, cx, UpdateEvent::Ready);
     ask_for_updates(&shell, cx);
-    assert!(cx.debug_bounds("release-sheet").is_some());
+    assert!(cx.debug_bounds("notice").is_some(), "a notice points to the button");
+    assert!(cx.debug_bounds("release-sheet").is_none());
     assert_eq!(calls.counts().0, 0, "no second look");
 }
 
@@ -238,32 +254,67 @@ fn kept(version: &str) -> atelier_settings::Settings {
     }
 }
 
+/// What the title bar and the sheet show for `kept`, the changelog the settings kept.
 #[gpui_kit::test]
-fn the_first_start_of_an_updated_version_shows_a_chip_whose_sheet_has_only_close_and_goes_for_good(cx: &mut TestAppContext) {
+fn the_first_start_of_an_updated_version_opens_the_changelog_by_itself_and_close_forgets_it(cx: &mut TestAppContext) {
     let (shell, cx) = open_shell_with(cx, kept(env!("CARGO_PKG_VERSION")));
     settle(&shell, cx);
-    let chip = cx.debug_bounds("whats-new-chip").expect("the chip is there");
-    assert!(cx.debug_bounds("release-sheet").is_none(), "the sheet does not open by itself");
-    cx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
-    settle(&shell, cx);
-    assert!(cx.debug_bounds("release-sheet").is_some(), "a press opens it");
-    assert!(cx.debug_bounds("release-install").is_none(), "with nothing to restart");
+    assert!(cx.debug_bounds("release-sheet").is_some(), "the sheet is open at start");
+    assert!(cx.debug_bounds("whats-new-chip").is_none(), "there is no chip any more");
+    assert!(cx.debug_bounds("release-install").is_none() && cx.debug_bounds("release-later").is_none(), "and no buttons but Close");
+    assert!(cx.debug_bounds("release-earlier-0").is_none(), "the old layout is gone");
+    assert!(cx.debug_bounds("release-0").is_some() && cx.debug_bounds("release-1").is_some(), "the new version first, the older ones under it");
     let close = cx.debug_bounds("release-close").expect("Close is there");
     cx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    assert!(cx.debug_bounds("release-sheet").is_none() && cx.debug_bounds("whats-new-chip").is_none(), "Close removes both");
-    assert!(shell.read_with(cx, |s, _| s.whats_new.is_none()));
+    assert!(cx.debug_bounds("release-sheet").is_none(), "Close closes it");
+    assert!(shell.read_with(cx, |s, _| s.whats_new.is_none()), "and the kept record is forgotten");
+}
+
+#[gpui_kit::test]
+fn the_second_start_does_not_open_the_sheet_again(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.json");
+    atelier_settings::update(&path, |s| *s = kept(env!("CARGO_PKG_VERSION"))).unwrap();
+    let saved = atelier_settings::load(&path);
+    let (first, cx) = open_shell_with(cx, saved);
+    assert!(first.read_with(cx, |s, _| s.whats_new_open), "the first start opens it");
+    // Closing writes the settings without the record, as the app does off the UI thread.
+    atelier_settings::update(&path, |s| s.whats_new = None).unwrap();
+    let saved = atelier_settings::load(&path);
+    assert!(saved.whats_new.is_none());
+    let (second, cx) = open_shell_with(cx, saved);
+    assert!(!second.read_with(cx, |s, _| s.whats_new_open), "the second start does not");
+    assert!(cx.debug_bounds("release-sheet").is_none());
 }
 
 #[gpui_kit::test]
 fn escape_closes_the_whats_new_sheet_too(cx: &mut TestAppContext) {
     let (shell, cx) = open_shell_with(cx, kept(env!("CARGO_PKG_VERSION")));
-    shell.update(cx, |s, cx| s.show_whats_new(cx));
     settle(&shell, cx);
     assert!(cx.debug_bounds("release-sheet").is_some());
     cx.simulate_keystrokes("escape");
     settle(&shell, cx);
     assert!(cx.debug_bounds("release-sheet").is_none() && shell.read_with(cx, |s, _| s.whats_new.is_none()));
+}
+
+#[gpui_kit::test]
+fn the_sheet_of_an_update_shows_the_new_version_first_with_its_date_and_the_older_releases_under_it(cx: &mut TestAppContext) {
+    let (shell, cx) = open_shell_with(cx, atelier_settings::Settings::default());
+    shell.update(cx, |s, cx| {
+        s.whats_new = Some(atelier_settings::WhatsNew {
+            version: "0.1.5".into(),
+            notes: "## What is new in 0.1.5\nReleased: 2026-10-08\n- **Fast:** it is faster".into(),
+        });
+        s.whats_new_open = true;
+        cx.notify();
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("release-sheet").is_some());
+    assert!(cx.debug_bounds("release-date-0").is_some(), "the new version has its date");
+    let older = crate::changelog::releases().iter().filter(|(v, _)| crate::updater::is_older(v, "0.1.5")).count();
+    assert_eq!(older, (1..=older).filter(|n| drawn(cx, format!("release-{n}"))).count(), "every older release is listed");
+    assert!(!drawn(cx, format!("release-{}", older + 1)), "and no newer one");
 }
 
 #[gpui_kit::test]
@@ -276,7 +327,7 @@ fn a_changelog_kept_for_another_version_shows_no_chip(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_version_in_the_status_bar_opens_the_changelog_with_every_release_and_close_closes_it(cx: &mut TestAppContext) {
+fn the_version_in_the_status_bar_opens_the_changelog_with_every_release_and_a_date_and_close_closes_it(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = super::with_a_session(cx, 1200.);
     settle(&shell, cx);
     let button = cx.debug_bounds("status-version").expect("the version is on the screen");
@@ -285,9 +336,11 @@ fn the_version_in_the_status_bar_opens_the_changelog_with_every_release_and_clos
     settle(&shell, cx);
     assert!(cx.debug_bounds("release-sheet").is_some(), "a press opens the changelog");
     assert!(cx.debug_bounds("release-install").is_none(), "it has nothing to restart");
-    if crate::changelog::releases().len() > 1 {
-        assert!(cx.debug_bounds("release-earlier-0").is_some(), "the earlier releases are listed");
+    for (at, (version, markdown)) in crate::changelog::releases().iter().enumerate() {
+        assert!(drawn(cx, format!("release-{at}")), "{version} is listed, newest first");
+        assert_eq!(drawn(cx, format!("release-date-{at}")), crate::updater::release_date(markdown).is_some(), "{version}: a date when its notes have one");
     }
+    assert!(cx.debug_bounds("release-date-0").is_some(), "the current release has its date");
     cx.simulate_keystrokes("escape");
     settle(&shell, cx);
     assert!(cx.debug_bounds("release-sheet").is_none(), "Escape closes it");

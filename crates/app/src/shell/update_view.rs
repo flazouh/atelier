@@ -1,5 +1,6 @@
-//! The update's own look: a chip in the title bar while an update downloads and when it is ready, and one panel with the
-//! changelog and the choice to restart or wait. Sparkle's own windows are not used.
+//! The update's own look: a chip in the title bar while an update downloads and when it is ready, and the changelog sheet
+//! (the same one the version in the status bar opens, and the first start after an update opens by itself). Sparkle's own
+//! windows are not used.
 use atelier_ui::{
     ReleaseNote, ReleaseSheet, ReleaseVersion,
     button::{Button, ButtonSize, ButtonVariant},
@@ -7,27 +8,48 @@ use atelier_ui::{
     theme::ActiveTheme,
     typography::TextSize,
 };
-use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, div};
+use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, Window, div};
 
-use super::structs::Shell;
+use super::{helpers::sheet_width, structs::Shell};
 use crate::{
     changelog,
-    updater::{UpdateState, release_notes, running_version},
+    updater::{UpdateState, is_older, release_date, release_notes, running_version},
 };
 
 /// What a changelog the feed did not carry says.
 const NO_NOTES: &str = "This version has no release notes.";
 
+/// The notes of a release as the sheet lists them: one when the changelog has none, so the release is not empty.
+fn notes_of(markdown: &str) -> Vec<ReleaseNote> {
+    let mut notes: Vec<ReleaseNote> = release_notes(markdown).into_iter().map(|line| ReleaseNote::new(line.lead, line.text)).collect();
+    if notes.is_empty() {
+        notes.push(ReleaseNote::new(NO_NOTES, ""));
+    }
+    notes
+}
+
+/// A release as the sheet draws it: its version, its date when its notes carry one, and its notes.
+type Release = (SharedString, Option<SharedString>, Vec<ReleaseNote>);
+
+fn release_of(version: &str, markdown: &str) -> Release {
+    (SharedString::from(version.to_string()), release_date(markdown).map(SharedString::from), notes_of(markdown))
+}
+
+fn listed((version, date, notes): Release) -> ReleaseVersion {
+    ReleaseVersion::new(version, notes).date(date)
+}
+
 impl Shell {
     /// The room the chip takes in the title bar now: none when there is no chip.
     pub(super) fn update_chip_room(&self) -> f32 {
-        let shown = match &self.update {
-            UpdateState::Downloading { .. } | UpdateState::Ready { .. } | UpdateState::Installing => true,
-            UpdateState::Idle | UpdateState::Checking { .. } => self.whats_new.is_some(),
-        };
-        if shown { super::types::UPDATE_ROOM } else { 0. }
+        match &self.update {
+            UpdateState::Downloading { .. } | UpdateState::Ready { .. } | UpdateState::Installing => super::types::UPDATE_ROOM,
+            UpdateState::Idle | UpdateState::Checking { .. } => 0.,
+        }
     }
-    /// The chip at the right of the title bar: how far the download is, and the button to open the update once it is ready.
+
+    /// The chip at the right of the title bar, and the only place that builds it: how far the download is, then the button
+    /// that restarts and installs once the update is ready. Its look is one value here, so it can be swapped for another.
     pub(super) fn update_chip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let muted = cx.theme().muted_foreground;
         match &self.update {
@@ -39,125 +61,85 @@ impl Shell {
                     .child(format!("Updating {}%", (fraction * 100.).floor() as u32))
                     .into_any_element(),
             ),
-            UpdateState::Ready { .. } => {
+            UpdateState::Ready { version, .. } => {
                 let this = cx.entity().downgrade();
+                let label = if version.is_empty() { "Update and restart".to_string() } else { format!("Update to v{version}") };
                 Some(
                     Button::new("update-chip")
                         .debug_name("update-chip")
-                        .label("Update ready")
-                        .variant(ButtonVariant::Secondary)
+                        .label(label)
+                        .variant(ButtonVariant::Primary)
                         .size(ButtonSize::Sm)
-                        .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.show_update(cx))))
+                        .pill(true)
+                        .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.update_install(cx))))
                         .into_any_element(),
                 )
             }
             UpdateState::Installing => {
                 Some(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("Installing…").into_any_element())
             }
-            UpdateState::Idle | UpdateState::Checking { .. } => self.whats_new.as_ref().map(|_| {
-                let this = cx.entity().downgrade();
-                Button::new("whats-new-chip")
-                    .debug_name("whats-new-chip")
-                    .label("What's new")
-                    .variant(ButtonVariant::Ghost)
-                    .size(ButtonSize::Sm)
-                    .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.show_whats_new(cx))))
-                    .into_any_element()
-            }),
+            UpdateState::Idle | UpdateState::Checking { .. } => None,
         }
     }
 
-    /// The panel over the window while the reader reads the changelog: Later keeps the update for the next quit, and
-    /// Restart installs it now. Escape and a press outside are Later.
-    pub(super) fn update_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// The sheet over the window while the reader reads a changelog: the one this version came from, which opens by itself
+    /// at the first start after an update, or the one the version in the status bar opens.
+    pub(super) fn update_panel(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.whats_new_open {
-            return self.whats_new_panel(cx);
+            return self.whats_new_panel(window, cx);
         }
-        if self.changelog_open && !matches!(self.update, UpdateState::Ready { .. }) {
-            return self.changelog_panel(cx);
+        if self.changelog_open {
+            return self.changelog_panel(window, cx);
         }
-        let UpdateState::Ready { version, notes } = &self.update else { return None };
-        if !self.update_modal {
-            return None;
-        }
-        let (later, close, install) = (cx.entity().downgrade(), cx.entity().downgrade(), cx.entity().downgrade());
-        let version: SharedString = if version.is_empty() { "the new version".into() } else { version.clone().into() };
-        let mut lines = release_notes(notes);
-        if lines.is_empty() {
-            lines.push(crate::updater::NoteLine { kind: atelier_ui::ReleaseKind::Improved, lead: NO_NOTES.into(), text: String::new() });
-        }
-        let sheet = ReleaseSheet::new("update-sheet", version)
-            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)))
-            .kind_colors(atelier_palette::kind_color)
-            .on_later(move |_, cx| drop(later.update(cx, |shell, cx| shell.update_later(cx))))
-            .on_install(move |_, cx| drop(install.update(cx, |shell, cx| shell.update_install(cx))));
-        Some(
-            Modal::new("update-ready")
-                .debug_name("update-panel")
-                .width(520.)
-                .flush()
-                .focus(&self.update_focus)
-                .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.update_later(cx))))
-                .child(div().track_focus(&self.update_focus).child(sheet))
-                .into_any_element(),
-        )
+        None
     }
 
-    /// The changelog of the update this version came from, after the restart: the same sheet with only Close.
-    fn whats_new_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// The changelog of the update this version came from, after the restart: its notes first, the older releases under.
+    fn whats_new_panel(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let record = self.whats_new.as_ref()?;
-        let (close, done) = (cx.entity().downgrade(), cx.entity().downgrade());
-        let mut lines = release_notes(&record.notes);
-        if lines.is_empty() {
-            lines.push(crate::updater::NoteLine { kind: atelier_ui::ReleaseKind::Improved, lead: NO_NOTES.into(), text: String::new() });
-        }
-        let sheet = ReleaseSheet::new("whats-new-sheet", SharedString::from(record.version.clone()))
-            .notes(lines.into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)))
-            .kind_colors(atelier_palette::kind_color)
-            .labels("Close", "")
-            .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.dismiss_whats_new(cx))));
-        Some(
-            Modal::new("whats-new")
-                .debug_name("update-panel")
-                .width(520.)
-                .flush()
-                .focus(&self.update_focus)
-                .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.dismiss_whats_new(cx))))
-                .child(div().track_focus(&self.update_focus).child(sheet))
-                .into_any_element(),
-        )
+        let date = release_date(&record.notes).or_else(|| changelog::notes_of(&record.version).and_then(release_date));
+        let earlier = changelog::releases()
+            .iter()
+            .filter(|(version, _)| is_older(version, &record.version))
+            .map(|(version, markdown)| release_of(version, markdown))
+            .collect();
+        let current = (SharedString::from(record.version.clone()), date.map(SharedString::from), notes_of(&record.notes));
+        Some(self.changelog_modal("whats-new", current, earlier, Self::dismiss_whats_new, window, cx))
     }
 
     /// The notes of the version that runs, with every earlier version under them.
-    fn changelog_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (close, done) = (cx.entity().downgrade(), cx.entity().downgrade());
+    fn changelog_panel(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let running = running_version();
-        let notes = |markdown: &str| -> Vec<ReleaseNote> {
-            release_notes(markdown).into_iter().map(|line| ReleaseNote::new(line.lead, line.text).kind(line.kind)).collect()
-        };
-        let mut current = notes(changelog::notes_of(&running).unwrap_or_default());
-        if current.is_empty() {
-            current.push(ReleaseNote::new(NO_NOTES, ""));
-        }
-        let earlier = changelog::releases()
-            .iter()
-            .filter(|(version, _)| *version != running.as_str())
-            .map(|(version, markdown)| ReleaseVersion::new(SharedString::from(version.to_string()), notes(markdown)));
-        let sheet = ReleaseSheet::new("changelog-sheet", SharedString::from(running.clone()))
-            .notes(current)
-            .earlier(earlier)
-            .kind_colors(atelier_palette::kind_color)
-            .labels("Close", "")
-            .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.close_changelog(cx))));
-        Some(
-            Modal::new("changelog")
-                .debug_name("update-panel")
-                .width(520.)
-                .flush()
-                .focus(&self.update_focus)
-                .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.close_changelog(cx))))
-                .child(div().track_focus(&self.update_focus).child(sheet))
-                .into_any_element(),
-        )
+        let current = release_of(&running, changelog::notes_of(&running).unwrap_or_default());
+        let earlier = changelog::releases().iter().filter(|(version, _)| *version != running.as_str()).map(|(version, markdown)| release_of(version, markdown)).collect();
+        Some(self.changelog_modal("changelog", current, earlier, Self::close_changelog, window, cx))
+    }
+
+    /// The changelog sheet in its panel: 860 design pixels wide, less in a narrow window; `close` runs on Close, on Escape
+    /// and on a press outside the panel.
+    fn changelog_modal(
+        &self,
+        id: &'static str,
+        (version, date, notes): Release,
+        earlier: Vec<Release>,
+        close: fn(&mut Shell, &mut Context<Shell>),
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let (on_modal, on_sheet) = (cx.entity().downgrade(), cx.entity().downgrade());
+        let sheet = ReleaseSheet::new(SharedString::from(format!("{id}-sheet")), version)
+            .title("Changelog")
+            .date(date)
+            .notes(notes)
+            .earlier(earlier.into_iter().map(listed))
+            .on_close(move |_, cx| drop(on_sheet.update(cx, close)));
+        Modal::new(id)
+            .debug_name("update-panel")
+            .width(sheet_width(atelier_ui::scale::design(window.viewport_size().width)))
+            .flush()
+            .focus(&self.update_focus)
+            .on_close(move |_, cx| drop(on_modal.update(cx, close)))
+            .child(div().track_focus(&self.update_focus).child(sheet))
+            .into_any_element()
     }
 }

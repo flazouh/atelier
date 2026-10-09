@@ -18,6 +18,11 @@ fn a_line_names_its_command() {
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"open","path":"~/p","host":"h"}"#).unwrap(), Request::Open { path: "~/p".into(), host: Some("h".into()) });
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"check_updates"}"#).unwrap(), Request::CheckUpdates);
     assert_eq!(
+        serde_json::from_str::<Request>(r#"{"cmd":"update","event":{"kind":"downloading","fraction":0.5}}"#).unwrap(),
+        Request::Update { event: crate::updater::UpdateEvent::Downloading { fraction: 0.5 } }
+    );
+    assert!(serde_json::from_str::<Request>(r#"{"cmd":"update"}"#).is_err(), "an update needs its event");
+    assert_eq!(
         serde_json::from_str::<Request>(r#"{"cmd":"edit","path":"a.txt","text":"x"}"#).unwrap(),
         Request::Edit { path: "a.txt".into(), text: "x".into() }
     );

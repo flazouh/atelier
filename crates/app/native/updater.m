@@ -1,17 +1,16 @@
 // The Mac updater: Sparkle's engine with the app's own user driver. Sparkle checks for an update, downloads it (as a small
 // patch when one fits), verifies its signature and installs it; it shows nothing. Every step it would show is sent to the
-// app as one line of JSON, and the app draws it in its own window (src/shell/update_view.rs). The app tells back, with
+// app as one line of JSON, and the app draws it in its own title bar (src/shell/update_view.rs). The app tells back, with
 // atelier_updater_install and atelier_updater_later, what the reader chose.
 //
 // Sparkle is found at run time, not at link time, so a build from source (which has no Sparkle) runs and says it cannot
 // update. The Rust side is src/updater/impls/sparkle_driver.rs.
 //
 // An update found is downloaded at once: the reader chooses only when to restart. When it is ready and Atelier is in the
-// background, the system shows a notification; a press on it brings Atelier forward and opens the update (the `focus`
-// event). Besides Sparkle's own hourly look, the app looks again each time the reader comes back to it, at most once in ten
+// background, the system shows a notification; a press on it only brings Atelier forward, where the title bar's button waits. Besides Sparkle's own hourly look, the app looks again each time the reader comes back to it, at most once in ten
 // minutes. The events, in the order they come:
 //   checking {user}, found {version, notes, user}, downloading {fraction}, extracting {fraction}, ready, installing,
-//   up_to_date, failed {message}, idle, focus.
+//   up_to_date, failed {message}, idle.
 #import <AppKit/AppKit.h>
 #import <UserNotifications/UserNotifications.h>
 #import <objc/message.h>
@@ -82,12 +81,11 @@ static BOOL can_notify(void) {
 @end
 
 @implementation AtelierNotificationDelegate
-// A press on the notification: Atelier comes forward and shows the update.
+// A press on the notification: Atelier comes forward, and nothing else happens.
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
     didReceiveNotificationResponse:(UNNotificationResponse *)response
              withCompletionHandler:(void (^)(void))completionHandler {
     [NSApp activateIgnoringOtherApps:YES];
-    emit(@{@"kind": @"focus"});
     completionHandler();
 }
 
@@ -119,7 +117,7 @@ static void notify_ready(void) {
         }
         UNMutableNotificationContent *content = [UNMutableNotificationContent new];
         content.title = version.length > 0 ? [NSString stringWithFormat:@"Atelier %@ is ready", version] : @"An Atelier update is ready";
-        content.body = @"Open Atelier to read what is new and restart.";
+        content.body = @"Open Atelier and press Update to restart.";
         UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:NOTIFICATION_ID content:content trigger:nil];
         [center addNotificationRequest:request withCompletionHandler:^(NSError *posted) {
             NSLog(@"atelier-notify: posted error=%@", posted);
@@ -225,7 +223,7 @@ static void clear_notification(void) {
 }
 
 - (void)showUpdateInFocus {
-    emit(@{@"kind": @"focus"});
+    [NSApp activateIgnoringOtherApps:YES];
 }
 @end
 
@@ -332,7 +330,8 @@ void atelier_updater_install(void) {
     }
 }
 
-// The reader chose to wait: the update installs when the app quits.
+// The app is quitting with the update ready and unpressed: the update installs when the app quits. Asking twice, or with no
+// update waiting, does nothing, because the reply is taken out of `ready_reply` the first time.
 void atelier_updater_later(void) {
     void (^reply)(NSInteger) = ready_reply;
     ready_reply = nil;
