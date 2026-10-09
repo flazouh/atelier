@@ -48,6 +48,11 @@ impl MessagingCapabilities {
     pub fn has(&self, feature: Feature) -> bool {
         self.features.contains(&feature)
     }
+    /// Whether a person or an agent may be offered `operation`: it is listed, and it does not write on a read-only
+    /// account. `can` still says the call exists (`send` is core), so ask this one before drawing a control or a tool.
+    pub fn offers(&self, operation: Operation) -> bool {
+        self.can(operation) && !(operation.writes() && self.has(Feature::ReadOnly))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

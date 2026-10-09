@@ -71,8 +71,26 @@ pub enum Feature {
     Attachments,
     Presence,
     Typing,
+    /// The account may not change the service. It may list `send` (it is core) and the other write calls, and every
+    /// one of them answers `Provider { code: "read_only" }` without reaching the service. The screen and the agent
+    /// tools hide what writes.
+    ReadOnly,
 }
 
+impl Operation {
+    /// Whether the call changes the service, so a read-only account does not offer it.
+    pub fn writes(self) -> bool {
+        matches!(
+            self,
+            Operation::Send
+                | Operation::Edit
+                | Operation::Delete
+                | Operation::React
+                | Operation::MarkRead
+                | Operation::Import
+        )
+    }
+}
 /// The entity kinds of an export or import batch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

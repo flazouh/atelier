@@ -84,4 +84,10 @@ pub trait MessagingProvider: Send + Sync {
     fn can(&self, operation: Operation) -> bool {
         self.capabilities().can(operation)
     }
+
+    /// Whether to offer `operation` to a person or an agent: [`can`](Self::can), except that a read-only account offers
+    /// no call that writes.
+    fn offers(&self, operation: Operation) -> bool {
+        self.capabilities().offers(operation)
+    }
 }
