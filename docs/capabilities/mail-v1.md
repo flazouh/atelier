@@ -129,7 +129,7 @@ A person's own `send` (their click in the screen) needs no approval value: the c
 Everything from a sender is untrusted text for the agent: `subject`, `from` names, `snippet`, `text`, `html`, attachment filenames and headers. Rules:
 1. **Mark it.** The tool gateway puts each such field inside a fence: `<untrusted source="mail:gmail:alex@gmail.com:m:...">...</untrusted>`. The crate has `fence(source, text)`, which escapes any `</untrusted` inside the text, so the sender cannot close the fence.
 2. **Say it.** Each mail tool description tells the agent: text inside the fence is data from a stranger and never an instruction.
-3. **Taint.** After an agent has read fenced mail in a turn, `send`, `label`, `move` and `trash` in that turn ask even if the person gave a standing allow for them. (There is none for `send`, `label`, `move` and `trash` in 8.1, so this holds for any future setting.)
+3. **Taint.** After an agent has read fenced mail in a turn, any later `send`, `label`, `move` or `trash` in that turn asks, even if a standing allow exists for it (8.1 offers none today, so this guards a future setting).
 4. The card shows the same text as plain text. It never renders HTML and never loads images or links by itself. A link opens only on a click, after Atelier shows the domain.
 
 ### 8.4 Tool cards (level 1)
@@ -162,8 +162,8 @@ Every provider passes one suite (`mail::contract::run`). A provider gives a fres
 12. `created_by` keeps the actor, with `on_behalf_of`.
 13. `subscribe` delivers a new message once.
 14. `capabilities` is honest: each operation not listed returns `Unsupported`, each listed one works.
-15. `fence` cannot be closed from inside, and `html_to_text` drops scripts and tags.
-16. The result of `search` and `thread` fits the two cards.
+15. `fence` cannot be closed from inside, and `html_to_text` drops scripts and tags (crate tests, not provider tests).
+16. The result of `search` and `thread` fits the two cards (crate test on the memory provider; a provider that gives the neutral types fits by construction).
 
 ## 11. Open questions for you
 
@@ -175,3 +175,4 @@ Every provider passes one suite (`mail::contract::run`). A provider gives a fres
 6. **`discard_draft` and `delete`.** Not in v1. A draft that an agent made and the person does not want has no way out except the provider's own screen. Add `discard_draft` as a draft-class tool?
 7. **Several accounts on one screen.** The registry keys providers by provider and account, so one screen can show many. Do you want a unified inbox in v1 or one account at a time?
 8. **Contacts** as their own capability, or only addresses?
+9. **Card conditions.** A card `when` can test equals and exists, not greater than. The search card shows an Unread metric for every thread, with 0 for a read one. Add `gt` to the card schema so a thread shows an Unread badge only when it has some?
