@@ -1,0 +1,82 @@
+{
+  "data": {
+    "issues": {
+      "nodes": [
+        {
+          "id": "00000000-0000-4000-8000-000000000032",
+          "identifier": "ACM-8",
+          "title": "Task title 7",
+          "description": "Text number 12.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+          "priority": 0,
+          "estimate": null,
+          "dueDate": null,
+          "createdAt": "2026-10-09T00:54:28.206Z",
+          "updatedAt": "2026-10-09T00:54:28.206Z",
+          "url": "https://linear.app/acme/issue/ACM-7/task",
+          "state": {
+            "id": "00000000-0000-4000-8000-000000000026",
+            "name": "Backlog",
+            "type": "backlog"
+          },
+          "assignee": null,
+          "creator": {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "Person 1"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "project": {
+            "id": "00000000-0000-4000-8000-000000000027",
+            "name": "Project 2",
+            "slugId": "slug2"
+          },
+          "parent": null,
+          "team": {
+            "id": "00000000-0000-4000-8000-000000000012",
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000033",
+          "identifier": "ACM-9",
+          "title": "Task title 8",
+          "description": "Text number 13.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+          "priority": 0,
+          "estimate": null,
+          "dueDate": null,
+          "createdAt": "2026-10-09T00:46:51.406Z",
+          "updatedAt": "2026-10-09T00:46:51.406Z",
+          "url": "https://linear.app/acme/issue/ACM-8/task",
+          "state": {
+            "id": "00000000-0000-4000-8000-000000000026",
+            "name": "Backlog",
+            "type": "backlog"
+          },
+          "assignee": null,
+          "creator": {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "Person 1"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "project": {
+            "id": "00000000-0000-4000-8000-000000000027",
+            "name": "Project 2",
+            "slugId": "slug2"
+          },
+          "parent": null,
+          "team": {
+            "id": "00000000-0000-4000-8000-000000000012",
+            "key": "ACM"
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "00000000-0000-4000-8000-000000000033"
+      }
+    }
+  }
+}

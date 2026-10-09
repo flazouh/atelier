@@ -1,0 +1,175 @@
+{
+  "data": {
+    "issue": {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "createdAt": "2026-10-08T23:31:12.196Z",
+      "creator": {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "name": "Person 1"
+      },
+      "history": {
+        "nodes": [
+          {
+            "id": "00000000-0000-4000-8000-000000000013",
+            "createdAt": "2026-10-09T00:42:54.889Z",
+            "actor": null,
+            "botActor": {
+              "name": "Person 2"
+            },
+            "fromState": {
+              "id": "00000000-0000-4000-8000-000000000014",
+              "name": "In Review",
+              "type": "started"
+            },
+            "toState": {
+              "id": "00000000-0000-4000-8000-000000000008",
+              "name": "Done",
+              "type": "completed"
+            },
+            "fromAssignee": null,
+            "toAssignee": null,
+            "fromTitle": null,
+            "toTitle": null,
+            "updatedDescription": null,
+            "fromPriority": null,
+            "toPriority": null,
+            "addedLabels": null,
+            "removedLabels": null,
+            "fromProject": null,
+            "toProject": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000015",
+            "createdAt": "2026-10-09T00:37:38.992Z",
+            "actor": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null,
+            "fromState": null,
+            "toState": null,
+            "fromAssignee": null,
+            "toAssignee": null,
+            "fromTitle": null,
+            "toTitle": null,
+            "updatedDescription": null,
+            "fromPriority": null,
+            "toPriority": null,
+            "addedLabels": [
+              {
+                "id": "00000000-0000-4000-8000-000000000009",
+                "name": "Person 3"
+              }
+            ],
+            "removedLabels": [
+              {
+                "id": "00000000-0000-4000-8000-000000000016",
+                "name": "Person 4"
+              }
+            ],
+            "fromProject": null,
+            "toProject": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000017",
+            "createdAt": "2026-10-09T00:37:37.624Z",
+            "actor": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null,
+            "fromState": {
+              "id": "00000000-0000-4000-8000-000000000018",
+              "name": "In Progress",
+              "type": "started"
+            },
+            "toState": {
+              "id": "00000000-0000-4000-8000-000000000014",
+              "name": "In Review",
+              "type": "started"
+            },
+            "fromAssignee": null,
+            "toAssignee": null,
+            "fromTitle": null,
+            "toTitle": null,
+            "updatedDescription": null,
+            "fromPriority": null,
+            "toPriority": null,
+            "addedLabels": null,
+            "removedLabels": null,
+            "fromProject": null,
+            "toProject": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000019",
+            "createdAt": "2026-10-09T00:37:19.706Z",
+            "actor": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null,
+            "fromState": null,
+            "toState": null,
+            "fromAssignee": null,
+            "toAssignee": null,
+            "fromTitle": null,
+            "toTitle": null,
+            "updatedDescription": null,
+            "fromPriority": null,
+            "toPriority": null,
+            "addedLabels": [
+              {
+                "id": "00000000-0000-4000-8000-000000000016",
+                "name": "Person 4"
+              }
+            ],
+            "removedLabels": [
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "name": "Person 5"
+              }
+            ],
+            "fromProject": null,
+            "toProject": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000021",
+            "createdAt": "2026-10-09T00:32:27.495Z",
+            "actor": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null,
+            "fromState": null,
+            "toState": null,
+            "fromAssignee": null,
+            "toAssignee": null,
+            "fromTitle": null,
+            "toTitle": null,
+            "updatedDescription": null,
+            "fromPriority": null,
+            "toPriority": null,
+            "addedLabels": [
+              {
+                "id": "00000000-0000-4000-8000-000000000020",
+                "name": "Person 5"
+              }
+            ],
+            "removedLabels": [
+              {
+                "id": "00000000-0000-4000-8000-000000000022",
+                "name": "Person 6"
+              }
+            ],
+            "fromProject": null,
+            "toProject": null
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "00000000-0000-4000-8000-000000000021"
+        }
+      }
+    }
+  }
+}
