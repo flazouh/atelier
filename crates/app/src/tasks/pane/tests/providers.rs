@@ -265,3 +265,19 @@ fn the_switcher_is_not_there_with_one_provider(cx: &mut TestAppContext) {
     let (_pane, cx) = open_with(source_of(&[&a]), 900., cx);
     assert!(cx.debug_bounds("tasks-provider").is_none());
 }
+
+#[gpui_kit::test]
+fn a_task_asked_for_before_the_tasks_are_read_opens_when_they_are(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        atelier_ui::init(cx);
+    });
+    let provider = Fake::seeded("a", &["One", "Two"]);
+    let (pane, cx) = cx.add_window_view(|window, cx| TasksPane::new("me", Vec::new(), window, cx));
+    cx.update(|window, cx| pane.update(cx, |p, cx| p.show_key("MEM-2", window, cx)));
+    assert!(pane.read_with(cx, |p, _| p.open.is_none()), "nothing to show yet");
+    pane.update(cx, |p, cx| p.attach(Ok(source_of(&[&provider])), cx));
+    settle(&pane, cx);
+    let open = pane.read_with(cx, |p, _| p.open.clone()).expect("the task is shown");
+    assert_eq!(pane.read_with(cx, |p, _| p.tasks().iter().find(|t| t.id == open).map(|t| t.title.to_string())).as_deref(), Some("Two"));
+}
