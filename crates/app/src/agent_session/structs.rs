@@ -163,6 +163,9 @@ pub struct AgentSession {
     _density: Subscription,
     _pump: Task<()>,
     _start: Task<()>,
+    /// The way the agent reaches the app's tools, for as long as this session's agent lives. Dropping it revokes the
+    /// token and removes the config file, so a replaced or closed session leaves nothing that opens the gateway.
+    _gateway: Option<atelier_gateway::Grant>,
 }
 
 impl AgentSession {
@@ -427,6 +430,7 @@ impl AgentSession {
             _changed: Task::ready(()),
             _pump,
             _start: Task::ready(()),
+            _gateway: None,
         };
         // The conversation follows the agent's output while the reader is at its end, lets go when they scroll up, and takes
         // hold again when they come back (beui's message-scroller `followOutput`). The panel is told of each scroll, so its
@@ -527,8 +531,10 @@ impl AgentSession {
         let this_open = self.live_open.fetch_add(1, Ordering::SeqCst) + 1;
         let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink(this_open));
         let fork = self.native_fork().filter(|_| resume.is_none());
-        let mut request = OpenRequest { resume: resume.clone().or(fork.clone()), model: self.model.clone(), mode: self.mode, provider: None, fork: fork.is_some() };
+        let mut request = OpenRequest { resume: resume.clone().or(fork.clone()), model: self.model.clone(), mode: self.mode, provider: None, fork: fork.is_some(), mcp_config: None };
         let (choice, secrets) = (self.provider.clone(), crate::providers::secrets(cx));
+        // Only Claude Code reads an MCP config file.
+        let hub = (backend.name() == "claude-code").then(|| cx.try_global::<crate::capability_hub::CapabilityHub>().cloned()).flatten();
         let opening = cx.background_spawn(async move {
             let provider = choice.map(|choice| crate::providers::provider(&choice, secrets.as_ref())).transpose();
             let (history, record) = match &resume {
@@ -539,6 +545,9 @@ impl AgentSession {
                 }
                 _ => (Vec::new(), None),
             };
+            // A gateway that cannot be reached must never stop a session: no grant, and the session starts without it.
+            let grant = hub.and_then(|hub| hub.grant(project.as_ref()));
+            request.mcp_config = grant.as_ref().map(|grant| grant.config_path().to_path_buf());
             let opened = match provider {
                 Ok(provider) => {
                     request.provider = provider;
@@ -546,10 +555,10 @@ impl AgentSession {
                 }
                 Err(why) => Err(atelier_agents::session::SessionError::Start(why)),
             };
-            (history, record, opened)
+            (history, record, opened, grant)
         });
         self._start = cx.spawn(async move |this, cx| {
-            let (history, record, opened) = opening.await;
+            let (history, record, opened, grant) = opening.await;
             _ = this.update(cx, |s, cx| {
                 s.starting = false;
                 for event in &history {
@@ -575,6 +584,7 @@ impl AgentSession {
                 match opened {
                     Ok(session) => {
                         s.session = Some(session);
+                        s._gateway = grant;
                         if let Some(command) = s.waiting_send.take() {
                             s.start_turn(command, cx);
                         }

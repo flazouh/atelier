@@ -38,6 +38,9 @@ pub struct OpenRequest {
     /// `resume` starts a new session from that one's history, which stays as it was. Only for an agent that
     /// [`Capabilities::forks`].
     pub fork: bool,
+    /// A file of MCP servers to give the agent, for the tools of the app itself. Only an agent that takes MCP servers
+    /// from a file reads it; the others leave it. It is a path on this machine, so a project on another host gets none.
+    pub mcp_config: Option<std::path::PathBuf>,
 }
 
 /// One of the agent's sign-ins on a host, which a [`super::types::Provider::Account`] names.

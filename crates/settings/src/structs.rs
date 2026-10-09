@@ -73,6 +73,8 @@ pub struct Settings {
     pub tool_density: Option<String>,
     /// How the sidebar looks, as the Settings page sets it; a field left out is the default.
     pub sidebar_layout: SidebarSaved,
+    /// What the app's capabilities do for agents: `{ "capabilities": { "agent_tools": false } }`.
+    pub capabilities: CapabilitiesSaved,
     /// What the reader chose for each agent's models, and the list the agent last reported, by the agent's backend name.
     pub agent_models: std::collections::BTreeMap<String, AgentModels>,
     /// The changelog of the update the app downloaded last, kept so that the first start of that version can show it once.
@@ -80,6 +82,14 @@ pub struct Settings {
     /// Keys a newer or older atelier wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
+}
+
+/// The `capabilities` settings.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CapabilitiesSaved {
+    /// Agents get the app's tools, such as the tasks, through the gateway. Unset: on.
+    pub agent_tools: Option<bool>,
 }
 
 /// An update the app downloaded: its version and its changelog.

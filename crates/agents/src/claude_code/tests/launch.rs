@@ -200,6 +200,17 @@ fn a_key_never_prints() {
     assert!(!printed.contains(OPENROUTER_KEY));
 }
 
+#[test]
+fn an_mcp_config_goes_to_claude_as_a_file_and_no_config_adds_no_flag() {
+    let with = OpenRequest { mcp_config: Some("/run/atelier/mcp-1.json".into()), ..OpenRequest::default() };
+    assert!(has_pair(&args(&with), "--mcp-config", "/run/atelier/mcp-1.json"));
+    assert!(!args(&OpenRequest::default()).iter().any(|arg| arg == "--mcp-config"));
+}
+#[test]
+fn the_permission_flow_is_the_same_with_an_mcp_config() {
+    let with = OpenRequest { mcp_config: Some("/run/atelier/mcp-1.json".into()), ..OpenRequest::default() };
+    assert!(has_pair(&args(&with), "--permission-prompt-tool", "stdio"));
+}
 fn on(provider: Provider) -> OpenRequest {
     OpenRequest { provider: Some(provider), ..OpenRequest::default() }
 }

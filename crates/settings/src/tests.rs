@@ -265,3 +265,13 @@ fn a_hidden_model_leaves_the_picker_but_the_default_and_the_last_one_stay() {
     let all_hidden = AgentModels { hidden: vec!["a".into(), "b".into(), "c".into()], ..AgentModels::default() };
     assert_eq!(all_hidden.visible(&list), list, "a picker is never empty");
 }
+#[test]
+fn agent_tools_are_on_unless_the_file_turns_them_off() {
+    assert_eq!(Settings::default().capabilities.agent_tools, None);
+    let path = scratch("tools");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, r#"{"capabilities":{"agent_tools":false}}"#).unwrap();
+    assert_eq!(load(&path).capabilities.agent_tools, Some(false));
+    update(&path, |s| s.theme = Some("x".into())).unwrap();
+    assert_eq!(load(&path).capabilities.agent_tools, Some(false), "another save keeps it");
+}

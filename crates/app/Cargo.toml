@@ -17,6 +17,7 @@ atelier-agents.workspace = true
 atelier-capabilities.workspace = true
 atelier-editor.workspace = true
 atelier-forge.workspace = true
+atelier-gateway.workspace = true
 atelier-i18n.workspace = true
 atelier-lsp.workspace = true
 atelier-palette.workspace = true
