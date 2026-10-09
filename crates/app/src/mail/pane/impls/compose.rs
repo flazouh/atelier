@@ -9,6 +9,7 @@ use super::super::{
     structs::{Compose, Facts, Held, MailPane, Outcome},
     types::{Load, Press, Problem},
 };
+
 impl MailPane {
     /// The reply box is there when the thread is read, the provider lists `create_draft`, and the reader may act. A provider
     /// that cannot write has no box at all.
