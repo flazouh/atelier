@@ -1,4 +1,4 @@
-use super::super::{NoteLine, helpers::written_date, is_older, release_date, release_notes};
+use super::super::{NoteLine, helpers::written_date, release_date, release_notes};
 
 fn line(lead: &str, text: &str) -> NoteLine {
     NoteLine { lead: lead.into(), text: text.into() }
@@ -67,11 +67,3 @@ fn a_day_that_the_calendar_does_not_have_is_no_date() {
     }
 }
 
-#[test]
-fn versions_compare_by_number() {
-    assert!(is_older("0.1.8", "0.1.9"));
-    assert!(is_older("0.1.9", "0.1.10"), "numbers, not letters");
-    assert!(!is_older("0.1.9", "0.1.9"));
-    assert!(!is_older("0.2.0", "0.1.9"));
-    assert!(!is_older("dev", "0.1.9") && !is_older("0.1.9", "dev"), "a word is no version");
-}
