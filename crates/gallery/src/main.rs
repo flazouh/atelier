@@ -26,6 +26,7 @@ mod sidebar_story;
 mod pr_view_story;
 mod motion_story;
 mod tasks_story;
+mod tool_card_story;
 mod streaming_story;
 mod voice_story;
 mod variants_story;
@@ -74,6 +75,7 @@ enum Story {
     Voice,
     Buttons,
     Badges,
+    ToolCards,
     Messages,
     Tools,
     Diffs,
@@ -94,7 +96,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 42] = [
+    const ALL: [Story; 43] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::Worktrees,
@@ -120,6 +122,7 @@ impl Story {
         Story::Voice,
         Story::Buttons,
         Story::Badges,
+        Story::ToolCards,
         Story::Messages,
         Story::Tools,
         Story::Diffs,
@@ -166,6 +169,7 @@ impl Story {
             Story::Voice => "Voice",
             Story::Buttons => "Buttons",
             Story::Badges => "Badges and keys",
+            Story::ToolCards => "Tool cards",
             Story::Messages => "Messages",
             Story::Tools => "Tool calls",
             Story::Diffs => "Diffs and code",
@@ -564,6 +568,7 @@ impl Gallery {
             Story::Spark => spark_story(cx).into_any_element(),
             Story::Buttons => buttons().into_any_element(),
             Story::Badges => badges().into_any_element(),
+            Story::ToolCards => tool_card_story::tool_cards_story().into_any_element(),
             Story::Messages => messages(self.started).into_any_element(),
             Story::Tools => tools().into_any_element(),
             Story::Diffs => diffs().into_any_element(),

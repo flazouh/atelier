@@ -37,8 +37,7 @@
                   "value": {
                     "path": "$.message.author.name"
                   },
-                  "style": "title",
-                  "max_lines": 1
+                  "style": "title"
                 },
                 {
                   "type": "badge",

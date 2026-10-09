@@ -53,8 +53,7 @@
                         "value": {
                           "path": "$.from.address"
                         },
-                        "style": "title",
-                        "max_lines": 1
+                        "style": "title"
                       },
                       {
                         "type": "text",
