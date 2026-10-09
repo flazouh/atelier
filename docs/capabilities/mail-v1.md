@@ -51,7 +51,7 @@ A provider with no message ids (as `gmailcli`) makes them: `m:<thread>.<n>`, whe
 - `attachments` is metadata only (4.7).
 
 ### 4.5 Thread
-A **summary** (what a list shows) is `{ ref, subject, snippet, participants, message_count, unread, starred, has_attachments, mailboxes, last_at, version }`. A **thread** is a summary plus `messages`, oldest first. `search` gives summaries. `thread(ref)` gives the whole thread. A provider with no threads (plain IMAP) makes one thread per message, and does not list `threads` in features.
+A **summary** (what a list shows) is `{ ref, subject, snippet, participants, message_count, unread, starred, has_attachments, mailboxes, last_at, version }`. A **thread** is a summary plus `messages`, oldest first. `search` gives summaries. `thread(ref)` gives the whole thread. A provider with no threads (plain IMAP) makes one thread per message, and does not list `threads` in features. A provider that cannot count messages or unread mail in a list gives `message_count` 1 and `unread` 0 or 1: they are lower bounds there, and exact in `thread(ref)`.
 
 ### 4.6 Draft
 `{ ref, thread?, in_reply_to?, to, cc, bcc, subject, text, created_by (actor), created_at, updated_at, version }`. A draft is plain text in v1. Every message that leaves Atelier goes through a draft, so there is always something to show before it goes (section 8).
@@ -140,9 +140,18 @@ Cards in v1: `mail.search` (a list of threads: sender, subject, snippet, unread 
 
 ## 9. Gmail notes (what the first provider does)
 
-- Gmail **labels** are mailboxes with `kind` `system` (INBOX, SENT, DRAFT, TRASH, SPAM) or `user`. `archive` removes INBOX.
-- `search` takes Gmail syntax. `mailbox` becomes `label:<name>`.
-- `gmailcli` reads only. The first provider lists `mailboxes`, `search`, `thread`, `get`, `download_attachment` and `subscribe` (by polling), and nothing that writes. The Gmail API provider (OAuth) is the way to the write operations and to push.
+The crate is `crates/gmail` (`atelier-gmail`). `GmailMail` asks a `Runner` for JSON. `CliRunner` runs `gmailcli ... -json`, here or over SSH on the Mac that holds the browser login. The tests use a fake runner that behaves like a small mailbox and passes the contract suite.
+
+- **Lists:** `mailboxes`, `search`, `thread`, `get`, `subscribe` (polls the inbox, 60 s by default) and `download_attachment` (when the runner can read files). It lists nothing that writes, because `gmailcli` cannot. Drafts, send, labels, archive and trash need the Gmail API provider.
+- **Mailboxes** are Gmail's labels from the navigation pane. The label name is the id (`b:Work/Projects`). Inbox, Sent, Drafts, Trash, Spam and All Mail (role `archive`) get roles. Starred and Important are `custom` and `system`.
+- **Search** takes Gmail syntax. `mailbox` becomes `in:inbox`, `in:sent` and so on, or `label:<name>` (lower case, hyphens for spaces and slashes). With no text, the search is `in:anywhere -in:trash -in:spam`. A query never starts with a dash, because `gmailcli` would read it as a flag.
+- **Paging:** `gmailcli` has a count and no offset. A cursor is an offset into one page of at most 50 threads, so nothing beyond the 50 newest is reachable.
+- **Ids:** `gmailcli` gives thread ids only. A message id is `m:<thread>.<n>` and a file id is `a:<thread>.<n>`, with `n` counted through the thread. They hold while no message is added before them.
+- **Unknown:** a search row gives `unread` as 0 or 1, `message_count` as 1, no mailboxes and no starred flag. A thread read gives `to` as addresses only, no cc, no html and no headers except the date.
+- **Reading marks mail read.** `gmailcli` opens a thread in the browser, and Gmail then marks it read. So `thread` and `get` change the real mailbox. A message from `thread` says `read: true` because it is now true.
+- **Dates** are the text Gmail shows, at the minute, in the account's language and local time. The provider reads English and French, takes the time as UTC, and keeps the text in `headers.date`. It may be off by the UTC offset. A date it cannot read is 0.
+- **Errors:** logged out is `NotSignedIn`. A rate limit or "unusual traffic" is `RateLimited` (60 s, a guess). No route, no name or a refused SSH is `Offline`. A changed Gmail page is `Provider { layout_changed }`. A missing tool is `Provider { not_installed }`. The browser signed in to another account is `Provider { account_mismatch }` on `whoami`.
+- **Speed:** each call takes 6 to 10 s because it drives a real browser.
 
 ## 10. Contract tests
 
@@ -176,3 +185,6 @@ Every provider passes one suite (`mail::contract::run`). A provider gives a fres
 7. **Several accounts on one screen.** The registry keys providers by provider and account, so one screen can show many. Do you want a unified inbox in v1 or one account at a time?
 8. **Contacts** as their own capability, or only addresses?
 9. **Card conditions.** A card `when` can test equals and exists, not greater than. The search card shows an Unread metric for every thread, with 0 for a read one. Add `gt` to the card schema so a thread shows an Unread badge only when it has some?
+10. **Reading marks mail read.** With `gmailcli`, an agent that reads a thread marks it read in Gmail. Accept this for the first provider, or hold `thread` behind a prompt until the Gmail API provider exists?
+11. **Dates without an offset.** Gmail's page gives the local time with no zone, and the provider reads it as UTC. Should the user's zone go in the provider settings so dates are exact?
+12. **The 50-thread page and `-in:`.** I could not run `gmailcli` here (it needs the Mac's browser). The 50-thread page size and Gmail accepting `-in:trash -in:spam` are from reading the code and the Gmail docs, not from a live run. Please run the ignored live tests once.
