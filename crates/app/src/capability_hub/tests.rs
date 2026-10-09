@@ -226,3 +226,23 @@ fn a_project_on_another_host_gets_nothing() {
     assert!(hub(base.path(), true).grant(&remote).is_none());
     assert!(!base.path().join("run").exists(), "no port, no file");
 }
+
+#[test]
+fn the_screen_and_the_agent_tools_read_one_set_of_messaging_accounts() {
+    use atelier_capabilities::messaging::{ChannelKind, MemoryMessaging};
+    let base = tempfile::tempdir().unwrap();
+    let project = project(base.path(), "atelier");
+    let hub = hub(base.path(), true);
+    assert!(hub.messaging_providers().is_empty(), "no account until one is added");
+    let memory = MemoryMessaging::new("acme");
+    memory.add_channel("general", ChannelKind::Public);
+    // The hub is cloned around the app: a copy adds, the original and the screen see it.
+    hub.clone().add_messaging(Arc::new(memory));
+    let accounts: Vec<String> = hub.messaging_providers().iter().map(|p| p.account().to_string()).collect();
+    assert_eq!(accounts, ["acme"]);
+    let grant = hub.grant(&project).expect("a grant");
+    let access = grant.access().clone();
+    let answer = call(&access.url, &access.token, "messaging_channels", json!({}));
+    assert_eq!(answer["result"]["isError"], json!(false), "{answer}");
+    assert!(answer.to_string().contains("general"), "the agent reads the channel the screen shows: {answer}");
+}
