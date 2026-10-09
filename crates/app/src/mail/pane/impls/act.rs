@@ -108,7 +108,7 @@ impl MailPane {
     }
 
     /// Opens or closes a small menu of the reading pane's head.
-    pub fn toggle_menu(&mut self, menu: Menu, cx: &mut Context<Self>) {
+    pub(in crate::mail::pane) fn toggle_menu(&mut self, menu: Menu, cx: &mut Context<Self>) {
         self.menu = (self.menu != Some(menu)).then_some(menu);
         cx.notify();
     }

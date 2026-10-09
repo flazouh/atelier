@@ -114,7 +114,7 @@ impl MailPane {
     fn threads_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let problem = self.effective_problem();
-        let Some(mailbox) = self.mailbox.clone() else {
+        if self.mailbox.is_none() {
             let words = match (self.account(), problem) {
                 (Some(a), _) if a.failed.is_some() => a.failed.clone().unwrap_or_default(),
                 (Some(a), _) if a.reading => "Reading the mailboxes…".into(),
@@ -122,7 +122,7 @@ impl MailPane {
                 _ => "This account has no mailboxes.".into(),
             };
             return say(words, &theme);
-        };
+        }
         match &self.threads_load {
             Load::Loading => return say("Reading the mail…".into(), &theme),
             Load::Failed(why) => return say(why.clone(), &theme),
@@ -145,7 +145,6 @@ impl MailPane {
             self.list.clone(),
             cx.entity().downgrade(),
         );
-        let _ = mailbox;
         list(state, move |ix, _, cx| match rows.get(ix) {
             Some(row) => {
                 let (pane, thread) = (pane.clone(), row.reference.clone());
@@ -287,7 +286,7 @@ impl MailPane {
         let pane = cx.entity().downgrade();
         let press = |f: fn(&mut MailPane, &mut Context<MailPane>)| -> Press {
             let pane = pane.clone();
-            Rc::new(move |_, cx| drop(pane.update(cx, |p, cx| f(p, cx))))
+            Rc::new(move |_, cx| drop(pane.update(cx, f)))
         };
         let mut buttons: Vec<AnyElement> = Vec::new();
         if self.can(MailOperation::Star) {

@@ -6,8 +6,11 @@ use atelier_capabilities::{
     },
 };
 
-use super::super::types::{PAGE_FALLBACK, PAGE_MOST, Problem, Reaction, THREAD_PAGES};
-use crate::mail::map::{BoxRow, ThreadRow, box_rows_of, thread_row_of};
+use super::super::{
+    structs::{Boxes, Fetched, Outcome},
+    types::{PAGE_FALLBACK, PAGE_MOST, Problem, Reaction, THREAD_PAGES},
+};
+use crate::mail::map::{box_rows_of, thread_row_of};
 
 /// How the screen answers an error: offline and a wait are banners over what stays, signed out is an empty state, a call
 /// that is not offered loses its control, and anything else is one line.
@@ -29,23 +32,11 @@ fn page_of(caps: &MailCapabilities) -> u32 {
         .clamp(1, PAGE_MOST)
 }
 
-/// What reading an account's mailboxes brings.
-pub struct Boxes {
-    pub caps: MailCapabilities,
-    pub rows: Vec<BoxRow>,
-}
-
 /// The mailboxes of the account, and what it can do. Blocks.
 pub fn read_boxes(provider: &dyn MailProvider) -> CapResult<Boxes> {
     let caps = provider.capabilities();
     let rows = box_rows_of(&provider.mailboxes()?);
     Ok(Boxes { caps, rows })
-}
-
-/// What one reading of a mailbox's threads brings: the rows, newest first, and the cursor of the page after them.
-pub struct Fetched {
-    pub rows: Vec<ThreadRow>,
-    pub next: Option<String>,
 }
 
 fn query_of(
@@ -111,13 +102,6 @@ pub fn read_more(
 /// A thread with its messages, oldest first. Blocks.
 pub fn read_thread(provider: &dyn MailProvider, thread: &Ref) -> CapResult<Thread> {
     provider.thread(thread)
-}
-
-/// What writing the reader's reply brings: the draft as the provider now holds it, and, when the reader asked to send, what the
-/// send answered. A draft that was saved and not sent stays shown, at its new version.
-pub struct Outcome {
-    pub draft: Draft,
-    pub sent: Option<CapResult<Message>>,
 }
 
 /// Saves `text` as a draft that answers `last`, then sends it when `send` is set. The draft is made, or changed from the version

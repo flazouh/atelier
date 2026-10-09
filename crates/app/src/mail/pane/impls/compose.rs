@@ -5,8 +5,8 @@ use atelier_capabilities::{
 use gpui_kit::{AppContext, Context, SharedString, Window};
 
 use super::super::{
-    helpers::{Outcome, write_draft},
-    structs::{Compose, Facts, Held, MailPane},
+    helpers::write_draft,
+    structs::{Compose, Facts, Held, MailPane, Outcome},
     types::{Load, Press, Problem},
 };
 use atelier_capabilities::CapResult;

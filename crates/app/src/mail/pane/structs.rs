@@ -1,10 +1,8 @@
 use std::{rc::Rc, sync::Arc};
 
 use atelier_capabilities::{
-    Actor, Ref, Subscription as Told,
-    mail::{
-        Draft, MailCapabilities, MailEvent, MailOperation, MailProvider, Thread,
-    },
+    Actor, CapResult, Ref, Subscription as Told,
+    mail::{Draft, MailCapabilities, MailEvent, MailOperation, MailProvider, Message, Thread},
 };
 use atelier_ui::{ActiveTheme, scale::px, theme::radius};
 use gpui_kit::{
@@ -63,6 +61,25 @@ pub(super) struct Compose {
     pub empty: bool,
     pub save: Option<super::types::Press>,
     pub send: Option<super::types::Press>,
+}
+
+/// What reading an account's mailboxes brings.
+pub(super) struct Boxes {
+    pub caps: MailCapabilities,
+    pub rows: Vec<BoxRow>,
+}
+
+/// What one reading of a mailbox's threads brings: the rows, newest first, and the cursor of the page after them.
+pub(super) struct Fetched {
+    pub rows: Vec<ThreadRow>,
+    pub next: Option<String>,
+}
+
+/// What writing the reader's reply brings: the draft as the provider now holds it, and, when the reader asked to send, what the
+/// send answered. A draft that was saved and not sent stays shown, at its new version.
+pub(super) struct Outcome {
+    pub draft: Draft,
+    pub sent: Option<CapResult<Message>>,
 }
 
 /// What the reply box says of itself, for the drawing code and the tests.

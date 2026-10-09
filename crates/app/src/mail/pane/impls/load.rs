@@ -8,10 +8,9 @@ use gpui_kit::{AppContext, Context, Window};
 
 use super::super::{
     helpers::{
-        Boxes, Fetched, apply, new_list, react, read_boxes, read_more, read_thread, read_threads,
-        set_tail,
+        apply, new_list, react, read_boxes, read_more, read_thread, read_threads, set_tail,
     },
-    structs::{Account, MailPane},
+    structs::{Account, Boxes, Fetched, MailPane},
     types::{Load, POLL, Reaction},
 };
 use crate::mail::{

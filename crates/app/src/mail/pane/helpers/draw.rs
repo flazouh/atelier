@@ -332,8 +332,12 @@ pub fn message_card(
                 .text_color(muted)
                 .child(view.time.clone()),
         );
-    let shown = view.shown(whole).clone();
     let cut = view.cut.is_some() && !whole;
+    // A cut body ends in an ellipsis, so it does not read as the whole of what was written.
+    let shown: SharedString = match cut {
+        true => format!("{}…", view.shown(whole)).into(),
+        false => view.shown(whole).clone(),
+    };
     let links = (!view.links.is_empty()).then(|| {
         div()
             .flex()
