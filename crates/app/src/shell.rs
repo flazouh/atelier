@@ -12,6 +12,7 @@ mod impls;
 mod changes;
 mod history;
 mod lens;
+mod messages;
 mod rail;
 mod restore;
 mod structs;

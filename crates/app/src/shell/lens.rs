@@ -27,7 +27,7 @@ use atelier_settings::Location;
 use crate::tasks::pane::Scope;
 
 /// A row of a lens's sidebar: a mark, the words, and a count at the end. `id` names it for the control socket.
-fn nav_row(id: String, on: bool, mark: AnyElement, label: SharedString, count: Option<usize>, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
+pub(super) fn nav_row(id: String, on: bool, mark: AnyElement, label: SharedString, count: Option<usize>, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
     let theme = cx.theme();
     let name = id.clone();
     div()
@@ -49,7 +49,7 @@ fn nav_row(id: String, on: bool, mark: AnyElement, label: SharedString, count: O
 }
 
 /// A heading over a group of rows in a lens's sidebar.
-fn nav_heading(words: &'static str, cx: &App) -> AnyElement {
+pub(super) fn nav_heading(words: &'static str, cx: &App) -> AnyElement {
     div()
         .px(px(8.))
         .pt(px(10.))
@@ -404,6 +404,7 @@ impl Shell {
     pub(crate) fn go_to(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         match view {
             ShellView::Tasks => self.show_tasks(window, cx),
+            ShellView::Messages => self.show_messages(window, cx),
             v if v.in_code() => self.show_code(v, window, cx),
             v => self.show_view(v, window, cx),
         }

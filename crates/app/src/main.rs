@@ -85,7 +85,11 @@ fn main() {
         atelier_ui::init(cx);
         file_glyphs::install(cx);
         cx.set_global(agent_session::RunPickedSkills(saved.run_picked_skills.unwrap_or(false)));
-        cx.set_global(capability_hub::CapabilityHub::for_this_app(saved.capabilities.agent_tools.unwrap_or(true)));
+        let hub = capability_hub::CapabilityHub::for_this_app(saved.capabilities.agent_tools.unwrap_or(true));
+        // A debug build with ATELIER_DEMO_MESSAGING=1 has one seeded chat account, to look at the Messages view with.
+        #[cfg(debug_assertions)]
+        drop(messages::demo::register_from_env(&hub));
+        cx.set_global(hub);
         cx.set_global(slots::builtin());
         cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));
         pr_glance::install(&saved.pr_card_off, cx);

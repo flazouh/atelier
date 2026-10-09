@@ -712,6 +712,7 @@ impl Render for MessagesPane {
         });
         div()
             .id("messages-pane")
+            .debug_selector(|| "messages-pane".into())
             .key_context("Messages")
             .track_focus(&self.focus)
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
