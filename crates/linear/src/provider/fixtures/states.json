@@ -1,0 +1,75 @@
+{
+  "data": {
+    "workflowStates": {
+      "nodes": [
+        {
+          "id": "00000000-0000-4000-8000-000000000014",
+          "name": "In Review",
+          "type": "started",
+          "position": 1002,
+          "team": {
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000037",
+          "name": "Todo",
+          "type": "unstarted",
+          "position": 1,
+          "team": {
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000008",
+          "name": "Done",
+          "type": "completed",
+          "position": 3,
+          "team": {
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000018",
+          "name": "In Progress",
+          "type": "started",
+          "position": 2,
+          "team": {
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000038",
+          "name": "Duplicate",
+          "type": "duplicate",
+          "position": 5,
+          "team": {
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000026",
+          "name": "Backlog",
+          "type": "backlog",
+          "position": 0,
+          "team": {
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000039",
+          "name": "Canceled",
+          "type": "canceled",
+          "position": 4,
+          "team": {
+            "key": "ACM"
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "00000000-0000-4000-8000-000000000039"
+      }
+    }
+  }
+}

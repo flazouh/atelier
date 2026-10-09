@@ -1,0 +1,29 @@
+{
+  "channel": "#general",
+  "total": 2,
+  "hasMore": false,
+  "rows": [
+    {
+      "author": "alex",
+      "message": "Who can review the release notes?",
+      "at": "2025-10-09T08:54:40.000Z",
+      "url": "https://app.slack.com/client/T01ACME/C01GENERAL/p1760000080000200",
+      "replies": 2,
+      "files": []
+    },
+    {
+      "author": "sam",
+      "message": "I can, after lunch.",
+      "at": "2025-10-09T08:55:10.000Z",
+      "url": "https://app.slack.com/client/T01ACME/C01GENERAL/p1760000110000400?thread_ts=1760000080.000200",
+      "files": []
+    },
+    {
+      "author": "alex",
+      "message": "Thanks.",
+      "at": "2025-10-09T08:55:30.000Z",
+      "url": "https://app.slack.com/client/T01ACME/C01GENERAL/p1760000130000500?thread_ts=1760000080.000200",
+      "files": []
+    }
+  ]
+}
