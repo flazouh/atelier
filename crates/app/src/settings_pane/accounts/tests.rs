@@ -64,8 +64,8 @@ fn open_with<'a>(
     let services = AccountServices {
         secrets: secrets.clone(),
         linear,
-        github,
-    };
+        github, ..AccountServices::isolated()
+};
     cx.update(|cx| {
         gpui_kit::init(cx);
         set_appearance(Appearance::Light, cx);
@@ -362,8 +362,8 @@ fn a_keychain_that_will_not_keep_the_key_is_said_in_words_and_nothing_is_connect
         cx.set_global(AccountServices {
             secrets: Arc::new(Locked),
             linear,
-            github,
-        })
+            github, ..AccountServices::isolated()
+})
     });
 
     pane.update(cx, |p, cx| p.save_linear(KEY.into(), cx));

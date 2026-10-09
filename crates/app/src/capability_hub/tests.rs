@@ -285,8 +285,10 @@ fn built(
         rows: Rows {
             linear: row(!providers.is_empty()),
             github: Row::Off,
+            ..Default::default()
         },
         providers,
+        ..Default::default()
     }
 }
 

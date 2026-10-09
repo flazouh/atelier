@@ -145,8 +145,8 @@ fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
             cx.set_global(crate::accounts::AccountServices {
                 secrets: secrets.clone(),
                 linear: |_| Ok(std::sync::Arc::new(atelier_capabilities::tasks::MemoryTasks::new("acme"))),
-                github: |_| Err(atelier_capabilities::CapError::Offline),
-            })
+                github: |_| Err(atelier_capabilities::CapError::Offline), ..crate::accounts::AccountServices::isolated()
+})
         });
         _pane.update(cx, |pane, cx| pane.save_linear("lin_api_SECRET".into(), cx));
         cx.run_until_parked();

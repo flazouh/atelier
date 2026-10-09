@@ -331,7 +331,7 @@ fn a_connected_account_joins_an_open_pane_and_leaves_with_its_provider(cx: &mut 
     let acme = Arc::new(MemoryTasks::new("acme"));
     let connect = |providers: Vec<Arc<dyn TasksProvider>>, cx: &mut VisualTestContext| {
         let turn = hub.checking(&Default::default());
-        hub.install(crate::accounts::Built { rows: Default::default(), providers }, turn);
+        hub.install(crate::accounts::Built { providers, ..Default::default() }, turn);
         cx.update(|_, cx| cx.update_global::<CapabilityHub, _>(|_, _| {}));
         settle(&pane, cx);
     };

@@ -35,6 +35,7 @@ fn services(secrets: &Arc<InMemory>) -> AccountServices {
         secrets: secrets.clone(),
         linear,
         github,
+        ..AccountServices::isolated()
     }
 }
 
@@ -76,6 +77,7 @@ fn nothing_connected_builds_nothing_and_never_asks_the_keychain() {
         secrets: Arc::new(Untouched),
         linear,
         github,
+        ..AccountServices::isolated()
     };
     let built = build(&AccountsSaved::default(), &services);
     assert!(built.providers.is_empty());

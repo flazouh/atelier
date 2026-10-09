@@ -48,6 +48,9 @@ struct Local {
 #[derive(Default)]
 struct Linked {
     providers: Vec<Arc<dyn TasksProvider>>,
+    /// The chat accounts the person connected, which are in the registry as well.
+    messaging: Vec<Arc<dyn MessagingProvider>>,
+    mail: Vec<Arc<dyn MailProvider>>,
     rows: Rows,
     /// Counts the refreshes, so the answer of an old one is dropped.
     turn: u64,
@@ -81,7 +84,7 @@ impl CapabilityHub {
         not(debug_assertions),
         allow(
             dead_code,
-            reason = "the Accounts section of Settings registers the real ones; until it lands only the debug demo does"
+            reason = "connected accounts go in through `install`; only the debug demo adds one by hand"
         )
     )]
     pub(crate) fn add_messaging(&self, provider: Arc<dyn MessagingProvider>) {
@@ -108,7 +111,7 @@ impl CapabilityHub {
         not(debug_assertions),
         allow(
             dead_code,
-            reason = "the Accounts section of Settings registers the real ones; until it lands only the debug demo does"
+            reason = "connected accounts go in through `install`; only the debug demo adds one by hand"
         )
     )]
     pub(crate) fn add_mail(&self, provider: Arc<dyn MailProvider>) {
@@ -246,6 +249,9 @@ impl CapabilityHub {
         linked.rows = Rows {
             linear: state(saved.linear.is_some()),
             github: state(saved.github_issues.is_some()),
+            slack: state(saved.slack.is_some()),
+            discord: state(saved.discord.is_some()),
+            gmail: state(saved.gmail.is_some()),
         };
         linked.turn
     }
@@ -268,7 +274,22 @@ impl CapabilityHub {
         for new in &built.providers {
             registry.add_tasks(new.clone());
         }
+        // Only what the accounts added goes: a messaging or mail provider that came another way (the debug demo) stays.
+        for old in &linked.messaging {
+            registry.remove_messaging(old.provider(), old.account());
+        }
+        for new in &built.messaging {
+            registry.add_messaging(new.clone());
+        }
+        for old in &linked.mail {
+            registry.remove_mail(old.provider(), old.account());
+        }
+        for new in &built.mail {
+            registry.add_mail(new.clone());
+        }
         linked.providers = built.providers;
+        linked.messaging = built.messaging;
+        linked.mail = built.mail;
         linked.rows = built.rows;
         true
     }
