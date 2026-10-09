@@ -1,0 +1,33 @@
+{
+  "id": 1000,
+  "number": 74,
+  "title": "Associate default labels with a terminal color",
+  "body": "In #58, @probablycorey mentioned that color alone wouldn't be very sustainable. It would be nice to have a consistent design language to display them \r\n\r\n---\r\n\r\n**Update:** \r\nAt our brainstorm, we tal",
+  "state": "closed",
+  "state_reason": "completed",
+  "locked": false,
+  "user": {
+    "login": "ampinsk",
+    "id": 1
+  },
+  "labels": [
+    {
+      "id": 7,
+      "name": "enhancement",
+      "color": "0dd8ac",
+      "description": "a request to improve CLI"
+    },
+    {
+      "id": 7,
+      "name": "core",
+      "color": "e25944",
+      "description": "This issue is not accepting PRs from outside contributors"
+    }
+  ],
+  "assignees": [],
+  "comments": 8,
+  "created_at": "2019-11-14T22:04:34Z",
+  "updated_at": "2021-07-12T17:46:01Z",
+  "closed_at": "2021-07-12T17:46:01Z",
+  "html_url": "https://github.com/cli/cli/issues/74"
+}

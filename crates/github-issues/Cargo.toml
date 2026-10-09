@@ -1,0 +1,15 @@
+[package]
+name = "atelier-github-issues"
+description = "GitHub Issues as a `tasks` provider: the issues of one repository, read and written through the `gh` command line tool."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+atelier-capabilities.workspace = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

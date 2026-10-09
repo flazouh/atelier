@@ -1,0 +1,32 @@
+[
+  {
+    "id": 7,
+    "name": "accessibility",
+    "color": "9ce9f4",
+    "description": ""
+  },
+  {
+    "id": 7,
+    "name": "actions",
+    "color": "f9e98b",
+    "description": ""
+  },
+  {
+    "id": 7,
+    "name": "agentic-workflows",
+    "color": "ededed",
+    "description": null
+  },
+  {
+    "id": 7,
+    "name": "attachments",
+    "color": "b2fa88",
+    "description": "Issues regarding `--attach`"
+  },
+  {
+    "id": 7,
+    "name": "auth",
+    "color": "00517a",
+    "description": "related to tokens, authentication state, or oauth"
+  }
+]
