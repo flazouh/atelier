@@ -1,6 +1,7 @@
 //! The Messages view of the shell: the chat accounts and their channels in the sidebar, and the pane that shows the open channel.
 //! The pane is one for the whole window (the accounts are the person's, not a project's) and is made the first time the view is in
 //! front. What it shows is written once against the `MessagingProvider` trait, so a new provider needs nothing here.
+use atelier_capabilities::messaging::ChannelKind;
 use atelier_ui::{
     Icon, IconName,
     project_badge::{ProjectBadge, fallback_color},
@@ -8,7 +9,6 @@ use atelier_ui::{
     theme::ActiveTheme,
     typography::TextSize,
 };
-use atelier_capabilities::messaging::ChannelKind;
 use gpui_kit::prelude::*;
 use gpui_kit::{AnyElement, Context, Focusable, Window, div};
 
@@ -43,32 +43,51 @@ impl Shell {
             Some(pane) => pane,
             None => {
                 let pane = cx.new(|cx| MessagesPane::new(window, cx));
-                let subscription = cx.subscribe_in(&pane, window, |this: &mut Self, _, event: &MessagesEvent, window, cx| match event {
-                    MessagesEvent::OpenSettings => this.open_settings(&OpenSettings, window, cx),
-                });
+                let subscription = cx.subscribe_in(
+                    &pane,
+                    window,
+                    |this: &mut Self, _, event: &MessagesEvent, window, cx| match event {
+                        MessagesEvent::OpenSettings => {
+                            this.open_settings(&OpenSettings, window, cx)
+                        }
+                    },
+                );
                 self._subscriptions.push(subscription);
                 self.messages = Some(pane.clone());
                 pane
             }
         };
-        let providers = cx.try_global::<CapabilityHub>().map(CapabilityHub::messaging_providers).unwrap_or_default();
+        let providers = cx
+            .try_global::<CapabilityHub>()
+            .map(CapabilityHub::messaging_providers)
+            .unwrap_or_default();
         pane.update(cx, |pane, cx| pane.set_providers(providers, cx));
     }
 
     /// The main area of the Messages view: the pane, a panels' gap from the sidebar, as the Tasks pane is.
     pub(super) fn messages_main(&self) -> AnyElement {
         match &self.messages {
-            Some(pane) => div().debug_selector(|| "messages-view".into()).size_full().pl(px(super::types::PANE_GAP)).pr(px(8.)).child(pane.clone()).into_any_element(),
+            Some(pane) => div()
+                .debug_selector(|| "messages-view".into())
+                .size_full()
+                .pl(px(super::types::PANE_GAP))
+                .pr(px(8.))
+                .child(pane.clone())
+                .into_any_element(),
             None => div().into_any_element(),
         }
     }
 
     /// The Messages view's sidebar: each account with its channels and direct messages. A press on a channel opens it.
     pub(super) fn messages_sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
-        let Some(pane) = self.messages.clone() else { return div().into_any_element() };
+        let Some(pane) = self.messages.clone() else {
+            return div().into_any_element();
+        };
         let theme = cx.theme().clone();
         let state = pane.read(cx);
-        let open = state.open_channel_ref().map(|(at, channel)| (at, channel.clone()));
+        let open = state
+            .open_channel_ref()
+            .map(|(at, channel)| (at, channel.clone()));
         let mut column = div()
             .debug_selector(|| "messages-sidebar".into())
             .id("messages-sidebar")
@@ -81,30 +100,69 @@ impl Shell {
         for (at, account) in state.accounts().iter().enumerate() {
             column = column.child(account_heading(at, account, cx));
             if let Some(words) = account_note(account) {
-                column = column.child(div().px(px(8.)).pb(px(4.)).text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(words));
+                column = column.child(
+                    div()
+                        .px(px(8.))
+                        .pb(px(4.))
+                        .text_size(TextSize::Xs.font_size())
+                        .text_color(theme.muted_foreground)
+                        .child(words),
+                );
             }
             // The groups have headings only where there is more than one to tell apart.
-            let both = account.group(Group::Channels).next().is_some() && account.group(Group::Direct).next().is_some();
-            for (group, heading) in [(Group::Channels, "Channels"), (Group::Direct, "Direct messages")] {
-                let rows: Vec<(usize, &Row)> = account.rows.iter().enumerate().filter(|(_, r)| r.group == group).collect();
+            let both = account.group(Group::Channels).next().is_some()
+                && account.group(Group::Direct).next().is_some();
+            for (group, heading) in [
+                (Group::Channels, "Channels"),
+                (Group::Direct, "Direct messages"),
+            ] {
+                let rows: Vec<(usize, &Row)> = account
+                    .rows
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, r)| r.group == group)
+                    .collect();
                 if both && !rows.is_empty() {
                     column = column.child(nav_heading(heading, cx));
                 }
                 for (n, row) in rows {
-                    let on = open.as_ref().is_some_and(|(a, channel)| *a == at && *channel == row.reference);
+                    let on = open
+                        .as_ref()
+                        .is_some_and(|(a, channel)| *a == at && *channel == row.reference);
                     let channel = row.reference.clone();
                     let pane = pane.downgrade();
                     let dot = row.unread.then(|| {
-                        div().debug_selector(move || format!("messages-unread-{at}-{n}")).flex_none().size(px(7.)).rounded_full().bg(theme.accent)
+                        div()
+                            .debug_selector(move || format!("messages-unread-{at}-{n}"))
+                            .flex_none()
+                            .size(px(7.))
+                            .rounded_full()
+                            .bg(theme.accent)
                     });
-                    let item = nav_row(format!("messages-channel-{at}-{n}"), on, channel_mark(row, cx), row.name.clone(), None, cx)
-                        .on_click(move |_, _, cx| drop(pane.update(cx, |p, cx| p.open_channel(at, &channel, cx))));
+                    let item = nav_row(
+                        format!("messages-channel-{at}-{n}"),
+                        on,
+                        channel_mark(row, cx),
+                        row.name.clone(),
+                        None,
+                        cx,
+                    )
+                    .on_click(move |_, _, cx| {
+                        drop(pane.update(cx, |p, cx| p.open_channel(at, &channel, cx)))
+                    });
                     column = column.child(item.children(dot));
                 }
             }
         }
         if state.accounts().is_empty() {
-            column = column.child(div().px(px(8.)).pt(px(10.)).text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child("No accounts yet."));
+            column = column.child(
+                div()
+                    .px(px(8.))
+                    .pt(px(10.))
+                    .text_size(TextSize::Xs.font_size())
+                    .text_color(theme.muted_foreground)
+                    .child("No accounts yet."),
+            );
         }
         column.into_any_element()
     }
@@ -114,7 +172,11 @@ impl Shell {
 fn account_heading(at: usize, account: &Account, cx: &gpui_kit::App) -> AnyElement {
     let theme = cx.theme();
     let name = account.choice.name();
-    let letter = name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
+    let letter = name
+        .chars()
+        .next()
+        .map(|c| c.to_uppercase().to_string())
+        .unwrap_or_default();
     div()
         .debug_selector(move || format!("messages-account-{at}"))
         .flex()
@@ -125,7 +187,10 @@ fn account_heading(at: usize, account: &Account, cx: &gpui_kit::App) -> AnyEleme
         .pb(px(4.))
         .text_size(TextSize::Xs.font_size())
         .text_color(theme.muted_foreground)
-        .child(ProjectBadge::new(letter, fallback_color(&account.choice.provider)))
+        .child(ProjectBadge::new(
+            letter,
+            fallback_color(&account.choice.provider),
+        ))
         .child(div().min_w_0().truncate().child(account.choice.words()))
         .into_any_element()
 }
@@ -135,7 +200,9 @@ fn account_note(account: &Account) -> Option<gpui_kit::SharedString> {
     use crate::messages::pane::Problem;
     match (account.problem, &account.failed) {
         (Some(Problem::Offline), _) => Some("Offline".into()),
-        (Some(Problem::Wait(ms)), _) => Some(format!("Try again in {} s", ms.div_ceil(1000)).into()),
+        (Some(Problem::Wait(ms)), _) => {
+            Some(format!("Try again in {} s", ms.div_ceil(1000)).into())
+        }
         (Some(Problem::SignedOut), _) => Some("Not signed in".into()),
         (None, Some(why)) => Some(why.clone()),
         (None, None) => None,
@@ -146,7 +213,10 @@ fn account_note(account: &Account) -> Option<gpui_kit::SharedString> {
 fn channel_mark(row: &Row, cx: &gpui_kit::App) -> AnyElement {
     match row.kind {
         ChannelKind::Public => div().child("#").into_any_element(),
-        ChannelKind::Private => Icon::new(IconName::Lock).size(px(12.)).color(cx.theme().muted_foreground).into_any_element(),
+        ChannelKind::Private => Icon::new(IconName::Lock)
+            .size(px(12.))
+            .color(cx.theme().muted_foreground)
+            .into_any_element(),
         ChannelKind::Dm | ChannelKind::GroupDm => div().child("@").into_any_element(),
     }
 }

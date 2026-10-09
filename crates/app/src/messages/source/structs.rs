@@ -14,7 +14,10 @@ impl Choice {
     /// The provider as a person reads it: `Slack`.
     pub fn name(&self) -> String {
         let mut name = self.provider.chars();
-        let head: String = name.next().map(|c| c.to_uppercase().collect()).unwrap_or_default();
+        let head: String = name
+            .next()
+            .map(|c| c.to_uppercase().collect())
+            .unwrap_or_default();
         format!("{head}{}", name.as_str())
     }
 
@@ -32,29 +35,26 @@ pub struct MessagesSource {
 impl MessagesSource {
     pub fn from_providers(providers: impl IntoIterator<Item = Arc<dyn MessagingProvider>>) -> Self {
         let mut registry = Registry::new();
-        providers.into_iter().for_each(|p| registry.add_messaging(p));
+        providers
+            .into_iter()
+            .for_each(|p| registry.add_messaging(p));
         Self { registry }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.registry.all_messaging().is_empty()
-    }
-
-    pub fn providers(&self) -> Vec<Arc<dyn MessagingProvider>> {
-        self.registry.all_messaging()
-    }
-
-    /// The provider of the account at `index` of [`choices`](Self::choices).
-    pub fn provider(&self, index: usize) -> Option<Arc<dyn MessagingProvider>> {
-        self.registry.all_messaging().into_iter().nth(index)
-    }
-
-    /// Every provider and account.
-    pub fn choices(&self) -> Vec<Choice> {
+    /// Every account, in the registry's order: how the sidebar names it, and its provider.
+    pub fn accounts(&self) -> Vec<(Choice, Arc<dyn MessagingProvider>)> {
         self.registry
             .all_messaging()
-            .iter()
-            .map(|p| Choice { provider: p.provider().to_string(), account: p.account().to_string() })
+            .into_iter()
+            .map(|p| {
+                (
+                    Choice {
+                        provider: p.provider().to_string(),
+                        account: p.account().to_string(),
+                    },
+                    p,
+                )
+            })
             .collect()
     }
 
@@ -62,6 +62,9 @@ impl MessagesSource {
     /// answer that has not changed must not read every channel again.
     pub fn same_as(&self, providers: &[Arc<dyn MessagingProvider>]) -> bool {
         let held = self.registry.all_messaging();
-        held.len() == providers.len() && providers.iter().all(|p| held.iter().any(|h| Arc::ptr_eq(h, p)))
+        held.len() == providers.len()
+            && providers
+                .iter()
+                .all(|p| held.iter().any(|h| Arc::ptr_eq(h, p)))
     }
 }

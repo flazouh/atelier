@@ -5,13 +5,11 @@ use atelier_capabilities::{
     messaging::{ChannelQuery, Formatting, MessagingCapabilities, MessagingProvider},
 };
 use atelier_ui::{
-    Button, ButtonSize, ButtonVariant,
-    scale::px,
-    theme::Theme,
-    typography::TextSize,
+    Button, ButtonSize, ButtonVariant, scale::px, theme::Theme, typography::TextSize,
 };
 use gpui_kit::{
-    AnyElement, App, InteractiveElement, IntoElement, ListOffset, ListState, ParentElement, Styled, Window, div,
+    AnyElement, App, InteractiveElement, IntoElement, ListOffset, ListState, ParentElement, Styled,
+    Window, div,
 };
 
 use super::super::map::{Line, Row, line_of, row_of};
@@ -31,7 +29,10 @@ pub fn react(error: &CapError) -> Reaction {
 
 /// How many messages a page asks for: what the provider allows, within what a screen wants.
 pub(super) fn page_of(caps: &MessagingCapabilities) -> u32 {
-    caps.limits.page_max.unwrap_or(PAGE_FALLBACK).clamp(1, PAGE_MOST)
+    caps.limits
+        .page_max
+        .unwrap_or(PAGE_FALLBACK)
+        .clamp(1, PAGE_MOST)
 }
 
 /// What one reading of a channel's history brings: the lines, oldest first, and the cursor of the page before them.
@@ -49,7 +50,10 @@ pub(super) struct Channels {
 /// The channels of the account, and what it can do. Blocks.
 pub(super) fn read_channels(provider: &dyn MessagingProvider) -> CapResult<Channels> {
     let caps = provider.capabilities();
-    let mut query = ChannelQuery { limit: caps.limits.page_max, ..ChannelQuery::default() };
+    let mut query = ChannelQuery {
+        limit: caps.limits.page_max,
+        ..ChannelQuery::default()
+    };
     let mut rows = Vec::new();
     for _ in 0..CHANNEL_PAGES {
         let page = provider.channels(&query)?;
@@ -63,7 +67,12 @@ pub(super) fn read_channels(provider: &dyn MessagingProvider) -> CapResult<Chann
 }
 
 /// The first `pages` pages of a channel's history, as lines with the oldest first. Blocks.
-pub(super) fn read_history(provider: &dyn MessagingProvider, channel: &Ref, pages: usize, now: u64) -> CapResult<Fetched> {
+pub(super) fn read_history(
+    provider: &dyn MessagingProvider,
+    channel: &Ref,
+    pages: usize,
+    now: u64,
+) -> CapResult<Fetched> {
     let caps = provider.capabilities();
     let (limit, mut cursor, mut newest_first) = (page_of(&caps), None::<String>, Vec::new());
     for _ in 0..pages.max(1) {
@@ -74,18 +83,33 @@ pub(super) fn read_history(provider: &dyn MessagingProvider, channel: &Ref, page
             break;
         }
     }
-    Ok(Fetched { lines: lines_of(newest_first.iter().rev(), caps.formatting, now), next: cursor })
+    Ok(Fetched {
+        lines: lines_of(newest_first.iter().rev(), caps.formatting, now),
+        next: cursor,
+    })
 }
 
 /// The page of history that follows `cursor`, going back in time. Blocks.
-pub(super) fn read_older(provider: &dyn MessagingProvider, channel: &Ref, cursor: &str, now: u64) -> CapResult<Fetched> {
+pub(super) fn read_older(
+    provider: &dyn MessagingProvider,
+    channel: &Ref,
+    cursor: &str,
+    now: u64,
+) -> CapResult<Fetched> {
     let caps = provider.capabilities();
     let page = provider.history(channel, Some(cursor), Some(page_of(&caps)))?;
-    Ok(Fetched { lines: lines_of(page.items.iter().rev(), caps.formatting, now), next: page.next_cursor })
+    Ok(Fetched {
+        lines: lines_of(page.items.iter().rev(), caps.formatting, now),
+        next: page.next_cursor,
+    })
 }
 
 /// A thread: the root first, then its replies. Blocks.
-pub(super) fn read_thread(provider: &dyn MessagingProvider, root: &Ref, now: u64) -> CapResult<Fetched> {
+pub(super) fn read_thread(
+    provider: &dyn MessagingProvider,
+    root: &Ref,
+    now: u64,
+) -> CapResult<Fetched> {
     let formatting = provider.capabilities().formatting;
     let (mut messages, mut cursor) = (Vec::new(), None::<String>);
     for _ in 0..THREAD_PAGES {
@@ -96,10 +120,17 @@ pub(super) fn read_thread(provider: &dyn MessagingProvider, root: &Ref, now: u64
             break;
         }
     }
-    Ok(Fetched { lines: lines_of(messages.iter(), formatting, now), next: cursor })
+    Ok(Fetched {
+        lines: lines_of(messages.iter(), formatting, now),
+        next: cursor,
+    })
 }
 
-fn lines_of<'a>(messages: impl Iterator<Item = &'a atelier_capabilities::messaging::Message>, formatting: Formatting, now: u64) -> Vec<Line> {
+fn lines_of<'a>(
+    messages: impl Iterator<Item = &'a atelier_capabilities::messaging::Message>,
+    formatting: Formatting,
+    now: u64,
+) -> Vec<Line> {
     messages.map(|m| line_of(m, formatting, now)).collect()
 }
 
@@ -110,7 +141,13 @@ pub(super) fn apply(current: &mut Rc<Vec<Line>>, list: &ListState, next: Vec<Lin
     let old = Rc::clone(current);
     let before = old.iter().zip(&next).take_while(|(a, b)| a == b).count();
     let room = old.len().min(next.len()) - before;
-    let after = old.iter().rev().zip(next.iter().rev()).take(room).take_while(|(a, b)| a == b).count();
+    let after = old
+        .iter()
+        .rev()
+        .zip(next.iter().rev())
+        .take(room)
+        .take_while(|(a, b)| a == b)
+        .count();
     let removed = before..old.len() - after;
     let added = next.len() - before - after;
     if removed.is_empty() && added == 0 {
@@ -121,14 +158,21 @@ pub(super) fn apply(current: &mut Rc<Vec<Line>>, list: &ListState, next: Vec<Lin
     list.splice(removed.clone(), added);
     if !list.is_following_tail() && removed.end <= place.item_ix && from != to {
         let item_ix = (place.item_ix + to).saturating_sub(from);
-        list.scroll_to(ListOffset { item_ix, offset_in_item: place.offset_in_item });
+        list.scroll_to(ListOffset {
+            item_ix,
+            offset_in_item: place.offset_in_item,
+        });
     }
     *current = Rc::new(next);
 }
 
 /// The banner of a problem the pane waits out: offline has Retry, a wait says how long. `None` for the problem that takes the
 /// whole pane.
-pub(super) fn banner(problem: Problem, retry: impl Fn(&mut Window, &mut App) + 'static, theme: &Theme) -> Option<AnyElement> {
+pub(super) fn banner(
+    problem: Problem,
+    retry: impl Fn(&mut Window, &mut App) + 'static,
+    theme: &Theme,
+) -> Option<AnyElement> {
     let words = match problem {
         Problem::Offline => "There is no connection.".to_string(),
         Problem::Wait(ms) => format!("Too many requests. Try again in {} s.", ms.div_ceil(1000)),
@@ -143,7 +187,12 @@ pub(super) fn banner(problem: Problem, retry: impl Fn(&mut Window, &mut App) + '
         .gap(px(8.))
         .px(px(12.))
         .pb(px(8.))
-        .child(div().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(words));
+        .child(
+            div()
+                .text_size(TextSize::Xs.font_size())
+                .text_color(theme.muted_foreground)
+                .child(words),
+        );
     let row = if problem == Problem::Offline {
         row.child(
             Button::new("messages-retry")
@@ -160,13 +209,34 @@ pub(super) fn banner(problem: Problem, retry: impl Fn(&mut Window, &mut App) + '
 }
 
 /// The empty state of an account the reader is not signed in to, with a way to Settings.
-pub(super) fn signed_out(account: &str, open_settings: impl Fn(&mut Window, &mut App) + 'static, theme: &Theme) -> AnyElement {
-    state("messages-signed-out", format!("Sign in to {account} to see its messages."), "messages-sign-in", "Open settings", open_settings, theme)
+pub(super) fn signed_out(
+    account: &str,
+    open_settings: impl Fn(&mut Window, &mut App) + 'static,
+    theme: &Theme,
+) -> AnyElement {
+    state(
+        "messages-signed-out",
+        format!("Sign in to {account} to see its messages."),
+        "messages-sign-in",
+        "Open settings",
+        open_settings,
+        theme,
+    )
 }
 
 /// The empty state of an app with no chat account.
-pub(super) fn no_account(open_settings: impl Fn(&mut Window, &mut App) + 'static, theme: &Theme) -> AnyElement {
-    state("messages-empty", "No chat account is connected.".to_string(), "messages-open-settings", "Open settings", open_settings, theme)
+pub(super) fn no_account(
+    open_settings: impl Fn(&mut Window, &mut App) + 'static,
+    theme: &Theme,
+) -> AnyElement {
+    state(
+        "messages-empty",
+        "No chat account is connected.".to_string(),
+        "messages-open-settings",
+        "Open settings",
+        open_settings,
+        theme,
+    )
 }
 
 fn state(
@@ -201,11 +271,24 @@ fn state(
 
 /// One muted line in the middle of the pane: what it waits for, or what went wrong.
 pub(super) fn say(words: gpui_kit::SharedString, theme: &Theme) -> AnyElement {
-    div().debug_selector(|| "messages-line".into()).flex_1().size_full().flex().items_center().justify_center().px(px(24.)).text_color(theme.muted_foreground).child(words).into_any_element()
+    div()
+        .debug_selector(|| "messages-line".into())
+        .flex_1()
+        .size_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .px(px(24.))
+        .text_color(theme.muted_foreground)
+        .child(words)
+        .into_any_element()
 }
 
 /// The row over the history that reads the page before it.
-pub(super) fn load_older(loading: bool, load: impl Fn(&mut Window, &mut App) + 'static) -> AnyElement {
+pub(super) fn load_older(
+    loading: bool,
+    load: impl Fn(&mut Window, &mut App) + 'static,
+) -> AnyElement {
     div()
         .id("messages-load-older-row")
         .flex()

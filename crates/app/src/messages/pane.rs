@@ -5,12 +5,12 @@ mod helpers;
 mod structs;
 mod types;
 
+#[cfg(test)]
+use helpers::{apply, react};
 pub use structs::{Account, MessagesPane};
 pub use types::{MessagesEvent, Problem};
 #[cfg(test)]
-use helpers::{apply, react};
-#[cfg(test)]
-use types::{Load, POLL, Reaction, View};
+use types::{POLL, Reaction};
 
 #[cfg(test)]
 mod tests;

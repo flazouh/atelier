@@ -2,18 +2,18 @@ use std::{collections::BTreeSet, rc::Rc, sync::Arc};
 
 use atelier_capabilities::{
     CapError, CapResult, Ref, Subscription as Told,
-    messaging::{Event, Feature, Filter, MessagingCapabilities, MessagingProvider, NewMessage, Operation},
+    messaging::{
+        Event, Feature, Filter, MessagingCapabilities, MessagingProvider, NewMessage, Operation,
+    },
 };
 use atelier_ui::{
-    ActiveTheme, Button, ButtonSize, ButtonVariant, PromptInput, PromptInputEvent,
-    scale::px,
-    theme::radius,
-    typography::TextSize,
+    ActiveTheme, Button, ButtonSize, ButtonVariant, PromptInput, PromptInputEvent, scale::px,
+    theme::radius, typography::TextSize,
 };
 use gpui_kit::{
-    AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, FollowMode, InteractiveElement, IntoElement, KeyDownEvent,
-    ListAlignment, ListState, ParentElement, Render, SharedString, Styled, Subscription, Window, div, list,
-    prelude::FluentBuilder,
+    AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, FollowMode,
+    InteractiveElement, IntoElement, KeyDownEvent, ListAlignment, ListState, ParentElement, Render,
+    SharedString, Styled, Subscription, Window, div, list, prelude::FluentBuilder,
 };
 
 use super::super::{
@@ -21,7 +21,10 @@ use super::super::{
     rows::{OpenThread, draw_line},
     source::{Choice, MessagesSource},
 };
-use super::helpers::{Channels, Fetched, apply, banner, load_older, no_account, react, read_channels, read_history, read_older, read_thread, say, signed_out};
+use super::helpers::{
+    Channels, Fetched, apply, banner, load_older, no_account, react, read_channels, read_history,
+    read_older, read_thread, say, signed_out,
+};
 use super::types::{Load, MessagesEvent, POLL, Problem, Reaction, View};
 
 /// One messaging account: the provider, what it can do, and the channels it lists. The sidebar draws these.
@@ -38,9 +41,16 @@ pub struct Account {
 }
 
 impl Account {
-    fn new(provider: Arc<dyn MessagingProvider>) -> Self {
-        let choice = Choice { provider: provider.provider().to_string(), account: provider.account().to_string() };
-        Self { choice, rows: Vec::new(), problem: None, failed: None, reading: true, provider, caps: MessagingCapabilities::default() }
+    fn new(choice: Choice, provider: Arc<dyn MessagingProvider>) -> Self {
+        Self {
+            choice,
+            rows: Vec::new(),
+            problem: None,
+            failed: None,
+            reading: true,
+            provider,
+            caps: MessagingCapabilities::default(),
+        }
     }
 
     /// The rows of one group, in the provider's order.
@@ -111,11 +121,15 @@ impl MessagesPane {
         let subscriptions = [&composer, &reply_composer]
             .into_iter()
             .map(|input| {
-                cx.subscribe_in(input, window, |this: &mut Self, _, event: &PromptInputEvent, window, cx| {
-                    if let PromptInputEvent::Submit(message) = event {
-                        this.submit(message.text.clone(), window, cx);
-                    }
-                })
+                cx.subscribe_in(
+                    input,
+                    window,
+                    |this: &mut Self, _, event: &PromptInputEvent, window, cx| {
+                        if let PromptInputEvent::Submit(message) = event {
+                            this.submit(message.text.clone(), window, cx);
+                        }
+                    },
+                )
             })
             .collect();
         Self {
@@ -150,14 +164,23 @@ impl MessagesPane {
 
     /// Gives the pane the app's messaging providers. The same ones as before change nothing; others replace the accounts, and
     /// the channels of each are read, off the UI thread.
-    pub fn set_providers(&mut self, providers: Vec<Arc<dyn MessagingProvider>>, cx: &mut Context<Self>) {
+    pub fn set_providers(
+        &mut self,
+        providers: Vec<Arc<dyn MessagingProvider>>,
+        cx: &mut Context<Self>,
+    ) {
         if self.source.same_as(&providers) {
             return;
         }
         self.generation += 1;
         self.epoch += 1;
         self.source = MessagesSource::from_providers(providers);
-        self.accounts = self.source.providers().into_iter().map(Account::new).collect();
+        self.accounts = self
+            .source
+            .accounts()
+            .into_iter()
+            .map(|(choice, provider)| Account::new(choice, provider))
+            .collect();
         self.listening.clear();
         (self.shown, self.channel, self.view) = (0, None, View::Channel);
         self.clear_open(cx);
@@ -229,7 +252,8 @@ impl MessagesPane {
 
     /// What stops the pane: the last call about the open channel, or reading the channels of its account.
     pub(super) fn effective_problem(&self) -> Option<Problem> {
-        self.problem.or_else(|| self.account().and_then(|a| a.problem))
+        self.problem
+            .or_else(|| self.account().and_then(|a| a.problem))
     }
 
     fn ready(&self) -> bool {
@@ -241,7 +265,10 @@ impl MessagesPane {
 
     /// The composer is there only when the provider lists `send`, and the open channel or thread is read.
     pub fn composer_shown(&self) -> bool {
-        self.channel.is_some() && self.can(Operation::Send) && self.effective_problem() != Some(Problem::SignedOut) && self.ready()
+        self.channel.is_some()
+            && self.can(Operation::Send)
+            && self.effective_problem() != Some(Problem::SignedOut)
+            && self.ready()
     }
 
     fn composer_now(&self) -> &Entity<PromptInput> {
@@ -253,21 +280,32 @@ impl MessagesPane {
 
     /// Reads the channels of account `at` again, with what it can do, off the UI thread.
     fn read_channels(&mut self, at: usize, cx: &mut Context<Self>) {
-        let Some(provider) = self.accounts.get(at).map(|a| a.provider.clone()) else { return };
+        let Some(provider) = self.accounts.get(at).map(|a| a.provider.clone()) else {
+            return;
+        };
         let epoch = self.epoch;
         let reading = cx.background_spawn(async move { read_channels(provider.as_ref()) });
         cx.spawn(async move |this, cx| {
             let result = reading.await;
-            this.update(cx, |this, cx| this.channels_read(at, result, epoch, cx)).ok();
+            this.update(cx, |this, cx| this.channels_read(at, result, epoch, cx))
+                .ok();
         })
         .detach();
     }
 
-    fn channels_read(&mut self, at: usize, result: CapResult<Channels>, epoch: u64, cx: &mut Context<Self>) {
+    fn channels_read(
+        &mut self,
+        at: usize,
+        result: CapResult<Channels>,
+        epoch: u64,
+        cx: &mut Context<Self>,
+    ) {
         if epoch != self.epoch {
             return;
         }
-        let Some(account) = self.accounts.get_mut(at) else { return };
+        let Some(account) = self.accounts.get_mut(at) else {
+            return;
+        };
         account.reading = false;
         match result {
             Ok(Channels { caps, rows }) => {
@@ -276,12 +314,18 @@ impl MessagesPane {
             }
             Err(error) => match react(&error) {
                 Reaction::Raise(problem) => account.problem = Some(problem),
-                Reaction::Hide | Reaction::Line(_) => account.failed = Some(error.to_string().into()),
+                Reaction::Hide | Reaction::Line(_) => {
+                    account.failed = Some(error.to_string().into())
+                }
             },
         }
         // The first channel of the first account that has one opens, so the pane has something to show.
         if self.channel.is_none()
-            && let Some((first, channel)) = self.accounts.iter().enumerate().find_map(|(i, a)| a.rows.first().map(|r| (i, r.reference.clone())))
+            && let Some((first, channel)) = self
+                .accounts
+                .iter()
+                .enumerate()
+                .find_map(|(i, a)| a.rows.first().map(|r| (i, r.reference.clone())))
         {
             self.open_channel(first, &channel, cx);
         }
@@ -308,8 +352,13 @@ impl MessagesPane {
     /// The reader has the channel in front of them, so the provider is told it is read, when it keeps that and the channel has
     /// unread. The channels are read again after, for what the provider now says.
     fn mark_read(&mut self, cx: &mut Context<Self>) {
-        let (Some(account), Some(channel)) = (self.account(), self.channel.clone()) else { return };
-        let unread = account.rows.iter().any(|r| r.reference == channel && r.unread);
+        let (Some(account), Some(channel)) = (self.account(), self.channel.clone()) else {
+            return;
+        };
+        let unread = account
+            .rows
+            .iter()
+            .any(|r| r.reference == channel && r.unread);
         if !unread || !account.caps.can(Operation::MarkRead) {
             return;
         }
@@ -331,17 +380,32 @@ impl MessagesPane {
 
     /// Reads the open channel's first pages again (as many as are read), off the UI thread.
     fn read_history(&mut self, cx: &mut Context<Self>) {
-        let (Some(account), Some(channel)) = (self.account(), self.channel.clone()) else { return };
+        let (Some(account), Some(channel)) = (self.account(), self.channel.clone()) else {
+            return;
+        };
         let (provider, pages, generation) = (account.provider.clone(), self.pages, self.generation);
-        let reading = cx.background_spawn(async move { read_history(provider.as_ref(), &channel, pages, crate::agent_session::now()) });
+        let reading = cx.background_spawn(async move {
+            read_history(
+                provider.as_ref(),
+                &channel,
+                pages,
+                crate::agent_session::now(),
+            )
+        });
         cx.spawn(async move |this, cx| {
             let result = reading.await;
-            this.update(cx, |this, cx| this.history_read(result, generation, cx)).ok();
+            this.update(cx, |this, cx| this.history_read(result, generation, cx))
+                .ok();
         })
         .detach();
     }
 
-    fn history_read(&mut self, result: CapResult<Fetched>, generation: u64, cx: &mut Context<Self>) {
+    fn history_read(
+        &mut self,
+        result: CapResult<Fetched>,
+        generation: u64,
+        cx: &mut Context<Self>,
+    ) {
         if generation != self.generation {
             return;
         }
@@ -366,16 +430,30 @@ impl MessagesPane {
 
     /// Reads the page of history before the oldest one shown, when there is one, and puts it above.
     pub fn load_older(&mut self, cx: &mut Context<Self>) {
-        let (Some(provider), Some(channel), Some(cursor)) = (self.account().map(|a| a.provider.clone()), self.channel.clone(), self.older.clone()) else { return };
+        let (Some(provider), Some(channel), Some(cursor)) = (
+            self.account().map(|a| a.provider.clone()),
+            self.channel.clone(),
+            self.older.clone(),
+        ) else {
+            return;
+        };
         if self.loading_older {
             return;
         }
         self.loading_older = true;
         let generation = self.generation;
-        let reading = cx.background_spawn(async move { read_older(provider.as_ref(), &channel, &cursor, crate::agent_session::now()) });
+        let reading = cx.background_spawn(async move {
+            read_older(
+                provider.as_ref(),
+                &channel,
+                &cursor,
+                crate::agent_session::now(),
+            )
+        });
         cx.spawn(async move |this, cx| {
             let result = reading.await;
-            this.update(cx, |this, cx| this.older_read(result, generation, cx)).ok();
+            this.update(cx, |this, cx| this.older_read(result, generation, cx))
+                .ok();
         })
         .detach();
         cx.notify();
@@ -390,13 +468,21 @@ impl MessagesPane {
             Ok(Fetched { lines, next }) => {
                 // A message may sit in two pages when the channel moved between the readings.
                 let held: BTreeSet<&Ref> = self.history.iter().map(|l| &l.reference).collect();
-                let mut all: Vec<Line> = lines.into_iter().filter(|l| !held.contains(&l.reference)).collect();
+                let mut all: Vec<Line> = lines
+                    .into_iter()
+                    .filter(|l| !held.contains(&l.reference))
+                    .collect();
                 all.extend(self.history.iter().cloned());
                 apply(&mut self.history, &self.list, all);
                 self.older = next;
                 self.pages += 1;
             }
-            Err(error) => self.fail(error, Operation::History, "Could not read older messages", cx),
+            Err(error) => self.fail(
+                error,
+                Operation::History,
+                "Could not read older messages",
+                cx,
+            ),
         }
         cx.notify();
     }
@@ -416,12 +502,17 @@ impl MessagesPane {
     }
 
     fn read_thread(&mut self, cx: &mut Context<Self>) {
-        let (Some(account), View::Thread(root)) = (self.account(), self.view.clone()) else { return };
+        let (Some(account), View::Thread(root)) = (self.account(), self.view.clone()) else {
+            return;
+        };
         let (provider, generation) = (account.provider.clone(), self.generation);
-        let reading = cx.background_spawn(async move { read_thread(provider.as_ref(), &root, crate::agent_session::now()) });
+        let reading = cx.background_spawn(async move {
+            read_thread(provider.as_ref(), &root, crate::agent_session::now())
+        });
         cx.spawn(async move |this, cx| {
             let result = reading.await;
-            this.update(cx, |this, cx| this.thread_read(result, generation, cx)).ok();
+            this.update(cx, |this, cx| this.thread_read(result, generation, cx))
+                .ok();
         })
         .detach();
     }
@@ -477,8 +568,12 @@ impl MessagesPane {
                 self.problem = Some(problem);
                 // The banner sits over the pane, so a first reading that failed shows it over the empty list.
                 match operation {
-                    Operation::Thread if loading(&self.thread_load) => self.thread_load = Load::Ready,
-                    Operation::History if loading(&self.history_load) => self.history_load = Load::Ready,
+                    Operation::Thread if loading(&self.thread_load) => {
+                        self.thread_load = Load::Ready
+                    }
+                    Operation::History if loading(&self.history_load) => {
+                        self.history_load = Load::Ready
+                    }
                     _ => {}
                 }
             }
@@ -494,7 +589,9 @@ impl MessagesPane {
             Reaction::Hide | Reaction::Line(_) => {
                 // A first reading that failed takes the pane, in words; any other failure is a line under the header.
                 let first = match operation {
-                    Operation::History if loading(&self.history_load) => Some(&mut self.history_load),
+                    Operation::History if loading(&self.history_load) => {
+                        Some(&mut self.history_load)
+                    }
                     Operation::Thread if loading(&self.thread_load) => Some(&mut self.thread_load),
                     _ => None,
                 };
@@ -514,9 +611,13 @@ impl MessagesPane {
     /// Sends what the reader typed, to the open channel or as a reply in the open thread. The text is the reader's, so the
     /// message goes as the person; the pane never sends on its own.
     fn submit(&mut self, text: SharedString, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(account), Some(channel)) = (self.account(), self.channel.clone()) else { return };
+        let (Some(account), Some(channel)) = (self.account(), self.channel.clone()) else {
+            return;
+        };
         if self.sending || !account.caps.can(Operation::Send) {
-            self.composer_now().clone().update(cx, |c, cx| c.set_text(text, window, cx));
+            self.composer_now()
+                .clone()
+                .update(cx, |c, cx| c.set_text(text, window, cx));
             return;
         }
         let new = match &self.view {
@@ -533,7 +634,8 @@ impl MessagesPane {
         });
         cx.spawn_in(window, async move |this, cx| {
             let result = sending.await;
-            this.update_in(cx, |this, window, cx| this.sent(result, text, window, cx)).ok();
+            this.update_in(cx, |this, window, cx| this.sent(result, text, window, cx))
+                .ok();
         })
         .detach();
         cx.notify();
@@ -545,14 +647,22 @@ impl MessagesPane {
         }
     }
 
-    fn sent(&mut self, result: CapResult<atelier_capabilities::messaging::Message>, text: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+    fn sent(
+        &mut self,
+        result: CapResult<atelier_capabilities::messaging::Message>,
+        text: SharedString,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.sending = false;
         self.set_composers_off(false, cx);
         match result {
             Ok(_) => self.refresh_open(cx),
             Err(error) => {
                 // The text goes back in the box, so the reader can send it again or change it.
-                self.composer_now().clone().update(cx, |c, cx| c.set_text(text, window, cx));
+                self.composer_now()
+                    .clone()
+                    .update(cx, |c, cx| c.set_text(text, window, cx));
                 self.fail(error, Operation::Send, "Could not send", cx);
             }
         }
@@ -561,7 +671,9 @@ impl MessagesPane {
 
     /// Asks account `at` for what happens from now on, off the UI thread.
     fn listen(&mut self, at: usize, cx: &mut Context<Self>) {
-        let Some(provider) = self.accounts.get(at).map(|a| a.provider.clone()) else { return };
+        let Some(provider) = self.accounts.get(at).map(|a| a.provider.clone()) else {
+            return;
+        };
         let epoch = self.epoch;
         let asking = cx.background_spawn(async move { provider.subscribe(&Filter::default()) });
         cx.spawn(async move |this, cx| {
@@ -597,17 +709,19 @@ impl MessagesPane {
     /// changed, and of the channels of an account for what the others say (their unread).
     fn poll(&mut self, cx: &mut Context<Self>) {
         let (mut open, mut elsewhere) = (false, BTreeSet::new());
-        self.listening.retain_mut(|(at, told)| loop {
-            match told.try_recv() {
-                Ok(event) => {
-                    if *at == self.shown && self.channel.as_ref() == Some(&event.channel) {
-                        open = true;
-                    } else {
-                        elsewhere.insert(*at);
+        self.listening.retain_mut(|(at, told)| {
+            loop {
+                match told.try_recv() {
+                    Ok(event) => {
+                        if *at == self.shown && self.channel.as_ref() == Some(&event.channel) {
+                            open = true;
+                        } else {
+                            elsewhere.insert(*at);
+                        }
                     }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => return true,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => return false,
                 }
-                Err(std::sync::mpsc::TryRecvError::Empty) => return true,
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => return false,
             }
         });
         if open {
@@ -627,17 +741,24 @@ impl MessagesPane {
             && account.caps.can(Operation::MarkRead)
         {
             let provider = account.provider.clone();
-            cx.background_spawn(async move { provider.mark_read(&channel, None).ok() }).detach();
+            cx.background_spawn(async move { provider.mark_read(&channel, None).ok() })
+                .detach();
         }
     }
 
     fn title(&self) -> SharedString {
-        let Some(row) = self.channel.as_ref().and_then(|c| self.account()?.rows.iter().find(|r| r.reference == *c)) else {
+        let Some(row) = self
+            .channel
+            .as_ref()
+            .and_then(|c| self.account()?.rows.iter().find(|r| r.reference == *c))
+        else {
             return "Messages".into();
         };
         match (&self.view, row.kind) {
             (View::Thread(_), _) => format!("Thread in {}", row.name).into(),
-            (_, atelier_capabilities::messaging::ChannelKind::Public) => format!("#{}", row.name).into(),
+            (_, atelier_capabilities::messaging::ChannelKind::Public) => {
+                format!("#{}", row.name).into()
+            }
             _ => row.name.clone(),
         }
     }
@@ -649,7 +770,9 @@ impl Render for MessagesPane {
         let pane = cx.entity();
         let open_settings = {
             let pane = pane.clone();
-            move |_: &mut Window, cx: &mut gpui_kit::App| pane.update(cx, |_, cx| cx.emit(MessagesEvent::OpenSettings))
+            move |_: &mut Window, cx: &mut gpui_kit::App| {
+                pane.update(cx, |_, cx| cx.emit(MessagesEvent::OpenSettings))
+            }
         };
         let in_thread = matches!(self.view, View::Thread(_));
         let header = div()
@@ -661,8 +784,19 @@ impl Render for MessagesPane {
             .gap(px(8.))
             .h(px(44.))
             .px(px(12.))
-            .child(div().debug_selector(|| "messages-title".into()).text_size(TextSize::Sm.font_size()).font_weight(gpui_kit::FontWeight::MEDIUM).child(self.title()))
-            .children(self.account().filter(|_| self.channel.is_some()).map(|a| div().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(a.choice.words())))
+            .child(
+                div()
+                    .debug_selector(|| "messages-title".into())
+                    .text_size(TextSize::Sm.font_size())
+                    .font_weight(gpui_kit::FontWeight::MEDIUM)
+                    .child(self.title()),
+            )
+            .children(self.account().filter(|_| self.channel.is_some()).map(|a| {
+                div()
+                    .text_size(TextSize::Xs.font_size())
+                    .text_color(theme.muted_foreground)
+                    .child(a.choice.words())
+            }))
             .child(div().flex_1())
             .when(in_thread, |d| {
                 let pane = pane.clone();
@@ -677,12 +811,18 @@ impl Render for MessagesPane {
                 )
             });
         let problem = self.effective_problem();
-        let name = self.account().map_or_else(|| "this account".to_string(), |a| a.choice.name());
+        let name = self
+            .account()
+            .map_or_else(|| "this account".to_string(), |a| a.choice.name());
         let body = if self.accounts.is_empty() {
             no_account(open_settings.clone(), &theme)
         } else if problem == Some(Problem::SignedOut) {
             signed_out(&name, open_settings.clone(), &theme)
-        } else if let Some(failed) = self.account().and_then(|a| a.failed.clone()).filter(|_| self.channel.is_none()) {
+        } else if let Some(failed) = self
+            .account()
+            .and_then(|a| a.failed.clone())
+            .filter(|_| self.channel.is_none())
+        {
             say(failed, &theme)
         } else if self.channel.is_none() {
             let words = match (self.account(), problem) {
@@ -694,21 +834,40 @@ impl Render for MessagesPane {
         } else {
             match (&self.view, &self.history_load, &self.thread_load) {
                 (View::Channel, Load::Loading, _) => say("Reading the messages…".into(), &theme),
-                (View::Channel, Load::Failed(why), _) | (View::Thread(_), _, Load::Failed(why)) => say(why.clone(), &theme),
+                (View::Channel, Load::Failed(why), _) | (View::Thread(_), _, Load::Failed(why)) => {
+                    say(why.clone(), &theme)
+                }
                 (View::Thread(_), _, Load::Loading) => say("Reading the thread…".into(), &theme),
                 _ => self.messages(cx),
             }
         };
         let notice = problem.and_then(|problem| {
             let pane = pane.clone();
-            banner(problem, move |_, cx| pane.update(cx, |p, cx| p.reload(cx)), &theme)
+            banner(
+                problem,
+                move |_, cx| pane.update(cx, |p, cx| p.reload(cx)),
+                &theme,
+            )
         });
-        let older = (self.older.is_some() && !in_thread && self.channel.is_some() && matches!(self.history_load, Load::Ready) && problem != Some(Problem::SignedOut)).then(|| {
+        let older = (self.older.is_some()
+            && !in_thread
+            && self.channel.is_some()
+            && matches!(self.history_load, Load::Ready)
+            && problem != Some(Problem::SignedOut))
+        .then(|| {
             let pane = pane.clone();
-            load_older(self.loading_older, move |_, cx| pane.update(cx, |p, cx| p.load_older(cx)))
+            load_older(self.loading_older, move |_, cx| {
+                pane.update(cx, |p, cx| p.load_older(cx))
+            })
         });
         let composer = self.composer_shown().then(|| {
-            div().id("messages-composer").debug_selector(|| "messages-composer".into()).flex_none().px(px(12.)).pb(px(12.)).child(self.composer_now().clone())
+            div()
+                .id("messages-composer")
+                .debug_selector(|| "messages-composer".into())
+                .flex_none()
+                .px(px(12.))
+                .pb(px(12.))
+                .child(self.composer_now().clone())
         });
         div()
             .id("messages-pane")
@@ -729,7 +888,15 @@ impl Render for MessagesPane {
             .bg(theme.card)
             .child(header)
             .when_some(self.said.clone(), |d, said| {
-                d.child(div().debug_selector(|| "messages-said".into()).px(px(12.)).pb(px(8.)).text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(said))
+                d.child(
+                    div()
+                        .debug_selector(|| "messages-said".into())
+                        .px(px(12.))
+                        .pb(px(8.))
+                        .text_size(TextSize::Xs.font_size())
+                        .text_color(theme.danger)
+                        .child(said),
+                )
             })
             .children(notice)
             .children(older)
@@ -741,11 +908,18 @@ impl Render for MessagesPane {
 impl MessagesPane {
     /// The messages of the open channel or thread, as a list that lays out the rows on screen.
     fn messages(&self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
-        let (lines, state, link): (Rc<Vec<Line>>, ListState, Option<OpenThread>) = match &self.view {
+        let (lines, state, link): (Rc<Vec<Line>>, ListState, Option<OpenThread>) = match &self.view
+        {
             View::Channel => {
                 let weak = cx.entity().downgrade();
-                let open: OpenThread = Rc::new(move |root, _, cx| drop(weak.update(cx, |p, cx| p.open_thread(root, cx))));
-                (self.history.clone(), self.list.clone(), self.threads().then_some(open))
+                let open: OpenThread = Rc::new(move |root, _, cx| {
+                    drop(weak.update(cx, |p, cx| p.open_thread(root, cx)))
+                });
+                (
+                    self.history.clone(),
+                    self.list.clone(),
+                    self.threads().then_some(open),
+                )
             }
             View::Thread(_) => (self.thread.clone(), self.thread_list.clone(), None),
         };

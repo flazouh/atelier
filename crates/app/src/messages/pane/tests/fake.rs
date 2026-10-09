@@ -8,8 +8,9 @@ use std::{
 use atelier_capabilities::{
     Actor, CapError, CapResult, Ref, Subscription,
     messaging::{
-        Channel, ChannelKind, ChannelQuery, Envelope, Event, Feature, Filter, Formatting, MemoryMessaging, Message,
-        MessagingCapabilities, MessagingProvider, NewMessage, Operation, Page, SearchQuery, Workspace,
+        Channel, ChannelKind, ChannelQuery, Envelope, Event, Feature, Filter, Formatting,
+        MemoryMessaging, Message, MessagingCapabilities, MessagingProvider, NewMessage, Operation,
+        Page, SearchQuery, Workspace,
     },
 };
 
@@ -37,8 +38,16 @@ impl Fake {
     pub fn over(inner: MemoryMessaging, texts: &[&str]) -> (Arc<Self>, Ref) {
         let channel = inner.add_channel("general", ChannelKind::Public);
         let me = inner.whoami().unwrap();
-        texts.iter().for_each(|text| drop(inner.send(&NewMessage::to(&channel, text), &me).unwrap()));
-        (Arc::new(Self { inner, plan: Mutex::new(Plan::default()) }), channel)
+        texts
+            .iter()
+            .for_each(|text| drop(inner.send(&NewMessage::to(&channel, text), &me).unwrap()));
+        (
+            Arc::new(Self {
+                inner,
+                plan: Mutex::new(Plan::default()),
+            }),
+            channel,
+        )
     }
 
     pub fn memory(&self) -> &MemoryMessaging {
@@ -70,7 +79,13 @@ impl Fake {
 
     /// How many times the screen asked.
     pub fn calls(&self, operation: Operation) -> usize {
-        self.plan.lock().unwrap().calls.get(&operation).copied().unwrap_or(0)
+        self.plan
+            .lock()
+            .unwrap()
+            .calls
+            .get(&operation)
+            .copied()
+            .unwrap_or(0)
     }
 
     fn check(&self, operation: Operation) -> CapResult<()> {
@@ -116,7 +131,12 @@ impl MessagingProvider for Fake {
         self.inner.channels(query)
     }
 
-    fn history(&self, channel: &Ref, cursor: Option<&str>, limit: Option<u32>) -> CapResult<Page<Message>> {
+    fn history(
+        &self,
+        channel: &Ref,
+        cursor: Option<&str>,
+        limit: Option<u32>,
+    ) -> CapResult<Page<Message>> {
         self.check(Operation::History)?;
         self.inner.history(channel, cursor, limit)
     }

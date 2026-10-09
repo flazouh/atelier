@@ -1,6 +1,6 @@
 use super::{
-    Attachment, AttachmentKind, ChannelKind, MemoryMessaging, Message, MessagingProvider, NewMessage, contract, contract::Seed,
-    message_ref, split_message,
+    Attachment, AttachmentKind, ChannelKind, MemoryMessaging, Message, MessagingProvider,
+    NewMessage, contract, contract::Seed, message_ref, split_message,
 };
 use crate::Ref;
 
@@ -103,7 +103,11 @@ fn a_page_holds_no_more_than_the_provider_says() {
     }
     assert_eq!(p.capabilities().limits.page_max, Some(3));
     let first = p.history(&channel, None, None).unwrap();
-    assert_eq!(first.items.len(), 3, "the page is as long as the provider allows");
+    assert_eq!(
+        first.items.len(),
+        3,
+        "the page is as long as the provider allows"
+    );
     let cursor = first.next_cursor.expect("two more messages wait");
     let second = p.history(&channel, Some(&cursor), None).unwrap();
     assert_eq!(second.items.len(), 2);
@@ -138,7 +142,13 @@ fn a_file_and_an_unread_count_can_be_seeded() {
     p.set_unread(&channel, 4).unwrap();
     let held = p.history(&channel, None, None).unwrap().items.remove(0);
     assert_eq!(held.attachments, vec![file]);
-    assert_eq!(p.channels(&Default::default()).unwrap().items[0].unread, Some(4));
+    assert_eq!(
+        p.channels(&Default::default()).unwrap().items[0].unread,
+        Some(4)
+    );
     let elsewhere: Ref = "messaging:memory:test:C99".parse().unwrap();
-    assert!(p.set_unread(&elsewhere, 1).is_err(), "a channel the provider lacks");
+    assert!(
+        p.set_unread(&elsewhere, 1).is_err(),
+        "a channel the provider lacks"
+    );
 }

@@ -4,11 +4,11 @@ mod helpers;
 mod structs;
 mod types;
 
-pub use helpers::{letter_of, line_of, row_of, safe_markdown};
+#[cfg(test)]
+use helpers::{letter_of, safe_markdown, size_words};
+pub use helpers::{line_of, row_of};
 pub use structs::{Chip, File, Line, Row};
 pub use types::{Body, Group};
-#[cfg(test)]
-use helpers::size_words;
 
 #[cfg(test)]
 mod tests;

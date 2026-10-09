@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use atelier_capabilities::Ref;
 use atelier_ui::{
     AgentText, Badge, Button, ButtonSize, ButtonVariant, Icon, IconName,
     project_badge::ProjectBadge,
@@ -7,8 +8,10 @@ use atelier_ui::{
     theme::{ActiveTheme, radius},
     typography::TextSize,
 };
-use atelier_capabilities::Ref;
-use gpui_kit::{AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, Window, div, prelude::FluentBuilder};
+use gpui_kit::{
+    AnyElement, App, ElementId, FontWeight, InteractiveElement, IntoElement, ParentElement,
+    SharedString, Styled, Window, div, prelude::FluentBuilder,
+};
 
 use super::super::map::{Body, Chip, File, Line};
 
@@ -23,34 +26,77 @@ pub fn draw_line(ix: usize, line: &Line, thread: Option<OpenThread>, cx: &App) -
         .flex()
         .items_center()
         .gap(px(8.))
-        .child(div().text_size(TextSize::Sm.font_size()).font_weight(FontWeight::MEDIUM).child(line.author.clone()))
-        .children(line.origin.clone().map(|origin| div().debug_selector(move || format!("message-origin-{ix}")).child(Badge::new(origin))))
-        .child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child(line.time.clone()))
-        .when(line.edited, |d| d.child(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("edited")));
+        .child(
+            div()
+                .text_size(TextSize::Sm.font_size())
+                .font_weight(FontWeight::MEDIUM)
+                .child(line.author.clone()),
+        )
+        .children(line.origin.clone().map(|origin| {
+            div()
+                .debug_selector(move || format!("message-origin-{ix}"))
+                .child(Badge::new(origin))
+        }))
+        .child(
+            div()
+                .text_size(TextSize::Xs.font_size())
+                .text_color(muted)
+                .child(line.time.clone()),
+        )
+        .when(line.edited, |d| {
+            d.child(
+                div()
+                    .text_size(TextSize::Xs.font_size())
+                    .text_color(muted)
+                    .child("edited"),
+            )
+        });
     let text = match &line.body {
-        Body::Markdown(markdown) => AgentText::new(ElementId::Name(format!("message-text-{ix}").into()), markdown.clone()).into_any_element(),
-        Body::Plain(plain) => div().text_size(TextSize::Sm.font_size()).line_height(px(24.)).child(plain.clone()).into_any_element(),
+        Body::Markdown(markdown) => AgentText::new(
+            ElementId::Name(format!("message-text-{ix}").into()),
+            markdown.clone(),
+        )
+        .into_any_element(),
+        Body::Plain(plain) => div()
+            .text_size(TextSize::Sm.font_size())
+            .line_height(px(24.))
+            .child(plain.clone())
+            .into_any_element(),
     };
     let reactions = (!line.reactions.is_empty()).then(|| {
-        div()
-            .flex()
-            .flex_wrap()
-            .gap(px(4.))
-            .children(line.reactions.iter().enumerate().map(|(n, chip)| reaction(ix, n, chip, cx)))
+        div().flex().flex_wrap().gap(px(4.)).children(
+            line.reactions
+                .iter()
+                .enumerate()
+                .map(|(n, chip)| reaction(ix, n, chip, cx)),
+        )
     });
-    let files = (!line.files.is_empty()).then(|| div().flex().flex_wrap().gap(px(4.)).children(line.files.iter().enumerate().map(|(n, file)| file_chip(ix, n, file, cx))));
+    let files = (!line.files.is_empty()).then(|| {
+        div().flex().flex_wrap().gap(px(4.)).children(
+            line.files
+                .iter()
+                .enumerate()
+                .map(|(n, file)| file_chip(ix, n, file, cx)),
+        )
+    });
     let replies = thread.filter(|_| line.replies > 0).map(|open| {
         let root = line.reference.clone();
-        let words = if line.replies == 1 { "1 reply".to_string() } else { format!("{} replies", line.replies) };
+        let words = if line.replies == 1 {
+            "1 reply".to_string()
+        } else {
+            format!("{} replies", line.replies)
+        };
         // The row stretches over the column; the named box is as wide as the button, so a press on its middle is on the button.
         div().flex().child(
-            div().debug_selector(move || format!("message-replies-{ix}")).child(
-                Button::new(ElementId::Name(format!("message-replies-{ix}").into()))
-                    .label(words)
-                    .variant(ButtonVariant::Ghost)
-                    .size(ButtonSize::Sm)
-                    .on_click(move |_, window, cx| open(&root, window, cx)),
-            ),
+            div()
+                .debug_selector(move || format!("message-replies-{ix}"))
+                .child(
+                    Button::new(ElementId::Name(format!("message-replies-{ix}").into()))
+                        .label(words)
+                        .variant(ButtonVariant::Ghost)
+                        .size(ButtonSize::Sm)
+                        .on_click(move |_, window, cx| open(&root, window, cx)),
+                ),
         )
     });
     div()
@@ -60,8 +106,25 @@ pub fn draw_line(ix: usize, line: &Line, thread: Option<OpenThread>, cx: &App) -
         .gap(px(10.))
         .px(px(12.))
         .py(px(6.))
-        .child(div().flex_none().pt(px(3.)).child(ProjectBadge::new(line.letter.clone(), line.color)))
-        .child(div().flex().flex_col().flex_1().min_w_0().gap(px(2.)).child(head).child(text).children(files).children(reactions).children(replies))
+        .child(
+            div()
+                .flex_none()
+                .pt(px(3.))
+                .child(ProjectBadge::new(line.letter.clone(), line.color)),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .min_w_0()
+                .gap(px(2.))
+                .child(head)
+                .child(text)
+                .children(files)
+                .children(reactions)
+                .children(replies),
+        )
         .into_any_element()
 }
 
@@ -81,9 +144,17 @@ fn reaction(ix: usize, n: usize, chip: &Chip, cx: &App) -> AnyElement {
         .px(px(8.))
         .rounded_full()
         .text_size(TextSize::Xs.font_size())
-        .bg(if chip.mine { theme.accent.opacity(0.25) } else { theme.card_strong })
+        .bg(if chip.mine {
+            theme.accent.opacity(0.25)
+        } else {
+            theme.card_strong
+        })
         .child(face)
-        .child(div().text_color(theme.muted_foreground).child(chip.count.to_string()))
+        .child(
+            div()
+                .text_color(theme.muted_foreground)
+                .child(chip.count.to_string()),
+        )
         .into_any_element()
 }
 
@@ -119,8 +190,16 @@ fn file_chip(ix: usize, n: usize, file: &File, cx: &App) -> AnyElement {
         .rounded(radius::md())
         .bg(theme.card_strong)
         .text_size(TextSize::Xs.font_size())
-        .child(Icon::new(IconName::AttachFile).size(px(14.)).color(theme.muted_foreground))
+        .child(
+            Icon::new(IconName::AttachFile)
+                .size(px(14.))
+                .color(theme.muted_foreground),
+        )
         .child(file.name.clone())
-        .child(div().text_color(theme.muted_foreground).child(file.detail.clone()))
+        .child(
+            div()
+                .text_color(theme.muted_foreground)
+                .child(file.detail.clone()),
+        )
         .into_any_element()
 }

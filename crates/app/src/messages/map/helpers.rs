@@ -11,7 +11,9 @@ use super::{
 
 /// The first letter or digit of `name`, in capitals; `?` for a name with neither.
 pub fn letter_of(name: &str) -> String {
-    name.chars().find(|c| c.is_alphanumeric()).map_or_else(|| "?".to_string(), |c| c.to_uppercase().collect())
+    name.chars()
+        .find(|c| c.is_alphanumeric())
+        .map_or_else(|| "?".to_string(), |c| c.to_uppercase().collect())
 }
 
 /// `message` as a line. `now` is in seconds, for its age. `formatting` is what the provider keeps of the markdown subset.
@@ -33,7 +35,15 @@ pub fn line_of(message: &Message, formatting: Formatting, now: u64) -> Line {
         edited: message.edited_at.is_some(),
         body,
         replies: message.reply_count,
-        reactions: message.reactions.iter().map(|r| Chip { name: r.name.clone().into(), count: r.count, mine: r.me }).collect(),
+        reactions: message
+            .reactions
+            .iter()
+            .map(|r| Chip {
+                name: r.name.clone().into(),
+                count: r.count,
+                mine: r.me,
+            })
+            .collect(),
         files: message.attachments.iter().map(file_of).collect(),
     }
 }
@@ -45,7 +55,13 @@ fn file_of(attachment: &Attachment) -> File {
         AttachmentKind::Link => "link",
         AttachmentKind::Other => "attachment",
     };
-    File { name: attachment.name.clone().into(), detail: attachment.size.map_or_else(|| kind.to_string(), size_words).into() }
+    File {
+        name: attachment.name.clone().into(),
+        detail: attachment
+            .size
+            .map_or_else(|| kind.to_string(), size_words)
+            .into(),
+    }
 }
 
 /// `2 KB`, `1.5 MB`: one unit, and a decimal only where it says something.
@@ -110,7 +126,13 @@ fn safe_line(line: &str) -> String {
     };
     line.split('`')
         .enumerate()
-        .map(|(n, part)| if n % 2 == 0 { safe_text(part) } else { part.to_string() })
+        .map(|(n, part)| {
+            if n % 2 == 0 {
+                safe_text(part)
+            } else {
+                part.to_string()
+            }
+        })
         .collect::<Vec<_>>()
         .join("`")
 }

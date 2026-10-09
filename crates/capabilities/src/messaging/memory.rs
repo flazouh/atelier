@@ -85,7 +85,12 @@ impl MemoryMessaging {
     pub fn with_me(mut self, name: &str) -> Self {
         self.me.name = name.to_string();
         let me = self.me.clone();
-        if let Some(known) = self.inner.get_mut().ok().and_then(|inner| inner.people.first_mut()) {
+        if let Some(known) = self
+            .inner
+            .get_mut()
+            .ok()
+            .and_then(|inner| inner.people.first_mut())
+        {
             *known = me;
         }
         self
@@ -340,7 +345,12 @@ impl MessagingProvider for MemoryMessaging {
                 .parse::<usize>()
                 .map_err(|_| CapError::invalid("cursor"))?,
         };
-        let items: Vec<Message> = all.iter().skip(start).take(self.page_max).cloned().collect();
+        let items: Vec<Message> = all
+            .iter()
+            .skip(start)
+            .take(self.page_max)
+            .cloned()
+            .collect();
         let next_cursor =
             (start + items.len() < all.len()).then(|| (start + items.len()).to_string());
         Ok(Page { items, next_cursor })
