@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use atelier_capabilities::{
     Actor, CapError,
-    messaging::{MessagingProvider, NewMessage},
+    messaging::{Feature, MessagingProvider, NewMessage, Operation},
 };
 
 use super::support::{
@@ -28,6 +28,18 @@ fn a_provider_reads_only_unless_it_is_told_it_may_write() {
     let reply = p.send(&NewMessage::reply(&message(M2), &general(), "hi"), &alex());
     assert!(matches!(reply, Err(CapError::Provider { .. })));
     assert!(fixtures.calls().is_empty(), "not even a read ran");
+}
+
+#[test]
+fn a_provider_lists_read_only_exactly_when_it_may_not_write() {
+    let fixtures = Fixtures::the_usual();
+    let read = provider(&fixtures).capabilities();
+    assert!(read.has(Feature::ReadOnly), "a default block reads only");
+    assert!(read.can(Operation::Send), "send is core, so it is listed");
+    assert!(!read.offers(Operation::Send), "and it is not offered");
+    let write = writer(&fixtures).capabilities();
+    assert!(!write.has(Feature::ReadOnly), "allow_writes lifts it");
+    assert!(write.offers(Operation::Send));
 }
 
 #[test]
