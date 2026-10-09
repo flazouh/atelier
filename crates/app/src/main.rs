@@ -59,6 +59,7 @@ mod tabs;
 mod test_dirs;
 mod timings;
 mod tool_density;
+mod messages;
 mod tasks;
 mod tree;
 mod tree_view;
