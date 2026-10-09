@@ -43,7 +43,7 @@
         {
           "type": "object",
           "required": ["template"],
-          "properties": { "template": { "type": "string", "maxLength": 200, "description": "Text with {$.path} holes. Nothing else is evaluated." } },
+          "properties": { "template": { "type": "string", "maxLength": 200, "description": "Text with {$.path} holes. A hole may name a format: {$.path|relative_time}. Nothing else is evaluated." } },
           "additionalProperties": false
         }
       ]

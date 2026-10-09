@@ -23,7 +23,7 @@ A new node type needs a pull request to Atelier. A plugin cannot add one.
 
 ## 3. Values
 
-A value is a literal, a **path** into the tool result (`{ "path": "$.title" }`), or a **template** (`"{$.project} · last seen {$.last_seen}"`).
+A value is a literal, a **path** into the tool result (`{ "path": "$.title" }`), or a **template** (`"{$.project} · last seen {$.last_seen|relative_time}"`). A hole may name a format after a bar.
 A path may carry a **format**: `count` (1.2k), `relative_time`, `absolute_time`, `duration_ms`, `bytes`, `percent`.
 Nothing else is evaluated: no expression, no function, no loop outside `list`. A node may carry `when`: `{ path, equals }` or `{ path, exists }`.
 

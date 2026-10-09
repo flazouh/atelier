@@ -1,6 +1,10 @@
 use std::{
     ops::Deref,
-    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc::Receiver},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::Receiver,
+    },
 };
 
 use crate::Event;
@@ -28,7 +32,13 @@ impl Subscription {
     /// The reader's end, and the flag for the backend that sends to `events`.
     pub fn new(events: Receiver<Event>) -> (Self, StopFlag) {
         let stop = Arc::new(AtomicBool::new(false));
-        (Self { events, stop: stop.clone() }, StopFlag(stop))
+        (
+            Self {
+                events,
+                stop: stop.clone(),
+            },
+            StopFlag(stop),
+        )
     }
 }
 

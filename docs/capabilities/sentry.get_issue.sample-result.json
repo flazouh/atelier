@@ -1,0 +1,13 @@
+{
+  "ref": "plugin:sentry:acme:WEB-1A",
+  "short_id": "WEB-1A",
+  "title": "TypeError: Cannot read properties of undefined (reading 'id')",
+  "level": "error",
+  "status": "unresolved",
+  "events": 1520,
+  "users": 87,
+  "first_seen": 1759900000000,
+  "culprit": "app/checkout/cart.ts in loadCart",
+  "permalink": "https://sentry.io/organizations/acme/issues/1/",
+  "latest_event": { "stack_excerpt": "at loadCart (app/checkout/cart.ts:42)\nat render (app/checkout/page.ts:9)" }
+}

@@ -514,6 +514,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-capabilities"
+version = "0.1.6"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atelier-editor"
 version = "0.1.6"
 dependencies = [
@@ -658,6 +666,7 @@ dependencies = [
 name = "atelier-tracker"
 version = "0.1.6"
 dependencies = [
+ "atelier-capabilities",
  "rusqlite",
  "serde",
  "serde_json",

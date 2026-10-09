@@ -102,7 +102,10 @@ pub struct Patch {
 
 impl Patch {
     pub fn status(status: Status) -> Self {
-        Self { status: Some(status), ..Self::default() }
+        Self {
+            status: Some(status),
+            ..Self::default()
+        }
     }
 }
 

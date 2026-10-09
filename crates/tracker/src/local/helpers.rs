@@ -1,17 +1,19 @@
 use rusqlite::{Connection, OptionalExtension, Transaction, params, types::Value};
 
+use super::structs::Links;
+use super::types::TASK_COLUMNS;
 use crate::{
     Activity, ActivityKind, Assignee, NewTask, Priority, Status, Task, TaskId, TrackerError,
     TrackerResult,
 };
-use super::structs::Links;
-use super::types::TASK_COLUMNS;
 
 pub(super) fn row_id(id: &TaskId) -> TrackerResult<i64> {
     id.0.parse().map_err(|_| TrackerError::NotFound(id.clone()))
 }
 
-pub(super) fn assignee_parts(assignee: &Option<Assignee>) -> (Option<&'static str>, Option<String>) {
+pub(super) fn assignee_parts(
+    assignee: &Option<Assignee>,
+) -> (Option<&'static str>, Option<String>) {
     match assignee {
         Some(Assignee::Person(name)) => (Some("person"), Some(name.clone())),
         Some(Assignee::Agent(name)) => (Some("agent"), Some(name.clone())),
@@ -41,7 +43,9 @@ pub(super) fn read_task(prefix: &str, row: &rusqlite::Row<'_>) -> rusqlite::Resu
         },
         labels: {
             let joined: Option<String> = row.get(12)?;
-            let mut labels: Vec<String> = joined.map(|j| j.split('\u{1f}').map(str::to_string).collect()).unwrap_or_default();
+            let mut labels: Vec<String> = joined
+                .map(|j| j.split('\u{1f}').map(str::to_string).collect())
+                .unwrap_or_default();
             labels.sort();
             labels
         },
@@ -69,24 +73,49 @@ pub(super) fn load_one(conn: &Connection, prefix: &str, id: i64) -> TrackerResul
 }
 
 pub(super) fn like_pattern(text: &str) -> String {
-    let escaped = text.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    let escaped = text
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
     format!("%{escaped}%")
 }
 
-pub(super) fn log(tx: &Transaction<'_>, task: i64, at: i64, by: &str, kind: &ActivityKind) -> TrackerResult<Activity> {
+pub(super) fn log(
+    tx: &Transaction<'_>,
+    task: i64,
+    at: i64,
+    by: &str,
+    kind: &ActivityKind,
+) -> TrackerResult<Activity> {
     let data = serde_json::to_string(kind)?;
-    tx.prepare_cached("INSERT INTO activity (task, at, actor, data) VALUES (?1, ?2, ?3, ?4)")?.execute(params![task, at, by, data])?;
-    Ok(Activity { id: tx.last_insert_rowid(), task: TaskId(task.to_string()), at, by: by.to_string(), kind: kind.clone() })
+    tx.prepare_cached("INSERT INTO activity (task, at, actor, data) VALUES (?1, ?2, ?3, ?4)")?
+        .execute(params![task, at, by, data])?;
+    Ok(Activity {
+        id: tx.last_insert_rowid(),
+        task: TaskId(task.to_string()),
+        at,
+        by: by.to_string(),
+        kind: kind.clone(),
+    })
 }
 
-pub(super) fn insert(tx: &Transaction<'_>, new: &NewTask, at: i64, by: &str) -> TrackerResult<(i64, Activity)> {
+pub(super) fn insert(
+    tx: &Transaction<'_>,
+    new: &NewTask,
+    at: i64,
+    by: &str,
+) -> TrackerResult<(i64, Activity)> {
     if new.title.trim().is_empty() {
         return Err(TrackerError::Invalid("a task needs a title".into()));
     }
     let parent = match &new.parent {
         Some(parent) => {
             let parent = row_id(parent)?;
-            let exists: bool = tx.query_row("SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1)", [parent], |r| r.get(0))?;
+            let exists: bool = tx.query_row(
+                "SELECT EXISTS (SELECT 1 FROM tasks WHERE id = ?1)",
+                [parent],
+                |r| r.get(0),
+            )?;
             if !exists {
                 return Err(TrackerError::NotFound(TaskId(parent.to_string())));
             }
@@ -94,7 +123,9 @@ pub(super) fn insert(tx: &Transaction<'_>, new: &NewTask, at: i64, by: &str) -> 
         }
         None => None,
     };
-    let number: i64 = tx.query_row("SELECT COALESCE(MAX(number), 0) + 1 FROM tasks", [], |r| r.get(0))?;
+    let number: i64 = tx.query_row("SELECT COALESCE(MAX(number), 0) + 1 FROM tasks", [], |r| {
+        r.get(0)
+    })?;
     let (kind, name) = assignee_parts(&new.assignee);
     tx.prepare_cached(
         "INSERT INTO tasks (number, title, description, status, priority, assignee_kind, assignee_name, project, parent, created_at, updated_at)
@@ -103,7 +134,8 @@ pub(super) fn insert(tx: &Transaction<'_>, new: &NewTask, at: i64, by: &str) -> 
     .execute(params![number, new.title.trim(), new.description, new.status.as_str(), new.priority.number(), kind, name, new.project, parent, at])?;
     let id = tx.last_insert_rowid();
     for label in &new.labels {
-        tx.prepare_cached("INSERT OR IGNORE INTO task_labels (task, label) VALUES (?1, ?2)")?.execute(params![id, label.trim()])?;
+        tx.prepare_cached("INSERT OR IGNORE INTO task_labels (task, label) VALUES (?1, ?2)")?
+            .execute(params![id, label.trim()])?;
     }
     let activity = log(tx, id, at, by, &ActivityKind::Created)?;
     Ok((id, activity))
