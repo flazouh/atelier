@@ -53,3 +53,19 @@ fn a_removed_tasks_provider_is_gone_and_the_others_stay() {
         "removing twice finds nothing"
     );
 }
+
+#[test]
+fn a_messaging_or_mail_account_can_be_taken_out_and_only_that_one() {
+    let mut r = Registry::new();
+    r.add_messaging(Arc::new(crate::messaging::MemoryMessaging::new("a")));
+    r.add_messaging(Arc::new(crate::messaging::MemoryMessaging::new("b")));
+    r.add_mail(Arc::new(crate::mail::MemoryMail::new("a")));
+    assert!(r.remove_messaging("memory", "a").is_some());
+    assert!(
+        r.remove_messaging("memory", "a").is_none(),
+        "nothing left to take"
+    );
+    assert_eq!(r.all_messaging().len(), 1);
+    assert!(r.remove_mail("memory", "a").is_some());
+    assert!(r.all_mail().is_empty());
+}

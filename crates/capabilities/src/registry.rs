@@ -65,6 +65,16 @@ impl Registry {
             .cloned()
     }
 
+    /// Takes a messaging provider out, for an account the person disconnected. `None` when there was none.
+    pub fn remove_messaging(
+        &mut self,
+        provider: &str,
+        account: &str,
+    ) -> Option<Arc<dyn MessagingProvider>> {
+        self.messaging
+            .remove(&(provider.to_string(), account.to_string()))
+    }
+
     /// Every messaging provider, in provider and account order.
     pub fn all_messaging(&self) -> Vec<Arc<dyn MessagingProvider>> {
         self.messaging.values().cloned().collect()
@@ -85,6 +95,12 @@ impl Registry {
         self.mail
             .get(&(provider.to_string(), account.to_string()))
             .cloned()
+    }
+
+    /// Takes a mail provider out, for an account the person disconnected. `None` when there was none.
+    pub fn remove_mail(&mut self, provider: &str, account: &str) -> Option<Arc<dyn MailProvider>> {
+        self.mail
+            .remove(&(provider.to_string(), account.to_string()))
     }
 
     /// Every mail provider, in provider and account order.
