@@ -11,7 +11,7 @@ pub use helpers::{
 };
 #[cfg(test)]
 use helpers::{clean_body, clean_line, cut_at};
-pub use structs::{Attached, BoxRow, MessageView, ThreadRow};
+pub use structs::{BoxRow, MessageView, ThreadRow};
 pub use types::{BODY_LIMIT, LINKS_MOST};
 
 #[cfg(test)]

@@ -65,6 +65,14 @@ pub(super) struct Compose {
     pub send: Option<super::types::Press>,
 }
 
+/// What the reply box says of itself, for the drawing code and the tests.
+pub(super) struct Facts {
+    pub to: SharedString,
+    pub status: Option<SharedString>,
+    pub empty: bool,
+    pub editable: bool,
+}
+
 /// What the pane keeps of a thread's reply between two visits: the draft the provider holds, and the words in the box.
 pub(super) struct Held {
     pub thread: Ref,
@@ -240,6 +248,13 @@ impl MailPane {
     #[cfg(test)]
     pub fn messages(&self) -> &[MessageView] {
         &self.views
+    }
+
+    /// The text the screen draws for message `at` of the open thread.
+    #[cfg(test)]
+    pub fn shown_body(&self, at: usize) -> SharedString {
+        let view = &self.views[at];
+        view.shown(self.whole.contains(&view.reference)).clone()
     }
 
     #[cfg(test)]

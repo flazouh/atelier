@@ -24,7 +24,7 @@ use super::super::{
 
 impl MailPane {
     /// The open mailbox's words, or `Mail`.
-    fn title(&self) -> SharedString {
+    pub(in crate::mail::pane) fn title(&self) -> SharedString {
         self.mailbox
             .as_ref()
             .and_then(|m| self.account()?.boxes.iter().find(|b| b.reference == *m))

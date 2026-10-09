@@ -60,3 +60,13 @@ pub struct MessageView {
     /// The addresses in the body, as text. The screen opens one only when the reader asks, and after it shows the address.
     pub links: Vec<SharedString>,
 }
+
+impl MessageView {
+    /// The text the screen draws: the cut body, until the reader asks for all of it.
+    pub fn shown(&self, whole: bool) -> &SharedString {
+        match (&self.cut, whole) {
+            (Some(cut), false) => cut,
+            _ => &self.text,
+        }
+    }
+}

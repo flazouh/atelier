@@ -1,12 +1,12 @@
 use atelier_capabilities::{
     CapError, Ref,
-    mail::{Draft, MailOperation, Message, reply_recipients},
+    mail::{Draft, MailOperation, reply_recipients},
 };
 use gpui_kit::{AppContext, Context, SharedString, Window};
 
 use super::super::{
     helpers::{Outcome, write_draft},
-    structs::{Compose, Held, MailPane},
+    structs::{Compose, Facts, Held, MailPane},
     types::{Load, Press, Problem},
 };
 use atelier_capabilities::CapResult;
@@ -27,8 +27,8 @@ impl MailPane {
         self.compose.read(cx).value()
     }
 
-    /// What the reply box is made of for the drawing code.
-    pub(in crate::mail::pane) fn compose_view(&self, cx: &mut Context<Self>) -> Option<Compose> {
+    /// What the reply box says of itself: who the reply goes to, where the draft stands, and whether the words can be written.
+    pub(in crate::mail::pane) fn compose_facts(&self, cx: &gpui_kit::App) -> Option<Facts> {
         if !self.compose_shown() {
             return None;
         }
@@ -53,6 +53,18 @@ impl MailPane {
             (Some(d), _) if d.text == text.as_ref() => Some("Draft saved".into()),
             (Some(_), _) => Some("Changes not saved".into()),
         };
+        Some(Facts {
+            to,
+            status,
+            empty: text.trim().is_empty(),
+            // A saved draft can be changed only where the provider lists `update_draft`; a new one can always be written.
+            editable: self.draft.is_none() || self.can(MailOperation::UpdateDraft),
+        })
+    }
+
+    /// What the reply box is made of for the drawing code.
+    pub(in crate::mail::pane) fn compose_view(&self, cx: &mut Context<Self>) -> Option<Compose> {
+        let Facts { to, status, empty, editable } = self.compose_facts(cx)?;
         let pane = cx.entity().downgrade();
         let press = |send: bool| -> Press {
             let pane = pane.clone();
@@ -65,9 +77,9 @@ impl MailPane {
             status,
             input: self.compose.clone(),
             focus: self.compose_focus.clone(),
-            editable: self.draft.is_none() || self.can(MailOperation::UpdateDraft),
+            editable,
             busy: self.working,
-            empty: text.trim().is_empty(),
+            empty,
             save: Some(press(false)),
             send: self.can(MailOperation::Send).then(|| press(true)),
         })
@@ -195,9 +207,4 @@ impl MailPane {
         });
     }
 
-    /// The thread's last message, which the reply answers.
-    #[allow(dead_code)]
-    fn last_message(&self) -> Option<&Message> {
-        self.thread.as_ref()?.messages.last()
-    }
 }

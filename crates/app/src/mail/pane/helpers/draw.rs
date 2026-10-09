@@ -332,10 +332,7 @@ pub fn message_card(
                 .text_color(muted)
                 .child(view.time.clone()),
         );
-    let shown = match (&view.cut, whole) {
-        (Some(cut), false) => cut.clone(),
-        _ => view.text.clone(),
-    };
+    let shown = view.shown(whole).clone();
     let cut = view.cut.is_some() && !whole;
     let links = (!view.links.is_empty()).then(|| {
         div()
