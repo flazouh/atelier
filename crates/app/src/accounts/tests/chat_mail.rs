@@ -26,7 +26,9 @@ fn slack(saved: &SlackSaved) -> CapResult<Arc<dyn MessagingProvider>> {
 
 fn discord(saved: &DiscordSaved) -> CapResult<Arc<dyn MessagingProvider>> {
     match saved.server.as_str() {
-        "Acme" => Ok(Arc::new(MemoryMessaging::new("1100000000000000001").with_me("Alex"))),
+        "Acme" => Ok(Arc::new(
+            MemoryMessaging::new("1100000000000000001").with_me("Alex"),
+        )),
         "loggedout" => Err(CapError::NotSignedIn),
         "gone" => Err(CapError::not_found("the server")),
         "" => Err(CapError::invalid("server")),
@@ -86,10 +88,17 @@ fn a_good_slack_account_builds_a_provider_and_the_row_names_the_person() {
         ..Default::default()
     };
     let built = build(&saved, &services());
-    let accounts: Vec<_> = built.messaging.iter().map(|p| p.account().to_string()).collect();
+    let accounts: Vec<_> = built
+        .messaging
+        .iter()
+        .map(|p| p.account().to_string())
+        .collect();
     assert_eq!(accounts, ["acme"]);
     assert_eq!(built.rows.slack, Row::Connected("Ada".into()));
-    assert!(built.providers.is_empty() && built.mail.is_empty(), "nothing else is built");
+    assert!(
+        built.providers.is_empty() && built.mail.is_empty(),
+        "nothing else is built"
+    );
 }
 
 #[test]
@@ -118,7 +127,10 @@ fn a_good_gmail_account_builds_a_provider_and_the_row_names_the_address() {
 fn each_failure_leaves_the_provider_out_and_gives_its_plain_row() {
     let row_of = |saved: AccountsSaved| {
         let built = build(&saved, &services());
-        assert!(built.messaging.is_empty() && built.mail.is_empty(), "no provider for a failure");
+        assert!(
+            built.messaging.is_empty() && built.mail.is_empty(),
+            "no provider for a failure"
+        );
         built.rows
     };
     let slack_row = |name: &str| {
@@ -133,7 +145,11 @@ fn each_failure_leaves_the_provider_out_and_gives_its_plain_row() {
     let Row::Failed(words) = slack_row("missing") else {
         panic!("a missing tool is a problem with words")
     };
-    assert!(words.contains("slackcli is not installed") && words.contains("github.com/flazouh/slackcli"), "{words}");
+    assert!(
+        words.contains("slackcli is not installed")
+            && words.contains("github.com/flazouh/slackcli"),
+        "{words}"
+    );
     let Row::Failed(words) = slack_row("") else {
         panic!("no workspace name is a problem with words")
     };
@@ -219,8 +235,14 @@ fn the_words_for_a_missing_tool_say_where_to_get_it() {
         code: code.into(),
         message: String::new(),
     };
-    assert!(plain_words(Kind::Slack, &missing("slackcli_missing")).contains("github.com/flazouh/slackcli"));
-    assert!(plain_words(Kind::Discord, &missing("discordcli_missing")).contains("github.com/flazouh/discordcli"));
+    assert!(
+        plain_words(Kind::Slack, &missing("slackcli_missing"))
+            .contains("github.com/flazouh/slackcli")
+    );
+    assert!(
+        plain_words(Kind::Discord, &missing("discordcli_missing"))
+            .contains("github.com/flazouh/discordcli")
+    );
     assert!(plain_words(Kind::Slack, &CapError::NotSignedIn).contains("slackcli login"));
     assert!(plain_words(Kind::Discord, &CapError::NotSignedIn).contains("discordcli login"));
     assert!(plain_words(Kind::Gmail, &CapError::NotSignedIn).contains("Sign in to Gmail"));

@@ -123,7 +123,9 @@ pub(crate) fn server_account(
     }
     let mut after: Option<String> = None;
     for _ in 0..SERVER_PAGES {
-        let mut args: Vec<String> = ["servers", "--json", "-n", "100"].map(String::from).to_vec();
+        let mut args: Vec<String> = ["servers", "--json", "-n", "100"]
+            .map(String::from)
+            .to_vec();
         if let Some(cursor) = &after {
             args.extend(["--after".to_string(), cursor.clone()]);
         }

@@ -8,8 +8,9 @@ use gpui_kit::{
 };
 
 use super::{
-    AccountsPage, Checked, badge_of, check_line, row_note,
+    AccountsPage, Checked, badge_of, check_line,
     parts::{Buttons, actions, labelled, note, typed},
+    row_note,
 };
 use crate::{
     accounts::{self, Kind, Row, Rows},
@@ -19,7 +20,11 @@ use crate::{
     },
 };
 
-const GMAIL: Buttons = Buttons { test: "gmail-test", save: "gmail-save", forget: "gmail-forget" };
+const GMAIL: Buttons = Buttons {
+    test: "gmail-test",
+    save: "gmail-save",
+    forget: "gmail-forget",
+};
 
 /// What the Mail card holds while the page is open.
 #[derive(Default)]
@@ -37,7 +42,12 @@ struct MailFields {
     program: Entity<InputState>,
 }
 
-fn field(placeholder: &str, value: &str, window: &mut Window, cx: &mut Context<SettingsPane>) -> Entity<InputState> {
+fn field(
+    placeholder: &str,
+    value: &str,
+    window: &mut Window,
+    cx: &mut Context<SettingsPane>,
+) -> Entity<InputState> {
     let (placeholder, value) = (placeholder.to_string(), value.to_string());
     cx.new(|cx| {
         let mut field = InputState::new(window, cx).placeholder(placeholder);
@@ -57,14 +67,24 @@ impl SettingsPane {
         self.accounts.mail.fields = Some(MailFields {
             address: field("you@gmail.com", &gmail.address, window, cx),
             host: field("Host in your ssh config", &gmail.host, window, cx),
-            program: field("gmailcli (looked up on the PATH there)", &gmail.program, window, cx),
+            program: field(
+                "gmailcli (looked up on the PATH there)",
+                &gmail.program,
+                window,
+                cx,
+            ),
         });
     }
 
     /// A field of the Mail card by its name, for a test that types into it.
     #[cfg(test)]
     pub(crate) fn mail_field(&self, name: &str) -> Entity<InputState> {
-        let fields = self.accounts.mail.fields.as_ref().expect("the section was drawn");
+        let fields = self
+            .accounts
+            .mail
+            .fields
+            .as_ref()
+            .expect("the section was drawn");
         match name {
             "gmail-address" => &fields.address,
             "gmail-host" => &fields.host,
@@ -79,14 +99,20 @@ impl SettingsPane {
         Some(GmailSaved {
             address: typed(&fields.address, cx),
             // A host typed and then switched away from is not kept.
-            host: if self.accounts.mail.over_ssh { typed(&fields.host, cx) } else { String::new() },
+            host: if self.accounts.mail.over_ssh {
+                typed(&fields.host, cx)
+            } else {
+                String::new()
+            },
             program: typed(&fields.program, cx),
         })
     }
 
     /// Asks `gmailcli` which account the browser is signed in to, with what is typed. Keeps nothing. It takes several seconds.
     pub(crate) fn test_gmail(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.gmail_draft(cx) else { return };
+        let Some(draft) = self.gmail_draft(cx) else {
+            return;
+        };
         let services = accounts::services(cx);
         self.accounts.mail.check = Checked::Checking;
         let work = cx.background_spawn(async move {
@@ -106,7 +132,9 @@ impl SettingsPane {
 
     /// Keeps the Gmail facts and has the provider built.
     pub(crate) fn save_gmail(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.gmail_draft(cx) else { return };
+        let Some(draft) = self.gmail_draft(cx) else {
+            return;
+        };
         let services = accounts::services(cx);
         self.accounts.mail.check = Checked::Checking;
         let asked = draft.clone();
@@ -140,9 +168,16 @@ impl SettingsPane {
         cx.notify();
     }
 
-    pub(super) fn gmail_card(&self, rows: &Rows, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn gmail_card(
+        &self,
+        rows: &Rows,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let page: &AccountsPage = &self.accounts;
-        let Some(fields) = &page.mail.fields else { return div().into_any_element() };
+        let Some(fields) = &page.mail.fields else {
+            return div().into_any_element();
+        };
         let this = cx.entity().downgrade();
         let row = &rows.gmail;
         let saved = page.saved.gmail.as_ref();
@@ -154,7 +189,10 @@ impl SettingsPane {
             let this = this.clone();
             Segmented::new(
                 "gmail-where",
-                [Segment::new("On this machine").debug_name("gmail-here"), Segment::new("Over SSH").debug_name("gmail-ssh")],
+                [
+                    Segment::new("On this machine").debug_name("gmail-here"),
+                    Segment::new("Over SSH").debug_name("gmail-ssh"),
+                ],
                 usize::from(page.mail.over_ssh),
             )
             .on_change(move |i, _, cx| {

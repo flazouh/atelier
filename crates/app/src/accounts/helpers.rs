@@ -6,9 +6,7 @@ use atelier_capabilities::{
     messaging::MessagingProvider,
     tasks::{Query, TasksProvider},
 };
-use atelier_settings::{
-    AccountsSaved, DiscordSaved, GmailSaved, SlackSaved, secrets::LINEAR_KEY,
-};
+use atelier_settings::{AccountsSaved, DiscordSaved, GmailSaved, SlackSaved, secrets::LINEAR_KEY};
 use gpui_kit::{App, AppContext, BorrowAppContext};
 
 use super::{
@@ -123,8 +121,10 @@ pub(crate) fn plain_words(kind: Kind, error: &CapError) -> String {
             "The gh command line tool is not installed here.".into()
         }
         CapError::Provider { code, .. }
-            if matches!(code.as_str(), "slackcli_missing" | "discordcli_missing" | "not_installed")
-                && !kind.missing_tool().is_empty() =>
+            if matches!(
+                code.as_str(),
+                "slackcli_missing" | "discordcli_missing" | "not_installed"
+            ) && !kind.missing_tool().is_empty() =>
         {
             kind.missing_tool().into()
         }
@@ -152,7 +152,10 @@ fn settle<P>(kind: Kind, connected: CapResult<(P, String)>) -> (Row, Option<P>) 
 
 /// The row of a build that stopped on a panic, so one kind that breaks leaves the others alone.
 fn stopped<P>(kind: Kind) -> (Row, Option<P>) {
-    (Row::Failed(format!("{} stopped unexpectedly.", kind.name())), None)
+    (
+        Row::Failed(format!("{} stopped unexpectedly.", kind.name())),
+        None,
+    )
 }
 
 /// The providers for what is saved, and the state of each row. Reads the keychain and asks the network and the command line
@@ -167,7 +170,9 @@ pub(crate) fn build(saved: &AccountsSaved, services: &AccountServices) -> Built 
         let gmail = build_gmail(saved, services);
         (
             linear.join().unwrap_or_else(|_| stopped(Kind::Linear)),
-            github.join().unwrap_or_else(|_| stopped(Kind::GithubIssues)),
+            github
+                .join()
+                .unwrap_or_else(|_| stopped(Kind::GithubIssues)),
             slack.join().unwrap_or_else(|_| stopped(Kind::Slack)),
             discord.join().unwrap_or_else(|_| stopped(Kind::Discord)),
             gmail,

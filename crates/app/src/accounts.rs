@@ -13,7 +13,8 @@ mod types;
 #[cfg(test)]
 pub(crate) use helpers::build;
 pub(crate) use helpers::{
-    connect_discord, connect_github, connect_gmail, connect_linear, connect_slack, plain_words, refresh,
+    connect_discord, connect_github, connect_gmail, connect_linear, connect_slack, plain_words,
+    refresh,
 };
 
 pub(crate) use cli::split_list;

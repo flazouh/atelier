@@ -1,10 +1,7 @@
 //! The pieces the Chat and Mail cards share: a labelled field, a note, a switch row and the row of buttons. They use the
 //! sizes and colours of the Linear and GitHub cards beside them.
 use atelier_ui::{
-    Button, ButtonVariant, Switch, TextInput,
-    scale::px,
-    theme::Theme,
-    typography::TextSize,
+    Button, ButtonVariant, Switch, TextInput, scale::px, theme::Theme, typography::TextSize,
 };
 use gpui_kit::{
     AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Styled, Window,

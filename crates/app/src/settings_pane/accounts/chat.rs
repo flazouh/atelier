@@ -3,19 +3,16 @@
 //! the paths. Test asks the tool who is signed in and changes nothing; Save keeps the facts and has the app build the
 //! provider (see [`crate::accounts::refresh`]); Forget takes them away.
 use atelier_settings::{DiscordSaved, SlackSaved};
-use atelier_ui::{
-    icon::IconName,
-    scale::px,
-    theme::Theme,
-};
+use atelier_ui::{icon::IconName, scale::px, theme::Theme};
 use gpui_kit::{
     AnyElement, AppContext, Context, Entity, IntoElement, ParentElement, Styled, Task, Window,
     component::input::InputState, div,
 };
 
 use super::{
-    AccountsPage, Checked, badge_of, check_line, row_note,
+    AccountsPage, Checked, badge_of, check_line,
     parts::{Buttons, actions, labelled, note, switch_row, typed},
+    row_note,
 };
 use crate::{
     accounts::{self, Kind, Row, Rows, split_list},
@@ -25,8 +22,16 @@ use crate::{
     },
 };
 
-const SLACK: Buttons = Buttons { test: "slack-test", save: "slack-save", forget: "slack-forget" };
-const DISCORD: Buttons = Buttons { test: "discord-test", save: "discord-save", forget: "discord-forget" };
+const SLACK: Buttons = Buttons {
+    test: "slack-test",
+    save: "slack-save",
+    forget: "slack-forget",
+};
+const DISCORD: Buttons = Buttons {
+    test: "discord-test",
+    save: "discord-save",
+    forget: "discord-forget",
+};
 /// Said under Allow sending, from `docs/capabilities/discord-notes.md`.
 const DISCORD_RISK: &str = "Discord does not allow a program to act on a user login, and an account that sends this way can be banned. Reading is the default.";
 
@@ -78,17 +83,42 @@ impl SettingsPane {
         self.accounts.chat.discord_writes = discord.allow_writes;
         self.accounts.chat.fields = Some(ChatFields {
             slack_workspace: field("acme", &slack.workspace, window, cx),
-            slack_channels: field("general, random, C0123ABCD", &slack.channels.join(", "), window, cx),
-            slack_program: field("slackcli (looked up on your PATH)", &slack.program, window, cx),
-            discord_server: field("Server name or id (empty: direct messages only)", &discord.server, window, cx),
-            discord_program: field("discordcli (looked up on your PATH)", &discord.program, window, cx),
+            slack_channels: field(
+                "general, random, C0123ABCD",
+                &slack.channels.join(", "),
+                window,
+                cx,
+            ),
+            slack_program: field(
+                "slackcli (looked up on your PATH)",
+                &slack.program,
+                window,
+                cx,
+            ),
+            discord_server: field(
+                "Server name or id (empty: direct messages only)",
+                &discord.server,
+                window,
+                cx,
+            ),
+            discord_program: field(
+                "discordcli (looked up on your PATH)",
+                &discord.program,
+                window,
+                cx,
+            ),
         });
     }
 
     /// A field of the Chat cards by its name, for a test that types into it.
     #[cfg(test)]
     pub(crate) fn chat_field(&self, name: &str) -> Entity<InputState> {
-        let fields = self.accounts.chat.fields.as_ref().expect("the section was drawn");
+        let fields = self
+            .accounts
+            .chat
+            .fields
+            .as_ref()
+            .expect("the section was drawn");
         match name {
             "slack-workspace" => &fields.slack_workspace,
             "slack-channels" => &fields.slack_channels,
@@ -123,7 +153,9 @@ impl SettingsPane {
 
     /// Asks `slackcli` who is signed in, with what is typed. Keeps nothing.
     pub(crate) fn test_slack(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.slack_draft(cx) else { return };
+        let Some(draft) = self.slack_draft(cx) else {
+            return;
+        };
         let services = accounts::services(cx);
         self.accounts.chat.slack_check = Checked::Checking;
         let work = cx.background_spawn(async move {
@@ -144,7 +176,9 @@ impl SettingsPane {
     /// Keeps the Slack facts in the settings and has the provider built. A tool that is missing or logged out is kept as
     /// well: the row says why, and the account works once the reader fixes it.
     pub(crate) fn save_slack(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.slack_draft(cx) else { return };
+        let Some(draft) = self.slack_draft(cx) else {
+            return;
+        };
         let services = accounts::services(cx);
         self.accounts.chat.slack_check = Checked::Checking;
         let asked = draft.clone();
@@ -156,7 +190,10 @@ impl SettingsPane {
         self.accounts.chat._slack = Some(cx.spawn(async move |this, cx| {
             let found = work.await;
             _ = this.update(cx, |pane, cx| {
-                pane.accounts.saved.slack = Some(SlackSaved { person: found.clone().ok(), ..draft });
+                pane.accounts.saved.slack = Some(SlackSaved {
+                    person: found.clone().ok(),
+                    ..draft
+                });
                 pane.accounts.chat.slack_check = Checked::of(found);
                 pane.accounts_changed(cx);
                 cx.notify();
@@ -169,7 +206,11 @@ impl SettingsPane {
         self.accounts.saved.slack = None;
         self.accounts.chat.slack_check = Checked::Unchecked;
         if let Some(fields) = &self.accounts.chat.fields {
-            for field in [&fields.slack_workspace, &fields.slack_channels, &fields.slack_program] {
+            for field in [
+                &fields.slack_workspace,
+                &fields.slack_channels,
+                &fields.slack_program,
+            ] {
                 field.update(cx, |field, cx| field.set_value("", window, cx));
             }
         }
@@ -179,7 +220,9 @@ impl SettingsPane {
 
     /// Asks `discordcli` who is signed in, with what is typed. Keeps nothing.
     pub(crate) fn test_discord(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.discord_draft(cx) else { return };
+        let Some(draft) = self.discord_draft(cx) else {
+            return;
+        };
         let services = accounts::services(cx);
         self.accounts.chat.discord_check = Checked::Checking;
         let work = cx.background_spawn(async move {
@@ -199,7 +242,9 @@ impl SettingsPane {
 
     /// Keeps the Discord facts, the two switches among them, and has the provider built.
     pub(crate) fn save_discord(&mut self, cx: &mut Context<Self>) {
-        let Some(draft) = self.discord_draft(cx) else { return };
+        let Some(draft) = self.discord_draft(cx) else {
+            return;
+        };
         let services = accounts::services(cx);
         self.accounts.chat.discord_check = Checked::Checking;
         let asked = draft.clone();
@@ -211,7 +256,10 @@ impl SettingsPane {
         self.accounts.chat._discord = Some(cx.spawn(async move |this, cx| {
             let found = work.await;
             _ = this.update(cx, |pane, cx| {
-                pane.accounts.saved.discord = Some(DiscordSaved { person: found.clone().ok(), ..draft });
+                pane.accounts.saved.discord = Some(DiscordSaved {
+                    person: found.clone().ok(),
+                    ..draft
+                });
                 pane.accounts.chat.discord_check = Checked::of(found);
                 pane.accounts_changed(cx);
                 cx.notify();
@@ -235,9 +283,16 @@ impl SettingsPane {
         cx.notify();
     }
 
-    pub(super) fn slack_card(&self, rows: &Rows, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn slack_card(
+        &self,
+        rows: &Rows,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let page: &AccountsPage = &self.accounts;
-        let Some(fields) = &page.chat.fields else { return div().into_any_element() };
+        let Some(fields) = &page.chat.fields else {
+            return div().into_any_element();
+        };
         let this = cx.entity().downgrade();
         let row = &rows.slack;
         let saved = page.saved.slack.as_ref();
@@ -280,14 +335,23 @@ impl SettingsPane {
             .into_any_element()
     }
 
-    pub(super) fn discord_card(&self, rows: &Rows, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn discord_card(
+        &self,
+        rows: &Rows,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let page: &AccountsPage = &self.accounts;
-        let Some(fields) = &page.chat.fields else { return div().into_any_element() };
+        let Some(fields) = &page.chat.fields else {
+            return div().into_any_element();
+        };
         let this = cx.entity().downgrade();
         let row = &rows.discord;
         let saved = page.saved.discord.as_ref();
         let detail = match (row, saved) {
-            (Row::Connected(name), Some(discord)) if !discord.server.is_empty() => format!("{} · {name}", discord.server),
+            (Row::Connected(name), Some(discord)) if !discord.server.is_empty() => {
+                format!("{} · {name}", discord.server)
+            }
             (Row::Connected(name), Some(_)) => format!("Direct messages · {name}"),
             (_, Some(discord)) if !discord.server.is_empty() => discord.server.clone(),
             _ => "A server of yours, over discordcli".to_string(),

@@ -20,7 +20,10 @@ struct Servers;
 
 impl Runner for Servers {
     fn run(&self, args: &[String]) -> Result<Output, RunError> {
-        assert_eq!(args[0], "servers", "only the server list is asked: {args:?}");
+        assert_eq!(
+            args[0], "servers",
+            "only the server list is asked: {args:?}"
+        );
         let page = if args.iter().any(|a| a == "--after") {
             format!(r#"{{"rows":[{{"id":"{SIDE}","name":"Side project"}}],"hasMore":false}}"#)
         } else {
@@ -76,7 +79,10 @@ fn a_list_is_split_at_commas_and_lines_trimmed_and_without_repeats() {
 #[test]
 fn a_typed_path_is_used_as_it_is_and_nothing_typed_looks_on_the_path() {
     assert_eq!(program_of("  ", "slackcli"), "slackcli");
-    assert_eq!(program_of(" /opt/bin/slackcli ", "slackcli"), "/opt/bin/slackcli");
+    assert_eq!(
+        program_of(" /opt/bin/slackcli ", "slackcli"),
+        "/opt/bin/slackcli"
+    );
     let home = std::env::var("HOME").unwrap();
     assert_eq!(
         program_of("~/bin/slackcli", "slackcli"),
@@ -86,7 +92,12 @@ fn a_typed_path_is_used_as_it_is_and_nothing_typed_looks_on_the_path() {
 
 #[test]
 fn slack_channels_are_read_by_name_or_id_and_an_id_says_what_kind_it_is() {
-    let specs = channel_specs(&["#general".into(), "C0123ABCD".into(), "G0123ABCD".into(), "D0123ABCD".into()]);
+    let specs = channel_specs(&[
+        "#general".into(),
+        "C0123ABCD".into(),
+        "G0123ABCD".into(),
+        "D0123ABCD".into(),
+    ]);
     let seen: Vec<(&str, ChannelKind)> = specs.iter().map(|s| (s.id.as_str(), s.kind)).collect();
     assert_eq!(
         seen,
@@ -97,7 +108,10 @@ fn slack_channels_are_read_by_name_or_id_and_an_id_says_what_kind_it_is() {
             ("D0123ABCD", ChannelKind::Dm),
         ]
     );
-    assert!(specs.iter().all(|s| s.id == s.name), "slackcli takes either, so the entry is both");
+    assert!(
+        specs.iter().all(|s| s.id == s.name),
+        "slackcli takes either, so the entry is both"
+    );
 }
 
 #[test]
@@ -126,7 +140,10 @@ fn a_discord_block_from_the_defaults_reads_only_and_cannot_send() {
         account: ACME.into(),
         id: "1200000000000000001".into(),
     };
-    let sent = provider.send(&NewMessage::to(&channel, "hello"), &Actor::person("me", "Me"));
+    let sent = provider.send(
+        &NewMessage::to(&channel, "hello"),
+        &Actor::person("me", "Me"),
+    );
     assert!(
         matches!(&sent, Err(CapError::Provider { code, .. }) if code == "read_only"),
         "{sent:?}"
@@ -152,7 +169,10 @@ fn a_server_given_by_id_is_used_without_asking_discord() {
 #[test]
 fn a_server_given_by_name_is_found_on_any_page_whatever_the_case() {
     assert_eq!(server_account(&Servers, &discord("acme")).unwrap(), ACME);
-    assert_eq!(server_account(&Servers, &discord(" SIDE project ")).unwrap(), SIDE);
+    assert_eq!(
+        server_account(&Servers, &discord(" SIDE project ")).unwrap(),
+        SIDE
+    );
     assert!(matches!(
         server_account(&Servers, &discord("nowhere")),
         Err(CapError::NotFound { .. })
@@ -175,7 +195,10 @@ fn no_server_means_the_direct_messages_only_when_they_are_asked_for() {
 #[test]
 fn a_logged_out_or_missing_discordcli_gives_the_error_the_row_needs() {
     let logged_out = Failing(Ok(Output::failed("Not logged in. Run discordcli login.")));
-    assert!(matches!(server_account(&logged_out, &discord("acme")), Err(CapError::NotSignedIn)));
+    assert!(matches!(
+        server_account(&logged_out, &discord("acme")),
+        Err(CapError::NotSignedIn)
+    ));
     let missing = Failing(Err(RunError::NotInstalled("discordcli".into())));
     assert!(matches!(
         server_account(&missing, &discord("acme")),
@@ -196,10 +219,18 @@ fn a_tool_at_the_typed_path_answers_and_one_that_is_missing_says_so() {
         program,
         ..Default::default()
     };
-    let name = slack_system(&slack(slackcli)).unwrap().whoami().unwrap().name;
+    let name = slack_system(&slack(slackcli))
+        .unwrap()
+        .whoami()
+        .unwrap()
+        .name;
     assert_eq!(name, "alex");
 
-    let gone = dir.path().join("nothing-here").to_string_lossy().into_owned();
+    let gone = dir
+        .path()
+        .join("nothing-here")
+        .to_string_lossy()
+        .into_owned();
     let error = slack_system(&slack(gone)).unwrap().whoami().unwrap_err();
     assert!(
         matches!(&error, CapError::Provider { code, .. } if code == "slackcli_missing"),
@@ -210,7 +241,11 @@ fn a_tool_at_the_typed_path_answers_and_one_that_is_missing_says_so() {
 #[test]
 fn a_logged_out_tool_is_not_signed_in() {
     let dir = tempfile::tempdir().unwrap();
-    let program = script(&dir, "slackcli", "echo 'No Slack credentials found. Run slackcli login.' >&2; exit 1");
+    let program = script(
+        &dir,
+        "slackcli",
+        "echo 'No Slack credentials found. Run slackcli login.' >&2; exit 1",
+    );
     let saved = SlackSaved {
         workspace: "acme".into(),
         program,
@@ -249,7 +284,11 @@ fn gmail_needs_an_address_and_runs_the_tool_at_the_typed_path() {
         Err(CapError::Invalid { .. })
     ));
     let dir = tempfile::tempdir().unwrap();
-    let program = script(&dir, "gmailcli", r#"echo '{"email":"me@acme.test","unread":2}'"#);
+    let program = script(
+        &dir,
+        "gmailcli",
+        r#"echo '{"email":"me@acme.test","unread":2}'"#,
+    );
     let saved = GmailSaved {
         address: " me@acme.test ".into(),
         program,
