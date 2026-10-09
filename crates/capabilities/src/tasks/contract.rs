@@ -296,7 +296,7 @@ pub fn export_then_import_moves_everything(make: Make) {
     );
 }
 
-/// 7. `subscribe` delivers each change once, in order.
+/// 7. `subscribe` delivers each change once, in order. A provider may also tell the activity of a change as its own event.
 pub fn subscribe_delivers_each_change_once_in_order(make: Make) {
     let p = make();
     let sub = p.subscribe().expect("subscribe");
@@ -311,21 +311,21 @@ pub fn subscribe_delivers_each_change_once_in_order(make: Make) {
         &alex(),
     )
     .unwrap();
-    let wait = std::time::Duration::from_secs(2);
-    let first = sub.recv_timeout(wait).expect("the creation arrives");
-    let second = sub.recv_timeout(wait).expect("the update arrives");
+    let mut changes = Vec::new();
+    let mut quiet = std::time::Duration::from_secs(2);
+    while let Ok(event) = sub.recv_timeout(quiet) {
+        quiet = std::time::Duration::from_millis(300);
+        if event.kind != EventKind::Activity {
+            changes.push((event.kind, event.task.title));
+        }
+    }
     assert_eq!(
-        (first.kind, first.task.title.as_str()),
-        (EventKind::Created, "Watched")
-    );
-    assert_eq!(
-        (second.kind, second.task.title.as_str()),
-        (EventKind::Updated, "Renamed")
-    );
-    assert!(
-        sub.recv_timeout(std::time::Duration::from_millis(100))
-            .is_err(),
-        "nothing arrives twice"
+        changes,
+        [
+            (EventKind::Created, "Watched".to_string()),
+            (EventKind::Updated, "Renamed".to_string())
+        ],
+        "each change arrives once, in order"
     );
 }
 

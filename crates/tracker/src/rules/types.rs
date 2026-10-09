@@ -37,10 +37,16 @@ impl Rule {
     /// What the rule does, for the settings.
     pub fn words(self) -> &'static str {
         match self {
-            Self::SessionStartMovesToInProgress => "Starting a session on a task moves it to In Progress",
-            Self::AgentFinishMovesToInReview => "The agent finishing its work moves the task to In Review",
+            Self::SessionStartMovesToInProgress => {
+                "Starting a session on a task moves it to In Progress"
+            }
+            Self::AgentFinishMovesToInReview => {
+                "The agent finishing its work moves the task to In Review"
+            }
             Self::MergeMovesToDone => "Merging the pull request moves the task to Done",
-            Self::SessionResumeMovesToInProgress => "A reply in the session moves a task in review back to In Progress",
+            Self::SessionResumeMovesToInProgress => {
+                "A reply in the session moves a task in review back to In Progress"
+            }
         }
     }
 }
@@ -55,9 +61,18 @@ pub enum Signal {
     /// The reader sent a message in a session that is linked to tasks.
     SessionResumed { session_id: String },
     /// A session made a commit. It moves nothing; it is logged on the tasks of the session.
-    Committed { session_id: String, sha: String, subject: String, by: String },
+    Committed {
+        session_id: String,
+        sha: String,
+        subject: String,
+        by: String,
+    },
     /// A pull request was opened for this task, by `by`.
-    PrOpened { task: TaskId, pr: PrLink, by: String },
+    PrOpened {
+        task: TaskId,
+        pr: PrLink,
+        by: String,
+    },
     /// A pull request was merged, by `by`. Every task it is linked to hears of it.
     PrMerged { number: u64, by: String },
 }

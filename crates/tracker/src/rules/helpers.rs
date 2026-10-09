@@ -1,10 +1,14 @@
-use crate::{Entry, Patch, TaskId, Tracker, TrackerResult};
 use super::structs::{Handled, RuleSet};
 use super::types::Signal;
+use crate::{Entry, Patch, TaskId, Tracker, TrackerResult};
 
 /// Applies a signal: logs it on the tasks it concerns, then lets the rules move each task. Does nothing for
 /// a signal that concerns no task.
-pub fn handle(tracker: &dyn Tracker, rules: &RuleSet, signal: &Signal) -> TrackerResult<Vec<Handled>> {
+pub fn handle(
+    tracker: &dyn Tracker,
+    rules: &RuleSet,
+    signal: &Signal,
+) -> TrackerResult<Vec<Handled>> {
     match signal {
         Signal::SessionStarted { task, session } => {
             tracker.record(task, &Entry::SessionStarted(session.clone()), &session.agent)?;
@@ -48,13 +52,23 @@ pub fn handle(tracker: &dyn Tracker, rules: &RuleSet, signal: &Signal) -> Tracke
     }
 }
 
-fn decide_and_move(tracker: &dyn Tracker, rules: &RuleSet, id: &TaskId, signal: &Signal) -> TrackerResult<Handled> {
-    let task = tracker.get(id)?.ok_or_else(|| crate::TrackerError::NotFound(id.clone()))?;
+fn decide_and_move(
+    tracker: &dyn Tracker,
+    rules: &RuleSet,
+    id: &TaskId,
+    signal: &Signal,
+) -> TrackerResult<Handled> {
+    let task = tracker
+        .get(id)?
+        .ok_or_else(|| crate::TrackerError::NotFound(id.clone()))?;
     match rules.decide(task.status, signal) {
         Some(decision) => {
             let by = format!("rule:{}", decision.rule.id());
             let task = tracker.update(id, &Patch::status(decision.to), &by)?;
-            Ok(Handled { task, moved: Some(decision) })
+            Ok(Handled {
+                task,
+                moved: Some(decision),
+            })
         }
         None => Ok(Handled { task, moved: None }),
     }
