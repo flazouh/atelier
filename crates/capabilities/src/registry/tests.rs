@@ -36,3 +36,13 @@ fn mail_providers_are_found_by_provider_and_account() {
     assert_eq!(r.all_mail().len(), 1);
     assert!(r.mail("memory", "a").is_some() && r.mail("gmail", "a").is_none());
 }
+
+#[test]
+fn a_removed_tasks_provider_is_gone_and_the_others_stay() {
+    let mut r = Registry::new();
+    r.add_tasks(Arc::new(MemoryTasks::new("a")));
+    r.add_tasks(Arc::new(MemoryTasks::new("b")));
+    assert_eq!(r.remove_tasks("memory", "a").map(|p| p.account().to_string()), Some("a".into()));
+    assert!(r.tasks("memory", "a").is_none() && r.tasks("memory", "b").is_some());
+    assert!(r.remove_tasks("memory", "a").is_none(), "removing twice finds nothing");
+}

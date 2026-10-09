@@ -33,6 +33,11 @@ impl Registry {
             .cloned()
     }
 
+    /// Takes a tasks provider out, for an account the person disconnected. `None` when there was none.
+    pub fn remove_tasks(&mut self, provider: &str, account: &str) -> Option<Arc<dyn TasksProvider>> {
+        self.tasks.remove(&(provider.to_string(), account.to_string()))
+    }
+
     /// Every tasks provider, in provider and account order.
     pub fn all_tasks(&self) -> Vec<Arc<dyn TasksProvider>> {
         self.tasks.values().cloned().collect()
