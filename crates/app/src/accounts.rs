@@ -22,4 +22,7 @@ pub(crate) use structs::{AccountServices, Built, Rows, services};
 pub(crate) use types::{Kind, Row};
 
 #[cfg(test)]
+pub(crate) use cli::tests::until_runnable;
+
+#[cfg(test)]
 mod tests;

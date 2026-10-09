@@ -197,4 +197,4 @@ pub(super) fn gmail_system(saved: &GmailSaved) -> CapResult<Arc<dyn MailProvider
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

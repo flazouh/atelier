@@ -64,7 +64,25 @@ fn script(dir: &tempfile::TempDir, name: &str, body: &str) -> String {
     let path: PathBuf = dir.path().join(name);
     std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    until_runnable(&path);
     path.to_string_lossy().into_owned()
+}
+
+/// Runs the script once, until the system lets it run. A program that another test thread forked while this file was open
+/// for writing holds it busy for a moment, and a run in that moment fails with "text file busy" (ETXTBSY).
+pub(crate) fn until_runnable(path: &std::path::Path) {
+    const TEXT_FILE_BUSY: i32 = 26;
+    for _ in 0..200 {
+        match std::process::Command::new(path)
+            .stdin(std::process::Stdio::null())
+            .output()
+        {
+            Err(error) if error.raw_os_error() == Some(TEXT_FILE_BUSY) => {
+                std::thread::sleep(std::time::Duration::from_millis(10))
+            }
+            _ => return,
+        }
+    }
 }
 
 #[test]

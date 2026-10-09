@@ -241,6 +241,7 @@ esac
     )
     .unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    crate::accounts::until_runnable(&path);
     let (pane, hub, cx) = tall(open(&Arc::new(InMemory::default()), cx));
     cx.update(|_, cx| {
         cx.set_global(crate::accounts::AccountServices {
