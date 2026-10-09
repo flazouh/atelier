@@ -139,6 +139,9 @@ impl Render for UsagePage {
             .right_0()
             .bottom(px(atelier_ui::status_bar::HEIGHT))
             .flex()
+            .gap(px(atelier_ui::panel_layout::GAP))
+            .pr(px(8.))
+            .pb(px(10.))
             .bg(theme.background)
             .track_focus(&self.focus)
             .on_key_down(move |event, _, cx| {
@@ -175,9 +178,10 @@ impl Render for UsagePage {
                     .h_full()
                     .overflow_y_scroll()
                     .px(px(DETAIL_PAD))
-                    .pt(px(10.))
+                    .pt(px(DETAIL_PAD))
                     .pb(px(DETAIL_PAD))
                     .rounded(radius::lg())
+                    .bg(theme.card)
                     .child(dashboard),
             )
     }
