@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atelier.dev/schemas/mail/v1.json",
+  "title": "Atelier capability: mail (v1 draft)",
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "description": "mail:<provider>:<address>:<kind>:<id>, for example mail:gmail:alex@gmail.com:t:1a0b3ab523a5d891. The kind is one letter: b mailbox, t thread, m message, d draft, a attachment.",
+      "pattern": "^mail:[a-z0-9_-]+:[A-Za-z0-9_.@+-]+:[btmda]:.+$"
+    },
+    "millis": { "type": "integer", "description": "Milliseconds since the epoch, UTC" },
+    "actor": {
+      "type": "object",
+      "required": ["kind", "id", "name"],
+      "properties": {
+        "kind": { "enum": ["person", "agent"] },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "on_behalf_of": { "type": "string", "description": "Id of the person an agent works for" }
+      },
+      "additionalProperties": false
+    },
+    "contact": {
+      "type": "object",
+      "required": ["address"],
+      "properties": { "name": { "type": "string" }, "address": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "account": {
+      "type": "object",
+      "required": ["ref", "address"],
+      "properties": { "ref": { "type": "string" }, "address": { "type": "string" }, "name": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "mailbox": {
+      "type": "object",
+      "required": ["ref", "name", "role", "kind", "unread"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "name": { "type": "string" },
+        "role": { "enum": ["inbox", "sent", "drafts", "trash", "spam", "archive", "custom"] },
+        "kind": { "enum": ["system", "user"] },
+        "unread": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "color": { "type": "string" },
+        "raw": {}
+      },
+      "additionalProperties": false
+    },
+    "attachment": {
+      "type": "object",
+      "required": ["ref", "filename", "mime", "inline"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "filename": { "type": "string" },
+        "mime": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "inline": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "flags": {
+      "type": "object",
+      "required": ["read", "starred"],
+      "properties": { "read": { "type": "boolean" }, "starred": { "type": "boolean" } },
+      "additionalProperties": false
+    },
+    "message": {
+      "type": "object",
+      "required": ["ref", "thread", "from", "subject", "text", "date", "flags"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "thread": { "$ref": "#/$defs/ref" },
+        "from": { "$ref": "#/$defs/contact" },
+        "to": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "cc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "bcc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "reply_to": { "$ref": "#/$defs/contact" },
+        "subject": { "type": "string" },
+        "snippet": { "type": "string" },
+        "text": { "type": "string", "description": "The body as plain text. What every screen and every agent sees." },
+        "html": { "type": "string", "description": "The sender's HTML, kept as it came. No screen renders it in v1." },
+        "attachments": { "type": "array", "items": { "$ref": "#/$defs/attachment" } },
+        "date": { "$ref": "#/$defs/millis" },
+        "flags": { "$ref": "#/$defs/flags" },
+        "mailboxes": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "headers": {
+          "type": "object",
+          "description": "A small set: message-id, in-reply-to, references, list-unsubscribe, date",
+          "additionalProperties": { "type": "string" }
+        },
+        "raw": { "description": "The provider's own JSON" }
+      },
+      "additionalProperties": false
+    },
+    "thread_summary": {
+      "type": "object",
+      "description": "What a list shows of a thread. Open: a thread adds its messages.",
+      "required": ["ref", "subject", "snippet", "participants", "message_count", "unread", "starred", "has_attachments", "last_at", "version"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "subject": { "type": "string" },
+        "snippet": { "type": "string" },
+        "participants": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "message_count": { "type": "integer", "minimum": 0 },
+        "unread": { "type": "integer", "minimum": 0, "description": "How many messages are unread" },
+        "starred": { "type": "boolean" },
+        "has_attachments": { "type": "boolean" },
+        "mailboxes": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "last_at": { "$ref": "#/$defs/millis" },
+        "version": { "type": "string" }
+      }
+    },
+    "thread": {
+      "description": "A thread summary and its messages, oldest first",
+      "allOf": [
+        { "$ref": "#/$defs/thread_summary" },
+        { "required": ["messages"], "properties": { "messages": { "type": "array", "items": { "$ref": "#/$defs/message" } } } }
+      ],
+      "unevaluatedProperties": false
+    },
+    "draft": {
+      "type": "object",
+      "required": ["ref", "subject", "text", "created_by", "created_at", "updated_at", "version"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "thread": { "$ref": "#/$defs/ref" },
+        "in_reply_to": { "$ref": "#/$defs/ref" },
+        "to": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "cc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "bcc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "subject": { "type": "string" },
+        "text": { "type": "string" },
+        "created_by": { "$ref": "#/$defs/actor" },
+        "created_at": { "$ref": "#/$defs/millis" },
+        "updated_at": { "$ref": "#/$defs/millis" },
+        "version": { "type": "string", "description": "Opaque. Send it back on update and on send." }
+      },
+      "additionalProperties": false
+    },
+    "new_draft": {
+      "type": "object",
+      "properties": {
+        "to": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "cc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "bcc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "subject": { "type": "string" },
+        "text": { "type": "string" },
+        "in_reply_to": { "$ref": "#/$defs/ref" }
+      },
+      "additionalProperties": false
+    },
+    "draft_patch": {
+      "type": "object",
+      "description": "A field that is present changes. A field that is absent stays.",
+      "properties": {
+        "to": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "cc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "bcc": { "type": "array", "items": { "$ref": "#/$defs/contact" } },
+        "subject": { "type": "string" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "approval": {
+      "type": "object",
+      "description": "A person's click on Send, for the exact draft they saw. An agent's send needs one.",
+      "required": ["person", "version"],
+      "properties": { "person": { "$ref": "#/$defs/actor" }, "version": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "search_query": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "Read as the provider's search_syntax says" },
+        "mailbox": { "$ref": "#/$defs/ref" },
+        "unread": { "type": "boolean" },
+        "limit": { "type": "integer", "minimum": 1 },
+        "cursor": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "page": {
+      "type": "object",
+      "required": ["items"],
+      "properties": { "items": { "type": "array" }, "next_cursor": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["operations", "features", "search_syntax", "limits", "auth"],
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": { "enum": ["mailboxes", "search", "thread", "get", "mark_read", "star", "archive", "label", "move", "trash", "create_draft", "update_draft", "reply", "send", "download_attachment", "subscribe"] }
+        },
+        "features": { "type": "array", "items": { "enum": ["threads", "labels", "folders", "drafts", "attachments", "push", "stable_message_ids"] } },
+        "search_syntax": { "enum": ["plain", "gmail", "imap"] },
+        "limits": { "type": "object", "properties": { "page_max": { "type": "integer" }, "per_minute": { "type": "integer" } } },
+        "auth": { "type": "array", "items": { "enum": ["oauth", "token", "browser_session", "none"] } }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "oneOf": [
+        { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["offline", "not_signed_in"] } } },
+        { "type": "object", "required": ["kind", "what"], "properties": { "kind": { "const": "not_found" }, "what": { "type": "string" } } },
+        { "type": "object", "required": ["kind", "message"], "properties": { "kind": { "const": "storage" }, "message": { "type": "string" } } },
+        { "type": "object", "required": ["kind", "field"], "properties": { "kind": { "const": "invalid" }, "field": { "type": "string" } } },
+        { "type": "object", "required": ["kind", "current"], "properties": { "kind": { "const": "conflict" }, "current": { "$ref": "#/$defs/draft" } } },
+        { "type": "object", "required": ["kind", "retry_after_ms"], "properties": { "kind": { "const": "rate_limited" }, "retry_after_ms": { "type": "integer" } } },
+        { "type": "object", "required": ["kind", "feature"], "properties": { "kind": { "const": "unsupported" }, "feature": { "type": "string" } } },
+        {
+          "type": "object",
+          "required": ["kind", "code", "message"],
+          "properties": {
+            "kind": { "const": "provider" },
+            "code": { "type": "string", "description": "approval_required is fixed: send by an agent with no valid approval" },
+            "message": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "required": ["kind", "thread"],
+      "properties": { "kind": { "enum": ["new_message", "changed"] }, "thread": { "$ref": "#/$defs/thread_summary" } },
+      "additionalProperties": false
+    }
+  }
+}

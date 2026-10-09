@@ -1,0 +1,88 @@
+{
+  "data": {
+    "issues": {
+      "nodes": [
+        {
+          "id": "00000000-0000-4000-8000-000000000028",
+          "identifier": "ACM-5",
+          "title": "Task title 4",
+          "description": "Text number 9.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+          "priority": 0,
+          "estimate": null,
+          "dueDate": null,
+          "createdAt": "2026-10-09T00:32:23.483Z",
+          "updatedAt": "2026-10-09T00:59:33.868Z",
+          "url": "https://linear.app/acme/issue/ACM-4/task",
+          "state": {
+            "id": "00000000-0000-4000-8000-000000000018",
+            "name": "In Progress",
+            "type": "started"
+          },
+          "assignee": null,
+          "creator": {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "Person 1"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "id": "00000000-0000-4000-8000-000000000029",
+                "name": "Label 6",
+                "color": "#EB5757"
+              }
+            ]
+          },
+          "project": {
+            "id": "00000000-0000-4000-8000-000000000010",
+            "name": "Project 1",
+            "slugId": "slug1"
+          },
+          "parent": null,
+          "team": {
+            "id": "00000000-0000-4000-8000-000000000012",
+            "key": "ACM"
+          }
+        },
+        {
+          "id": "00000000-0000-4000-8000-000000000030",
+          "identifier": "ACM-6",
+          "title": "Task title 5",
+          "description": "Text number 10.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+          "priority": 0,
+          "estimate": null,
+          "dueDate": null,
+          "createdAt": "2026-10-09T00:38:54.707Z",
+          "updatedAt": "2026-10-09T00:55:06.302Z",
+          "url": "https://linear.app/acme/issue/ACM-5/task",
+          "state": {
+            "id": "00000000-0000-4000-8000-000000000018",
+            "name": "In Progress",
+            "type": "started"
+          },
+          "assignee": null,
+          "creator": {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "Person 1"
+          },
+          "labels": {
+            "nodes": []
+          },
+          "project": {
+            "id": "00000000-0000-4000-8000-000000000027",
+            "name": "Project 2",
+            "slugId": "slug2"
+          },
+          "parent": null,
+          "team": {
+            "id": "00000000-0000-4000-8000-000000000012",
+            "key": "ACM"
+          }
+        }
+      ],
+      "pageInfo": {
+        "hasNextPage": true,
+        "endCursor": "00000000-0000-4000-8000-000000000030"
+      }
+    }
+  }
+}

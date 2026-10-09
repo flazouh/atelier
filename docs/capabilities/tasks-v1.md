@@ -37,7 +37,7 @@ This v1 keeps what works and adds what a second provider needs. Nothing here rem
    absent from the list. The screen and the agent tools show only what the list allows.
 4. **People and agents are the same kind of actor** (section 4.3). Every change records who made it and for whom.
 5. **Time is milliseconds since the epoch, UTC.** (Today's tracker uses seconds: the adapter multiplies.)
-6. **Calls are async and paged.** Lists return a page and a cursor.
+6. **Calls never run on the UI thread, and lists are paged.** The Rust interface blocks, as the rest of the app does, and the app calls it from a background thread. A list returns a page and a cursor. A binding for another language (Swift) may use async calls with the same shape.
 
 ## 4. Entities
 
@@ -86,10 +86,12 @@ Core (every provider):
 | `create(new, actor)` | title, description, status, priority, project, labels, assignees, parent | the task |
 | `update(ref, patch, version, actor)` | the fields to change (a field set to `null` clears it) | the task, or a `Conflict` if `version` is old |
 | `comment(ref, body, actor)` | text | the comment |
+| `labels()` | none | the labels in use (an empty list when the provider has none) |
+| `projects()` | none | the projects in use (an empty list when the provider has none) |
 | `activity(ref, cursor)` | a task | a page of activity |
 | `subscribe(filter)` | what to follow | a stream of `created`, `updated`, `activity` events |
 
-Optional (a provider lists the ones it has): `create_many`, `delete`, `link`/`unlink`, `labels()`, `projects()`, `statuses()`,
+Optional (a provider lists the ones it has): `create_many`, `delete`, `link`/`unlink`, `statuses()`,
 `relations`, `cycles`, `attachments`, `webhooks` (push) as against polling, `export`, `import`.
 
 `export(cursor)` gives every entity as `{ entity, raw }`, in order, with a cursor. `import(batch, id_map)` takes the same shape,

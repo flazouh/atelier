@@ -584,6 +584,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-linear"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "chrono",
+ "serde",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "atelier-lsp"
 version = "0.1.6"
 dependencies = [
