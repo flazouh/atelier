@@ -60,6 +60,7 @@ mod tabs;
 mod test_dirs;
 mod timings;
 mod tool_density;
+mod mail;
 mod messages;
 mod tasks;
 mod tree;
@@ -90,6 +91,9 @@ fn main() {
         // A debug build with ATELIER_DEMO_MESSAGING=1 has one seeded chat account, to look at the Messages view with.
         #[cfg(debug_assertions)]
         let _ = messages::demo::register_from_env(&hub);
+        // The same for the Mail view, with ATELIER_DEMO_MAIL.
+        #[cfg(debug_assertions)]
+        let _ = mail::demo::register_from_env(&hub);
         cx.set_global(hub);
         cx.set_global(slots::builtin());
         cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));

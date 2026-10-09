@@ -3,6 +3,7 @@ use gpui_kit::{TestAppContext, px, size};
 
 use super::*;
 
+mod mail;
 mod messages;
 
 #[gpui_kit::test]

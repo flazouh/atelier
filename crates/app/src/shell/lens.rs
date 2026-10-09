@@ -405,6 +405,7 @@ impl Shell {
         match view {
             ShellView::Tasks => self.show_tasks(window, cx),
             ShellView::Messages => self.show_messages(window, cx),
+            ShellView::Mail => self.show_mail(window, cx),
             v if v.in_code() => self.show_code(v, window, cx),
             v => self.show_view(v, window, cx),
         }

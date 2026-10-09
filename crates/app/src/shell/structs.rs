@@ -110,6 +110,8 @@ pub struct Shell {
     pub(super) code_view: ShellView,
     /// The Messages view's pane, made the first time the view is in front.
     pub(super) messages: Option<Entity<crate::messages::pane::MessagesPane>>,
+    /// The Mail view's pane, made the first time the view is in front.
+    pub(super) mail: Option<Entity<crate::mail::pane::MailPane>>,
     /// In Sessions, the project the list and the panels are narrowed to; all of them with `None`.
     pub(super) session_filter: Option<SharedString>,
     /// The project switcher's menu is open.
@@ -214,6 +216,7 @@ impl Shell {
             opened: None,
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             messages: None,
+            mail: None,
             session_filter: None,
             switcher_open: false,
             add_open: false,
@@ -1795,7 +1798,7 @@ impl Shell {
         let switcher = self.project_switcher(cx);
         // The Sessions sidebar has a row of its own at the top, with the ⋯ at its right: the switcher stands on that row,
         // left of the ⋯, so the head is one row. The other lenses have no such row and give the switcher one.
-        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Messages) {
+        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Messages | ShellView::Mail) {
             let row = switcher.map(|switcher| {
                 div().absolute().top(px(5.)).left(px(8.)).right(px(44.)).h(px(36.)).flex().items_center().min_w_0().child(switcher)
             });
@@ -1819,6 +1822,9 @@ impl Shell {
         }
         if self.view == ShellView::Messages {
             return div().size_full().child(self.messages_sidebar(cx));
+        }
+        if self.view == ShellView::Mail {
+            return div().size_full().child(self.mail_sidebar(cx));
         }
         div()
             .flex()
@@ -1933,6 +1939,9 @@ impl Shell {
         // A window that closed on Messages opens on it with no press, so the pane is made here and not only by the rail.
         if self.view == ShellView::Messages {
             self.ensure_messages(window, cx);
+        }
+        if self.view == ShellView::Mail {
+            self.ensure_mail(window, cx);
         }
         let total = atelier_ui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
@@ -2094,6 +2103,7 @@ impl Shell {
         match self.view {
             ShellView::Tasks => self.tasks_main(project, window, cx),
             ShellView::Messages => self.messages_main(),
+            ShellView::Mail => self.mail_main(),
             ShellView::Git => self.changes_main(project, cx),
             ShellView::Files => self.files_editor(project, false, cx),
             ShellView::Pulls => self.pulls_main(project, cx),

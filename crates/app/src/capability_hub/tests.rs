@@ -247,6 +247,24 @@ fn the_screen_and_the_agent_tools_read_one_set_of_messaging_accounts() {
     assert!(answer.to_string().contains("general"), "the agent reads the channel the screen shows: {answer}");
 }
 
+#[test]
+fn the_screen_and_the_agent_tools_read_one_set_of_mail_accounts() {
+    use atelier_capabilities::mail::MemoryMail;
+    let base = tempfile::tempdir().unwrap();
+    let project = project(base.path(), "atelier");
+    let hub = hub(base.path(), true);
+    assert!(hub.mail_providers().is_empty(), "no account until one is added");
+    // The hub is cloned around the app: a copy adds, the original and the screen see it.
+    hub.clone().add_mail(Arc::new(MemoryMail::new("me@acme.test")));
+    let accounts: Vec<String> = hub.mail_providers().iter().map(|p| p.account().to_string()).collect();
+    assert_eq!(accounts, ["me@acme.test"]);
+    let grant = hub.grant(&project).expect("a grant");
+    let access = grant.access().clone();
+    let answer = call(&access.url, &access.token, "mail_mailboxes", json!({}));
+    assert_eq!(answer["result"]["isError"], json!(false), "{answer}");
+    assert!(answer.to_string().contains("Inbox"), "the agent reads the account the screen shows: {answer}");
+}
+
 fn memory(account: &str) -> Arc<dyn atelier_capabilities::tasks::TasksProvider> {
     Arc::new(atelier_capabilities::tasks::MemoryTasks::new(account))
 }
