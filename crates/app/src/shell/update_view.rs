@@ -85,6 +85,7 @@ impl Shell {
             .on_install(move |_, cx| drop(install.update(cx, |shell, cx| shell.update_install(cx))));
         Some(
             Modal::new("update-ready")
+                .debug_name("update-panel")
                 .width(520.)
                 .flush()
                 .focus(&self.update_focus)
@@ -109,6 +110,7 @@ impl Shell {
             .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.dismiss_whats_new(cx))));
         Some(
             Modal::new("whats-new")
+                .debug_name("update-panel")
                 .width(520.)
                 .flush()
                 .focus(&self.update_focus)
@@ -141,6 +143,7 @@ impl Shell {
             .on_later(move |_, cx| drop(done.update(cx, |shell, cx| shell.close_changelog(cx))));
         Some(
             Modal::new("changelog")
+                .debug_name("update-panel")
                 .width(520.)
                 .flush()
                 .focus(&self.update_focus)
