@@ -18,9 +18,9 @@ mod structs;
 mod tree_menu;
 mod types;
 mod update_view;
-mod views;
 mod updates;
 mod view;
+mod views;
 
 pub use view::ShellView;
 
