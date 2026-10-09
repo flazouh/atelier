@@ -1,0 +1,9 @@
+{
+  "rows": [
+    { "id": "1300000000000000001", "name": "sam", "type": 1, "guildId": null, "parentId": null, "url": "https://discord.com/channels/@me/1300000000000000001" },
+    { "id": "1300000000000000002", "name": "sam, kim", "type": 3, "guildId": null, "parentId": null, "url": "https://discord.com/channels/@me/1300000000000000002" }
+  ],
+  "total": 2,
+  "hasMore": false,
+  "nextOffset": null
+}

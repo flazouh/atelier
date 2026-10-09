@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "id": "1425768080998400000", "channelId": "1200000000000000001", "guildId": "1100000000000000001",
+      "authorId": "1500000000000000001", "author": "Sam",
+      "message": "Morning. The build is green.", "at": "2025-10-09T08:53:20.000000+00:00",
+      "url": "https://discord.com/channels/1100000000000000001/1200000000000000001/1425768080998400000",
+      "attachments": [], "replyTo": null
+    },
+    {
+      "id": "1425768332656640001", "channelId": "1200000000000000001", "guildId": "1100000000000000001",
+      "authorId": "1400000000000000001", "author": "Alex",
+      "message": "Who can review the release notes?", "at": "2025-10-09T08:54:20.000000+00:00",
+      "url": "https://discord.com/channels/1100000000000000001/1200000000000000001/1425768332656640001",
+      "attachments": [], "replyTo": null
+    },
+    {
+      "id": "1425768584314880002", "channelId": "1200000000000000001", "guildId": "1100000000000000001",
+      "authorId": "1500000000000000001", "author": "Sam",
+      "message": "I can. <@1400000000000000001> see <#1200000000000000004> and <:party:1600000000000000001>",
+      "at": "2025-10-09T08:55:20.000000+00:00",
+      "url": "https://discord.com/channels/1100000000000000001/1200000000000000001/1425768584314880002",
+      "attachments": [], "replyTo": "1425768332656640001"
+    },
+    {
+      "id": "1425768835973120003", "channelId": "1200000000000000001", "guildId": "1100000000000000001",
+      "authorId": "1500000000000000001", "author": "Sam",
+      "message": "", "at": "2025-10-09T08:56:20.000000+00:00",
+      "url": "https://discord.com/channels/1100000000000000001/1200000000000000001/1425768835973120003",
+      "attachments": [
+        { "id": "1700000000000000001", "filename": "shot.png", "url": "https://cdn.example.test/shot.png", "size": 421888, "contentType": "image/png" },
+        { "id": "1700000000000000002", "filename": "notes.txt", "url": "https://cdn.example.test/notes.txt", "size": 120, "contentType": "text/plain" }
+      ],
+      "replyTo": null
+    },
+    {
+      "id": "1425769087631360004", "channelId": "1200000000000000001", "guildId": "1100000000000000001",
+      "authorId": "1400000000000000001", "author": "Alex",
+      "message": "Thanks!", "at": "2025-10-09T08:57:20.000000+00:00",
+      "url": "https://discord.com/channels/1100000000000000001/1200000000000000001/1425769087631360004",
+      "attachments": [], "replyTo": "1425768584314880002"
+    }
+  ],
+  "channelId": "1200000000000000001",
+  "guildId": "1100000000000000001",
+  "hasMore": false,
+  "before": "1425768080998400000",
+  "after": "1425769087631360004"
+}

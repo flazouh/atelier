@@ -1,0 +1,8 @@
+{
+  "rows": [
+    { "id": "1100000000000000001", "name": "Acme", "owner": false },
+    { "id": "1100000000000000002", "name": "Side project", "owner": true }
+  ],
+  "hasMore": false,
+  "after": "1100000000000000002"
+}
