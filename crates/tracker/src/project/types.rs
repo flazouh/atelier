@@ -21,15 +21,30 @@ impl ProjectKey {
     /// The last part of the path: "atelier" for "/Users/user/code/atelier".
     pub fn folder(&self) -> &str {
         let (Self::Local { path } | Self::Ssh { path, .. }) = self;
-        trim_slash(path).rsplit('/').find(|part| !part.is_empty()).unwrap_or("project")
+        trim_slash(path)
+            .rsplit('/')
+            .find(|part| !part.is_empty())
+            .unwrap_or("project")
     }
 
     /// The database file's name: the folder, for a person to recognize it, and a hash of the identity, so
     /// two projects in folders of one name do not share a file.
     pub fn file_name(&self) -> String {
-        let readable: String =
-            self.folder().chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' }).collect();
-        format!("{readable}-{:016x}.sqlite", fnv1a(self.identity().as_bytes()))
+        let readable: String = self
+            .folder()
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+        format!(
+            "{readable}-{:016x}.sqlite",
+            fnv1a(self.identity().as_bytes())
+        )
     }
 
     /// The database's place in the app's data folder: `<data>/tracker/<file name>`. Never inside the

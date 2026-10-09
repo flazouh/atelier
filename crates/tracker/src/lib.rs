@@ -10,13 +10,16 @@
 mod local;
 mod model;
 mod project;
+mod provider;
 mod rules;
 mod tracker;
 
 pub use local::LocalTracker;
 pub use model::{
-    Activity, ActivityKind, Assignee, Entry, Event, NewTask, Patch, PrLink, Priority, Query, SessionLink, Status, Task, TaskId,
+    Activity, ActivityKind, Assignee, Entry, Event, NewTask, Patch, PrLink, Priority, Query,
+    SessionLink, Status, Task, TaskId,
 };
 pub use project::{ProjectKey, prefix_for};
+pub use provider::LocalTasks;
 pub use rules::{Decision, Handled, Rule, RuleSet, Signal, handle};
 pub use tracker::{StopFlag, Subscription, Tracker, TrackerError, TrackerResult};

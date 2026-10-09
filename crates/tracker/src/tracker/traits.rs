@@ -1,6 +1,6 @@
-use crate::{Activity, Entry, NewTask, Patch, Query, Task, TaskId};
 use super::structs::Subscription;
 use super::types::TrackerResult;
+use crate::{Activity, Entry, NewTask, Patch, Query, Task, TaskId};
 
 /// The tasks of one project. `by` is who acts, for the activity log: a person's name, an agent's name, or
 /// `rule:<id>` for the automation.
