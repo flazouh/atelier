@@ -1,0 +1,194 @@
+<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>The crew, live</title>
+<style>
+:root{--bg:#141413;--card:#1C1C1A;--strong:#2A2926;--ink:#F0EEE6;--muted:#8A867C;--eye:#141413;--accent:#F9A825}
+:root[data-theme=light]{--bg:#F0EEE6;--card:#EAE7DC;--strong:#DDD9CA;--ink:#141413;--muted:#63605A}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 24px 60px}
+header{display:flex;align-items:center;gap:16px;margin-bottom:6px}
+h1{font-size:22px;margin:0;font-weight:600}
+.sp{flex:1}
+p.lede{color:var(--muted);margin:4px 0 18px}
+button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--strong);border-radius:10px;padding:7px 12px;cursor:pointer}
+button:hover{background:var(--strong)}
+button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.moods{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.card{background:var(--card);border-radius:18px;padding:16px 12px 14px;text-align:center;cursor:pointer;user-select:none;transition:background .2s}
+.card:hover{background:var(--strong)}
+.card svg{display:block;margin:0 auto;overflow:visible;transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+.card:hover svg{transform:scale(1.06)}
+.nm{font-weight:600;font-size:16px;margin-top:6px}
+.rl{color:var(--muted);font-size:12.5px}
+.hb{color:var(--muted);font-size:12px;margin-top:6px;min-height:34px}
+h2{font-size:15px;margin:30px 0 10px;font-weight:600}
+.app{display:grid;grid-template-columns:260px 1fr;gap:0;background:var(--card);border-radius:18px;overflow:hidden;min-height:260px}
+.side{background:var(--bg);padding:14px;border-right:1px solid var(--strong)}
+.side .lab{color:var(--muted);font-size:12px;margin:10px 0 6px}
+.row{display:flex;align-items:center;gap:10px;padding:5px 6px;border-radius:8px}
+.row small{color:var(--muted);margin-left:auto;font-size:12px}
+.chat{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:12px}
+.msg b{font-weight:600}.msg small{color:var(--muted);margin-left:6px}
+.pill{background:var(--strong);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--muted);margin-left:6px}
+.hint{color:var(--muted);font-size:12.5px;margin-top:14px}
+svg{overflow:visible}
+@media (max-width:860px){.grid{grid-template-columns:repeat(2,1fr)}.app{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+<header><h1>The crew, live</h1><span class="sp"></span><button id="theme">Light / dark</button></header>
+<p class="lede">Move the mouse: eyes follow. Click a bot: it reacts. Pick a mood: all bots change, smoothly. Keys 1 to 6 also work.</p>
+<div class="moods" id="moods"></div>
+<div class="grid" id="grid"></div>
+<h2>In the app, at real sizes</h2>
+<div class="app"><div class="side"><div class="row" style="font-weight:600">Fluentai</div><div class="lab">Working now</div><div id="srows"></div></div>
+<div class="chat" id="chat"></div></div>
+<p class="hint">Every bot has its own habit: Bolt taps the hammer, Pip sweeps the lens, Olive turns the periscope, Skip flickers the jets, Dot scuttles, Nimbus waves the flag, Keyla swings the key. Moods change the speed and the size of the habit.</p>
+</div>
+<script>
+const NS='http://www.w3.org/2000/svg';
+const STATES=['idle','thinking','working','done','needs','stuck'];
+const LABEL={idle:'Idle',thinking:'Thinking',working:'Working',done:'Done',needs:'Needs you',stuck:'Stuck'};
+const BOTS=[
+ {id:'blob',name:'Bolt',role:'Builder',color:'#4ACFFF',habit:'Taps the hammer when it builds.'},
+ {id:'drop',name:'Pip',role:'Prover',color:'#15DB95',habit:'Sweeps the lens over the proof.'},
+ {id:'bean',name:'Olive',role:'Reviewer',color:'#9758FF',habit:'Turns the periscope to read every line.'},
+ {id:'bun',name:'Skip',role:'Shipper',color:'#FF8D22',habit:'Flickers the jets before it ships.'},
+ {id:'dome',name:'Dot',role:'Debugger',color:'#FF78F7',habit:'Scuttles when it hunts a bug.'},
+ {id:'cloud',name:'Nimbus',role:'Planner',color:'#FBD73C',habit:'Waves the flag over the plan.'},
+ {id:'shield',name:'Keyla',role:'SSO Auditor',color:'#FF5C59',habit:'Swings the key it guards.'}];
+const CH={blob:{T:38,L:30,R:90,M:62,eye:58},drop:{T:32,L:26,R:94,M:62,eye:58},bean:{T:24,L:34,R:86,M:54,eye:48},bun:{T:36,L:22,R:98,M:58,eye:58},dome:{T:40,L:26,R:94,M:62,eye:62},cloud:{T:28,L:28,R:92,M:58,eye:52},shield:{T:24,L:32,R:88,M:46,eye:44}};
+const mixc=(h,t)=>{const p=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));const a=p(h),b=p('#74716A');return '#'+a.map((v,i)=>Math.round(v*(1-t)+b[i]*t).toString(16).padStart(2,'0')).join('')};
+const rr=(x,y,w,h,r,x2='')=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" ${x2}/>`;
+const sin=Math.sin,PI=Math.PI;
+const tap=(t,s)=>{const ph=(t*s)%3.2;return ph<.9?Math.abs(sin(ph/.9*PI*3)):0};
+function build(name,c){
+  const C=`fill="${c}"`,DK=`fill="#000" fill-opacity=".3"`,LT=`fill="#fff" fill-opacity=".4"`;
+  const two=(t,a)=>`<${t} ${a} ${C}/><${t} ${a} ${DK}/>`;
+  const st=`stroke="${c}" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
+  const P=(svg,px=60,py=100,fn=null)=>({svg,px,py,fn});
+  const k=CH[name],T=k.T,L=k.L,R=k.R,M=k.M;
+  const back=[],front=[];let body='';
+  switch(name){
+   case 'blob':
+    back.push(P(two('rect','x="20" y="82" width="80" height="20" rx="10"')+rr(30,90,10,4,2,LT)+rr(55,90,10,4,2,LT)+rr(80,90,10,4,2,LT)));
+    body=rr(30,38,60,50,22,C);
+    front.push(P(rr(R-6,M-5,18,10,5,C)+two('rect',`x="${R+8}" y="${M-14}" width="12" height="28" rx="5"`),R-2,M,(t,s,a)=>({r:-a*30*tap(t,s)})));break;
+   case 'drop':{
+    const spin=(cx)=>(t,s)=>({r:t*Math.max(0,s-1.2)*130});
+    back.push(P(two('rect','x="28" y="80" width="24" height="24" rx="9"')+two('rect','x="68" y="80" width="24" height="24" rx="9"')));
+    back.push(P(rr(36,88,8,8,3,LT),40,92,spin()));back.push(P(rr(76,88,8,8,3,LT),80,92,spin()));
+    body=rr(26,32,68,56,24,C);
+    front.push(P(rr(58,T-14,4,16,2,C)+rr(50,T-30,20,18,8,`fill="none" stroke="${c}" stroke-width="4"`)+rr(56,T-25,8,8,3,LT),60,T,(t,s,a)=>({x:a*5*sin(t*s*1.6),r:a*6*sin(t*s*1.6+1)})));break;}
+   case 'bean':
+    back.push(P(`<path d="M60 80L50 86L70 92L50 98L60 104" ${st} stroke-width="5.5"/>`,60,80,(t,s,a,ph)=>({sy:1+a*.07*sin(t*s*3+ph),sx:1-a*.03*sin(t*s*3+ph)})));
+    body=rr(34,24,52,60,24,C);
+    front.push(P(rr(57,T-14,6,16,3,C)+rr(57,T-23,20,11,5,C)+rr(68,T-20,5,5,2.5,'fill="var(--eye)"'),60,T,(t,s,a)=>({r:a*14*sin(t*s*1.2)})));break;
+   case 'bun':{
+    const fl=(o)=>(t,s,a)=>({sy:1+a*(.35*sin(t*26+o)+.2*sin(t*17+o*2))});
+    back.push(P(two('rect','x="32" y="76" width="18" height="12" rx="5"')+two('rect','x="70" y="76" width="18" height="12" rx="5"')));
+    back.push(P(rr(37,90,8,10,4,'fill="#FFE9B0"'),41,90,fl(0)));back.push(P(rr(75,90,8,10,4,'fill="#FFE9B0"'),79,90,fl(2)));
+    body=rr(22,36,76,44,22,C);
+    front.push(P(two('rect',`x="44" y="${T-16}" width="32" height="20" rx="5"`)+rr(58,T-16,4,20,0,LT),60,T+4,(t,s,a)=>({y:-a*1.4*Math.abs(sin(t*s*2)),r:a*2*sin(t*s*1.3)})));break;}
+   case 'dome':{
+    back.push(P(`<path d="M36 76L22 86V100M44 82L36 94V104M52 86L50 98V104M84 76L98 86V100M76 82L84 94V104M68 86L70 98V104" ${st} stroke-width="4.5"/>`,60,86,(t,s,a)=>{const m=Math.min(1,.15+Math.max(0,s-1)*.4);return {r:m*2*sin(t*s*7),y:-m*1.4*Math.abs(sin(t*s*7))}}));
+    body=rr(26,40,68,46,22,C);
+    front.push(P(`<path d="M46 ${T+6}L40 ${T-10}" ${st}/>`+rr(35,T-20,10,10,5,C),46,T+6,(t,s,a)=>({r:a*10*sin(t*s*2.2)})));
+    front.push(P(`<path d="M74 ${T+6}L80 ${T-10}" ${st}/>`+rr(75,T-20,10,10,5,C),74,T+6,(t,s,a)=>({r:a*10*sin(t*s*2.2+1.6)})));break;}
+   case 'cloud':
+    back.push(P(two('rect','x="40" y="82" width="12" height="16" rx="6"')+two('rect','x="68" y="82" width="12" height="16" rx="6"')+rr(34,94,24,10,5,C)+rr(62,94,24,10,5,C)));
+    body=rr(28,28,64,60,26,C);
+    front.push(P(rr(58,T-24,4,26,2,C)+`<path d="M62 ${T-24}Q82 ${T-22} 80 ${T-16}Q82 ${T-10} 62 ${T-8}Z" ${C}/>`,60,T+2,(t,s,a)=>({r:a*6*sin(t*s*3),sx:1+a*.05*sin(t*s*5)})));break;
+   case 'shield':
+    back.push(P(two('rect','x="48" y="82" width="24" height="24" rx="7" transform="rotate(45 60 94)"')));
+    body=`<path d="M38 30H82V50Q82 62 60 80Q38 62 38 50Z" ${C} stroke="${c}" stroke-width="12" stroke-linejoin="round"/>`;
+    front.push(P(rr(L-22,M-8,16,16,6,`fill="none" stroke="${c}" stroke-width="4"`)+`<path d="M${L-14} ${M+8}V${M+28}M${L-14} ${M+20}h8M${L-14} ${M+28}h8" ${st}/>`,L-14,M-8,(t,s,a)=>({r:a*10*sin(t*s*2.4)})));break;
+  }
+  return {back,body,front,k};
+}
+function eyeSets(cy){
+  const e='fill="var(--eye)"',s='stroke="var(--eye)"',L=48,R=72;
+  const pl=(x,w,h)=>`<rect x="${x-w/2}" y="${cy-h/2}" width="${w}" height="${h}" rx="${w/2}" ${e}/>`;
+  return {
+   idle:pl(L,8,12)+pl(R,8,12),
+   thinking:`<circle cx="48" cy="${cy}" r="3.4" ${e}/><circle cx="60" cy="${cy}" r="3.4" ${e} opacity=".6"/><circle cx="72" cy="${cy}" r="3.4" ${e} opacity=".3"/>`,
+   working:`<rect x="42" y="${cy-2}" width="36" height="4" rx="2" ${e}/>`,
+   done:`<path d="M${L-6} ${cy+3}Q${L} ${cy-6} ${L+6} ${cy+3}M${R-6} ${cy+3}Q${R} ${cy-6} ${R+6} ${cy+3}" ${s} stroke-width="3.6" fill="none" stroke-linecap="round"/>`,
+   needs:pl(L,8,20)+pl(R,8,20),
+   stuck:`<path d="M${L-4} ${cy-4}L${L+4} ${cy+4}M${L+4} ${cy-4}L${L-4} ${cy+4}M${R-4} ${cy-4}L${R+4} ${cy+4}M${R+4} ${cy-4}L${R-4} ${cy+4}" ${s} stroke-width="3" stroke-linecap="round"/>`};
+}
+const hop=(u,h)=>{const k=Math.min(u,1-u),sq=k<.1?.14*(1-k/.1):0,air=sin(PI*u);return {y:-h*4*u*(1-u),sy:-sq+(sq?0:.07*air),sx:sq*.9-.035*air}};
+const POSE={
+ idle:(t,ph)=>({y:-(1+sin(t*1.8+ph))*.9,sy:.012*sin(t*1.8+ph+.6),sx:-.008*sin(t*1.8+ph+.6)}),
+ thinking:(t,ph)=>({r:3*sin(t*1.4+ph),y:-1}),
+ working:(t)=>({x:.9*sin(t*28),sy:.01*sin(t*14),y:-.5}),
+ done:(t,ph)=>hop((t*.9+ph/6.3)%1,10),
+ needs:(t,ph)=>hop((t*1.6+ph/6.3)%1,7),
+ stuck:(t)=>({r:-8+1.5*sin(t*9),x:.8*sin(t*17)})};
+const PARAM={idle:[1,1],thinking:[.7,.8],working:[3.2,1],done:[2,1.2],needs:[2.5,1.4],stuck:[.5,.25]};
+const bots=[];let gState='idle',mx=-999,my=-999;
+function mount(host,def,size,fixed,delay){
+  const b=build(def.id,mixc(def.color,.1)),k=b.k;
+  const svg=document.createElementNS(NS,'svg');svg.setAttribute('viewBox','0 0 120 120');svg.setAttribute('width',size);svg.setAttribute('height',size);
+  const all=[...b.back,{svg:b.body,px:60,py:100,fn:null},...b.front];
+  const es=eyeSets(k.eye);
+  const cheeks=def.id==='shield'?'':`<rect x="${k.L+10}" y="${k.eye+8}" width="8" height="5" rx="2.5" fill="#fff" fill-opacity=".28"/><rect x="${k.R-18}" y="${k.eye+8}" width="8" height="5" rx="2.5" fill="#fff" fill-opacity=".28"/>`;
+  svg.innerHTML=`<g class="root">${all.map((p,i)=>`<g data-i="${i}">${p.svg}</g>`).join('')}<g class="ch">${cheeks}</g><g class="eyes">${STATES.map(s=>`<g data-e="${s}" opacity="0">${es[s]}</g>`).join('')}</g></g>`;
+  host.appendChild(svg);
+  const bot={svg,root:svg.querySelector('.root'),parts:all.map((p,i)=>({p,g:svg.querySelector(`[data-i="${i}"]`)})),ch:svg.querySelector('.ch'),eyes:svg.querySelector('.eyes'),eg:{},w:{},ph:Math.random()*6.28,nb:1+Math.random()*3,bl:-1,react:-9,fixed,delay:delay||0,cy:k.eye};
+  STATES.forEach(s=>{bot.eg[s]=svg.querySelector(`[data-e="${s}"]`);bot.w[s]=s==='idle'?1:0});
+  svg.style.cursor='pointer';
+  svg.addEventListener('click',()=>{bot.react=performance.now()/1000+T0});
+  bots.push(bot);return bot;
+}
+const tf=(o,px,py)=>`translate(${o.x||0} ${o.y||0}) translate(${px} ${py}) rotate(${o.r||0}) scale(${o.sx==null?1:o.sx} ${o.sy==null?1:o.sy}) translate(${-px} ${-py})`;
+const ease=x=>{x=Math.max(0,Math.min(1,x));const c1=1.9,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+let T0=0;
+function frame(ms){
+  const t=ms/1000+T0;
+  for(const b of bots){
+    let st=b.fixed||gState;const ru=(t-b.react)/.75;const reacting=ru>=0&&ru<1;if(reacting)st='done';
+    let x=0,y=0,r=0,sx=1,sy=1,sp=0,am=0;
+    for(const s of STATES){b.w[s]+=((s===st?1:0)-b.w[s])*.12;const w=b.w[s];if(w<.003)continue;const p=POSE[s](t,b.ph);x+=w*(p.x||0);y+=w*(p.y||0);r+=w*(p.r||0);sx+=w*(p.sx||0);sy+=w*(p.sy||0);sp+=w*PARAM[s][0];am+=w*PARAM[s][1];}
+    if(reacting){const u=ru;if(u<.2){const k=u/.2;sy-=.2*k;sx+=.12*k}else if(u<.85){const v=(u-.2)/.65;y-=18*4*v*(1-v);sy+=.1*sin(PI*v);sx-=.05*sin(PI*v)}else{const k=(1-u)/.15;sy-=.15*k;sx+=.1*k}}
+    const ap=ease((t-b.delay)/.8);sx*=ap;sy*=ap;y+=(1-ap)*18;
+    const rc=b.svg.getBoundingClientRect(),cx=rc.left+rc.width/2,cyy=rc.top+rc.height/2;
+    let dx=Math.max(-1,Math.min(1,(mx-cx)/260)),dy=Math.max(-1,Math.min(1,(my-cyy)/260));
+    const look=1-b.w.stuck;
+    r+=dx*1.6*look;
+    b.root.setAttribute('transform',tf({x,y,r,sx,sy},60,104));
+    for(const q of b.parts){if(!q.p.fn)continue;q.g.setAttribute('transform',tf(q.p.fn(t,sp,am,b.ph),q.p.px,q.p.py))}
+    // blink
+    if(b.bl<0&&t>b.nb){b.bl=t}
+    let bk=1;if(b.bl>=0){const u=(t-b.bl)/.16;if(u>=1){b.bl=-1;b.nb=t+2+Math.random()*3.5}else bk=1-.92*sin(PI*u)}
+    for(const s of STATES){b.eg[s].setAttribute('opacity',b.w[s].toFixed(3))}
+    b.eg.idle.setAttribute('transform',`translate(0 ${b.cy}) scale(1 ${bk}) translate(0 ${-b.cy})`);
+    b.eg.needs.setAttribute('transform',`translate(0 ${b.cy}) scale(1 ${bk}) translate(0 ${-b.cy})`);
+    b.eg.working.setAttribute('transform',`translate(${(8*sin(t*5)).toFixed(2)} 0)`);
+    b.eyes.setAttribute('transform',`translate(${(dx*3.2*look).toFixed(2)} ${(dy*2.2*look).toFixed(2)})`);
+    b.ch.setAttribute('opacity',Math.max(b.w.idle,b.w.done,b.w.thinking).toFixed(3));
+  }
+  requestAnimationFrame(frame);
+}
+// page
+const grid=document.getElementById('grid');
+BOTS.forEach((d,i)=>{const c=document.createElement('div');c.className='card';c.innerHTML=`<div class="h"></div><div class="nm">${d.name}</div><div class="rl">${d.role}</div><div class="hb">${d.habit}</div>`;grid.appendChild(c);const bot=mount(c.querySelector('.h'),d,150,null,i*.12);c.addEventListener('click',()=>{bot.react=performance.now()/1000+T0})});
+const nu=document.createElement('div');nu.className='card';nu.innerHTML=`<svg width="150" height="150" viewBox="0 0 120 120"><g fill="none" stroke="var(--muted)" stroke-width="3.4" stroke-dasharray="5 7" stroke-linecap="round" opacity=".8"><rect x="30" y="82" width="22" height="20" rx="8"/><rect x="68" y="82" width="22" height="20" rx="8"/><rect x="26" y="32" width="68" height="58" rx="24"/><path d="M60 52V72M50 62H70"/></g></svg><div class="nm">You?</div><div class="rl">A new friend</div><div class="hb">Pick a body, a colour and a tool. It takes a minute.</div>`;grid.appendChild(nu);
+const mo=document.getElementById('moods');
+STATES.forEach((s,i)=>{const b=document.createElement('button');b.textContent=`${i+1}  ${LABEL[s]}`;b.dataset.s=s;if(s==='idle')b.classList.add('on');b.onclick=()=>setState(s);mo.appendChild(b)});
+function setState(s){gState=s;[...mo.children].forEach(b=>b.classList.toggle('on',b.dataset.s===s))}
+addEventListener('keydown',e=>{const i=+e.key;if(i>=1&&i<=6)setState(STATES[i-1])});
+addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY});
+const B=id=>BOTS.find(b=>b.id===id);
+const srows=document.getElementById('srows');
+[['blob','working','#general · 14 s'],['dome','thinking','#design · 2 min'],['bean','needs','needs Alex'],['bun','done','merged']].forEach(([id,s,txt])=>{const r=document.createElement('div');r.className='row';r.innerHTML=`<span></span><span>${B(id).name}</span><small>${txt}</small>`;srows.appendChild(r);mount(r.firstElementChild,B(id),30,s,0)});
+const chat=document.getElementById('chat');
+function msg(id,state,who,badge,time,text){const m=document.createElement('div');m.className='msg';m.innerHTML=`<span></span><div><b>${who}</b><span class="pill">${badge}</span><small>${time}</small><div>${text}</div></div>`;chat.appendChild(m);mount(m.firstElementChild,B(id),44,state,0)}
+msg('dome','working','Dot','Alex’s bot','10:05','On it. Looking at how the server binds its port.');
+msg('blob','idle','Bolt','Workspace bot','10:06','Tests first. I will start when you say go.');
+msg('bun','done','Skip','Workspace bot','10:08','ENG-370 is merged and released. I told Ana.');
+const q=new URLSearchParams(location.search);T0=+(q.get('skip')||0);
+if(q.get('light')!==null)document.documentElement.dataset.theme='light';
+if(q.get('mood'))setState(q.get('mood'));
+document.getElementById('theme').onclick=()=>{const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'};
+requestAnimationFrame(frame);
+</script></body></html>

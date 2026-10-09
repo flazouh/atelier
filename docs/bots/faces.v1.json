@@ -1,0 +1,608 @@
+{
+ "version": 1,
+ "view_box": [
+  0,
+  0,
+  120,
+  120
+ ],
+ "ground_y": 104,
+ "colour_mix_with_grey": 0.1,
+ "grey": "#74716A",
+ "tokens": {
+  "body": "the bot colour mixed 10% toward the grey",
+  "shade": "black at 30% opacity, drawn over the body colour",
+  "light": "white at 40% opacity",
+  "eye": "#141413 in both themes"
+ },
+ "states": {
+  "idle": {
+   "speed": 1,
+   "amount": 1
+  },
+  "thinking": {
+   "speed": 0.7,
+   "amount": 0.8
+  },
+  "working": {
+   "speed": 3.2,
+   "amount": 1
+  },
+  "done": {
+   "speed": 2,
+   "amount": 1.2
+  },
+  "needs": {
+   "speed": 2.5,
+   "amount": 1.4
+  },
+  "stuck": {
+   "speed": 0.5,
+   "amount": 0.25
+  }
+ },
+ "bots": [
+  {
+   "id": "blob",
+   "name": "Bolt",
+   "role": "Builder",
+   "colour": "#4ACFFF",
+   "habit_text": "Taps the hammer when it builds.",
+   "eye_y": 58,
+   "cheeks": [
+    [
+     40,
+     66,
+     8,
+     5
+    ],
+    [
+     72,
+     66,
+     8,
+     5
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<rect x=\"20\" y=\"82\" width=\"80\" height=\"20\" rx=\"10\" fill=\"{body}\"/><rect x=\"20\" y=\"82\" width=\"80\" height=\"20\" rx=\"10\" fill=\"{shade}\"/><rect x=\"30\" y=\"90\" width=\"10\" height=\"4\" rx=\"2\" fill=\"{light}\"/><rect x=\"55\" y=\"90\" width=\"10\" height=\"4\" rx=\"2\" fill=\"{light}\"/><rect x=\"80\" y=\"90\" width=\"10\" height=\"4\" rx=\"2\" fill=\"{light}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"30\" y=\"38\" width=\"60\" height=\"50\" rx=\"22\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"84\" y=\"57\" width=\"18\" height=\"10\" rx=\"5\" fill=\"{body}\"/><rect x=\"98\" y=\"48\" width=\"12\" height=\"28\" rx=\"5\" fill=\"{body}\"/><rect x=\"98\" y=\"48\" width=\"12\" height=\"28\" rx=\"5\" fill=\"{shade}\"/>",
+     "pivot": [
+      88,
+      62
+     ],
+     "habit": {
+      "kind": "swing",
+      "pivot": [
+       88,
+       62
+      ],
+      "amp_deg": 30,
+      "every_s": 3.2,
+      "note": "taps 3 times, then rests"
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"58\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
+    "working": "<rect x=\"42\" y=\"56\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 61Q48 52 54 61M66 61Q72 52 78 61\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 54L52 62M52 54L44 62M68 54L76 62M76 54L68 62\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+   }
+  },
+  {
+   "id": "drop",
+   "name": "Pip",
+   "role": "Prover",
+   "colour": "#15DB95",
+   "habit_text": "Sweeps the lens over the proof.",
+   "eye_y": 58,
+   "cheeks": [
+    [
+     36,
+     66,
+     8,
+     5
+    ],
+    [
+     76,
+     66,
+     8,
+     5
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<rect x=\"28\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{body}\"/><rect x=\"28\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{shade}\"/><rect x=\"68\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{body}\"/><rect x=\"68\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{shade}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"36\" y=\"88\" width=\"8\" height=\"8\" rx=\"3\" fill=\"{light}\"/>",
+     "pivot": [
+      40,
+      92
+     ],
+     "habit": {
+      "kind": "spin",
+      "pivot": [
+       40,
+       92
+      ],
+      "deg_per_s": 130,
+      "only_when": "speed>1.2"
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"76\" y=\"88\" width=\"8\" height=\"8\" rx=\"3\" fill=\"{light}\"/>",
+     "pivot": [
+      80,
+      92
+     ],
+     "habit": {
+      "kind": "spin",
+      "pivot": [
+       80,
+       92
+      ],
+      "deg_per_s": 130,
+      "only_when": "speed>1.2"
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"26\" y=\"32\" width=\"68\" height=\"56\" rx=\"24\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"58\" y=\"18\" width=\"4\" height=\"16\" rx=\"2\" fill=\"{body}\"/><rect x=\"50\" y=\"2\" width=\"20\" height=\"18\" rx=\"8\" fill=\"none\" stroke=\"{body}\" stroke-width=\"4\"/><rect x=\"56\" y=\"7\" width=\"8\" height=\"8\" rx=\"3\" fill=\"{light}\"/>",
+     "pivot": [
+      60,
+      32
+     ],
+     "habit": {
+      "kind": "sweep",
+      "pivot": [
+       60,
+       32
+      ],
+      "dx": 5,
+      "rot_deg": 6,
+      "hz": 1.6
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"58\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
+    "working": "<rect x=\"42\" y=\"56\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 61Q48 52 54 61M66 61Q72 52 78 61\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 54L52 62M52 54L44 62M68 54L76 62M76 54L68 62\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+   }
+  },
+  {
+   "id": "bean",
+   "name": "Olive",
+   "role": "Reviewer",
+   "colour": "#9758FF",
+   "habit_text": "Turns the periscope to read every line.",
+   "eye_y": 48,
+   "cheeks": [
+    [
+     44,
+     56,
+     8,
+     5
+    ],
+    [
+     68,
+     56,
+     8,
+     5
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<path d=\"M60 80L50 86L70 92L50 98L60 104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"5.5\"/>",
+     "pivot": [
+      60,
+      80
+     ],
+     "habit": {
+      "kind": "spring",
+      "pivot": [
+       60,
+       80
+      ],
+      "squash": 0.07,
+      "hz": 3
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"34\" y=\"24\" width=\"52\" height=\"60\" rx=\"24\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"57\" y=\"10\" width=\"6\" height=\"16\" rx=\"3\" fill=\"{body}\"/><rect x=\"57\" y=\"1\" width=\"20\" height=\"11\" rx=\"5\" fill=\"{body}\"/><rect x=\"68\" y=\"4\" width=\"5\" height=\"5\" rx=\"2.5\" fill=\"{eye}\"/>",
+     "pivot": [
+      60,
+      24
+     ],
+     "habit": {
+      "kind": "swing",
+      "pivot": [
+       60,
+       24
+      ],
+      "amp_deg": 14,
+      "hz": 1.2
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<rect x=\"44\" y=\"42\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"42\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"48\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"48\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"48\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
+    "working": "<rect x=\"42\" y=\"46\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 51Q48 42 54 51M66 51Q72 42 78 51\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"38\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"38\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 44L52 52M52 44L44 52M68 44L76 52M76 44L68 52\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+   }
+  },
+  {
+   "id": "bun",
+   "name": "Skip",
+   "role": "Shipper",
+   "colour": "#FF8D22",
+   "habit_text": "Flickers the jets before it ships.",
+   "eye_y": 58,
+   "cheeks": [
+    [
+     32,
+     66,
+     8,
+     5
+    ],
+    [
+     80,
+     66,
+     8,
+     5
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<rect x=\"32\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{body}\"/><rect x=\"32\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{shade}\"/><rect x=\"70\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{body}\"/><rect x=\"70\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{shade}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"37\" y=\"90\" width=\"8\" height=\"10\" rx=\"4\" fill=\"#FFE9B0\"/>",
+     "pivot": [
+      41,
+      90
+     ],
+     "habit": {
+      "kind": "flicker",
+      "pivot": [
+       41,
+       90
+      ],
+      "amp": 0.35
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"75\" y=\"90\" width=\"8\" height=\"10\" rx=\"4\" fill=\"#FFE9B0\"/>",
+     "pivot": [
+      79,
+      90
+     ],
+     "habit": {
+      "kind": "flicker",
+      "pivot": [
+       79,
+       90
+      ],
+      "amp": 0.35
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"22\" y=\"36\" width=\"76\" height=\"44\" rx=\"22\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"44\" y=\"20\" width=\"32\" height=\"20\" rx=\"5\" fill=\"{body}\"/><rect x=\"44\" y=\"20\" width=\"32\" height=\"20\" rx=\"5\" fill=\"{shade}\"/><rect x=\"58\" y=\"20\" width=\"4\" height=\"20\" rx=\"0\" fill=\"{light}\"/>",
+     "pivot": [
+      60,
+      40
+     ],
+     "habit": {
+      "kind": "bob",
+      "pivot": [
+       60,
+       40
+      ],
+      "dy": 1.4,
+      "rot_deg": 2,
+      "hz": 2
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"58\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
+    "working": "<rect x=\"42\" y=\"56\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 61Q48 52 54 61M66 61Q72 52 78 61\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 54L52 62M52 54L44 62M68 54L76 62M76 54L68 62\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+   }
+  },
+  {
+   "id": "dome",
+   "name": "Dot",
+   "role": "Debugger",
+   "colour": "#FF78F7",
+   "habit_text": "Scuttles when it hunts a bug.",
+   "eye_y": 62,
+   "cheeks": [
+    [
+     36,
+     70,
+     8,
+     5
+    ],
+    [
+     76,
+     70,
+     8,
+     5
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<path d=\"M36 76L22 86V100M44 82L36 94V104M52 86L50 98V104M84 76L98 86V100M76 82L84 94V104M68 86L70 98V104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"4.5\"/>",
+     "pivot": [
+      60,
+      86
+     ],
+     "habit": {
+      "kind": "scuttle",
+      "pivot": [
+       60,
+       86
+      ],
+      "rot_deg": 2,
+      "dy": 1.4,
+      "hz": 7,
+      "intensity": "by speed"
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"26\" y=\"40\" width=\"68\" height=\"46\" rx=\"22\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "front",
+     "svg": "<path d=\"M46 46L40 30\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"35\" y=\"20\" width=\"10\" height=\"10\" rx=\"5\" fill=\"{body}\"/>",
+     "pivot": [
+      46,
+      46
+     ],
+     "habit": {
+      "kind": "swing",
+      "pivot": [
+       46,
+       46
+      ],
+      "amp_deg": 10,
+      "hz": 2.2
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<path d=\"M74 46L80 30\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"75\" y=\"20\" width=\"10\" height=\"10\" rx=\"5\" fill=\"{body}\"/>",
+     "pivot": [
+      74,
+      46
+     ],
+     "habit": {
+      "kind": "swing",
+      "pivot": [
+       74,
+       46
+      ],
+      "amp_deg": 10,
+      "hz": 2.2,
+      "phase": 1.6
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<rect x=\"44\" y=\"56\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"56\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"62\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
+    "working": "<rect x=\"42\" y=\"60\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 65Q48 56 54 65M66 65Q72 56 78 65\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 58L52 66M52 58L44 66M68 58L76 66M76 58L68 66\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+   }
+  },
+  {
+   "id": "cloud",
+   "name": "Nimbus",
+   "role": "Planner",
+   "colour": "#FBD73C",
+   "habit_text": "Waves the flag over the plan.",
+   "eye_y": 52,
+   "cheeks": [
+    [
+     38,
+     60,
+     8,
+     5
+    ],
+    [
+     74,
+     60,
+     8,
+     5
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<rect x=\"40\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{body}\"/><rect x=\"40\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{shade}\"/><rect x=\"68\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{body}\"/><rect x=\"68\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{shade}\"/><rect x=\"34\" y=\"94\" width=\"24\" height=\"10\" rx=\"5\" fill=\"{body}\"/><rect x=\"62\" y=\"94\" width=\"24\" height=\"10\" rx=\"5\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"28\" y=\"28\" width=\"64\" height=\"60\" rx=\"26\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"58\" y=\"4\" width=\"4\" height=\"26\" rx=\"2\" fill=\"{body}\"/><path d=\"M62 4Q82 6 80 12Q82 18 62 20Z\" fill=\"{body}\"/>",
+     "pivot": [
+      60,
+      30
+     ],
+     "habit": {
+      "kind": "wave",
+      "pivot": [
+       60,
+       30
+      ],
+      "amp_deg": 6,
+      "stretch": 0.05,
+      "hz": 3
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<rect x=\"44\" y=\"46\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"46\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"52\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"52\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"52\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
+    "working": "<rect x=\"42\" y=\"50\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 55Q48 46 54 55M66 55Q72 46 78 55\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"42\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"42\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 48L52 56M52 48L44 56M68 48L76 56M76 48L68 56\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+   }
+  },
+  {
+   "id": "shield",
+   "name": "Keyla",
+   "role": "SSO Auditor",
+   "colour": "#FF5C59",
+   "habit_text": "Swings the key it guards.",
+   "eye_y": 44,
+   "cheeks": null,
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<rect x=\"48\" y=\"82\" width=\"24\" height=\"24\" rx=\"7\" transform=\"rotate(45 60 94)\" fill=\"{body}\"/><rect x=\"48\" y=\"82\" width=\"24\" height=\"24\" rx=\"7\" transform=\"rotate(45 60 94)\" fill=\"{shade}\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<path d=\"M38 30H82V50Q82 62 60 80Q38 62 38 50Z\" fill=\"{body}\" stroke=\"{body}\" stroke-width=\"12\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"10\" y=\"38\" width=\"16\" height=\"16\" rx=\"6\" fill=\"none\" stroke=\"{body}\" stroke-width=\"4\"/><path d=\"M18 54V74M18 66h8M18 74h8\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      18,
+      38
+     ],
+     "habit": {
+      "kind": "swing",
+      "pivot": [
+       18,
+       38
+      ],
+      "amp_deg": 10,
+      "hz": 2.4
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<rect x=\"44\" y=\"38\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"38\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"44\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"44\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"44\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
+    "working": "<rect x=\"42\" y=\"42\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 47Q48 38 54 47M66 47Q72 38 78 47\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"34\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"34\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 40L52 48M52 40L44 48M68 40L76 48M76 40L68 48\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+   }
+  }
+ ]
+}
