@@ -12,11 +12,15 @@ use atelier_capabilities::{
 };
 use serde_json::{Value, json};
 
-use crate::{Gateway, SessionAccess, TasksTools, ToolSet};
+use crate::{Gateway, MailTools, MessagingTools, SessionAccess, TasksTools, ToolSet};
 
 mod access;
+mod fakes;
+mod mail;
+mod messaging;
 mod protocol;
 mod tasks;
+mod visibility;
 
 const VERSION: &str = "2025-11-25";
 
@@ -24,6 +28,7 @@ const VERSION: &str = "2025-11-25";
 struct Fixture {
     gateway: Gateway,
     memory: Arc<MemoryTasks>,
+    registry: Arc<RwLock<Registry>>,
     access: SessionAccess,
     http: ureq::Agent,
 }
@@ -40,8 +45,13 @@ fn fixture() -> Fixture {
 }
 
 fn with_registry(registry: Registry, memory: Arc<MemoryTasks>) -> Fixture {
-    let tools: Arc<dyn ToolSet> = Arc::new(TasksTools::new(Arc::new(RwLock::new(registry))));
-    let gateway = Gateway::start(vec![tools]).expect("the gateway starts");
+    let registry = Arc::new(RwLock::new(registry));
+    let sets: Vec<Arc<dyn ToolSet>> = vec![
+        Arc::new(TasksTools::new(registry.clone())),
+        Arc::new(MessagingTools::new(registry.clone())),
+        Arc::new(MailTools::new(registry.clone())),
+    ];
+    let gateway = Gateway::start(sets).expect("the gateway starts");
     let access = gateway.session(agent()).expect("a session token");
     let http = ureq::Agent::config_builder()
         .http_status_as_error(false)
@@ -51,9 +61,15 @@ fn with_registry(registry: Registry, memory: Arc<MemoryTasks>) -> Fixture {
     Fixture {
         gateway,
         memory,
+        registry,
         access,
         http,
     }
+}
+
+/// A gateway over `registry`, for a test that has no tasks. The tasks memory it carries is not in the registry.
+fn without_tasks(registry: Registry) -> Fixture {
+    with_registry(registry, Arc::new(MemoryTasks::new("none")))
 }
 
 /// A person made this task; the memory provider keeps it.
@@ -108,6 +124,16 @@ impl Fixture {
         );
         assert!(answer.get("error").is_none(), "{answer}");
         answer["result"].clone()
+    }
+
+    /// The names `tools/list` shows, in order.
+    fn tool_names(&self) -> Vec<String> {
+        self.rpc("tools/list", json!({}))["result"]["tools"]
+            .as_array()
+            .expect("a list of tools")
+            .iter()
+            .map(|tool| tool["name"].as_str().expect("a name").to_string())
+            .collect()
     }
 
     /// The text of the first content block of a result.
