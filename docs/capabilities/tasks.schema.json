@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atelier.dev/schemas/tasks/v1.json",
+  "title": "Atelier capability: tasks (v1 draft)",
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "description": "<capability>:<provider>:<account>:<id>, for example tasks:linear:acme:ENG-123",
+      "pattern": "^[a-z_]+:[a-z0-9_-]+:[A-Za-z0-9_.-]+:.+$"
+    },
+    "millis": { "type": "integer", "description": "Milliseconds since the epoch, UTC" },
+    "actor": {
+      "type": "object",
+      "required": ["kind", "id", "name"],
+      "properties": {
+        "kind": { "enum": ["person", "agent"] },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "on_behalf_of": { "type": "string", "description": "Id of the person an agent works for" }
+      },
+      "additionalProperties": false
+    },
+    "priority": { "enum": ["none", "urgent", "high", "medium", "low"] },
+    "status": {
+      "type": "object",
+      "required": ["id", "name", "category"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "enum": ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] }
+      },
+      "additionalProperties": false
+    },
+    "link": {
+      "type": "object",
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": { "enum": ["session", "pull_request", "task", "message", "mail", "url"] },
+        "ref": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "label": {
+      "type": "object",
+      "required": ["ref", "name"],
+      "properties": { "ref": { "$ref": "#/$defs/ref" }, "name": { "type": "string" }, "color": { "type": "string" }, "raw": {} },
+      "additionalProperties": false
+    },
+    "project": {
+      "type": "object",
+      "required": ["ref", "key", "name"],
+      "properties": { "ref": { "$ref": "#/$defs/ref" }, "key": { "type": "string" }, "name": { "type": "string" }, "raw": {} },
+      "additionalProperties": false
+    },
+    "task": {
+      "type": "object",
+      "required": ["ref", "key", "title", "status", "priority", "assignees", "labels", "links", "created_at", "updated_at", "version"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "key": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string", "description": "Markdown" },
+        "status": { "$ref": "#/$defs/status" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "assignees": { "type": "array", "items": { "$ref": "#/$defs/actor" } },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "project": { "$ref": "#/$defs/ref" },
+        "parent": { "$ref": "#/$defs/ref" },
+        "links": { "type": "array", "items": { "$ref": "#/$defs/link" } },
+        "created_at": { "$ref": "#/$defs/millis" },
+        "updated_at": { "$ref": "#/$defs/millis" },
+        "version": { "type": "string", "description": "Opaque. Send it back on update." },
+        "due_at": { "$ref": "#/$defs/millis" },
+        "estimate": { "type": "number" },
+        "relations": { "type": "array", "items": { "type": "object", "required": ["kind", "ref"], "properties": { "kind": { "enum": ["blocks", "blocked_by", "relates", "duplicates"] }, "ref": { "$ref": "#/$defs/ref" } } } },
+        "raw": { "description": "The provider's own JSON, kept for export and import" }
+      },
+      "additionalProperties": false
+    },
+    "comment": {
+      "type": "object",
+      "required": ["ref", "task", "author", "body", "created_at"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "task": { "$ref": "#/$defs/ref" },
+        "author": { "$ref": "#/$defs/actor" },
+        "body": { "type": "string" },
+        "created_at": { "$ref": "#/$defs/millis" },
+        "updated_at": { "$ref": "#/$defs/millis" },
+        "raw": {}
+      },
+      "additionalProperties": false
+    },
+    "activity": {
+      "type": "object",
+      "required": ["ref", "task", "at", "by", "kind"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "task": { "$ref": "#/$defs/ref" },
+        "at": { "$ref": "#/$defs/millis" },
+        "by": { "$ref": "#/$defs/actor" },
+        "kind": { "enum": ["created", "status_changed", "assigned", "edited", "commented", "session_started", "pr_opened", "pr_merged", "commit"] },
+        "detail": {}
+      },
+      "additionalProperties": false
+    },
+    "query": {
+      "type": "object",
+      "properties": {
+        "status": { "type": "array", "items": { "enum": ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] } },
+        "assignee": { "type": "string" },
+        "project": { "$ref": "#/$defs/ref" },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "text": { "type": "string" },
+        "linked_to": { "$ref": "#/$defs/ref" },
+        "sort": { "enum": ["updated", "created", "priority"] },
+        "limit": { "type": "integer", "minimum": 1 },
+        "cursor": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "page": {
+      "type": "object",
+      "required": ["items"],
+      "properties": { "items": { "type": "array" }, "next_cursor": { "type": "string" } }
+    },
+    "new_task": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "project": { "$ref": "#/$defs/ref" },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "assignees": { "type": "array", "items": { "type": "string" } },
+        "parent": { "$ref": "#/$defs/ref" }
+      },
+      "additionalProperties": false
+    },
+    "patch": {
+      "type": "object",
+      "description": "A field that is present changes. A field set to null clears. A field that is absent stays.",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "status": { "type": "string" },
+        "priority": { "$ref": "#/$defs/priority" },
+        "project": { "oneOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/ref" } },
+        "assignees": { "type": "array", "items": { "type": "string" } },
+        "parent": { "oneOf": [{ "$ref": "#/$defs/ref" }, { "type": "null" }] }
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["operations", "features", "limits", "auth"],
+      "properties": {
+        "operations": { "type": "array", "items": { "enum": ["list", "get", "create", "update", "comment", "activity", "subscribe", "create_many", "delete", "link", "labels", "projects", "statuses", "export", "import"] } },
+        "features": { "type": "array", "items": { "enum": ["custom_states", "subtasks", "relations", "estimates", "due_dates", "cycles", "attachments", "webhooks", "reactions"] } },
+        "limits": { "type": "object", "properties": { "page_max": { "type": "integer" }, "per_minute": { "type": "integer" } } },
+        "auth": { "type": "array", "items": { "enum": ["oauth", "token", "browser_session", "none"] } }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "oneOf": [
+        { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["not_found", "offline", "not_signed_in", "storage"] } } },
+        { "type": "object", "required": ["kind", "field"], "properties": { "kind": { "const": "invalid" }, "field": { "type": "string" } } },
+        { "type": "object", "required": ["kind", "current"], "properties": { "kind": { "const": "conflict" }, "current": { "$ref": "#/$defs/task" } } },
+        { "type": "object", "required": ["kind", "retry_after_ms"], "properties": { "kind": { "const": "rate_limited" }, "retry_after_ms": { "type": "integer" } } },
+        { "type": "object", "required": ["kind", "feature"], "properties": { "kind": { "const": "unsupported" }, "feature": { "type": "string" } } },
+        { "type": "object", "required": ["kind", "code", "message"], "properties": { "kind": { "const": "provider" }, "code": { "type": "string" }, "message": { "type": "string" } } }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "required": ["kind", "task"],
+      "properties": { "kind": { "enum": ["created", "updated", "activity"] }, "task": { "$ref": "#/$defs/task" }, "activity": { "$ref": "#/$defs/activity" } }
+    },
+    "envelope": {
+      "type": "object",
+      "description": "One entity in an export or import batch",
+      "required": ["type", "entity"],
+      "properties": {
+        "type": { "enum": ["task", "comment", "activity", "label", "project", "actor"] },
+        "entity": {},
+        "raw": {}
+      }
+    }
+  }
+}

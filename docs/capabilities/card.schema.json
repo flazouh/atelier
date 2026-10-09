@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atelier.dev/schemas/card/v1.json",
+  "title": "Atelier tool card schema (v1 draft)",
+  "type": "object",
+  "required": ["version", "tool", "done"],
+  "properties": {
+    "version": { "const": 1 },
+    "tool": { "type": "string", "description": "The tool this card draws, as named in the plugin manifest" },
+    "running": { "$ref": "#/$defs/stateLine" },
+    "failed": { "$ref": "#/$defs/stateLine" },
+    "done": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "$ref": "#/$defs/value" },
+        "body": { "$ref": "#/$defs/node" },
+        "footer": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/action" } }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "stateLine": {
+      "type": "object",
+      "required": ["title"],
+      "properties": { "title": { "$ref": "#/$defs/value" } },
+      "additionalProperties": false
+    },
+    "path": { "type": "string", "pattern": "^\\$(\\.[A-Za-z_][A-Za-z0-9_]*|\\[[0-9]+\\])*$", "description": "A JSON path into the tool result. Only dots and indexes." },
+    "format": { "enum": ["count", "relative_time", "absolute_time", "duration_ms", "bytes", "percent"] },
+    "tone": { "enum": ["neutral", "info", "success", "warning", "danger"] },
+    "value": {
+      "oneOf": [
+        { "type": ["string", "number", "boolean"] },
+        {
+          "type": "object",
+          "required": ["path"],
+          "properties": { "path": { "$ref": "#/$defs/path" }, "format": { "$ref": "#/$defs/format" }, "default": { "type": ["string", "number"] } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["template"],
+          "properties": { "template": { "type": "string", "maxLength": 200, "description": "Text with {$.path} holes. Nothing else is evaluated." } },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "required": ["path"],
+      "properties": { "path": { "$ref": "#/$defs/path" }, "equals": {}, "exists": { "type": "boolean" } },
+      "additionalProperties": false
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "label", "ref"],
+          "properties": { "type": { "const": "open" }, "label": { "type": "string" }, "ref": { "$ref": "#/$defs/value" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "label", "url"],
+          "properties": { "type": { "const": "open_url" }, "label": { "type": "string" }, "url": { "$ref": "#/$defs/value" } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "label", "tool"],
+          "properties": {
+            "type": { "const": "call" },
+            "label": { "type": "string" },
+            "tool": { "type": "string" },
+            "args": { "type": "object", "additionalProperties": { "$ref": "#/$defs/value" } }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "node": {
+      "type": "object",
+      "required": ["type"],
+      "properties": { "when": { "$ref": "#/$defs/condition" } },
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "stack" },
+            "direction": { "enum": ["row", "column"] },
+            "gap": { "enum": ["xs", "sm", "md"] },
+            "children": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/node" } },
+            "when": {}
+          },
+          "required": ["type", "children"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "text" },
+            "value": { "$ref": "#/$defs/value" },
+            "style": { "enum": ["body", "title", "muted", "code"] },
+            "max_lines": { "type": "integer", "minimum": 1, "maximum": 6 },
+            "when": {}
+          },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "badge" }, "value": { "$ref": "#/$defs/value" }, "tone": { "$ref": "#/$defs/tone" }, "when": {} },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "metric" }, "label": { "type": "string" }, "value": { "$ref": "#/$defs/value" }, "when": {} },
+          "required": ["type", "label", "value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "icon" }, "name": { "type": "string", "description": "A name from the Atelier icon set" }, "tone": { "$ref": "#/$defs/tone" }, "when": {} },
+          "required": ["type", "name"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "avatar" }, "name": { "$ref": "#/$defs/value" }, "url": { "$ref": "#/$defs/value" }, "when": {} },
+          "required": ["type", "name"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "code" },
+            "value": { "$ref": "#/$defs/value" },
+            "language": { "type": "string" },
+            "max_lines": { "type": "integer", "minimum": 1, "maximum": 30 },
+            "when": {}
+          },
+          "required": ["type", "value"],
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "list" },
+            "items": { "$ref": "#/$defs/path" },
+            "item": { "$ref": "#/$defs/node" },
+            "limit": { "type": "integer", "minimum": 1, "maximum": 50 },
+            "empty": { "type": "string" },
+            "on_item": { "$ref": "#/$defs/action" },
+            "when": {}
+          },
+          "required": ["type", "items", "item"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "button" }, "action": { "$ref": "#/$defs/action" }, "when": {} },
+          "required": ["type", "action"],
+          "additionalProperties": false
+        },
+        {
+          "properties": { "type": { "const": "divider" }, "when": {} },
+          "required": ["type"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
