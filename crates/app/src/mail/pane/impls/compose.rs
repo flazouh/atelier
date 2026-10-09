@@ -1,5 +1,5 @@
 use atelier_capabilities::{
-    CapError, Ref,
+    CapError, CapResult, Ref,
     mail::{Draft, MailOperation, reply_recipients},
 };
 use gpui_kit::{AppContext, Context, SharedString, Window};
@@ -9,8 +9,6 @@ use super::super::{
     structs::{Compose, Facts, Held, MailPane, Outcome},
     types::{Load, Press, Problem},
 };
-use atelier_capabilities::CapResult;
-
 impl MailPane {
     /// The reply box is there when the thread is read, the provider lists `create_draft`, and the reader may act. A provider
     /// that cannot write has no box at all.
