@@ -6,5 +6,5 @@ pub fn today() -> (Day, i32) {
     // SAFETY: `secs` and `local` are live for the call, and `localtime_r` writes only into `local`.
     let known = !unsafe { libc::localtime_r(&secs, &mut local) }.is_null();
     let offset = if known { local.tm_gmtoff as i32 } else { 0 };
-    (Day::from_epoch_secs(secs as i64, offset), offset)
+    (Day::from_epoch_secs(secs, offset), offset)
 }

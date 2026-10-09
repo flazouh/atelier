@@ -94,7 +94,7 @@ fn build_view(state: &UsageState, readings: &[ProviderGauge], today: Day) -> Usa
         }
     }
     let mut models: Vec<_> = models.into_iter().collect();
-    models.sort_by(|a, b| counted(&b.1.0).cmp(&counted(&a.1.0)));
+    models.sort_by_key(|(_, (tokens, _))| std::cmp::Reverse(counted(tokens)));
     let total_tokens: u64 = models.iter().map(|(_, (t, _))| counted(t)).sum();
     let total_cost = sum_cost(models.iter().flat_map(|(_, (_, c))| c.iter().copied()));
     let models: Vec<UsageModel> = models
