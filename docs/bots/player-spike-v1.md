@@ -61,6 +61,8 @@ Rive would still help if an artist makes complex hand-drawn animation. The faces
 
 `faces.v1.json` had two parts (Olive's spring and Dot's legs) that wrote `stroke-width` twice in one element. A browser keeps the first value and hides the error. A strict parser refuses it. The data is fixed. The value is the first one, which is what the prototype showed.
 
+Also seen in the light theme: Skip's jet flames use a cream colour that is faint on a light page. The flame colour should come from the theme (or be a token). It is cosmetic.
+
 ## Next steps
 
 1. A rule for small sizes (ideas 1 to 3 above), with a test for each.
