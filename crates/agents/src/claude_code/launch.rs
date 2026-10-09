@@ -46,6 +46,9 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
     if let Some(model) = &request.model {
         args.extend(["--model".into(), model.clone()]);
     }
+    if let Some(config) = &request.mcp_config {
+        args.extend([MCP_CONFIG_FLAG.into(), config.to_string_lossy().into_owned()]);
+    }
     // `Ask` is what `claude` does with no flag.
     if let Some(mode) = request.mode.filter(|mode| *mode != PermissionMode::Ask) {
         args.extend(["--permission-mode".into(), mode_name(mode).into()]);
@@ -74,6 +77,8 @@ pub(super) fn streams_tool_input(provider: Option<&Provider>, already_said: bool
 
 const SHELL: &str = "sh";
 const FORK_FLAG: &str = "--fork-session";
+/// Adds the servers of a JSON file to the ones `claude` has already, so the reader keeps their own.
+const MCP_CONFIG_FLAG: &str = "--mcp-config";
 /// Carries the account's name into the script, so the script never holds it.
 const ACCOUNT_ENV: &str = "ATELIER_CLAUDE_ACCOUNT";
 /// Carries the id of the session to resume into the script, so the script never holds it.

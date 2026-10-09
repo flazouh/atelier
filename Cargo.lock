@@ -485,8 +485,10 @@ name = "atelier-app"
 version = "0.1.6"
 dependencies = [
  "atelier-agents",
+ "atelier-capabilities",
  "atelier-editor",
  "atelier-forge",
+ "atelier-gateway",
  "atelier-i18n",
  "atelier-lsp",
  "atelier-palette",
