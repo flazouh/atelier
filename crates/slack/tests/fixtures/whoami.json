@@ -1,0 +1,8 @@
+{
+  "user": "alex",
+  "userId": "U01ALEX",
+  "teamId": "T01ACME",
+  "workspace": "Acme",
+  "host": "acme.slack.com",
+  "credential": "session"
+}

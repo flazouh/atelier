@@ -27,6 +27,7 @@ atelier-project = { path = "crates/project" }
 atelier-remote = { path = "crates/remote" }
 atelier-review = { path = "crates/review" }
 atelier-settings = { path = "crates/settings" }
+atelier-slack = { path = "crates/slack" }
 atelier-tracker = { path = "crates/tracker" }
 atelier-voice = { path = "crates/voice" }
 

@@ -1,0 +1,6 @@
+{
+  "rows": [
+    { "id": "U01ALEX", "mention": "<@U01ALEX>", "handle": "alex", "realName": "Alex Example", "bot": false },
+    { "id": "B01BOT", "mention": "<@B01BOT>", "handle": "deploybot", "bot": true }
+  ]
+}

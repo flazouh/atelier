@@ -684,6 +684,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-slack"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atelier-tracker"
 version = "0.1.6"
 dependencies = [

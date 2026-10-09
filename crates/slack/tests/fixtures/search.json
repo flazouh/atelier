@@ -1,0 +1,28 @@
+{
+  "total": 3,
+  "rows": [
+    {
+      "channel": "#general",
+      "author": "sam",
+      "message": "The release is on Friday.",
+      "at": "2025-10-09T08:53:20.000Z",
+      "url": "https://app.slack.com/client/T01ACME/C01GENERAL/p1760000000000100",
+      "files": []
+    },
+    {
+      "channel": "#random",
+      "author": "alex",
+      "message": "release party",
+      "at": "2025-10-08T10:00:00.000Z",
+      "url": "https://acme.slack.com/archives/C02RANDOM/p1759917600000700?thread_ts=1759917000.000600",
+      "files": []
+    },
+    {
+      "channel": "#random",
+      "author": "sam",
+      "message": "a result Slack gave no link for",
+      "at": "2025-10-07T10:00:00.000Z",
+      "files": []
+    }
+  ]
+}
