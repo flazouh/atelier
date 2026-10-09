@@ -25,7 +25,7 @@ thing is:
 | Person | `user/<user>` | `messaging:slack:acme:user/U01` |
 
 `ts` is the provider's message id, a string that sorts in time order inside one channel. A thread has the reference of
-its root message. Ids hold no `:` before the first one, so a message reference splits at the first `:` of its id.
+its root message.
 
 ## 3. Entities
 
