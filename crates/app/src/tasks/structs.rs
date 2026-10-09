@@ -6,7 +6,8 @@ use atelier_project::Project;
 use crate::open_project::OpenProject;
 use super::pane::{TasksEvent, TasksPane};
 
-/// The task a session began from: its id, and the short key the header shows.
+/// The task a session began from, in the local tracker: its id, and the short key the header shows. Session links are
+/// local-only until they move to the capability.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TaskRef {
     pub id: atelier_tracker::TaskId,
@@ -21,7 +22,7 @@ pub struct Slot {
 }
 
 impl Slot {
-    /// The pane for `project`; its tracker opens off the UI thread.
+    /// The pane for `project`; its providers open off the UI thread.
     pub fn new(project: Arc<dyn Project>, window: &mut Window, cx: &mut Context<OpenProject>) -> Self {
         let me = std::env::var("USER").unwrap_or_else(|_| "me".to_string());
         let agents = vec![("Claude".into(), atelier_agents::claude::look())];
@@ -31,7 +32,8 @@ impl Slot {
             pane
         });
         let _events = cx.subscribe_in(&pane, window, |this: &mut OpenProject, _, event: &TasksEvent, window, cx| match event {
-            TasksEvent::Start(id) => this.start_from_task(id.clone(), window, cx),
+            TasksEvent::Start(task) => this.start_from_task(task.clone(), window, cx),
+            TasksEvent::OpenSettings => cx.emit(crate::open_project::ProjectEvent::OpenSettings),
         });
         Self { pane, shown: true, _events }
     }

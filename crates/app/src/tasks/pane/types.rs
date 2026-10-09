@@ -1,7 +1,7 @@
 use atelier_ui::task_list_model::Filters;
 use atelier_ui::task_model::{TaskData, TaskStatus};
 use gpui_kit::SharedString;
-use atelier_tracker::TaskId;
+use atelier_capabilities::Ref;
 
 /// Under this width the board would clip, so the pane shows the list and hides the switch.
 pub const BOARD_LEAST: f32 = 560.;
@@ -18,10 +18,33 @@ pub(super) enum Load {
     Failed(SharedString),
 }
 
+/// What went wrong with the provider that the reader can act on or wait out. The tasks already read stay on screen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Problem {
+    /// There is no connection: a banner with Retry.
+    Offline,
+    /// The provider asks for a wait, in milliseconds: a banner with the wait.
+    Wait(u64),
+    /// The reader is not signed in: an empty state with a button to Settings.
+    SignedOut,
+}
+
+/// How the screen answers an error of a call. See [`react`](super::helpers::react).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reaction {
+    Raise(Problem),
+    /// The call is not offered, so its control goes.
+    Hide,
+    /// One line, in words.
+    Line(String),
+}
+
 /// What the pane asks of the app.
 pub enum TasksEvent {
     /// The reader asked for a session for this task.
-    Start(TaskId),
+    Start(Ref),
+    /// The reader asked for Settings, to sign in to a provider.
+    OpenSettings,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
