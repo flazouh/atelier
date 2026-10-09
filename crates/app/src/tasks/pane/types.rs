@@ -43,8 +43,8 @@ pub enum Reaction {
 pub enum TasksEvent {
     /// The reader asked for a session for this task.
     Start(Ref),
-    /// The reader asked for Settings, to sign in to a provider.
-    OpenSettings,
+    /// The reader asked for the Accounts section of Settings, to sign in to a provider.
+    OpenAccounts,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -44,6 +44,8 @@ use gpui_kit::{
 use atelier_ui::scale::px;
 use atelier_tracker::Tracker;
 
+use crate::capability_hub::CapabilityHub;
+
 use super::super::{
     map,
     source::{TasksSource, Vocabulary},
@@ -198,8 +200,12 @@ impl TasksPane {
     /// Opens the project's providers, off the UI thread (a project over SSH asks its host), and shows the
     /// tasks when they are open.
     pub fn open_from(&mut self, project: Arc<dyn atelier_project::Project>, cx: &mut Context<Self>) {
-        let me = self.me.to_string();
-        let opening = cx.background_spawn(async move { TasksSource::open(&project, &me) });
+        // The app's hub holds the providers the gateway reads too. A pane with none around makes its own, so it still opens.
+        let hub = cx.try_global::<CapabilityHub>().cloned().unwrap_or_else(CapabilityHub::detached);
+        // The accounts the reader connects or forgets in Settings come and go while the pane lives.
+        let watching = cx.observe_global::<CapabilityHub>(|pane, cx| pane.accounts_changed(cx));
+        self._subscriptions.push(watching);
+        let opening = cx.background_spawn(async move { TasksSource::open(&project, &hub) });
         cx.spawn(async move |this, cx| {
             let opened = opening.await.map_err(SharedString::from);
             this.update(cx, |pane, cx| pane.attach(opened, cx)).ok();
@@ -210,7 +216,11 @@ impl TasksPane {
     /// Gives the pane its providers, or the words that say why it has none.
     pub fn attach(&mut self, source: Result<TasksSource, SharedString>, cx: &mut Context<Self>) {
         match source {
-            Ok(source) => {
+            Ok(mut source) => {
+                // Read now, not when the source was opened: an account may have been connected since.
+                if let Some(hub) = cx.try_global::<CapabilityHub>() {
+                    source.set_accounts(hub.accounts());
+                }
                 self.source = Ok(source);
                 self.follow(cx);
                 self.reload(cx);
@@ -271,12 +281,36 @@ impl TasksPane {
         self.source.as_ref().ok()?.local()
     }
 
+    /// The connected accounts changed in Settings: the switcher lists the ones that work now. When the shown provider
+    /// went or was built again, the pane starts over on the one it shows now.
+    fn accounts_changed(&mut self, cx: &mut Context<Self>) {
+        let Some(hub) = cx.try_global::<CapabilityHub>().cloned() else { return };
+        let before = self.provider();
+        let Ok(source) = &mut self.source else { return };
+        source.set_accounts(hub.accounts());
+        let same = match (&before, self.provider()) {
+            (Some(was), Some(now)) => std::ptr::addr_eq(Arc::as_ptr(was), Arc::as_ptr(&now)),
+            (None, None) => true,
+            _ => false,
+        };
+        if same {
+            cx.notify();
+        } else {
+            self.switched(cx);
+        }
+    }
+
     /// Shows the provider at `index` of the switcher, and reads its tasks.
     pub fn choose(&mut self, index: usize, cx: &mut Context<Self>) {
         let Ok(source) = &mut self.source else { return };
         if source.selected() == Some(index) || !source.select(index) {
             return;
         }
+        self.switched(cx);
+    }
+
+    /// The shown provider is another one now: drops what the last one gave and reads this one.
+    fn switched(&mut self, cx: &mut Context<Self>) {
         self.generation += 1;
         self.tasks.clear();
         self.labels.clear();
@@ -759,7 +793,7 @@ impl Render for TasksPane {
         let body = match (&self.load, &self.open, mode) {
             (Load::Ready, ..) if self.problem == Some(Problem::SignedOut) => {
                 let pane = cx.entity();
-                signed_out(provider_name.as_deref().unwrap_or("this provider"), move |_, cx| pane.update(cx, |_, cx| cx.emit(TasksEvent::OpenSettings)), &theme)
+                signed_out(provider_name.as_deref().unwrap_or("this provider"), move |_, cx| pane.update(cx, |_, cx| cx.emit(TasksEvent::OpenAccounts)), &theme)
             }
             (Load::Loading, ..) => div().flex_1().flex().items_center().justify_center().text_color(muted).child("Reading the tasks…").into_any_element(),
             (Load::Failed(why), ..) => {

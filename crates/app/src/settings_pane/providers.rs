@@ -55,7 +55,7 @@ pub(crate) struct ProvidersPage {
     _signing: Option<Task<()>>,
 }
 
-fn tail(key: &str) -> String {
+pub(super) fn tail(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
     chars[chars.len().saturating_sub(KEY_TAIL)..].iter().collect()
 }
@@ -448,31 +448,39 @@ fn folder_of(account: &str) -> String {
     if account == atelier_agents::claude_code::accounts::DEFAULT_ACCOUNT { "~/.claude".into() } else { format!("~/.claude-{account}") }
 }
 
+/// The square at the left of a card's head, which holds its mark or icon.
+fn tile(theme: &Theme) -> gpui_kit::Div {
+    div().flex().flex_none().items_center().justify_center().size(px(36.)).rounded(radius::md()).bg(theme.card_strong)
+}
+
+/// A tile with a plain icon, for a service that has no brand mark here.
+pub(super) fn icon_tile(icon: IconName, theme: &Theme) -> impl IntoElement {
+    tile(theme).child(Icon::new(icon).size(px(18.)).color(theme.foreground))
+}
+
 fn mark_tile(mark: Option<BrandMark>, theme: &Theme) -> impl IntoElement {
-    div()
-        .flex()
-        .flex_none()
-        .items_center()
-        .justify_center()
-        .size(px(36.))
-        .rounded(radius::md())
-        .bg(theme.card_strong)
+    tile(theme)
         .map(|d| match mark {
             Some(mark) => d.child(gpui_kit::img(mark.for_theme(theme.appearance)).size(px(20.))),
             None => d.child(Icon::new(IconName::Add).size(px(18.)).color(theme.muted_foreground)),
         })
 }
 
-fn dot(colour: gpui_kit::Hsla) -> impl IntoElement {
+pub(super) fn dot(colour: gpui_kit::Hsla) -> impl IntoElement {
     div().flex_none().size(px(6.)).rounded_full().bg(colour)
 }
 
 fn card_head(mark: Option<BrandMark>, name: &str, detail: &str, mono: bool, badge: Option<Badge>, theme: &Theme) -> impl IntoElement {
+    card_head_of(mark_tile(mark, theme), name, detail, mono, badge, theme)
+}
+
+/// A card's head with `tile` at its left.
+pub(super) fn card_head_of(tile: impl IntoElement, name: &str, detail: &str, mono: bool, badge: Option<Badge>, theme: &Theme) -> impl IntoElement {
     div()
         .flex()
         .items_center()
         .gap(px(12.))
-        .child(mark_tile(mark, theme))
+        .child(tile)
         .child(
             div()
                 .flex()
@@ -486,7 +494,7 @@ fn card_head(mark: Option<BrandMark>, name: &str, detail: &str, mono: bool, badg
         .children(badge)
 }
 
-fn card(id: &str, theme: &Theme) -> gpui_kit::Stateful<gpui_kit::Div> {
+pub(super) fn card(id: &str, theme: &Theme) -> gpui_kit::Stateful<gpui_kit::Div> {
     let hover = theme.muted_foreground.opacity(0.35);
     div()
         .id(SharedString::from(id.to_string()))
@@ -501,7 +509,7 @@ fn card(id: &str, theme: &Theme) -> gpui_kit::Stateful<gpui_kit::Div> {
         .hover(move |s| s.border_color(hover))
 }
 
-fn group(title: &str, gist: &str, theme: &Theme) -> impl IntoElement {
+pub(super) fn group(title: &str, gist: &str, theme: &Theme) -> impl IntoElement {
     div()
         .flex()
         .flex_col()

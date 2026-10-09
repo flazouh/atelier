@@ -73,3 +73,44 @@ fn a_reference_shows_its_name_and_one_the_lists_lack_shows_its_id() {
     assert_eq!(vocab.name_of(&unknown), "lbl_9");
     assert_eq!(vocab.label_ref("new").to_string(), "tasks:linear:acme:new", "a new name takes the provider's own form");
 }
+
+#[test]
+fn the_switcher_follows_the_connected_accounts() {
+    let mut source = TasksSource::from_providers([memory("project")]);
+    assert_eq!(source.choices().len(), 1, "one provider: no switcher");
+
+    source.set_accounts(vec![memory("acme"), memory("web")]);
+    assert_eq!(source.choices().len(), 3);
+
+    source.set_accounts(vec![memory("acme")]);
+    assert_eq!(source.choices().len(), 2, "an account taken out leaves the list");
+
+    source.set_accounts(Vec::new());
+    assert_eq!(source.choices().len(), 1);
+}
+
+#[test]
+fn the_shown_account_going_away_shows_the_first_provider_left() {
+    let mut source = TasksSource::from_providers([memory("project")]);
+    source.set_accounts(vec![memory("acme")]);
+    let at = source.choices().iter().position(|c| c.account == "acme").unwrap();
+    assert!(source.select(at));
+
+    source.set_accounts(Vec::new());
+
+    assert_eq!(source.provider().map(|p| p.account().to_string()), Some("project".to_string()));
+}
+
+#[test]
+fn an_account_built_again_replaces_the_one_held() {
+    let mut source = TasksSource::from_providers([memory("project")]);
+    let first = memory("acme");
+    source.set_accounts(vec![first.clone()]);
+    let second = memory("acme");
+
+    source.set_accounts(vec![second.clone()]);
+
+    let at = source.choices().iter().position(|c| c.account == "acme").unwrap();
+    assert!(source.select(at));
+    assert!(std::ptr::addr_eq(Arc::as_ptr(&source.provider().unwrap()), Arc::as_ptr(&second)));
+}

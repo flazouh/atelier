@@ -5,6 +5,9 @@ use std::{collections::HashMap, io, sync::Mutex};
 /// The keychain entry that holds the OpenRouter API key.
 pub const OPENROUTER_KEY: &str = "openrouter-api-key";
 
+/// The keychain entry that holds the Linear API key.
+pub const LINEAR_KEY: &str = "linear-api-key";
+
 /// The service every entry of atelier's is filed under.
 const SERVICE: &str = "atelier";
 

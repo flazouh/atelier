@@ -275,3 +275,22 @@ fn agent_tools_are_on_unless_the_file_turns_them_off() {
     update(&path, |s| s.theme = Some("x".into())).unwrap();
     assert_eq!(load(&path).capabilities.agent_tools, Some(false), "another save keeps it");
 }
+
+#[test]
+fn the_connected_accounts_round_trip_and_the_file_holds_no_key() {
+    let path = scratch("accounts");
+    assert_eq!(Settings::default().accounts, AccountsSaved::default());
+    let key = "lin_api_SECRET_SECRET";
+    update(&path, |s| {
+        s.accounts.linear = Some(LinearSaved { person: Some("Ada".into()) });
+        s.accounts.github_issues = Some(GithubIssuesSaved { repo: "acme/web".into(), person: None });
+    })
+    .unwrap();
+    let back = load(&path);
+    assert_eq!(back.accounts.linear, Some(LinearSaved { person: Some("Ada".into()) }));
+    assert_eq!(back.accounts.github_issues.map(|g| g.repo), Some("acme/web".into()));
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(!text.contains(key), "{text}");
+    update(&path, |s| s.accounts = AccountsSaved::default()).unwrap();
+    assert_eq!(load(&path).accounts, AccountsSaved::default(), "forgetting clears both");
+}

@@ -54,6 +54,8 @@ pub struct SettingsPane {
     pub(super) mics: Vec<atelier_ui::VoiceDevice>,
     /// The Providers section's accounts and key, read when it is shown.
     pub(crate) providers: super::providers::ProvidersPage,
+    /// The Accounts section: the services connected for tasks.
+    pub(crate) accounts: super::accounts::AccountsPage,
     /// The language the reader picked; `None` follows the system.
     pub(super) language: Option<Locale>,
 }
@@ -74,6 +76,8 @@ impl SettingsPane {
             .and_then(|bytes| PRIMARIES.iter().find(|(_, b, _)| *b == bytes))
             .map_or("default", |(name, _, _)| *name);
         let rules = atelier_tracker::RuleSet::from_disabled(saved.task_rules_off.iter().map(String::as_str));
+        // An account the app finished connecting or checking changes a row's state.
+        cx.observe_global::<crate::capability_hub::CapabilityHub>(|_, cx| cx.notify()).detach();
         Self {
             focus: cx.focus_handle(),
             agents,
@@ -85,6 +89,7 @@ impl SettingsPane {
             zoom_preview: None,
             mics: Vec::new(),
             providers: Default::default(),
+            accounts: super::accounts::AccountsPage::new(saved.accounts.clone()),
             language: saved.language.as_deref().and_then(Locale::from_tag),
         }
     }
@@ -118,6 +123,9 @@ impl SettingsPane {
         }
         if section == Section::Providers {
             self.read_providers(cx);
+        }
+        if section == Section::Accounts {
+            self.read_accounts(cx);
         }
         cx.notify();
     }
@@ -172,7 +180,7 @@ impl SettingsPane {
 }
 
 impl Render for SettingsPane {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let this = cx.entity().downgrade();
@@ -503,6 +511,7 @@ impl Render for SettingsPane {
             Section::Sidebar => sidebar.into_any_element(),
             Section::Agents => agents.into_any_element(),
             Section::Providers => self.providers_body(cx),
+            Section::Accounts => self.accounts_body(window, cx),
             Section::Dictation => dictation_pane.into_any_element(),
             Section::Tasks => tasks.into_any_element(),
             Section::PullRequests => pull_requests.into_any_element(),

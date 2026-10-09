@@ -137,6 +137,29 @@ fn a_pick_and_a_mode_apply_at_once_and_are_kept(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(wait_for(&file, |s| s.language.is_none()).language, None, "the system's again");
 
+    // Connecting Linear keeps the key in the keychain and, in the file, only that Linear is connected and who it is.
+    {
+        use atelier_settings::secrets::{InMemory, LINEAR_KEY, Secrets};
+        let secrets = std::sync::Arc::new(InMemory::default());
+        cx.update(|_, cx| {
+            cx.set_global(crate::accounts::AccountServices {
+                secrets: secrets.clone(),
+                linear: |_| Ok(std::sync::Arc::new(atelier_capabilities::tasks::MemoryTasks::new("acme"))),
+                github: |_| Err(atelier_capabilities::CapError::Offline),
+            })
+        });
+        _pane.update(cx, |pane, cx| pane.save_linear("lin_api_SECRET".into(), cx));
+        cx.run_until_parked();
+        let kept = wait_for(&file, |s| s.accounts.linear.is_some());
+        assert_eq!(kept.accounts.linear.and_then(|linear| linear.person), Some("Me".into()));
+        assert!(!std::fs::read_to_string(&file).unwrap().contains("lin_api_SECRET"), "the key is not in the settings file");
+        assert_eq!(secrets.read(LINEAR_KEY).unwrap().as_deref(), Some("lin_api_SECRET"));
+        _pane.update(cx, |pane, cx| pane.forget_linear(cx));
+        cx.run_until_parked();
+        assert_eq!(wait_for(&file, |s| s.accounts.linear.is_none()).accounts.linear, None, "forgetting clears the file's entry");
+        assert_eq!(secrets.read(LINEAR_KEY).unwrap(), None);
+    }
+
     // Escape asks to close.
     cx.simulate_keystrokes("escape");
     assert_eq!(closed.get(), 1);
