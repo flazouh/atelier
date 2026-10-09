@@ -158,6 +158,13 @@ pub fn version_line() -> String {
     format!("{VERSION} protocol {}", crate::protocol::VERSION)
 }
 
+/// Whether the `--version` line of a helper names this app's protocol, whatever version text comes before it. The
+/// protocol is the contract between the app and the helper: a helper built from an older checkout speaks it as well as a
+/// new one, and its path already carries the hash of its bytes.
+pub fn speaks_this_protocol(line: &str) -> bool {
+    line.trim().rsplit_once(" protocol ").is_some_and(|(_, n)| n == crate::protocol::VERSION.to_string())
+}
+
 /// What the reader reads when no copy for the host is found: what is missing, and what to do.
 pub fn missing_words(host: &str, platform: &Platform) -> String {
     format!(
@@ -196,14 +203,14 @@ pub fn deploy(host: &str, platform: &Platform, say: &dyn Fn(String)) -> io::Resu
     let bytes = std::fs::read(&local)?;
     let path = remote_binary(VERSION, &short_hash(&bytes));
     // A copy that answers another protocol is replaced by the one that matches, with nothing to see.
-    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| v.trim() == version_line()).unwrap_or(false);
+    let has = run(host, &format!("test -x {path} && {path} --version"), None).map(|v| speaks_this_protocol(&v)).unwrap_or(false);
     if has {
         return Ok(path);
     }
     say(format!("Putting atelier-remote on {host}…"));
     run(host, &upload_command(&path), Some(&bytes))?;
     let version = run(host, &format!("{path} --version"), None)?;
-    if version.trim() != version_line() {
+    if !speaks_this_protocol(&version) {
         return Err(io::Error::other(format!("{host}: the helper atelier put there does not start as it should")));
     }
     Ok(path)
