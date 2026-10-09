@@ -566,6 +566,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-gateway"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "getrandom 0.3.4",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "ureq",
+]
+
+[[package]]
 name = "atelier-i18n"
 version = "0.1.6"
 dependencies = [

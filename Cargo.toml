@@ -17,6 +17,7 @@ atelier-agents = { path = "crates/agents" }
 atelier-capabilities = { path = "crates/capabilities" }
 atelier-editor = { path = "crates/editor" }
 atelier-forge = { path = "crates/forge" }
+atelier-gateway = { path = "crates/gateway" }
 atelier-i18n = { path = "crates/i18n" }
 atelier-lsp = { path = "crates/lsp" }
 atelier-palette = { path = "crates/palette" }
