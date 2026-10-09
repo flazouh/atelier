@@ -115,17 +115,17 @@ chat. `update` of status or assignee: write. `delete`: always ask. Anything an a
 
 ### 8.1 Tool cards
 
-Every tool call of an agent shows as a card in the chat. The card belongs to the **tool of the capability**, not to the provider.
+Every tool call of an agent shows as a card in the chat. A tool has one of three kinds of card.
 
-- `tasks.search`, `tasks.get`, `tasks.create`, `tasks.update` and `tasks.comment` each have one card, written once in Atelier. It reads the neutral entities, so it works for every provider.
-- The header of the card shows the provider's **logo and name**, the account, and a short line: "Searched Linear, 3 tasks". The provider gives the logo and name in its manifest.
-- A card has four states: running, done, failed, and waiting for approval (for write tools). An agent's card shows the origin: "Alex's agent".
-- A task in a card opens in the one tasks screen, by its `ref`.
-- Each provider implements the **tool interface** of the capability: it returns the neutral result of section 4. It does not draw anything.
+1. **Capability tool.** `tasks.search`, `mail.get` and the like. Atelier draws one card per tool, once, from the neutral result. It works for every provider (Linear and GitHub for tasks, Gmail and IMAP for mail).
+2. **Plugin tool with a card schema.** A plugin that has no capability (Sentry, PostHog, Calendar) ships a **card schema** for each of its tools. The schema is JSON data, not code: a title, fields, badges (for example level and count), actions, and a link to an entity by `ref`. The host draws it. The plugin runs no code in the UI.
+3. **Fallback.** A tool with no card schema gets the generic card: name, arguments, and the result as folded JSON.
 
-A tool that the capability does not define (for example a Linear cycle report) must name a **card kind** from a small fixed set: `task`, `task_list`, `person`, `table`, `key_value`, `text`. The host draws it with the provider's logo. A tool with no card kind gets the generic card: name, arguments, and the result as folded JSON.
+All cards share one header: the provider's **logo and name** from its manifest, the account, and a short line such as "Searched Linear, 3 tasks". All cards have four states: running, done, failed, and waiting for approval (write tools). An agent's card shows the origin: "Alex's agent". An entity in a card opens in its shared screen, by `ref`.
 
-A plugin that wants a card kind outside this set opens a pull request. The new kind then serves all providers.
+A provider of a capability implements the **tool interface** and returns the neutral result. It draws nothing.
+
+**Promotion.** When a second provider appears for a plugin's domain (for example Datadog next to Sentry), the domain becomes a capability. The card schema becomes the one shared card, and the first plugin moves to it.
 
 ## 9. Contract tests
 
@@ -139,7 +139,7 @@ Every provider must pass one shared suite, including the local one:
 7. `subscribe` delivers each change once, in order.
 8. The `by` actor is kept, with `on_behalf_of`.
 9. A reference parses back to its provider and id.
-10. Each tool result fits its card kind: a result that does not fit fails the test.
+10. Each tool result fits the card of its tool: a result that does not fit fails the test.
 
 ## 10. How the current code gets there (additive)
 
