@@ -55,6 +55,8 @@ bundle_id=dev.atelier.app
 qa_keys=""
 if [ "${ATELIER_QA:-0}" = 1 ]; then
   [ -n "${ATELIER_QA_DIR:-}" ] || { echo "A QA build needs ATELIER_QA_DIR." >&2; exit 1; }
+  # The app keeps its settings here and no longer makes the folder itself.
+  mkdir -p "$ATELIER_QA_DIR"
   bundle_id=dev.atelier.qa
   qa_keys="  <key>LSEnvironment</key><dict><key>ATELIER_SETTINGS</key><string>${ATELIER_QA_DIR}/settings.json</string><key>ATELIER_CONTROL</key><string>${ATELIER_QA_DIR}/control.sock</string></dict>"
 fi

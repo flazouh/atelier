@@ -20,6 +20,11 @@ pub fn path() -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("ATELIER_SETTINGS") {
         return Some(PathBuf::from(path));
     }
+    default_path()
+}
+
+/// The settings file in the data folder.
+fn default_path() -> Option<PathBuf> {
     Some(dirs::data_dir()?.join("atelier").join("settings.json"))
 }
 
@@ -37,7 +42,11 @@ pub fn update(path: &Path, change: impl FnOnce(&mut Settings)) -> io::Result<Set
     let _turn = SAVING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut settings = load(path);
     change(&mut settings);
-    if let Some(dir) = path.parent() {
+    // Only the data folder is made, for the first run. A path given on purpose (`ATELIER_SETTINGS`) must have its folder
+    // already: a save that starts before a test ends and runs after its folder is gone must not make the folder again.
+    if let Some(dir) = path.parent()
+        && default_path().as_deref() == Some(path)
+    {
         std::fs::create_dir_all(dir)?;
     }
     let text = serde_json::to_string_pretty(&settings).map_err(io::Error::other)?;
