@@ -18,6 +18,8 @@ mod structs;
 mod tree_menu;
 mod types;
 mod update_view;
+mod usage;
+mod usage_view;
 mod updates;
 mod view;
 

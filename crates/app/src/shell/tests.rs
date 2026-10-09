@@ -159,6 +159,80 @@ fn a_press_on_the_version_opens_the_changelog(cx: &mut TestAppContext) {
     settle(&shell, cx);
     assert!(shell.read_with(cx, |s, _| s.changelog_open), "the changelog is open");
 }
+/// A press on the usage chips in the status bar opens the usage dashboard, and Escape closes it.
+#[gpui_kit::test]
+fn a_press_on_the_usage_chips_opens_the_dashboard_and_escape_closes_it(cx: &mut TestAppContext) {
+    use atelier_agents::usage::{Reading, Window};
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    shell.update(cx, |shell, cx| {
+        shell.vitals.update(cx, |vitals, cx| {
+            let reading = Reading { windows: vec![Window { label: "7d".into(), used: 0.4, resets_in: Some(60) }], note: None };
+            vitals.settle("Claude", atelier_ui::menu::Lead::Monogram, Ok(reading));
+            cx.notify();
+        })
+    });
+    settle(&shell, cx);
+    let chips = cx.debug_bounds("status-usage").expect("the usage chips are drawn");
+    assert!(cx.debug_bounds("usage-dashboard").is_none());
+    cx.simulate_click(chips.center(), gpui_kit::Modifiers::default());
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("usage-dashboard").is_some(), "a press opens the dashboard");
+    cx.simulate_keystrokes("escape");
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("usage-dashboard").is_none(), "Escape closes it");
+}
+/// The dashboard reads folders of logs off the UI thread: with none it says there is nothing, and with three Claude
+/// accounts, one of them with a broken line, it shows all three and counts the line it skipped.
+#[gpui_kit::test]
+fn the_dashboard_reads_the_logs_and_survives_a_broken_line_and_a_folder_with_nothing(cx: &mut TestAppContext) {
+    use atelier_agents::usage_history::{Provider, Roots};
+    let (shell, cx, dir) = with_a_session(cx, 1400.);
+    let home = dir.path().join("home");
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64;
+    let stamp = |secs: i64| {
+        let day = atelier_agents::usage_history::Day::from_epoch_secs(secs, 0);
+        format!("{:04}-{:02}-{:02}T12:00:00Z", day.year, day.month, day.day)
+    };
+    let line = |id: &str| {
+        format!(
+            r#"{{"type":"assistant","timestamp":"{}","sessionId":"s","cwd":"/home/a/proj","requestId":"r{id}","message":{{"id":"m{id}","model":"claude-sonnet-5-5","usage":{{"input_tokens":1000,"output_tokens":500,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}},"content":[{{"type":"text","text":"hi"}}]}}}}"#,
+            stamp(now - 3600)
+        )
+    };
+    // No logs at all: the empty state.
+    let nothing = Roots::new().with_dir(Provider::Claude, home.join(".claude-none"));
+    shell.update(cx, |shell, cx| {
+        shell.usage_roots = nothing;
+        shell.show_usage(cx);
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    settle(&shell, cx);
+    cx.executor().run_until_parked();
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("usage-empty").is_some(), "no logs: the dashboard says there is nothing");
+    shell.update(cx, |shell, cx| shell.close_usage(cx));
+    // Three accounts, one with a broken line.
+    let mut roots = Roots::new();
+    for (at, name) in [".claude", ".claude-work", ".claude-team"].iter().enumerate() {
+        let folder = home.join(name).join("projects").join("p");
+        std::fs::create_dir_all(&folder).unwrap();
+        let broken = if at == 1 { "\n{not json at all\n" } else { "\n" };
+        std::fs::write(folder.join("s.jsonl"), format!("{}{broken}", line(&at.to_string()))).unwrap();
+        roots = roots.with_dir(Provider::Claude, home.join(name));
+    }
+    shell.update(cx, |shell, cx| {
+        shell.usage_roots = roots;
+        shell.show_usage(cx);
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    settle(&shell, cx);
+    cx.executor().run_until_parked();
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("usage-dashboard").is_some(), "the dashboard is drawn");
+    assert!(cx.debug_bounds("usage-empty").is_none(), "with logs it does not say there is nothing");
+    let (accounts, skipped) = shell.read_with(cx, |s, _| (s.usage_seen.accounts.len(), s.usage_seen.skipped));
+    assert_eq!((accounts, skipped), (3, 1), "three accounts, and the one broken line counted, not read");
+}
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
 fn a_notice_floats_and_goes_after_a_few_seconds(cx: &mut TestAppContext) {

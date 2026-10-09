@@ -14,6 +14,7 @@ mod agent_models;
 mod agent_session;
 mod project_icons;
 mod providers;
+mod usage_view;
 mod vitals;
 mod agents_view;
 mod file_glyphs;

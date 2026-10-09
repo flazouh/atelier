@@ -10,7 +10,7 @@ use super::super::{consts::HISTORY, structs::Vitals, traits::LoadProbe, types::H
 
 impl Vitals {
     pub fn new(probe: Box<dyn LoadProbe>) -> Self {
-        Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None), version: None, on_version: None }
+        Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None), version: None, on_version: None, on_usage: None }
     }
 
     #[cfg(test)]
@@ -18,7 +18,6 @@ impl Vitals {
         self.load.as_ref()
     }
 
-    #[cfg(test)]
     pub fn providers(&self) -> &[ProviderGauge] {
         &self.providers
     }
@@ -49,6 +48,10 @@ impl Vitals {
     pub fn set_version(&mut self, version: impl Into<SharedString>, on_press: Handler) {
         self.version = Some(version.into());
         self.on_version = Some(on_press);
+    }
+    /// What a press on the usage chips does.
+    pub fn set_on_usage(&mut self, on_press: Handler) {
+        self.on_usage = Some(on_press);
     }
     /// Where the bar's cards stand: under the sidebar, under the right pane. Whether it changed is the answer.
     pub fn set_columns(&mut self, lead: Option<f32>, tail: Option<f32>) -> bool {
@@ -116,8 +119,12 @@ impl Render for Vitals {
             .providers(self.providers.clone())
             .columns(self.columns.0, self.columns.1)
             .version(self.version.clone());
-        match self.on_version.clone() {
+        let bar = match self.on_version.clone() {
             Some(press) => bar.on_version(move |window, cx| press(window, cx)),
+            None => bar,
+        };
+        match self.on_usage.clone() {
+            Some(press) => bar.on_usage(move |window, cx| press(window, cx)),
             None => bar,
         }
     }
