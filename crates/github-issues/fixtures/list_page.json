@@ -1,0 +1,215 @@
+[
+  {
+    "id": 1000,
+    "number": 14628,
+    "title": "pr merge: skip local cleanup outside the pull request's repository",
+    "body": "`gh pr merge <PR-URL> --delete-branch` executed from inside an unrelated repository deletes that repository's linked worktree and force-deletes its same-named branch. `git branch -D` skips git's own m",
+    "state": "open",
+    "state_reason": null,
+    "locked": false,
+    "user": {
+      "login": "entity-0-0-2",
+      "id": 1
+    },
+    "labels": [
+      {
+        "id": 7,
+        "name": "external",
+        "color": "2700AF",
+        "description": "pull request originating outside of the CLI core team"
+      },
+      {
+        "id": 7,
+        "name": "unmet-requirements",
+        "color": "ee2329",
+        "description": ""
+      }
+    ],
+    "assignees": [],
+    "comments": 1,
+    "created_at": "2026-10-08T22:57:17Z",
+    "updated_at": "2026-10-08T23:34:11Z",
+    "closed_at": null,
+    "html_url": "https://github.com/cli/cli/pull/14628",
+    "pull_request": {
+      "merged_at": null
+    }
+  },
+  {
+    "id": 1000,
+    "number": 14148,
+    "title": "Update glamour to v2",
+    "body": "Fixes #3718.\n\nThis updates the markdown stack to Glamour v2 and keeps the status column spacing aligned with trunk under Lip Gloss v2. Lip Gloss v2 counts the right border inside `Width()`, so the lef",
+    "state": "open",
+    "state_reason": null,
+    "locked": false,
+    "user": {
+      "login": "heaths",
+      "id": 1
+    },
+    "labels": [
+      {
+        "id": 7,
+        "name": "needs-triage",
+        "color": "D6393F",
+        "description": "needs to be reviewed"
+      },
+      {
+        "id": 7,
+        "name": "external",
+        "color": "2700AF",
+        "description": "pull request originating outside of the CLI core team"
+      }
+    ],
+    "assignees": [],
+    "comments": 1,
+    "created_at": "2026-08-15T00:09:53Z",
+    "updated_at": "2026-10-08T22:12:24Z",
+    "closed_at": null,
+    "html_url": "https://github.com/cli/cli/pull/14148",
+    "pull_request": {
+      "merged_at": null
+    }
+  },
+  {
+    "id": 1000,
+    "number": 14627,
+    "title": "`gh` fails with obscure errors when access token misses some permissionts",
+    "body": "### Describe the bug\n\nI have a fine-grained personal access token to use with `gh`, for a specific repo. It has read-only access to _Actions_, _Commit statuses_, _Contents_, _Metadata_, and _Pull requ",
+    "state": "open",
+    "state_reason": null,
+    "locked": false,
+    "user": {
+      "login": "heitorPB",
+      "id": 1
+    },
+    "labels": [
+      {
+        "id": 7,
+        "name": "needs-triage",
+        "color": "D6393F",
+        "description": "needs to be reviewed"
+      }
+    ],
+    "assignees": [],
+    "comments": 1,
+    "created_at": "2026-10-08T19:15:57Z",
+    "updated_at": "2026-10-08T19:21:25Z",
+    "closed_at": null,
+    "html_url": "https://github.com/cli/cli/issues/14627"
+  },
+  {
+    "id": 1000,
+    "number": 14617,
+    "title": "fix(auth): fail fast when --with-token is used with terminal stdin",
+    "body": "<!--\nThank you for contributing to GitHub CLI!\n\nIf you are proposing a fix for a security issue, STOP and follow .github/SECURITY.md instead.\n\nKeep the entire pull request self-contained, reviewer-fac",
+    "state": "closed",
+    "state_reason": null,
+    "locked": false,
+    "user": {
+      "login": "bingtang9",
+      "id": 1
+    },
+    "labels": [
+      {
+        "id": 7,
+        "name": "needs-triage",
+        "color": "D6393F",
+        "description": "needs to be reviewed"
+      },
+      {
+        "id": 7,
+        "name": "external",
+        "color": "2700AF",
+        "description": "pull request originating outside of the CLI core team"
+      }
+    ],
+    "assignees": [],
+    "comments": 0,
+    "created_at": "2026-10-07T08:30:54Z",
+    "updated_at": "2026-10-08T16:39:58Z",
+    "closed_at": "2026-10-08T16:39:58Z",
+    "html_url": "https://github.com/cli/cli/pull/14617",
+    "pull_request": {
+      "merged_at": null
+    }
+  },
+  {
+    "id": 1000,
+    "number": 14309,
+    "title": "`--attach` cannot work for GitHub App installation tokens — the upload endpoint 404s them even with write access",
+    "body": "### Describe the feature or problem you'd like to solve\n\nThe `--attach` stack (#14186) allowlists OAuth, classic PAT, and fine-grained PAT credentials, so a GitHub App installation token (`ghs_`) is r",
+    "state": "open",
+    "state_reason": null,
+    "locked": false,
+    "user": {
+      "login": "Ninodevo",
+      "id": 1
+    },
+    "labels": [
+      {
+        "id": 7,
+        "name": "blocked",
+        "color": "ff5451",
+        "description": ""
+      },
+      {
+        "id": 7,
+        "name": "enhancement",
+        "color": "0dd8ac",
+        "description": "a request to improve CLI"
+      },
+      {
+        "id": 7,
+        "name": "platform",
+        "color": "6E4A8E",
+        "description": "Problems with the GitHub platform rather than the CLI client"
+      },
+      {
+        "id": 7,
+        "name": "attachments",
+        "color": "b2fa88",
+        "description": "Issues regarding `--attach`"
+      }
+    ],
+    "assignees": [],
+    "comments": 21,
+    "created_at": "2026-09-01T08:19:52Z",
+    "updated_at": "2026-10-08T16:01:31Z",
+    "closed_at": null,
+    "html_url": "https://github.com/cli/cli/issues/14309"
+  },
+  {
+    "id": 1000,
+    "number": 10848,
+    "title": "Allow configuration of columns for `gh pr checks`",
+    "body": "### Describe the feature or problem you’d like to solve\n\nCurrently, you can only customize what fields are provided if the `--json` option is used. However, I want to see the table layout but filtered",
+    "state": "open",
+    "state_reason": null,
+    "locked": false,
+    "user": {
+      "login": "somewhatabstract",
+      "id": 1
+    },
+    "labels": [
+      {
+        "id": 7,
+        "name": "enhancement",
+        "color": "0dd8ac",
+        "description": "a request to improve CLI"
+      },
+      {
+        "id": 7,
+        "name": "needs-triage",
+        "color": "D6393F",
+        "description": "needs to be reviewed"
+      }
+    ],
+    "assignees": [],
+    "comments": 8,
+    "created_at": "2025-04-22T17:21:36Z",
+    "updated_at": "2026-10-08T15:56:50Z",
+    "closed_at": null,
+    "html_url": "https://github.com/cli/cli/issues/10848"
+  }
+]

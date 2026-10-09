@@ -1,0 +1,27 @@
+{
+  "id": 1000,
+  "number": 14626,
+  "title": "SDrysdale2306 Workflow",
+  "body": "SDrysdale2306 will update a file by replacing a caption.\n\n- [ ] Create a branch\n- [ ] Edit the file\n- [ ] Commit the changes\n- [ ] Create a Pull Request\n- [ ] Request a Review\n- [ ] Make more changes\n",
+  "state": "closed",
+  "state_reason": "not_planned",
+  "locked": false,
+  "user": {
+    "login": "SDrysdale2306",
+    "id": 1
+  },
+  "labels": [
+    {
+      "id": 7,
+      "name": "suspected-spam",
+      "color": "c62946",
+      "description": "Issue is likely a spam"
+    }
+  ],
+  "assignees": [],
+  "comments": 1,
+  "created_at": "2026-10-08T13:41:08Z",
+  "updated_at": "2026-10-08T13:44:46Z",
+  "closed_at": "2026-10-08T13:44:46Z",
+  "html_url": "https://github.com/cli/cli/issues/14626"
+}
