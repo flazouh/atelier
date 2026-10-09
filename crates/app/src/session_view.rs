@@ -25,7 +25,7 @@ pub use types::READING_WIDTH;
 pub use helpers::session_view;
 
 #[cfg(test)]
-use helpers::{gap_between, is_lookup, shows_stop};
+use helpers::{gap_between, is_lookup};
 #[cfg(test)]
 use types::Block;
 

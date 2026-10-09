@@ -47,3 +47,6 @@ pub(super) enum TitleTabs {
     /// The open files' tabs.
     Files,
 }
+
+/// The room the chip in the title bar (What is new, Update ready, Updating) takes at the right, left of the Settings button.
+pub(super) const UPDATE_ROOM: f32 = 120.;
