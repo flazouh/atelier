@@ -485,6 +485,7 @@ name = "atelier-app"
 version = "0.1.6"
 dependencies = [
  "atelier-agents",
+ "atelier-capabilities",
  "atelier-editor",
  "atelier-forge",
  "atelier-i18n",

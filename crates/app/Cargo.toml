@@ -14,6 +14,7 @@ path = "src/main.rs"
 gpui-kit.workspace = true
 atelier-ui.workspace = true
 atelier-agents.workspace = true
+atelier-capabilities.workspace = true
 atelier-editor.workspace = true
 atelier-forge.workspace = true
 atelier-i18n.workspace = true
