@@ -84,3 +84,20 @@ The manifest lists each tool, its permission class and its card:
 1. **Markdown in text.** Allow bold and links in `text` (many issue titles and messages have them), or plain text only?
 2. **Images.** Allow a screenshot node (Sentry has none, but PostHog and Linear do), with the same origin rule as avatars?
 3. **Who owns promotion.** When a second error-tracking provider arrives, who writes the capability: the Sentry plugin author or Atelier?
+
+## 10. The cards the app ships
+
+The app ships one card for each tool of the gateway (`crates/app/src/tool_card/cards/`). They are written once, in this schema, and
+draw the neutral result of the gateway for every provider. The result is the JSON text the agent got (the `structuredContent` of
+the call; Claude Code hands the same JSON to the agent as the text of the result). A result that is cut short, or is not the shape
+its card draws, keeps the plain tool row.
+
+The app adds three values to a result before a card reads it, because a card cannot count or name:
+
+- `$._provider.name` and `$._provider.account`: the provider as the first reference of the result names it (`tasks:linear:acme:ENG-1`
+  is Linear, account `acme`), or as an argument of the call names it.
+- `$._found`: what a list holds, such as "3 tasks", "1 channel", "no threads", or "50+ tasks" when more are available.
+- `$._in`: "in Linear", or nothing when the call does not say where it went.
+
+The built-in cards have `open` actions only: a card never makes a call and never opens a link. A press on a row or a button of a card
+shows the task in Tasks, the channel in Messages, or the mailbox or thread in Mail.

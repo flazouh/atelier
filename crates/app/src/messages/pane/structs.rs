@@ -341,6 +341,9 @@ impl MessagesPane {
     /// Shows the channel `channel` names, in the account its reference names. A reference of an account that is not here shows
     /// nothing, and a message of a channel opens the channel.
     pub fn open_ref(&mut self, channel: &Ref, cx: &mut Context<Self>) {
+        if channel.capability != "messaging" {
+            return;
+        }
         let Some(at) = self
             .accounts
             .iter()

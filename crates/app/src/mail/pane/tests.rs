@@ -10,6 +10,7 @@ use super::*;
 
 mod compose;
 mod fake;
+mod refs;
 mod states;
 
 use fake::Fake;

@@ -118,9 +118,20 @@ impl MailPane {
         cx.notify();
     }
 
+    /// Whether the mailboxes of the account `reference` names are read, or the account is not here: `open_ref` has what it needs.
+    pub fn mailboxes_ready(&self, reference: &Ref) -> bool {
+        self.accounts
+            .iter()
+            .find(|a| a.choice.provider == reference.provider && a.choice.account == reference.account)
+            .is_none_or(|a| !a.reading)
+    }
+
     /// Shows what a reference names, in the account it names: a mailbox with its threads, or a thread, with the inbox of the
     /// account (or its first mailbox) behind it when no mailbox of the account is open. Any other reference shows nothing.
     pub fn open_ref(&mut self, reference: &Ref, window: &mut Window, cx: &mut Context<Self>) {
+        if reference.capability != "mail" {
+            return;
+        }
         let Some(at) = self
             .accounts
             .iter()

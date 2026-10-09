@@ -14,6 +14,7 @@ use super::{helpers::set_head, *};
 use crate::messages::map::{Body, Line};
 
 mod fake;
+mod refs;
 mod states;
 
 use fake::Fake;
