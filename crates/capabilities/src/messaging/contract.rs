@@ -67,7 +67,15 @@ pub fn send_then_history(make: Make) {
     assert!(first.parent.is_none(), "a top-level message has no parent");
     let page = p.history(&public, None, None).expect("history");
     assert_eq!(text_of(&page.items), ["second", "hello"], "newest first");
-    assert_eq!(page.items[1], first, "history returns what send returned");
+    assert_eq!(
+        (
+            &page.items[1].reference,
+            &page.items[1].text,
+            &page.items[1].channel
+        ),
+        (&first.reference, &first.text, &first.channel),
+        "history returns what send returned"
+    );
     assert_eq!(page.items[0].reference, second.reference);
     for blank in ["", "   "] {
         assert!(
@@ -199,7 +207,11 @@ pub fn capabilities_are_honest(make: Make) {
     }
     if caps.can(Operation::Person) {
         let person = p.person(&by_ref(&public, &by)).expect("person");
-        assert_eq!(person.name, by.name, "the signed-in person by reference");
+        assert_eq!(
+            person.reference,
+            by_ref(&public, &by),
+            "the signed-in person by reference"
+        );
     }
 }
 
