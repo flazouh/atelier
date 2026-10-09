@@ -219,7 +219,7 @@ fn search_maps_the_channel_from_the_link_and_skips_a_row_with_none() {
             "--json",
             "--full",
             "-n",
-            "21",
+            "51",
             "--",
             "release in:general from:@sam"
         ]
@@ -503,6 +503,26 @@ fn a_failed_command_is_the_error_the_screen_knows() {
         }
         other => panic!("{other:?}"),
     }
+}
+
+#[test]
+fn a_logged_out_slack_stops_every_call_with_not_signed_in() {
+    let slack = FakeSlack::new();
+    slack.fail_with("Slack rejected the credential (invalid_auth). Run: slackcli login");
+    let p = SlackMessaging::new(slack, config());
+    assert_eq!(p.whoami().unwrap_err(), CapError::NotSignedIn);
+    assert_eq!(
+        p.history(&general(), None, None).unwrap_err(),
+        CapError::NotSignedIn
+    );
+    assert_eq!(
+        p.send(
+            &NewMessage::to(&general(), "hi"),
+            &Actor::person("U01", "alex")
+        )
+        .unwrap_err(),
+        CapError::NotSignedIn
+    );
 }
 
 #[test]
