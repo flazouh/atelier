@@ -162,6 +162,7 @@ impl MailPane {
                 self.held.retain(|h| h.thread != thread);
                 if here {
                     self.draft = None;
+                    self.to_end = true;
                     self.compose.update(cx, |c, cx| c.set_value("", window, cx));
                     self.reload(cx);
                 }

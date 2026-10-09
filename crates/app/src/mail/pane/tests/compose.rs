@@ -410,3 +410,56 @@ fn a_provider_that_cannot_change_a_draft_locks_the_box_once_it_is_saved(cx: &mut
         "it can still be sent, as it was saved"
     );
 }
+
+#[gpui_kit::test]
+fn a_thread_starts_at_its_top_and_a_sent_reply_scrolls_to_the_end(cx: &mut TestAppContext) {
+    let provider = Fake::seeded(ME, &["short"]);
+    let long = (0..40)
+        .map(|n| format!("line {n}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    provider
+        .memory()
+        .receive(&atelier_capabilities::mail::Incoming::new(
+            "ana@example.com",
+            ME,
+            "long",
+            &long,
+            1_790_000_900_000,
+        ))
+        .unwrap();
+    let (pane, cx) = one(&provider, cx);
+    // A short window, so the thread is taller than the room it has.
+    cx.simulate_resize(gpui_kit::size(gpui_kit::px(1000.), gpui_kit::px(420.)));
+    settle(&pane, cx);
+    let at = |pane: &Entity<MailPane>, cx: &mut VisualTestContext| {
+        pane.read_with(cx, |p, _| {
+            (
+                f32::from(p.messages_scroll().offset().y),
+                f32::from(p.messages_scroll().max_offset().y),
+            )
+        })
+    };
+    open_row(0, &pane, cx);
+    let (offset, max) = at(&pane, cx);
+    assert!(
+        max > 0. && offset == 0.,
+        "the thread is taller than its room and starts at the top: {offset} {max}"
+    );
+    // Scrolled down, then another thread: it starts at its top again.
+    pane.read_with(cx, |p, _| {
+        p.messages_scroll()
+            .set_offset(gpui_kit::point(gpui_kit::px(0.), gpui_kit::px(-80.)))
+    });
+    open_row(1, &pane, cx);
+    assert_eq!(at(&pane, cx).0, 0., "another thread starts at its top");
+    open_row(0, &pane, cx);
+    write("noted", &pane, cx);
+    press("mail-send", &pane, cx);
+    settle(&pane, cx);
+    let (offset, max) = at(&pane, cx);
+    assert!(
+        max > 0. && (offset + max).abs() < 1.,
+        "the reply that was just sent is in view: {offset} {max}"
+    );
+}

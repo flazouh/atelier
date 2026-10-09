@@ -7,7 +7,8 @@ use atelier_capabilities::{
 use atelier_ui::{ActiveTheme, scale::px, theme::radius};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement,
-    IntoElement, ListState, ParentElement, Render, SharedString, Styled, Subscription, Window,
+    IntoElement, ListState, ParentElement, Render, ScrollHandle, SharedString, Styled,
+    Subscription, Window,
     component::input::{InputEvent, InputState, TextareaState},
     div,
 };
@@ -124,6 +125,10 @@ pub struct MailPane {
     pub(super) thread_load: Load,
     /// The messages the reader asked to see whole.
     pub(super) whole: Vec<Ref>,
+    /// Where the messages of the open thread are scrolled to. A thread starts at its top, and a reply that was just sent shows.
+    pub(super) messages_scroll: ScrollHandle,
+    /// The next reading of the thread scrolls to its end: a reply was sent, and it is the last message.
+    pub(super) to_end: bool,
     /// An address the reader pressed, waiting for their yes.
     pub(super) link: Option<SharedString>,
     pub(super) menu: Option<Menu>,
@@ -203,6 +208,8 @@ impl MailPane {
             views: Rc::default(),
             thread_load: Load::Loading,
             whole: Vec::new(),
+            messages_scroll: ScrollHandle::new(),
+            to_end: false,
             link: None,
             menu: None,
             draft: None,
@@ -268,6 +275,11 @@ impl MailPane {
     pub fn shown_body(&self, at: usize) -> SharedString {
         let view = &self.views[at];
         view.shown(self.whole.contains(&view.reference)).clone()
+    }
+
+    #[cfg(test)]
+    pub fn messages_scroll(&self) -> &ScrollHandle {
+        &self.messages_scroll
     }
 
     #[cfg(test)]

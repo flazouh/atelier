@@ -277,6 +277,7 @@ impl MailPane {
         });
         div()
             .id("mail-messages")
+            .track_scroll(&self.messages_scroll)
             .debug_selector(|| "mail-messages".into())
             .size_full()
             .flex()

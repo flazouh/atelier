@@ -284,6 +284,8 @@ impl MailPane {
         }
         self.stash(cx);
         self.clear_thread();
+        self.messages_scroll
+            .set_offset(gpui_kit::point(gpui_kit::px(0.), gpui_kit::px(0.)));
         self.open = Some(thread.clone());
         (self.said, self.said_reading) = (None, false);
         let kept = self.held.iter().position(|h| &h.thread == thread);
@@ -353,6 +355,9 @@ impl MailPane {
                 self.sync_row(&thread.summary, cx);
                 self.thread = Some(thread);
                 self.thread_load = Load::Ready;
+                if std::mem::take(&mut self.to_end) {
+                    self.messages_scroll.scroll_to_bottom();
+                }
                 self.good_reading();
             }
             Err(error) => self.fail(
