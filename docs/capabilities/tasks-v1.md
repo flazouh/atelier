@@ -113,6 +113,20 @@ The screen reads this and hides what is missing. An agent tool that the provider
 provider and workspace). Permission classes: `list`, `get`, `search`: read, no prompt. `create`, `comment`: write, prompt once per
 chat. `update` of status or assignee: write. `delete`: always ask. Anything an agent reads from a task body is marked untrusted.
 
+### 8.1 Tool cards
+
+Every tool call of an agent shows as a card in the chat. The card belongs to the **tool of the capability**, not to the provider.
+
+- `tasks.search`, `tasks.get`, `tasks.create`, `tasks.update` and `tasks.comment` each have one card, written once in Atelier. It reads the neutral entities, so it works for every provider.
+- The header of the card shows the provider's **logo and name**, the account, and a short line: "Searched Linear, 3 tasks". The provider gives the logo and name in its manifest.
+- A card has four states: running, done, failed, and waiting for approval (for write tools). An agent's card shows the origin: "Alex's agent".
+- A task in a card opens in the one tasks screen, by its `ref`.
+- Each provider implements the **tool interface** of the capability: it returns the neutral result of section 4. It does not draw anything.
+
+A tool that the capability does not define (for example a Linear cycle report) must name a **card kind** from a small fixed set: `task`, `task_list`, `person`, `table`, `key_value`, `text`. The host draws it with the provider's logo. A tool with no card kind gets the generic card: name, arguments, and the result as folded JSON.
+
+A plugin that wants a card kind outside this set opens a pull request. The new kind then serves all providers.
+
 ## 9. Contract tests
 
 Every provider must pass one shared suite, including the local one:
@@ -125,6 +139,7 @@ Every provider must pass one shared suite, including the local one:
 7. `subscribe` delivers each change once, in order.
 8. The `by` actor is kept, with `on_behalf_of`.
 9. A reference parses back to its provider and id.
+10. Each tool result fits its card kind: a result that does not fit fails the test.
 
 ## 10. How the current code gets there (additive)
 
