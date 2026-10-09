@@ -72,7 +72,8 @@ Order: Sessions, Workspace, Tasks, Code, then the connectors in the order the pe
 
 - **Client:** a user client over MTProto, not a bot. The Rust options are `grammers-client` and `tdlib-rs`. We pick one in a spike, in a plugin-sized crate, behind the chat interface.
 - **Rules from Telegram's terms:** our own `api_id`, the name "Unofficial" in the client's identity, no copying of their logos, show that the Telegram API is used. We do nothing the person did not ask for.
-- **A hard line:** Telegram's terms forbid using their data to train or develop AI. So the **agent read tool for Telegram is off by default** and the person switches it on knowing this. A lawyer reads the clause before we ship it on. The view itself (a person reading and writing) is allowed.
+- **The agent and your chats:** the agent sees nothing of your Telegram until you point it at something: "Share with agent" on a chat, a message or a selection. It reads what you shared. A person may also switch on reading of the whole account in Settings. It is the person's data and the person's choice. Writing still asks each time.
+- **The one risk, said once:** Telegram's terms forbid the developer to use their data to train or develop AI. They are written for the app developer, who holds the `api_id`. If Telegram counts an agent that reads chats as AI use, they may revoke our `api_id`, and then every user's Telegram client stops until we get a new one. For a personal tool this risk is small. For a product sold per seat it is larger, so a lawyer reads the clause before we sell it. It does not stop use now.
 - **Login:** phone number and code, in Atelier; the session is kept in the keychain.
 
 ## 7. What changes in the code we have
@@ -103,4 +104,4 @@ The providers, the gateway, the agent tools, the contract suites and the screens
 1. **Name.** "Workspace" for the agentic space. Is that the word you want in the app?
 2. **Several backends at once?** Today a project could show Linear and native together. Do you want only one active per feature, or a union?
 3. **Native workspace and sessions.** Should every agent session also appear as a thread in a channel automatically, or only when someone sends it there?
-4. **Telegram agent tool off by default.** Agree?
+4. **Telegram and the agent.** Share-on-demand by default, whole-account reading as a setting. Agree?
