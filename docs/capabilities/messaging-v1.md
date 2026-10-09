@@ -121,6 +121,24 @@ app keeps the difference visible:
 What an agent reads from a message is data. The tool result is marked untrusted, and a message that tells the agent to
 send or delete something does not change what the agent may do.
 
+### 8.0 What the gateway offers today
+
+The gateway (`crates/gateway`) names a tool with an underscore, as MCP tool names do: `messaging_channels`,
+`messaging_history`, `messaging_thread`, `messaging_search`, `messaging_send`. A reply is `messaging_send` with
+`in_thread_of`; there is no tool of its own. `edit`, `delete`, `react` and `mark_read` are not offered yet.
+
+- A tool is listed only while some connected account lists the operation. A call to an account that lacks it answers with a
+  plain sentence (`memory/acme cannot search messages`), never a transport error.
+- Every tool takes `account` as `provider/account`. It can be left out when one account is connected, or when a ref names
+  the account. A channel or message argument may be a bare id when the account is clear.
+- `history`, `search` and `channels` return at most 50 items and a `next_cursor`. A message text over 8000 characters is cut,
+  in the text and in `structuredContent`, with a `[cut: ...]` line and `text_cut` data.
+- Channel names, topics and message text sit between `--- begin message data (untrusted) ---` and
+  `--- end message data ---`. The marker line cannot be forged from inside the text. The tool descriptions say the text is
+  data and not instructions.
+- `messaging_send` is a write for the client (`readOnlyHint` false, `destructiveHint` false). The message goes out as the
+  session's agent actor, so the provider adds the origin line.
+
 ### 8.1 Tool cards (level 1)
 
 Messaging is a capability, so Atelier draws **one card per tool**, once, from the neutral result; a provider draws

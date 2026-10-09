@@ -104,6 +104,26 @@ One code is fixed for mail: `Provider { code: "approval_required" }`, which `sen
 
 `mail.search`, `mail.thread`, `mail.get`, `mail.mailboxes`, `mail.mark_read`, `mail.star`, `mail.archive`, `mail.label`, `mail.move`, `mail.trash`, `mail.create_draft`, `mail.update_draft`, `mail.reply`, `mail.send`, `mail.attachment`. Each takes an `account` (provider and address).
 
+### 8.0 What the gateway offers today
+
+The gateway (`crates/gateway`) names a tool with an underscore, as MCP tool names do. It offers `mail_mailboxes`, `mail_search`,
+`mail_thread`, `mail_get` and `mail_create_draft`. **No tool sends mail**, and `mail_reply`, `mail_update_draft`,
+`mail_mark_read`, `mail_star`, `mail_archive`, `mail_label`, `mail_move`, `mail_trash` and `mail_attachment` are not offered
+yet. The person's click on **Send** is the only way a draft leaves: `MailProvider::send` needs an `Approval`, and only the app
+builds one.
+
+- A tool is listed only while some connected account lists the operation. A call to an account that lacks it answers with a
+  plain sentence, never a transport error.
+- Every tool takes `account` as `provider/account` (the account is the address). It can be left out when one account is
+  connected, or when a ref names it. Mail refs carry a kind letter, so a call needs the full ref an earlier call gave.
+- `mail_search` returns at most 50 threads and a `next_cursor`. A body over 8000 characters is cut, in the text and in
+  `structuredContent`, with a `[cut: ...]` line; `mail_get` takes `offset` (in characters) to read on.
+- The tools put all mail text of a result between `--- begin mail data (untrusted) ---` and `--- end mail data ---`, the same
+  marker the tasks tools use, and not one `<untrusted>` fence per field (section 8.3). A marker line inside the text is
+  changed, so it cannot close the block. `html` is left out of the result.
+- `mail_create_draft` is a write for the client (`readOnlyHint` false, `destructiveHint` false). The draft is made by the
+  session's agent actor, for the person it works for. `to` takes addresses, plain or as `Name <address>`.
+
 ### 8.1 Permission classes
 
 | Class | Tools | Rule |
