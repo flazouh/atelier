@@ -149,7 +149,10 @@ fn the_readonly_value_registers_an_account_that_lists_read_only_and_refuses_a_se
     assert_eq!(providers.len(), 1);
     let p = &providers[0];
     assert_eq!((p.provider(), p.account()), ("memory", "demo"));
-    assert!(p.capabilities().has(atelier_capabilities::messaging::Feature::ReadOnly));
+    assert!(
+        p.capabilities()
+            .has(atelier_capabilities::messaging::Feature::ReadOnly)
+    );
     assert!(!p.offers(atelier_capabilities::messaging::Operation::Send));
     let channels = p.channels(&ChannelQuery::default()).unwrap().items;
     assert!(

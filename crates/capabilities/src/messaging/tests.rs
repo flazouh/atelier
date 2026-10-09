@@ -48,7 +48,12 @@ impl MessagingProvider for ReadOnlyMemory {
     fn channels(&self, query: &ChannelQuery) -> CapResult<Page<Channel>> {
         self.0.channels(query)
     }
-    fn history(&self, c: &Ref, cursor: Option<&str>, limit: Option<u32>) -> CapResult<Page<Message>> {
+    fn history(
+        &self,
+        c: &Ref,
+        cursor: Option<&str>,
+        limit: Option<u32>,
+    ) -> CapResult<Page<Message>> {
         self.0.history(c, cursor, limit)
     }
     fn thread(&self, root: &Ref, cursor: Option<&str>) -> CapResult<Page<Message>> {
@@ -86,7 +91,10 @@ fn a_read_only_account_lists_send_but_does_not_offer_a_call_that_writes() {
     assert!(!p.offers(Operation::Send), "but it is not offered");
     assert!(p.offers(Operation::History), "a read stays");
     let writable = MemoryMessaging::new("test");
-    assert!(writable.offers(Operation::Send), "a writable account offers it");
+    assert!(
+        writable.offers(Operation::Send),
+        "a writable account offers it"
+    );
     assert!(
         !writable.capabilities().has(Feature::ReadOnly),
         "the memory provider lists no ReadOnly"

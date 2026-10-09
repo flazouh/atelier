@@ -114,7 +114,11 @@ fn a_read_only_chat_account_does_not_count_for_the_send_tool() {
     let f = without_tasks(registry);
     assert_eq!(
         f.tool_names(),
-        ["messaging_channels", "messaging_history", "messaging_thread"],
+        [
+            "messaging_channels",
+            "messaging_history",
+            "messaging_thread"
+        ],
         "send is listed by the account, and still not offered"
     );
     // A writable account next to it brings the tool back.

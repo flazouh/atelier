@@ -8,8 +8,9 @@ use atelier_capabilities::{
         MemoryMail, NewDraft, SearchQuery as MailQuery, Thread, ThreadSummary,
     },
     messaging::{
-        Channel, ChannelQuery, Event, Feature, Filter, MemoryMessaging, Message, MessagingCapabilities,
-        MessagingProvider, NewMessage, Operation, Page, SearchQuery, Workspace,
+        Channel, ChannelQuery, Event, Feature, Filter, MemoryMessaging, Message,
+        MessagingCapabilities, MessagingProvider, NewMessage, Operation, Page, SearchQuery,
+        Workspace,
     },
     tasks::Page as MailPage,
 };

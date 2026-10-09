@@ -273,7 +273,11 @@ fn a_read_only_provider_shows_no_composer_and_no_reply_box(cx: &mut TestAppConte
         assert_eq!(pane.read_with(cx, |p, _| p.composer_shown()), !read_only);
         assert_eq!(lines(&pane, cx), ["the root"], "the history reads");
         press("message-replies-0", &pane, cx);
-        assert_eq!(lines(&pane, cx), ["the root", "a reply"], "the thread reads");
+        assert_eq!(
+            lines(&pane, cx),
+            ["the root", "a reply"],
+            "the thread reads"
+        );
         assert_eq!(
             cx.debug_bounds("messages-composer").is_some(),
             !read_only,

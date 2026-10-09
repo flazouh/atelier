@@ -81,7 +81,7 @@ v1; they are listed so the vocabulary is fixed.
 
 ## 6. Capabilities value
 
-`{ operations: [...], features: [threads, reactions, edits, attachments, presence, typing], formatting: plain | basic |
+`{ operations: [...], features: [threads, reactions, edits, attachments, presence, typing, read_only], formatting: plain | basic |
 rich, limits: { page_max, per_minute }, auth: [oauth, token, browser_session, none] }`.
 
 - `formatting` says how much of section 4 the service keeps. `plain` keeps none (the screen shows text as typed), `basic`
@@ -90,6 +90,13 @@ rich, limits: { page_max, per_minute }, auth: [oauth, token, browser_session, no
   message), `reactions`, `edits` (a message may change after sending), `attachments`, `presence` and `typing` (the service
   tells who is online and who is typing; v1 has no call for them, so they only tell the screen what to hide).
 - A call that the list lacks returns `Unsupported`, and the agent tool for it is not offered.
+- `read_only` says the account may not change the service (Discord without `allow_writes`, a read-only token). Such a
+  provider may list `send`, because it is core, but every write call (`send`, `edit`, `delete`, `react`, `mark_read`,
+  `import`) returns `Provider { code: "read_only" }` without reaching the service and changes nothing. The screen and the
+  agent tools ask `offers`, not `can`: `offers` is `can`, except that a read-only account offers no call that writes. The
+  Messages screen draws no composer, no thread reply box and no reaction or edit control for it, and `messaging_send`
+  is not listed while no connected account offers it (one writable account is enough to list it; a call aimed at the
+  read-only one is refused with a plain sentence).
 
 ## 7. Errors
 
@@ -172,6 +179,8 @@ provider with one public channel and one dm, both empty.
 9. A reference parses back and is of the form of section 2; an unknown channel or message is `NotFound`.
 10. `channels` filters by kind and by text; `search` finds a message by a word of its text.
 11. `mark_read` is accepted for a channel and refused with `NotFound` for an unknown one.
+12. A provider that lists `read_only` is held to this check instead of 1 to 11: it offers no write, each write call it
+    lists returns `Provider { code: "read_only" }`, and its history is the same after.
 
 ## 10. Open questions
 

@@ -64,13 +64,19 @@ pub fn read_only_changes_nothing(make: Make) {
     let before = p.history(&public, None, None).expect("history");
     let nowhere = super::helpers::message_ref(&public, "1");
     let refused = [
-        ("send", p.send(&NewMessage::to(&public, "no"), &by).map(drop)),
+        (
+            "send",
+            p.send(&NewMessage::to(&public, "no"), &by).map(drop),
+        ),
         (
             "reply",
             p.send(&NewMessage::reply(&nowhere, &public, "no"), &by)
                 .map(drop),
         ),
-        ("send to a dm", p.send(&NewMessage::to(&dm, "no"), &by).map(drop)),
+        (
+            "send to a dm",
+            p.send(&NewMessage::to(&dm, "no"), &by).map(drop),
+        ),
     ];
     for (call, result) in refused {
         assert!(
@@ -81,7 +87,10 @@ pub fn read_only_changes_nothing(make: Make) {
     let write_calls = [
         (Operation::Edit, p.edit(&nowhere, "x", &by).map(drop)),
         (Operation::Delete, p.delete(&nowhere, &by)),
-        (Operation::React, p.react(&nowhere, "eyes", true, &by).map(drop)),
+        (
+            Operation::React,
+            p.react(&nowhere, "eyes", true, &by).map(drop),
+        ),
         (Operation::MarkRead, p.mark_read(&public, None)),
     ];
     for (op, result) in write_calls {
