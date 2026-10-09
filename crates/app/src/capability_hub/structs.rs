@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex, RwLock},
 };
 
-use atelier_capabilities::{Actor, Registry, tasks::TasksProvider};
+use atelier_capabilities::{Actor, Registry, messaging::MessagingProvider, tasks::TasksProvider};
 use atelier_gateway::{Gateway, Grant, MailTools, MessagingTools, TasksTools, ToolSet};
 use atelier_project::Project;
 use atelier_settings::AccountsSaved;
@@ -73,6 +73,33 @@ impl CapabilityHub {
     /// The hub of the running app: the person is whoever uses this machine, and the files go beside the settings.
     pub(crate) fn for_this_app(enabled: bool) -> Self {
         Self::new(person_actor(), run_dir(), enabled)
+    }
+
+    /// Adds a messaging account to the registry that the agent gateway and the Messages screen both read, so what the
+    /// agent can reach is what the person sees. A second one for the same provider and account replaces the first.
+    #[cfg_attr(
+        not(debug_assertions),
+        allow(
+            dead_code,
+            reason = "the Accounts section of Settings registers the real ones; until it lands only the debug demo does"
+        )
+    )]
+    pub(crate) fn add_messaging(&self, provider: Arc<dyn MessagingProvider>) {
+        self.inner
+            .registry
+            .write()
+            .unwrap_or_else(|p| p.into_inner())
+            .add_messaging(provider);
+    }
+
+    /// Every messaging account the app has, in the registry's order. The screen asks again each time it opens, so an
+    /// account added later shows.
+    pub(crate) fn messaging_providers(&self) -> Vec<Arc<dyn MessagingProvider>> {
+        self.inner
+            .registry
+            .read()
+            .unwrap_or_else(|p| p.into_inner())
+            .all_messaging()
     }
 
     /// A hub with no gateway, for a screen that runs without the app's own (a test, the gallery).
