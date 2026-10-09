@@ -1,14 +1,9 @@
-//! The update's own look: a chip in the title bar while an update downloads and when it is ready, and the changelog sheet
+//! The update's own look: the design system's update button in the title bar (a ring that fills while an update
+//! downloads, then "Update to vX"), and the changelog sheet
 //! (the same one the version in the status bar opens, and the first start after an update opens by itself). Sparkle's own
 //! windows are not used.
-use atelier_ui::{
-    ReleaseNote, ReleaseSheet, ReleaseVersion,
-    button::{Button, ButtonSize, ButtonVariant},
-    modal::Modal,
-    theme::ActiveTheme,
-    typography::TextSize,
-};
-use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Styled, Window, div};
+use atelier_ui::{ReleaseNote, ReleaseSheet, ReleaseVersion, UpdateButton, modal::Modal};
+use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString, Window, div};
 
 use super::{helpers::sheet_width, structs::Shell};
 use crate::{
@@ -51,33 +46,22 @@ impl Shell {
     /// The chip at the right of the title bar, and the only place that builds it: how far the download is, then the button
     /// that restarts and installs once the update is ready. Its look is one value here, so it can be swapped for another.
     pub(super) fn update_chip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let muted = cx.theme().muted_foreground;
+        let button = UpdateButton::new("update-button");
         match &self.update {
-            UpdateState::Downloading { fraction, .. } => Some(
-                div()
-                    .debug_selector(|| "update-progress".into())
-                    .text_size(TextSize::Xs.font_size())
-                    .text_color(muted)
-                    .child(format!("Updating {}%", (fraction * 100.).floor() as u32))
-                    .into_any_element(),
-            ),
+            UpdateState::Downloading { fraction, .. } => {
+                Some(button.downloading(*fraction as f32, format!("Updating {}%", (fraction * 100.).floor() as u32)).into_any_element())
+            }
             UpdateState::Ready { version, .. } => {
                 let this = cx.entity().downgrade();
                 let label = if version.is_empty() { "Update and restart".to_string() } else { format!("Update to v{version}") };
                 Some(
-                    Button::new("update-chip")
-                        .debug_name("update-chip")
-                        .label(label)
-                        .variant(ButtonVariant::Primary)
-                        .size(ButtonSize::Sm)
-                        .pill(true)
-                        .on_click(move |_, _, cx| drop(this.update(cx, |shell, cx| shell.update_install(cx))))
+                    button
+                        .ready(label)
+                        .on_click(move |_, cx| drop(this.update(cx, |shell, cx| shell.update_install(cx))))
                         .into_any_element(),
                 )
             }
-            UpdateState::Installing => {
-                Some(div().text_size(TextSize::Xs.font_size()).text_color(muted).child("Installing…").into_any_element())
-            }
+            UpdateState::Installing => Some(button.restarting("Restarting…").into_any_element()),
             UpdateState::Idle | UpdateState::Checking { .. } => None,
         }
     }

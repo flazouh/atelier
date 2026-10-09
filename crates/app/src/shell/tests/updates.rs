@@ -80,12 +80,12 @@ fn an_update_the_daily_look_finds_shows_its_percentage_and_then_a_button_and_ope
     let (shell, cx, _calls, _dir) = with_an_updater(cx);
     found_by_the_daily_look(&shell, cx);
     tell(&shell, cx, UpdateEvent::Downloading { fraction: 0.5 });
-    assert!(cx.debug_bounds("update-progress").is_some(), "the download shows a percentage");
-    assert!(cx.debug_bounds("update-chip").is_none() && cx.debug_bounds("release-sheet").is_none() && cx.debug_bounds("notice").is_none(), "and nothing else");
+    assert!(cx.debug_bounds("update-button-downloading").is_some(), "the download shows a percentage in the button");
+    assert!(cx.debug_bounds("update-button-ready").is_none() && cx.debug_bounds("release-sheet").is_none() && cx.debug_bounds("notice").is_none(), "and nothing else");
     tell(&shell, cx, UpdateEvent::Extracting { fraction: 1. });
     tell(&shell, cx, UpdateEvent::Ready);
-    assert!(cx.debug_bounds("update-chip").is_some(), "a button says the update is ready");
-    assert!(cx.debug_bounds("update-progress").is_none() && cx.debug_bounds("release-sheet").is_none(), "no sheet opens by itself");
+    assert!(cx.debug_bounds("update-button-ready").is_some(), "a button says the update is ready");
+    assert!(cx.debug_bounds("update-button-downloading").is_none() && cx.debug_bounds("release-sheet").is_none(), "no sheet opens by itself");
 }
 
 #[gpui_kit::test]
@@ -93,13 +93,13 @@ fn the_ready_button_names_the_version_and_a_press_installs_the_update_with_no_sh
     let (shell, cx, calls, _dir) = with_an_updater(cx);
     found_by_the_daily_look(&shell, cx);
     tell(&shell, cx, UpdateEvent::Ready);
-    let chip = cx.debug_bounds("update-chip").expect("the button is there");
+    let chip = cx.debug_bounds("update-button-ready").expect("the button is there");
     cx.simulate_click(chip.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert_eq!(calls.counts(), (0, 0, 1, 0), "the updater was told to install, and not to wait");
     assert!(cx.debug_bounds("release-sheet").is_none(), "no sheet opened");
     assert_eq!(shell.read_with(cx, |s, _| s.update.clone()), UpdateState::Installing);
-    assert!(cx.debug_bounds("update-chip").is_none(), "the button is gone: it says Installing instead");
+    assert!(cx.debug_bounds("update-button-ready").is_none() && cx.debug_bounds("update-button-restarting").is_some(), "the button now says it restarts");
 }
 
 #[gpui_kit::test]
@@ -147,7 +147,7 @@ fn a_look_the_reader_asked_for_opens_no_sheet_and_says_when_nothing_is_newer(cx:
     tell(&shell, cx, UpdateEvent::Found { version: "0.2.0".into(), notes: None, user: true });
     tell(&shell, cx, UpdateEvent::Ready);
     assert!(cx.debug_bounds("release-sheet").is_none(), "the update waits behind its button");
-    assert!(cx.debug_bounds("update-chip").is_some());
+    assert!(cx.debug_bounds("update-button-ready").is_some());
 }
 
 #[gpui_kit::test]

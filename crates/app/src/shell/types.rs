@@ -50,7 +50,7 @@ pub(super) enum TitleTabs {
 
 /// The room the chip in the title bar ("Updating 45%", the button "Update to v0.1.9") takes at the right, left of the
 /// Settings button.
-pub(super) const UPDATE_ROOM: f32 = 160.;
+pub(super) const UPDATE_ROOM: f32 = 190.;
 /// The widest the changelog sheet is, in design pixels.
 pub(super) const SHEET_WIDTH: f32 = 860.;
 /// The narrowest it gets in a narrow window, and the room it leaves at each side.
