@@ -294,3 +294,13 @@ fn the_connected_accounts_round_trip_and_the_file_holds_no_key() {
     update(&path, |s| s.accounts = AccountsSaved::default()).unwrap();
     assert_eq!(load(&path).accounts, AccountsSaved::default(), "forgetting clears both");
 }
+
+#[test]
+fn a_save_to_a_path_given_on_purpose_does_not_make_its_folder() {
+    let path = scratch("gone");
+    let dir = path.parent().unwrap().to_path_buf();
+    std::fs::remove_dir_all(&dir).unwrap();
+    let error = update(&path, |s| s.theme = Some("atelier Light".into())).unwrap_err();
+    assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "a folder that is gone stays gone");
+    assert!(!dir.exists(), "the save did not make the folder again");
+}
