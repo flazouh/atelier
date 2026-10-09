@@ -278,6 +278,11 @@ impl MailPane {
     }
 
     #[cfg(test)]
+    pub fn list_state(&self) -> &ListState {
+        &self.list
+    }
+
+    #[cfg(test)]
     pub fn messages_scroll(&self) -> &ScrollHandle {
         &self.messages_scroll
     }

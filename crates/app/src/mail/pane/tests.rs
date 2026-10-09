@@ -551,3 +551,47 @@ fn a_read_only_provider_shows_no_action_and_no_composer(cx: &mut TestAppContext)
         "the head is there with the subject"
     );
 }
+
+#[gpui_kit::test]
+fn a_list_taller_than_its_room_starts_at_its_top_and_keeps_the_readers_place(
+    cx: &mut TestAppContext,
+) {
+    let names: Vec<String> = (0..20).map(|n| format!("thread {n:02}")).collect();
+    let provider = Fake::seeded(ME, &names.iter().map(String::as_str).collect::<Vec<_>>());
+    let (pane, cx) = open(vec![provider.clone() as Arc<dyn MailProvider>], cx);
+    cx.simulate_resize(size(px(1000.), px(300.)));
+    settle(&pane, cx);
+    // Reading the mailbox again, as a change of the account does, with rows more than the room holds.
+    pane.update(cx, |p, cx| p.reload(cx));
+    settle(&pane, cx);
+    let top = |pane: &Entity<MailPane>, cx: &mut VisualTestContext| {
+        pane.read_with(cx, |p, _| p.list_state().logical_scroll_top().item_ix)
+    };
+    assert_eq!(top(&pane, cx), 0, "the first row is in view");
+    // The reader scrolls down; a thread then arrives above, and the reader still sees what they were reading.
+    pane.read_with(cx, |p, _| {
+        p.list_state().scroll_to(gpui_kit::ListOffset {
+            item_ix: 5,
+            offset_in_item: px(0.),
+        })
+    });
+    settle(&pane, cx);
+    provider
+        .memory()
+        .receive(&Incoming::new(
+            "ben@example.com",
+            ME,
+            "just now",
+            "hello",
+            1_790_002_000_000,
+        ))
+        .unwrap();
+    cx.executor().advance_clock(POLL * 2);
+    settle(&pane, cx);
+    assert_eq!(subjects(&pane, cx)[0], "just now");
+    assert_eq!(
+        top(&pane, cx),
+        6,
+        "one row was added above, so the view moved down by one"
+    );
+}

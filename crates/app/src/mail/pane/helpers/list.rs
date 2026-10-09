@@ -10,7 +10,8 @@ pub fn new_list() -> ListState {
 
 /// Puts `next` where `current` is, and tells the list only what changed: the rows from the first that differs to the last that
 /// differs. A row before the part that changes stays where it is, so a reading that finds nothing new moves nothing, and when
-/// the change is above the first row in view the view is moved by as many rows as were added, so the reader keeps their place.
+/// the change is above the first row in view (and the reader is not at the top) the view is moved by as many rows as were added,
+/// so the reader keeps their place.
 /// A "Load more" row after the last thread is not touched: it stands after the rows this changes.
 pub fn apply<T: PartialEq>(current: &mut Rc<Vec<T>>, list: &ListState, next: Vec<T>) {
     let old = Rc::clone(current);
@@ -31,7 +32,8 @@ pub fn apply<T: PartialEq>(current: &mut Rc<Vec<T>>, list: &ListState, next: Vec
     let place = list.logical_scroll_top();
     let (from, to) = (removed.len(), added);
     list.splice(removed.clone(), added);
-    if removed.end <= place.item_ix && from != to {
+    // A reader at the top stays there: the first filling of the list, and a thread that arrives, show from the first row.
+    if place.item_ix > 0 && removed.end <= place.item_ix && from != to {
         let item_ix = (place.item_ix + to).saturating_sub(from);
         list.scroll_to(ListOffset {
             item_ix,
