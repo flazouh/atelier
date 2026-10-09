@@ -5,7 +5,7 @@ use std::{
 };
 
 use atelier_capabilities::{Actor, Registry, tasks::TasksProvider};
-use atelier_gateway::{Gateway, Grant, TasksTools};
+use atelier_gateway::{Gateway, Grant, MailTools, MessagingTools, TasksTools, ToolSet};
 use atelier_project::Project;
 use atelier_settings::AccountsSaved;
 use atelier_tracker::{LocalTasks, ProjectKey, Tracker};
@@ -113,8 +113,13 @@ impl CapabilityHub {
             .ok_or_else(|| io::Error::other("this machine has no data folder"))?;
         let mut gateway = self.inner.gateway.lock().unwrap_or_else(|p| p.into_inner());
         if gateway.is_none() {
-            let tools = Arc::new(TasksTools::new(self.registry()));
-            *gateway = Some(Gateway::start(vec![tools])?);
+            let registry = self.registry();
+            let sets: Vec<Arc<dyn ToolSet>> = vec![
+                Arc::new(TasksTools::new(registry.clone())),
+                Arc::new(MessagingTools::new(registry.clone())),
+                Arc::new(MailTools::new(registry)),
+            ];
+            *gateway = Some(Gateway::start(sets)?);
         }
         gateway
             .as_ref()

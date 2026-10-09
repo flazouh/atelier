@@ -3,14 +3,19 @@ use atelier_agents::{
     usage::{ClaudeUsage, CodexUsage, OpenRouterUsage, Reading, UsageSource},
 };
 use atelier_project::Project;
-use atelier_ui::{Gauge, GaugeState, ProviderGauge, StatusBar, SystemLoad, Work, menu::Lead};
-use gpui_kit::{Context, IntoElement, Render, SharedString, Window};
+use atelier_ui::{Gauge, GaugeState, ProviderGauge, SystemLoad, Work, menu::Lead};
+use atelier_ui::status_bar::{StatusCard, StatusRow};
+use gpui_kit::{AnyElement, Context, ElementId, IntoElement, Render, Styled, WeakEntity, Window, div};
 
-use super::super::{consts::HISTORY, structs::Vitals, traits::LoadProbe, types::Handler};
+use super::super::{consts::HISTORY, structs::Vitals, traits::LoadProbe};
+use crate::{
+    shell::Shell,
+    slots::{BAR_ID, BarEnv, Column, Host, Slots},
+};
 
 impl Vitals {
     pub fn new(probe: Box<dyn LoadProbe>) -> Self {
-        Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None), version: None, on_version: None, on_usage: None }
+        Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None), shell: WeakEntity::new_invalid() }
     }
 
     #[cfg(test)]
@@ -44,14 +49,9 @@ impl Vitals {
         sources.iter().map(|(lead, source)| (source.name().to_string(), lead.clone(), source.read(project, now))).collect()
     }
 
-    /// The version at the left of the bar, and what a press on it does.
-    pub fn set_version(&mut self, version: impl Into<SharedString>, on_press: Handler) {
-        self.version = Some(version.into());
-        self.on_version = Some(on_press);
-    }
-    /// What a press on the usage chips does.
-    pub fn set_on_usage(&mut self, on_press: Handler) {
-        self.on_usage = Some(on_press);
+    /// The shell that shows the bar.
+    pub fn set_shell(&mut self, shell: WeakEntity<Shell>) {
+        self.shell = shell;
     }
     /// Where the bar's cards stand: under the sidebar, under the right pane. Whether it changed is the answer.
     pub fn set_columns(&mut self, lead: Option<f32>, tail: Option<f32>) -> bool {
@@ -112,20 +112,38 @@ fn failed(last: ProviderGauge, why: String) -> ProviderGauge {
 }
 
 impl Render for Vitals {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let bar = StatusBar::new("status-bar")
-            .load(self.load.clone())
-            .work(self.work)
-            .providers(self.providers.clone())
-            .columns(self.columns.0, self.columns.1)
-            .version(self.version.clone());
-        let bar = match self.on_version.clone() {
-            Some(press) => bar.on_version(move |window, cx| press(window, cx)),
-            None => bar,
+    /// The bar: the cards the slots hold for each column, in the panels the columns above it stand in. The panel under the
+    /// sidebar is there while the sidebar is. With it hidden its cards lead the middle panel. The panel under the right
+    /// pane is there while the pane is and has a card to show; without it its cards end the middle panel.
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let slots = cx.global::<Slots>().clone();
+        let id = ElementId::from(BAR_ID);
+        let host = Host::new(self.shell.clone(), cx.entity());
+        let env = BarEnv { id: &id, vitals: self, host: &host };
+        let mut column = |column: Column| -> Vec<AnyElement> {
+            slots.cards(column, env.vitals).into_iter().flat_map(|card| (card.render)(&env, window, cx)).collect()
         };
-        match self.on_usage.clone() {
-            Some(press) => bar.on_usage(move |window, cx| press(window, cx)),
-            None => bar,
+        let (left, middle, right) = (column(Column::Left), column(Column::Middle), column(Column::Right));
+        let (lead, tail) = (self.columns.0, self.columns.1.filter(|_| !right.is_empty()));
+        let mut cards: Vec<StatusCard> = Vec::new();
+        let mut middle = match lead {
+            Some(width) => {
+                cards.push(StatusCard::new("status-card-version").width(Some(width)).children(left));
+                middle
+            }
+            None => left.into_iter().chain(middle).collect(),
+        };
+        match tail {
+            Some(width) => {
+                cards.push(StatusCard::new("status-card-main").children(middle));
+                cards.push(StatusCard::new("status-card-load").width(Some(width)).children(right));
+            }
+            None => {
+                middle.push(div().flex_1().into_any_element());
+                middle.extend(right);
+                cards.push(StatusCard::new("status-card-main").children(middle));
+            }
         }
+        StatusRow::new(id).children(cards)
     }
 }

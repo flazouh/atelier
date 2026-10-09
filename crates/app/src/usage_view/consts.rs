@@ -13,3 +13,6 @@ pub const SHADES: usize = 3;
 pub const NOTHING: &str = "No usage found yet. Atelier reads the session logs of Claude Code and Codex on this computer.";
 pub const READING: &str = "Reading the session logs…";
 pub const NO_LOGS: &str = "This source keeps no token logs here. Its limit is in its tile.";
+/// The room the dashboard's panel leaves above and below it, and at each side in a narrow window, in design pixels.
+pub const MARGIN: f32 = 96.;
+pub const MARGIN_SIDE: f32 = 24.;
