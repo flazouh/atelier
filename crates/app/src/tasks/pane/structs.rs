@@ -282,6 +282,17 @@ impl TasksPane {
         self.labels.clear();
         self.versions.clear();
         self.vocab = Vocabulary::default();
+        // A label or an agent of the provider left is not the next one's, so the pane shows all of its tasks.
+        self.scope = Scope::All;
+        let all = Scope::All;
+        self.list.update(cx, |list, cx| {
+            let f = all.filters(list.filters());
+            list.set_filters(f, cx);
+        });
+        self.board.update(cx, |board, cx| {
+            let f = all.filters(board.filters());
+            board.set_filters(f, cx);
+        });
         (self.next, self.pages, self.loading_more) = (None, 1, false);
         (self.problem, self.said, self.open, self.load) = (None, None, None, Load::Loading);
         self.push_all(Source::None, cx);
@@ -734,7 +745,7 @@ impl Render for TasksPane {
                         .on_click(move |_, window, cx| pane.update(cx, |p, cx| p.back(window, cx))),
                 )
             })
-            .when(self.vocab.can(Operation::Create), |d| {
+            .when(self.vocab.can(Operation::Create) && self.problem != Some(Problem::SignedOut), |d| {
                 d.child(
                     Button::new("tasks-new")
                         .debug_name("tasks-new")

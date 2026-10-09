@@ -14,7 +14,7 @@ use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 
 use super::fake::Fake;
 use super::{open_with, settle};
-use crate::tasks::pane::{Change, Load, Problem, Reaction, Source, TasksEvent, TasksPane, apply, react};
+use crate::tasks::pane::{Change, Load, Problem, Reaction, Scope, Source, TasksEvent, TasksPane, apply, react};
 use crate::tasks::source::TasksSource;
 
 fn source_of(providers: &[&Arc<Fake>]) -> TasksSource {
@@ -280,4 +280,22 @@ fn a_task_asked_for_before_the_tasks_are_read_opens_when_they_are(cx: &mut TestA
     settle(&pane, cx);
     let open = pane.read_with(cx, |p, _| p.open.clone()).expect("the task is shown");
     assert_eq!(pane.read_with(cx, |p, _| p.tasks().iter().find(|t| t.id == open).map(|t| t.title.to_string())).as_deref(), Some("Two"));
+}
+
+#[gpui_kit::test]
+fn choosing_another_provider_shows_all_of_its_tasks_not_the_scope_of_the_last(cx: &mut TestAppContext) {
+    let (a, b) = (Fake::seeded("alpha", &["One"]), Fake::seeded("beta", &["Two"]));
+    let (pane, cx) = open_with(source_of(&[&a, &b]), 900., cx);
+    pane.update_in(cx, |p, window, cx| p.set_scope(Scope::Label("bug".into()), window, cx));
+    pane.update(cx, |p, cx| p.choose(1, cx));
+    settle(&pane, cx);
+    assert_eq!(pane.read_with(cx, |p, _| p.scope().clone()), Scope::All);
+}
+
+#[gpui_kit::test]
+fn signed_out_has_no_new_task_button(cx: &mut TestAppContext) {
+    let provider = Fake::seeded("a", &["One"]);
+    provider.fail(Operation::List, CapError::NotSignedIn);
+    let (_pane, cx) = open_with(source_of(&[&provider]), 900., cx);
+    assert!(cx.debug_bounds("tasks-new").is_none());
 }
