@@ -107,6 +107,28 @@ fn a_tool_no_account_can_do_is_not_listed_and_cannot_be_called() {
 }
 
 #[test]
+fn a_read_only_chat_account_does_not_count_for_the_send_tool() {
+    let only = Arc::new(FakeChat::new("acme", &MessagingCapabilities::CORE).read_only());
+    let mut registry = Registry::new();
+    registry.add_messaging(only.clone());
+    let f = without_tasks(registry);
+    assert_eq!(
+        f.tool_names(),
+        ["messaging_channels", "messaging_history", "messaging_thread"],
+        "send is listed by the account, and still not offered"
+    );
+    // A writable account next to it brings the tool back.
+    let mut registry = Registry::new();
+    registry.add_messaging(only);
+    registry.add_messaging(Arc::new(MemoryMessaging::new("beta")));
+    assert!(
+        without_tasks(registry)
+            .tool_names()
+            .contains(&"messaging_send".to_string())
+    );
+}
+
+#[test]
 fn hints_tell_a_client_which_tools_only_read() {
     let mut registry = Registry::new();
     registry.add_messaging(Arc::new(MemoryMessaging::new("acme")));

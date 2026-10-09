@@ -8,7 +8,7 @@ use atelier_capabilities::{
         MemoryMail, NewDraft, SearchQuery as MailQuery, Thread, ThreadSummary,
     },
     messaging::{
-        Channel, ChannelQuery, Event, Filter, MemoryMessaging, Message, MessagingCapabilities,
+        Channel, ChannelQuery, Event, Feature, Filter, MemoryMessaging, Message, MessagingCapabilities,
         MessagingProvider, NewMessage, Operation, Page, SearchQuery, Workspace,
     },
     tasks::Page as MailPage,
@@ -18,6 +18,7 @@ use atelier_capabilities::{
 pub struct FakeChat {
     pub inner: MemoryMessaging,
     operations: Vec<Operation>,
+    read_only: bool,
     fail: Mutex<Option<CapError>>,
 }
 
@@ -26,8 +27,15 @@ impl FakeChat {
         Self {
             inner: MemoryMessaging::new(account),
             operations: operations.to_vec(),
+            read_only: false,
             fail: Mutex::new(None),
         }
+    }
+
+    /// The account lists `ReadOnly`, as Discord does without `allow_writes`: `send` stays listed and is refused.
+    pub fn read_only(mut self) -> Self {
+        self.read_only = true;
+        self
     }
 
     pub fn failing(&self, error: CapError) {
@@ -50,10 +58,14 @@ impl MessagingProvider for FakeChat {
         self.inner.account()
     }
     fn capabilities(&self) -> MessagingCapabilities {
-        MessagingCapabilities {
+        let mut caps = MessagingCapabilities {
             operations: self.operations.clone(),
             ..self.inner.capabilities()
+        };
+        if self.read_only {
+            caps.features.push(Feature::ReadOnly);
         }
+        caps
     }
     fn whoami(&self) -> CapResult<Actor> {
         self.inner.whoami()

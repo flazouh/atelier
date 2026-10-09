@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use atelier_capabilities::{
     Actor, CapError, Ref, Registry,
-    messaging::{ChannelKind, MemoryMessaging, Message, MessagingProvider, NewMessage},
+    messaging::{
+        ChannelKind, MemoryMessaging, Message, MessagingCapabilities, MessagingProvider, NewMessage,
+    },
 };
 use serde_json::{Value, json};
 
@@ -412,4 +414,32 @@ fn an_account_that_lacks_a_call_says_so_while_another_account_keeps_the_tool_lis
         json!({ "query": "x", "account": "memory/full" }),
     );
     assert_eq!(works["isError"], json!(false), "{works}");
+}
+
+#[test]
+fn a_send_aimed_at_a_read_only_account_says_so_and_sends_nothing() {
+    let read_only = Arc::new(FakeChat::new("acme", &MessagingCapabilities::CORE).read_only());
+    let channel = read_only.inner.add_channel("general", ChannelKind::Public);
+    let beta = Arc::new(MemoryMessaging::new("beta"));
+    let mut registry = Registry::new();
+    registry.add_messaging(read_only.clone());
+    registry.add_messaging(beta);
+    let f = without_tasks(registry);
+    let result = f.call(
+        "messaging_send",
+        json!({ "channel": channel.to_string(), "text": "hi", "account": "memory/acme" }),
+    );
+    assert_eq!(result["isError"], json!(true), "{result}");
+    let text = Fixture::text(&result);
+    assert!(text.contains("read-only"), "{text}");
+    assert!(text.contains("memory/acme"), "{text}");
+    assert!(
+        read_only
+            .inner
+            .history(&channel, None, None)
+            .unwrap()
+            .items
+            .is_empty(),
+        "nothing was sent"
+    );
 }
