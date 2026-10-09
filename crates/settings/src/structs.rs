@@ -101,6 +101,9 @@ pub struct CapabilitiesSaved {
 pub struct AccountsSaved {
     pub linear: Option<LinearSaved>,
     pub github_issues: Option<GithubIssuesSaved>,
+    pub slack: Option<SlackSaved>,
+    pub discord: Option<DiscordSaved>,
+    pub gmail: Option<GmailSaved>,
 }
 
 /// Linear, connected with an API key kept in the keychain (see `secrets::LINEAR_KEY`).
@@ -119,6 +122,46 @@ pub struct GithubIssuesSaved {
     pub repo: String,
     /// The `gh` login's name, as GitHub last said it.
     pub person: Option<String>,
+}
+
+/// Slack, read through the reader's own `slackcli`. Facts only: `slackcli` keeps the login.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SlackSaved {
+    /// The workspace's name, used as the account in references.
+    pub workspace: String,
+    /// The channels to show, by name or id. `slackcli` has no channel list, so the reader names them.
+    pub channels: Vec<String>,
+    /// Where `slackcli` is. Empty: look it up on `PATH`.
+    pub program: String,
+    /// The name `slackcli` last said it signed in as.
+    pub person: Option<String>,
+}
+
+/// Discord, read through the reader's own `discordcli`. Facts only: `discordcli` keeps the session.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct DiscordSaved {
+    /// The server, by name or id. Empty: the direct messages only.
+    pub server: String,
+    pub include_dms: bool,
+    /// Sending is off unless the reader turns it on: a user-token login can get an account banned.
+    pub allow_writes: bool,
+    /// Where `discordcli` is. Empty: look it up on `PATH`.
+    pub program: String,
+    /// The name `discordcli` last said it signed in as.
+    pub person: Option<String>,
+}
+
+/// Gmail, read through the reader's own `gmailcli`, here or over SSH. Reads only.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GmailSaved {
+    pub address: String,
+    /// The host `gmailcli` runs on, over SSH. Empty: on this machine.
+    pub host: String,
+    /// Where `gmailcli` is. Empty: look it up on `PATH`.
+    pub program: String,
 }
 
 /// An update the app downloaded: its version and its changelog.

@@ -304,3 +304,35 @@ fn a_save_to_a_path_given_on_purpose_does_not_make_its_folder() {
     assert_eq!(error.kind(), std::io::ErrorKind::NotFound, "a folder that is gone stays gone");
     assert!(!dir.exists(), "the save did not make the folder again");
 }
+
+#[test]
+fn the_chat_and_mail_accounts_round_trip_as_plain_facts() {
+    let path = scratch("chat-mail");
+    update(&path, |s| {
+        s.accounts.slack = Some(SlackSaved { workspace: "acme".into(), channels: vec!["general".into(), "C01".into()], program: "/opt/slackcli".into(), person: Some("Ada".into()) });
+        s.accounts.discord = Some(DiscordSaved { server: "Acme".into(), include_dms: true, allow_writes: false, program: String::new(), person: None });
+        s.accounts.gmail = Some(GmailSaved { address: "me@acme.test".into(), host: "mac".into(), program: String::new() });
+    })
+    .unwrap();
+    let back = load(&path);
+    assert_eq!(back.accounts.slack.as_ref().map(|s| s.channels.clone()), Some(vec!["general".to_string(), "C01".to_string()]));
+    assert_eq!(back.accounts.discord.as_ref().map(|d| (d.include_dms, d.allow_writes)), Some((true, false)));
+    assert_eq!(back.accounts.gmail.map(|g| g.host), Some("mac".to_string()));
+    update(&path, |s| s.accounts = AccountsSaved::default()).unwrap();
+    assert_eq!(load(&path).accounts, AccountsSaved::default(), "forgetting clears them");
+}
+
+#[test]
+fn a_file_from_before_the_chat_and_mail_accounts_still_loads() {
+    let path = scratch("old-accounts");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, r#"{"accounts":{"linear":{"person":"Ada"},"github_issues":{"repo":"acme/web"}}}"#).unwrap();
+    let back = load(&path);
+    assert_eq!(back.accounts.linear, Some(LinearSaved { person: Some("Ada".into()) }));
+    assert_eq!((back.accounts.slack, back.accounts.discord, back.accounts.gmail), (None, None, None));
+    std::fs::write(&path, r#"{"accounts":{"discord":{"server":"Acme"},"slack":{"workspace":"acme"}}}"#).unwrap();
+    let back = load(&path);
+    let discord = back.accounts.discord.expect("a block with fewer keys loads");
+    assert!(!discord.allow_writes && !discord.include_dms, "sending is off unless the file says so");
+    assert!(back.accounts.slack.expect("slack").channels.is_empty());
+}
