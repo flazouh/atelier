@@ -1,5 +1,5 @@
 //! A seeded `MemoryMessaging` for checking the Messages screen before a real chat account is connected. It exists only in a
-//! debug build, and only when `ATELIER_DEMO_MESSAGING` is set to `1`: a release build does not have this module, and a
+//! debug build, and only when `ATELIER_DEMO_MESSAGING` is set to `1` (or `readonly`): a release build does not have this module, and a
 //! debug build without the variable registers nothing.
 use std::sync::{
     Arc,
@@ -9,7 +9,7 @@ use std::sync::{
 use atelier_capabilities::{
     Actor, CapError, CapResult, Ref, Subscription,
     messaging::{
-        Attachment, AttachmentKind, Channel, ChannelKind, ChannelQuery, Event, Filter,
+        Attachment, AttachmentKind, Channel, ChannelKind, ChannelQuery, Event, Feature, Filter,
         MemoryMessaging, Message, MessagingCapabilities, MessagingProvider, NewMessage, Page,
         Workspace,
     },
@@ -32,6 +32,8 @@ fn asked(value: Option<&str>) -> Option<Arc<dyn MessagingProvider>> {
     };
     match value.map(str::trim)? {
         "1" | "true" | "yes" => Some(Arc::new(seeded())),
+        // The same account as a read-only Discord has it: `send` listed, and refused.
+        "readonly" => Some(Arc::new(ReadOnly { inner: seeded() })),
         // The channels are listed and then the connection drops.
         "offline" => failing(CapError::Offline, false),
         "rate-limited" => failing(
@@ -113,6 +115,67 @@ impl MessagingProvider for Failing {
 
     fn subscribe(&self, _: &Filter) -> CapResult<Subscription<Event>> {
         Err(self.error.clone())
+    }
+}
+
+/// The seeded account as a chat service that may not be written to: it lists `ReadOnly`, and `send` (it is core) answers
+/// `read_only` without touching the account.
+struct ReadOnly {
+    inner: MemoryMessaging,
+}
+
+impl MessagingProvider for ReadOnly {
+    fn provider(&self) -> &str {
+        self.inner.provider()
+    }
+
+    fn account(&self) -> &str {
+        self.inner.account()
+    }
+
+    fn capabilities(&self) -> MessagingCapabilities {
+        let mut caps = self.inner.capabilities();
+        // What a read-only Discord lists: the core, and no other call that writes.
+        caps.operations
+            .retain(|o| MessagingCapabilities::CORE.contains(o) || !o.writes());
+        caps.features.push(Feature::ReadOnly);
+        caps
+    }
+
+    fn whoami(&self) -> CapResult<Actor> {
+        self.inner.whoami()
+    }
+
+    fn workspace(&self) -> CapResult<Workspace> {
+        self.inner.workspace()
+    }
+
+    fn channels(&self, query: &ChannelQuery) -> CapResult<Page<Channel>> {
+        self.inner.channels(query)
+    }
+
+    fn history(
+        &self,
+        channel: &Ref,
+        cursor: Option<&str>,
+        limit: Option<u32>,
+    ) -> CapResult<Page<Message>> {
+        self.inner.history(channel, cursor, limit)
+    }
+
+    fn thread(&self, root: &Ref, cursor: Option<&str>) -> CapResult<Page<Message>> {
+        self.inner.thread(root, cursor)
+    }
+
+    fn send(&self, _: &NewMessage, _: &Actor) -> CapResult<Message> {
+        Err(CapError::Provider {
+            code: "read_only".into(),
+            message: "the demo account is read-only".into(),
+        })
+    }
+
+    fn subscribe(&self, filter: &Filter) -> CapResult<Subscription<Event>> {
+        self.inner.subscribe(filter)
     }
 }
 
