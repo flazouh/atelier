@@ -33,7 +33,7 @@ impl Slot {
         });
         let _events = cx.subscribe_in(&pane, window, |this: &mut OpenProject, _, event: &TasksEvent, window, cx| match event {
             TasksEvent::Start(task) => this.start_from_task(task.clone(), window, cx),
-            TasksEvent::OpenSettings => cx.emit(crate::open_project::ProjectEvent::OpenSettings),
+            TasksEvent::OpenAccounts => cx.emit(crate::open_project::ProjectEvent::OpenAccounts),
         });
         Self { pane, shown: true, _events }
     }

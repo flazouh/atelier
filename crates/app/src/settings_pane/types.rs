@@ -86,6 +86,7 @@ pub enum Section {
     Sidebar,
     Agents,
     Providers,
+    Accounts,
     Dictation,
     Tasks,
     PullRequests,
@@ -93,7 +94,7 @@ pub enum Section {
 }
 
 impl Section {
-    pub const ALL: [Section; 8] = [Section::Appearance, Section::Sidebar, Section::Agents, Section::Providers, Section::Dictation, Section::Tasks, Section::PullRequests, Section::Keys];
+    pub const ALL: [Section; 9] = [Section::Appearance, Section::Sidebar, Section::Agents, Section::Providers, Section::Accounts, Section::Dictation, Section::Tasks, Section::PullRequests, Section::Keys];
 
     pub fn words(self) -> &'static str {
         match self {
@@ -101,6 +102,7 @@ impl Section {
             Section::Sidebar => t(&words::SECTION_SIDEBAR),
             Section::Agents => t(&words::SECTION_AGENTS),
             Section::Providers => "Providers",
+            Section::Accounts => "Accounts",
             Section::Dictation => t(&words::SECTION_DICTATION),
             Section::Tasks => t(&words::SECTION_TASKS),
             Section::PullRequests => t(&words::SECTION_PULL_REQUESTS),
@@ -115,6 +117,7 @@ impl Section {
             Section::Sidebar => t(&words::GIST_SIDEBAR),
             Section::Agents => t(&words::GIST_AGENTS),
             Section::Providers => "Where Claude Code gets its model. A session picks one beside its agent.",
+            Section::Accounts => "Linear and GitHub Issues, for the Tasks screen and your agents.",
             Section::Dictation => t(&words::GIST_DICTATION),
             Section::Tasks => t(&words::GIST_TASKS),
             Section::PullRequests => t(&words::GIST_PULL_REQUESTS),
@@ -129,6 +132,7 @@ impl Section {
             Section::Sidebar => "section-sidebar",
             Section::Agents => "section-agents",
             Section::Providers => "section-providers",
+            Section::Accounts => "section-accounts",
             Section::Dictation => "section-dictation",
             Section::Tasks => "section-tasks",
             Section::PullRequests => "section-pull-requests",

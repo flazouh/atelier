@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use atelier_capabilities::{
-    Actor, Capabilities, Operation, Ref, Registry,
+    Capabilities, Operation, Ref, Registry,
     tasks::{Category, Label, Project, Status, TasksProvider},
 };
 use atelier_project::Project as OpenedProject;
-use atelier_tracker::{LocalTasks, Tracker};
+use atelier_tracker::Tracker;
 use atelier_ui::task_model::TaskStatus;
 use gpui_kit::SharedString;
 
 use super::super::map;
+use crate::capability_hub::CapabilityHub;
 
 /// One provider and account, as the switcher lists it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,21 +39,23 @@ pub struct TasksSource {
     selected: Option<Choice>,
     /// The project's own tracker, for the rules and the session and pull request links (local-only for now).
     local: Option<Arc<dyn Tracker>>,
+    /// The providers of connected accounts, by provider and account, so a change of accounts takes out the old ones.
+    accounts: Vec<(String, String)>,
 }
 
 impl TasksSource {
-    /// The project's local tasks as the `local` provider. Blocks (a remote project asks its host), so it is
-    /// never called on the UI thread. `me` is the person using the app.
-    pub fn open(project: &Arc<dyn OpenedProject>, me: &str) -> Result<Self, String> {
+    /// The project's local tasks as the `local` provider, the one the hub holds for the gateway too. Blocks (a remote
+    /// project asks its host), so it is never called on the UI thread. The connected accounts come with
+    /// [`set_accounts`](Self::set_accounts).
+    pub fn open(project: &Arc<dyn OpenedProject>, hub: &CapabilityHub) -> Result<Self, String> {
         let tracker = project.tracker().map_err(|error| error.to_string())?;
-        let account = project.root().file_name().map_or_else(|| "project".to_string(), |n| n.to_string_lossy().into_owned());
-        let local = LocalTasks::new(tracker.clone(), &account, Actor::person(me, me));
-        Ok(Self::from_providers([Arc::new(local) as Arc<dyn TasksProvider>]).with_local(tracker))
+        let local = hub.local_tasks(project.as_ref()).map_err(|error| error.to_string())?;
+        Ok(Self::from_providers([local]).with_local(tracker))
     }
 
     /// A source that holds `providers`, the first of them chosen.
     pub fn from_providers(providers: impl IntoIterator<Item = Arc<dyn TasksProvider>>) -> Self {
-        let mut source = Self { registry: Registry::new(), selected: None, local: None };
+        let mut source = Self { registry: Registry::new(), selected: None, local: None, accounts: Vec::new() };
         providers.into_iter().for_each(|p| source.add(p));
         source
     }
@@ -67,6 +70,21 @@ impl TasksSource {
         let choice = Choice { provider: provider.provider().to_string(), account: provider.account().to_string() };
         self.registry.add_tasks(provider);
         self.selected.get_or_insert(choice);
+    }
+
+    /// Makes `providers` the connected accounts: the ones held before go, and the shown one is the first left when it was
+    /// one of them. Cheap: the providers are already built.
+    pub fn set_accounts(&mut self, providers: Vec<Arc<dyn TasksProvider>>) {
+        for (provider, account) in std::mem::take(&mut self.accounts) {
+            self.registry.remove_tasks(&provider, &account);
+        }
+        for provider in providers {
+            self.accounts.push((provider.provider().to_string(), provider.account().to_string()));
+            self.registry.add_tasks(provider);
+        }
+        if self.provider().is_none() {
+            self.selected = self.choices().into_iter().next();
+        }
     }
 
     /// Every provider and account, in the registry's order.

@@ -1075,6 +1075,25 @@ fn a_look_from_settings_reaches_the_sidebar_and_keeps_the_heads_choices(cx: &mut
     assert_eq!(layout.mode, ListMode::Priority, "the head's mode stays");
 }
 
+/// The Tasks screen's sign-in button asks for the Accounts section: the page opens on it, or shows it when open already.
+#[gpui_kit::test]
+fn the_sign_in_button_of_the_tasks_screen_opens_the_accounts_section(cx: &mut TestAppContext) {
+    use crate::settings_pane::Section;
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let section = |shell: &Entity<Shell>, cx: &mut gpui_kit::VisualTestContext| shell.read_with(cx, |s, cx| s.settings.as_ref().map(|(pane, _)| pane.read(cx).section()));
+    assert_eq!(section(&shell, cx), None);
+
+    shell.update_in(cx, |s, window, cx| s.open_accounts(window, cx));
+    settle(&shell, cx);
+    assert_eq!(section(&shell, cx), Some(Section::Accounts));
+
+    // Asked again with Settings open on another section, it shows Accounts and does not close the page.
+    shell.update_in(cx, |s, _, cx| s.settings.as_ref().unwrap().0.update(cx, |p, cx| p.show(Section::Tasks, cx)));
+    shell.update_in(cx, |s, window, cx| s.open_accounts(window, cx));
+    settle(&shell, cx);
+    assert_eq!(section(&shell, cx), Some(Section::Accounts));
+}
+
 /// ⌘+, ⌘− and ⌘0 scale the whole interface, as Zed's do: a button is as wide as the zoom says, and the window's breakpoints
 /// follow the scaled width.
 #[gpui_kit::test]

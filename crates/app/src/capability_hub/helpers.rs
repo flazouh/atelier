@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use atelier_capabilities::{Actor, Registry};
+use atelier_capabilities::Actor;
 
 /// The person using the app: the user of this machine.
 pub(super) fn person_actor() -> Actor {
@@ -26,13 +26,13 @@ pub(super) fn run_dir() -> Option<PathBuf> {
 
 /// `wanted` when no local provider has it as its account, else `wanted-2`, `wanted-3`. Two projects in folders of one
 /// name must not share an account, or one would hide the other.
-pub(super) fn unique_account(registry: &Registry, wanted: &str) -> String {
-    let taken = |name: &str| registry.tasks("local", name).is_some();
-    if !taken(wanted) {
+pub(super) fn unique_account(taken: &[String], wanted: &str) -> String {
+    let free = |name: &str| !taken.iter().any(|t| t == name);
+    if free(wanted) {
         return wanted.to_string();
     }
     (2..)
         .map(|n| format!("{wanted}-{n}"))
-        .find(|name| !taken(name))
+        .find(|name| free(name))
         .unwrap_or_else(|| wanted.to_string())
 }
