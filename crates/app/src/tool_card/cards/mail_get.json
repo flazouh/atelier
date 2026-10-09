@@ -9,7 +9,7 @@
   },
   "done": {
     "title": {
-      "template": "Read a message from {$.message.from.address}"
+      "template": "Read a message {$._in}"
     },
     "body": {
       "type": "stack",
@@ -27,8 +27,7 @@
         {
           "type": "text",
           "value": {
-            "path": "$.message.date",
-            "format": "relative_time"
+            "template": "{$.message.from.address} · {$.message.date|relative_time}"
           },
           "style": "muted",
           "max_lines": 1

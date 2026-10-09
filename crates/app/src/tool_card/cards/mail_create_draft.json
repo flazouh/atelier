@@ -9,7 +9,7 @@
   },
   "done": {
     "title": {
-      "template": "Drafted a message to {$.draft.to[0].address}"
+      "template": "Drafted a message {$._in}"
     },
     "body": {
       "type": "stack",
@@ -35,6 +35,14 @@
               "tone": "info"
             }
           ]
+        },
+        {
+          "type": "text",
+          "value": {
+            "template": "To {$.draft.to[0].address}"
+          },
+          "style": "muted",
+          "max_lines": 1
         },
         {
           "type": "text",

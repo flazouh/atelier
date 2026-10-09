@@ -187,6 +187,12 @@ fn the_titles_say_what_the_call_did_and_where() {
     );
     assert_eq!(drawn("mail_search").data.title, "Searched Memory, 1 thread");
     assert_eq!(drawn("mail_thread").data.title, "Read “Q3 plan” in Memory");
+    assert_eq!(drawn("mail_get").data.title, "Read a message in Memory");
+    assert_eq!(drawn("mail_create_draft").data.title, "Drafted a message in Memory");
+    assert_eq!(drawn("tasks_comment").data.title, "Commented on a task in Memory");
+    assert_eq!(drawn("messaging_thread").data.title, "Read a thread, 1 message in Memory");
+    assert_eq!(drawn("messaging_search").data.title, "Searched Memory, 1 message");
+    assert_eq!(drawn("mail_mailboxes").data.title, "Listed 7 mailboxes in Memory");
 }
 
 #[test]
