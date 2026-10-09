@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "tool": "sentry.search_issues",
+  "running": { "title": "Searching Sentry…" },
+  "failed": { "title": "Sentry search failed" },
+  "done": {
+    "title": { "template": "Searched Sentry, {$.total} issues" },
+    "body": {
+      "type": "list",
+      "items": "$.issues",
+      "limit": 10,
+      "empty": "No issues match.",
+      "on_item": { "type": "open", "label": "Open", "ref": { "path": "$.ref" } },
+      "item": {
+        "type": "stack",
+        "direction": "row",
+        "gap": "sm",
+        "children": [
+          { "type": "icon", "name": "bug", "tone": "danger", "when": { "path": "$.level", "equals": "error" } },
+          { "type": "icon", "name": "warning", "tone": "warning", "when": { "path": "$.level", "equals": "warning" } },
+          {
+            "type": "stack",
+            "direction": "column",
+            "gap": "xs",
+            "children": [
+              { "type": "text", "value": { "path": "$.title" }, "style": "title", "max_lines": 1 },
+              { "type": "text", "value": { "template": "{$.project} · last seen {$.last_seen}" }, "style": "muted" }
+            ]
+          },
+          { "type": "badge", "value": { "template": "{$.events} events" }, "tone": "neutral" },
+          { "type": "badge", "value": "regressed", "tone": "warning", "when": { "path": "$.regressed", "equals": true } }
+        ]
+      }
+    }
+  }
+}

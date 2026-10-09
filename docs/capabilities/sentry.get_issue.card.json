@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "tool": "sentry.get_issue",
+  "running": { "title": "Reading a Sentry issue…" },
+  "failed": { "title": "Could not read the Sentry issue" },
+  "done": {
+    "title": { "template": "{$.short_id}: {$.title}" },
+    "body": {
+      "type": "stack",
+      "direction": "column",
+      "gap": "sm",
+      "children": [
+        {
+          "type": "stack",
+          "direction": "row",
+          "gap": "sm",
+          "children": [
+            { "type": "badge", "value": { "path": "$.level" }, "tone": "danger", "when": { "path": "$.level", "equals": "error" } },
+            { "type": "badge", "value": { "path": "$.status" }, "tone": "neutral" },
+            { "type": "metric", "label": "Events", "value": { "path": "$.events", "format": "count" } },
+            { "type": "metric", "label": "Users", "value": { "path": "$.users", "format": "count" } },
+            { "type": "metric", "label": "First seen", "value": { "path": "$.first_seen", "format": "relative_time" } }
+          ]
+        },
+        { "type": "text", "value": { "path": "$.culprit" }, "style": "code", "max_lines": 1 },
+        { "type": "code", "value": { "path": "$.latest_event.stack_excerpt" }, "language": "text", "max_lines": 12, "when": { "path": "$.latest_event.stack_excerpt", "exists": true } }
+      ]
+    },
+    "footer": [
+      { "type": "open", "label": "Open in Atelier", "ref": { "path": "$.ref" } },
+      { "type": "open_url", "label": "Open in Sentry", "url": { "path": "$.permalink" } },
+      { "type": "call", "label": "Resolve", "tool": "sentry.resolve_issue", "args": { "issue": { "path": "$.ref" } } }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "total": 2,
+  "issues": [
+    { "ref": "plugin:sentry:acme:WEB-1A", "title": "TypeError: Cannot read properties of undefined (reading 'id')", "level": "error", "project": "web", "last_seen": 1760000000000, "events": 142, "regressed": true },
+    { "ref": "plugin:sentry:acme:API-9F", "title": "Slow query on /v1/orders", "level": "warning", "project": "api", "last_seen": 1759990000000, "events": 31, "regressed": false }
+  ]
+}
