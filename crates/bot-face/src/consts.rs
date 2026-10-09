@@ -26,3 +26,5 @@ pub const LOOK_Y: f32 = 2.2;
 pub const LEAN_DEGREES: f32 = 1.6;
 /// The control point distance that makes a cubic curve a quarter circle.
 pub const KAPPA: f32 = 0.552_284_7;
+/// The moment, in seconds, a still frame shows. No bot blinks or grows in at this moment.
+pub const STILL_T: f32 = 2.0;

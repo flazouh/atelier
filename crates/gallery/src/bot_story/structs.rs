@@ -168,7 +168,8 @@ impl Render for BotStory {
         let paint_shared = self.shared.clone();
         let stage = canvas(
             |area, _, _| area,
-            move |area, _, window, _| {
+            move |area, _, window, cx| {
+                let still = cx.reduce_motion();
                 let started = Instant::now();
                 let mut guard = paint_shared.borrow_mut();
                 let s = &mut *guard;
@@ -186,7 +187,11 @@ impl Render for BotStory {
                             ((f32::from(p.y) - f32::from(c.y)) / reach).clamp(-1.0, 1.0),
                         )
                     });
-                    let frame = runtime.tick(&s.set, bot, t, s.mood, look);
+                    let frame = if still {
+                        runtime.still(&s.set, bot, s.mood)
+                    } else {
+                        runtime.tick(&s.set, bot, t, s.mood, look)
+                    };
                     let palette = Palette::standard(s.set.body_colour(bot));
                     drawn += paint_bot(window, cell, bot, &frame, &palette);
                 }
@@ -203,7 +208,9 @@ impl Render for BotStory {
                 if s.log_every > 0 && s.frames.is_multiple_of(s.log_every) {
                     eprintln!("bots: {}", summary(s));
                 }
-                window.request_animation_frame();
+                if !still {
+                    window.request_animation_frame();
+                }
             },
         )
         .size_full();

@@ -6,7 +6,7 @@ Status: result of ENG-402. It answers open point 1 of `faces-v1.md`: write our o
 
 ## What was built
 
-- `atelier-bot-face`: reads `faces.v1.json`, parses the SVG shapes, runs the moods and habits, and draws with GPUI paths. 22 tests pass.
+- `atelier-bot-face`: reads `faces.v1.json`, parses the SVG shapes, runs the moods and habits, and draws with GPUI paths. 23 tests pass.
 - The "Bots" story in the gallery: many bots at once, six mood buttons, a click reaction, eyes that follow the pointer, and a line that shows the cost of a frame.
 - A benchmark with no window: `cargo test --release -p atelier-bot-face frame_cost -- --ignored --nocapture`.
 
@@ -55,7 +55,7 @@ Rive would still help if an artist makes complex hand-drawn animation. The faces
 - One `FaceSet` per app, loaded once from the data.
 - One `BotRuntime` for each bot on screen. Call `tick` each frame with the mood and the pointer, then `paint_bot`.
 - Ask for a new frame (`request_animation_frame`) only while a bot on screen is moving.
-- "Reduce motion": not built yet. The player must then draw the pose of the mood with no movement. This is the next small task.
+- "Reduce motion": built. `BotRuntime::still` returns the pose of the mood with no movement: the mood shows at once, no blink, no grow-in, no click reaction. The Bots story uses it when the system asks for reduced motion, and it stops asking for new frames.
 
 ## Found on the way
 
@@ -63,7 +63,7 @@ Rive would still help if an artist makes complex hand-drawn animation. The faces
 
 ## Next steps
 
-1. Reduce motion and a rule for small sizes (ideas 1 to 3 above), with a test for each.
+1. A rule for small sizes (ideas 1 to 3 above), with a test for each.
 2. One timing run on a Mac, to put a real GPU number beside this one.
 3. The four new faces: Quill, Ink, Mimi and Gus.
 4. The bot library view, then Sessions with the bots in it.

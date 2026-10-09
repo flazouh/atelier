@@ -119,3 +119,21 @@ fn the_eyes_look_toward_the_pointer_but_not_when_stuck() {
     );
     assert!(b.look.0.abs() < 0.1, "{:?}", b.look);
 }
+
+#[test]
+fn a_still_frame_shows_the_mood_at_once_and_does_not_move() {
+    let set = FaceSet::from_json(DATA).unwrap();
+    let mut rt = BotRuntime::new(7, 3.0);
+    rt.react(0.5);
+    let a = rt.still(&set, &set.bots[3], Mood::Needs);
+    let b = rt.still(&set, &set.bots[3], Mood::Needs);
+    assert_eq!(a, b, "two still frames are the same");
+    assert_eq!(a.eye_weights[Mood::Needs.index()], 1.0);
+    assert_eq!(a.blink, 1.0);
+    assert!(
+        (a.root.sx - 1.0).abs() < 0.2,
+        "full size, not growing in: {:?}",
+        a.root
+    );
+    assert_eq!(a.scan_x, 0.0);
+}
