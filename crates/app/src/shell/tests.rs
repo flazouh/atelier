@@ -283,7 +283,7 @@ fn the_update_button_and_the_layout_menu_do_not_overlap(cx: &mut TestAppContext)
         });
         settle(&shell, cx);
         settle(&shell, cx);
-        let chip = cx.debug_bounds("update-chip").expect("the button is drawn");
+        let chip = cx.debug_bounds("update-button").expect("the button is drawn");
         let layout = cx.debug_bounds("layout-menu").expect("the layout menu is drawn");
         assert!(layout.right() <= chip.left(), "{width}: the layout menu {layout:?} stands left of the button {chip:?}");
     }
