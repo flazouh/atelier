@@ -9,7 +9,7 @@ use atelier_capabilities::{
     Actor, CapError, CapResult, Ref, Subscription,
     mail::{
         Account, Approval, Contact, Draft, DraftPatch, Incoming, MailCapabilities, MailEvent,
-        MailOperation, MailProvider, MemoryMail, Message, Mailbox, NewDraft, SearchQuery, Thread,
+        MailOperation, MailProvider, Mailbox, MemoryMail, Message, NewDraft, SearchQuery, Thread,
         ThreadSummary, mailbox_ref,
     },
     tasks::Page,
@@ -42,7 +42,10 @@ enum Mode {
     Normal,
     ReadOnly,
     /// Every call but the listing of mailboxes (unless `boxes_too`) answers `error`.
-    Failing { error: CapError, boxes_too: bool },
+    Failing {
+        error: CapError,
+        boxes_too: bool,
+    },
 }
 
 /// What a value of the variable asks for.
@@ -266,7 +269,8 @@ pub fn seeded() -> MemoryMail {
     };
     let ana = || Contact::named("Ana Costa", "ana@example.com");
     let read = |message: &Message| {
-        mail.mark_read(&message.reference, true, &me).expect("a flag")
+        mail.mark_read(&message.reference, true, &me)
+            .expect("a flag")
     };
 
     // An old thread of three messages, the last one unread.
@@ -284,7 +288,12 @@ pub fn seeded() -> MemoryMail {
             from: Contact::new(ADDRESS),
             to: vec![ana()],
             thread: Some(first.thread.clone()),
-            ..got(Contact::new(ADDRESS), "Re: Release 0.1.6 is cut", "Yes, on it. I will report tonight.", step(1))
+            ..got(
+                Contact::new(ADDRESS),
+                "Re: Release 0.1.6 is cut",
+                "Yes, on it. I will report tonight.",
+                step(1),
+            )
         })
         .expect("a message");
     read(&reply);
@@ -310,7 +319,8 @@ pub fn seeded() -> MemoryMail {
         .expect("a message");
     read(&invoice);
     let receipts = mailbox_ref("memory", ADDRESS, "label-receipts");
-    mail.label(&invoice.thread, &[receipts], &[], &me).expect("a label");
+    mail.label(&invoice.thread, &[receipts], &[], &me)
+        .expect("a label");
 
     let ben = mail
         .receive(&got(
@@ -352,7 +362,12 @@ pub fn seeded() -> MemoryMail {
     let more = mail
         .receive(&Incoming {
             thread: Some(dan.thread.clone()),
-            ..got(Contact::named("Dan Evers", "dan@example.com"), "Re: Quarterly planning", "Never mind, I decided. Option two.", step(1))
+            ..got(
+                Contact::named("Dan Evers", "dan@example.com"),
+                "Re: Quarterly planning",
+                "Never mind, I decided. Option two.",
+                step(1),
+            )
         })
         .expect("a message");
     read(&more);
@@ -381,7 +396,12 @@ pub fn seeded() -> MemoryMail {
     // The first thread gets its third message, which is unread.
     mail.receive(&Incoming {
         thread: Some(first.thread.clone()),
-        ..got(ana(), "Re: Release 0.1.6 is cut", "Also: please run the Linux build, it failed on my side.", step(0))
+        ..got(
+            ana(),
+            "Re: Release 0.1.6 is cut",
+            "Also: please run the Linux build, it failed on my side.",
+            step(0),
+        )
     })
     .expect("a message");
 
@@ -400,13 +420,29 @@ pub fn seeded() -> MemoryMail {
         let message = mail
             .receive(&got(Contact::new(from), subject, text, now - 300 * HOUR))
             .expect("a message");
-        mail.mark_read(&message.reference, true, &me).expect("a flag");
+        mail.mark_read(&message.reference, true, &me)
+            .expect("a flag");
         mail.move_to(&message.thread, &mailbox_ref("memory", ADDRESS, role), &me)
             .expect("a move");
     };
-    boxed("archive", "ops@example.com", "Last year's report", "The report is done and filed.");
-    boxed("trash", "promo@example.com", "A sale you did not ask for", "Everything is half price today only.");
-    boxed("spam", "prize@example.net", "You won", "Click to claim your prize at https://example.net/claim");
+    boxed(
+        "archive",
+        "ops@example.com",
+        "Last year's report",
+        "The report is done and filed.",
+    );
+    boxed(
+        "trash",
+        "promo@example.com",
+        "A sale you did not ask for",
+        "Everything is half price today only.",
+    );
+    boxed(
+        "spam",
+        "prize@example.net",
+        "You won",
+        "Click to claim your prize at https://example.net/claim",
+    );
 
     // What the account sent, and a draft it has not.
     let sent = |to: Contact, subject: &str, text: &str, date: i64| {
@@ -417,22 +453,46 @@ pub fn seeded() -> MemoryMail {
                 ..got(Contact::new(ADDRESS), subject, text, date)
             })
             .expect("a message");
-        mail.mark_read(&message.reference, true, &me).expect("a flag");
-        mail.move_to(&message.thread, &mailbox_ref("memory", ADDRESS, "sent"), &me)
-            .expect("a move");
+        mail.mark_read(&message.reference, true, &me)
+            .expect("a flag");
+        mail.move_to(
+            &message.thread,
+            &mailbox_ref("memory", ADDRESS, "sent"),
+            &me,
+        )
+        .expect("a move");
     };
-    sent(Contact::named("Ben Okafor", "ben@example.com"), "Re: Design review notes", "Thanks. I will send my pass on Thursday.", now - 20 * HOUR);
-    sent(Contact::named("Dan Evers", "dan@example.com"), "Quarterly planning", "Option two works for me.", now - 30 * HOUR);
+    sent(
+        Contact::named("Ben Okafor", "ben@example.com"),
+        "Re: Design review notes",
+        "Thanks. I will send my pass on Thursday.",
+        now - 20 * HOUR,
+    );
+    sent(
+        Contact::named("Dan Evers", "dan@example.com"),
+        "Quarterly planning",
+        "Option two works for me.",
+        now - 30 * HOUR,
+    );
     let draft = mail
         .receive(&Incoming {
             from: Contact::new(ADDRESS),
             to: vec![ana()],
-            ..got(Contact::new(ADDRESS), "Smoke test results", "Draft: all green except the Linux build, which I am still looking at.", now - 2 * HOUR)
+            ..got(
+                Contact::new(ADDRESS),
+                "Smoke test results",
+                "Draft: all green except the Linux build, which I am still looking at.",
+                now - 2 * HOUR,
+            )
         })
         .expect("a message");
     mail.mark_read(&draft.reference, true, &me).expect("a flag");
-    mail.move_to(&draft.thread, &mailbox_ref("memory", ADDRESS, "drafts"), &me)
-        .expect("a move");
+    mail.move_to(
+        &draft.thread,
+        &mailbox_ref("memory", ADDRESS, "drafts"),
+        &me,
+    )
+    .expect("a move");
     mail
 }
 

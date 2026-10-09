@@ -15,9 +15,7 @@ use gpui_kit::{
 };
 
 use super::super::{
-    helpers::{
-        action, banner, composer, link_bar, load_more, message_card, say, thread_item,
-    },
+    helpers::{action, banner, composer, link_bar, load_more, message_card, say, thread_item},
     structs::MailPane,
     types::{LIST_WIDTH, Load, Menu as OpenMenu, OpenAddress, Press},
 };
@@ -76,9 +74,17 @@ impl MailPane {
         });
         let notice = self.effective_problem().and_then(|problem| {
             let pane = pane.clone();
-            banner(problem, move |_, cx| pane.update(cx, |p, cx| p.reload(cx)), &theme)
+            banner(
+                problem,
+                move |_, cx| pane.update(cx, |p, cx| p.reload(cx)),
+                &theme,
+            )
         });
-        let said = self.said.clone().filter(|_| self.open.is_none()).map(|said| self.said_line(said, &theme));
+        let said = self
+            .said
+            .clone()
+            .filter(|_| self.open.is_none())
+            .map(|said| self.said_line(said, &theme));
         let body = self.threads_body(cx);
         div()
             .id("mail-list")
@@ -233,8 +239,10 @@ impl MailPane {
         let said = self.said.clone().map(|said| self.said_line(said, &theme));
         let link = self.link.clone().map(|address| {
             let (pane_open, pane_cancel) = (cx.entity().downgrade(), cx.entity().downgrade());
-            let open: Press = Rc::new(move |_, cx| drop(pane_open.update(cx, |p, cx| p.open_link(cx))));
-            let cancel: Press = Rc::new(move |_, cx| drop(pane_cancel.update(cx, |p, cx| p.cancel_link(cx))));
+            let open: Press =
+                Rc::new(move |_, cx| drop(pane_open.update(cx, |p, cx| p.open_link(cx))));
+            let cancel: Press =
+                Rc::new(move |_, cx| drop(pane_cancel.update(cx, |p, cx| p.cancel_link(cx))));
             link_bar(&address, open, cancel, &theme)
         });
         let compose = self.compose_view(cx).map(|c| composer(&c, &theme));
@@ -256,10 +264,16 @@ impl MailPane {
         };
         let cards = self.views.iter().enumerate().map(|(ix, view)| {
             let (pane, message) = (pane.clone(), view.reference.clone());
-            let show_all: Press = Rc::new(move |_, cx| {
-                drop(pane.update(cx, |p, cx| p.show_all(&message, cx)))
-            });
-            message_card(ix, view, self.whole.contains(&view.reference), show_all, open.clone(), cx)
+            let show_all: Press =
+                Rc::new(move |_, cx| drop(pane.update(cx, |p, cx| p.show_all(&message, cx))));
+            message_card(
+                ix,
+                view,
+                self.whole.contains(&view.reference),
+                show_all,
+                open.clone(),
+                cx,
+            )
         });
         div()
             .id("mail-messages")
@@ -292,17 +306,31 @@ impl MailPane {
         if self.can(MailOperation::Star) {
             let pane = pane.clone();
             let starred = summary.starred;
-            let p: Press = Rc::new(move |_, cx| drop(pane.update(cx, |p, cx| p.star(!starred, cx))));
-            buttons.push(action("mail-star", if starred { "Unstar" } else { "Star" }, p));
+            let p: Press =
+                Rc::new(move |_, cx| drop(pane.update(cx, |p, cx| p.star(!starred, cx))));
+            buttons.push(action(
+                "mail-star",
+                if starred { "Unstar" } else { "Star" },
+                p,
+            ));
         }
         if self.can(MailOperation::MarkRead) {
             let pane = pane.clone();
             let unread = summary.unread > 0;
-            let p: Press = Rc::new(move |_, cx| drop(pane.update(cx, |p, cx| p.mark_read(unread, cx))));
-            buttons.push(action("mail-mark-read", if unread { "Mark read" } else { "Mark unread" }, p));
+            let p: Press =
+                Rc::new(move |_, cx| drop(pane.update(cx, |p, cx| p.mark_read(unread, cx))));
+            buttons.push(action(
+                "mail-mark-read",
+                if unread { "Mark read" } else { "Mark unread" },
+                p,
+            ));
         }
         if self.can(MailOperation::Archive) && !matches!(role, Some(Role::Archive | Role::Trash)) {
-            buttons.push(action("mail-archive", "Archive", press(|p, cx| p.archive(cx))));
+            buttons.push(action(
+                "mail-archive",
+                "Archive",
+                press(|p, cx| p.archive(cx)),
+            ));
         }
         if self.can(MailOperation::Trash) && role != Some(Role::Trash) {
             buttons.push(action("mail-trash", "Trash", press(|p, cx| p.trash(cx))));
@@ -381,7 +409,11 @@ impl MailPane {
                 .keep_focus()
                 .height(menu::height_of(MenuLook::SELECT, &entries))
                 .on_close(move |_, cx| drop(close.update(cx, |p, cx| p.close_menu(cx))))
-                .child(Menu::new(format!("{id}-menu"), entries).look(MenuLook::SELECT).min_width(200.))
+                .child(
+                    Menu::new(format!("{id}-menu"), entries)
+                        .look(MenuLook::SELECT)
+                        .min_width(200.),
+                )
         });
         let toggle = pane.clone();
         div()

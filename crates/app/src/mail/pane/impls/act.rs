@@ -31,8 +31,10 @@ impl MailPane {
         let doing_it = cx.background_spawn(async move { call(provider.as_ref(), &thread, &me) });
         cx.spawn(async move |this, cx| {
             let result = doing_it.await;
-            this.update(cx, |this, cx| this.changed(result, operation, doing, leaves, epoch, cx))
-                .ok();
+            this.update(cx, |this, cx| {
+                this.changed(result, operation, doing, leaves, epoch, cx)
+            })
+            .ok();
         })
         .detach();
         cx.notify();
@@ -65,46 +67,70 @@ impl MailPane {
 
     /// Marks the open thread read, or unread. Only the reader's press does this.
     pub fn mark_read(&mut self, read: bool, cx: &mut Context<Self>) {
-        self.change(MailOperation::MarkRead, "Could not mark the thread", false, cx, move |p, thread, me| {
-            p.mark_read(thread, read, me)
-        });
+        self.change(
+            MailOperation::MarkRead,
+            "Could not mark the thread",
+            false,
+            cx,
+            move |p, thread, me| p.mark_read(thread, read, me),
+        );
     }
 
     pub fn star(&mut self, starred: bool, cx: &mut Context<Self>) {
-        self.change(MailOperation::Star, "Could not star the thread", false, cx, move |p, thread, me| {
-            p.star(thread, starred, me)
-        });
+        self.change(
+            MailOperation::Star,
+            "Could not star the thread",
+            false,
+            cx,
+            move |p, thread, me| p.star(thread, starred, me),
+        );
     }
 
     pub fn archive(&mut self, cx: &mut Context<Self>) {
-        self.change(MailOperation::Archive, "Could not archive the thread", true, cx, |p, thread, me| {
-            p.archive(thread, me)
-        });
+        self.change(
+            MailOperation::Archive,
+            "Could not archive the thread",
+            true,
+            cx,
+            |p, thread, me| p.archive(thread, me),
+        );
     }
 
     pub fn trash(&mut self, cx: &mut Context<Self>) {
-        self.change(MailOperation::Trash, "Could not move the thread to the trash", true, cx, |p, thread, me| {
-            p.trash(thread, me)
-        });
+        self.change(
+            MailOperation::Trash,
+            "Could not move the thread to the trash",
+            true,
+            cx,
+            |p, thread, me| p.trash(thread, me),
+        );
     }
 
     /// Moves the open thread to `mailbox`.
     pub fn move_to(&mut self, mailbox: &Ref, cx: &mut Context<Self>) {
         let mailbox = mailbox.clone();
-        self.change(MailOperation::Move, "Could not move the thread", true, cx, move |p, thread, me| {
-            p.move_to(thread, &mailbox, me)
-        });
+        self.change(
+            MailOperation::Move,
+            "Could not move the thread",
+            true,
+            cx,
+            move |p, thread, me| p.move_to(thread, &mailbox, me),
+        );
     }
 
     /// Adds `label` to the open thread, or takes it off.
     pub fn label(&mut self, label: &Ref, add: bool, cx: &mut Context<Self>) {
         let label = vec![label.clone()];
-        self.change(MailOperation::Label, "Could not change the labels", false, cx, move |p, thread, me| {
-            match add {
+        self.change(
+            MailOperation::Label,
+            "Could not change the labels",
+            false,
+            cx,
+            move |p, thread, me| match add {
                 true => p.label(thread, &label, &[], me),
                 false => p.label(thread, &[], &label, me),
-            }
-        });
+            },
+        );
     }
 
     /// Opens or closes a small menu of the reading pane's head.
@@ -151,5 +177,7 @@ impl MailPane {
 /// Whether `address` is a web address: the only kind the screen opens.
 fn is_web(address: &str) -> bool {
     let lower = address.to_ascii_lowercase();
-    ["https://", "http://"].iter().any(|scheme| lower.starts_with(scheme))
+    ["https://", "http://"]
+        .iter()
+        .any(|scheme| lower.starts_with(scheme))
 }

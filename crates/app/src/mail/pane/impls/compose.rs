@@ -64,7 +64,12 @@ impl MailPane {
 
     /// What the reply box is made of for the drawing code.
     pub(in crate::mail::pane) fn compose_view(&self, cx: &mut Context<Self>) -> Option<Compose> {
-        let Facts { to, status, empty, editable } = self.compose_facts(cx)?;
+        let Facts {
+            to,
+            status,
+            empty,
+            editable,
+        } = self.compose_facts(cx)?;
         let pane = cx.entity().downgrade();
         let press = |send: bool| -> Press {
             let pane = pane.clone();
@@ -149,7 +154,10 @@ impl MailPane {
         let here = self.open.as_ref() == Some(&thread);
         match result {
             Ok(Outcome { draft, sent: None }) => self.keep_draft(&thread, here, Some(draft), text),
-            Ok(Outcome { draft: _, sent: Some(Ok(_)) }) => {
+            Ok(Outcome {
+                draft: _,
+                sent: Some(Ok(_)),
+            }) => {
                 // The draft is gone with the message it became: the box is empty, and the thread has one more message.
                 self.held.retain(|h| h.thread != thread);
                 if here {
@@ -158,18 +166,27 @@ impl MailPane {
                     self.reload(cx);
                 }
             }
-            Ok(Outcome { draft, sent: Some(Err(CapError::Conflict { current })) }) => {
+            Ok(Outcome {
+                draft,
+                sent: Some(Err(CapError::Conflict { current })),
+            }) => {
                 // The draft the provider holds is not the one that was saved a moment ago. Nothing was sent: the box shows the
                 // draft as it is now, and the reader reads it again before they press Send.
                 let now: Draft = serde_json::from_value(current).unwrap_or(draft);
                 if here {
                     let shown = now.text.clone();
-                    self.compose.update(cx, |c, cx| c.set_value(shown, window, cx));
+                    self.compose
+                        .update(cx, |c, cx| c.set_value(shown, window, cx));
                 }
                 self.keep_draft(&thread, here, Some(now.clone()), now.text);
-                self.said = Some("The draft changed before it was sent. Read it again, then press Send.".into());
+                self.said = Some(
+                    "The draft changed before it was sent. Read it again, then press Send.".into(),
+                );
             }
-            Ok(Outcome { draft, sent: Some(Err(error)) }) => {
+            Ok(Outcome {
+                draft,
+                sent: Some(Err(error)),
+            }) => {
                 // The draft is saved; only the send failed. The reader's words stay, as saved.
                 self.keep_draft(&thread, here, Some(draft), text);
                 self.fail(error, MailOperation::Send, "Could not send", cx);
@@ -180,7 +197,10 @@ impl MailPane {
                 if let Ok(now) = serde_json::from_value::<Draft>(current) {
                     self.keep_draft(&thread, here, Some(now), text);
                 }
-                self.said = Some("The draft was changed elsewhere. Save again to replace it with your words.".into());
+                self.said = Some(
+                    "The draft was changed elsewhere. Save again to replace it with your words."
+                        .into(),
+                );
             }
             Err(error) => {
                 let operation = match had_draft {
@@ -206,5 +226,4 @@ impl MailPane {
             text: text.into(),
         });
     }
-
 }

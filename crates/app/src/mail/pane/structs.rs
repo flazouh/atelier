@@ -179,15 +179,11 @@ impl MailPane {
             },
         );
         // The buttons wait for words, so a change of the box asks for a new drawing.
-        let typing = cx.subscribe_in(
-            &compose,
-            window,
-            |_, _, event: &InputEvent, _, cx| {
-                if matches!(event, InputEvent::Change) {
-                    cx.notify();
-                }
-            },
-        );
+        let typing = cx.subscribe_in(&compose, window, |_, _, event: &InputEvent, _, cx| {
+            if matches!(event, InputEvent::Change) {
+                cx.notify();
+            }
+        });
         Self {
             source: MailSource::from_providers([]),
             me,
@@ -313,15 +309,15 @@ impl Render for MailPane {
         let focus = self.focus.clone();
         let root = || {
             div()
-            .id("mail-pane")
-            .debug_selector(|| "mail-pane".into())
-            .key_context("Mail")
-            .track_focus(&focus)
-            .relative()
-            .flex()
-            .size_full()
-            .min_w_0()
-            .gap(px(atelier_ui::panel_layout::GAP))
+                .id("mail-pane")
+                .debug_selector(|| "mail-pane".into())
+                .key_context("Mail")
+                .track_focus(&focus)
+                .relative()
+                .flex()
+                .size_full()
+                .min_w_0()
+                .gap(px(atelier_ui::panel_layout::GAP))
         };
         let alone = |body: gpui_kit::AnyElement| {
             root().child(

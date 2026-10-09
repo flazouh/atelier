@@ -7,9 +7,7 @@ use atelier_capabilities::{
 use gpui_kit::{AppContext, Context, Window};
 
 use super::super::{
-    helpers::{
-        apply, new_list, react, read_boxes, read_more, read_thread, read_threads, set_tail,
-    },
+    helpers::{apply, new_list, react, read_boxes, read_more, read_thread, read_threads, set_tail},
     structs::{Account, Boxes, Fetched, MailPane},
     types::{Load, POLL, Reaction},
 };
@@ -81,7 +79,13 @@ impl MailPane {
         .detach();
     }
 
-    fn boxes_read(&mut self, at: usize, result: CapResult<Boxes>, epoch: u64, cx: &mut Context<Self>) {
+    fn boxes_read(
+        &mut self,
+        at: usize,
+        result: CapResult<Boxes>,
+        epoch: u64,
+        cx: &mut Context<Self>,
+    ) {
         if epoch != self.epoch {
             return;
         }
@@ -122,7 +126,8 @@ impl MailPane {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if at >= self.accounts.len() || (self.shown == at && self.mailbox.as_ref() == Some(mailbox)) {
+        if at >= self.accounts.len() || (self.shown == at && self.mailbox.as_ref() == Some(mailbox))
+        {
             return;
         }
         // A search belongs to the mailbox it was typed over.
@@ -192,7 +197,12 @@ impl MailPane {
             Ok(Fetched { rows, next }) => {
                 apply(&mut self.threads, &self.list, rows);
                 self.next = next;
-                set_tail(&self.list, &mut self.tail, self.threads.len(), self.next.is_some());
+                set_tail(
+                    &self.list,
+                    &mut self.tail,
+                    self.threads.len(),
+                    self.next.is_some(),
+                );
                 self.threads_load = Load::Ready;
                 self.good_reading();
             }
@@ -233,7 +243,8 @@ impl MailPane {
         });
         cx.spawn(async move |this, cx| {
             let result = reading.await;
-            this.update(cx, |this, cx| this.more_read(result, turn, cx)).ok();
+            this.update(cx, |this, cx| this.more_read(result, turn, cx))
+                .ok();
         })
         .detach();
         cx.notify();
@@ -252,7 +263,12 @@ impl MailPane {
                 all.extend(rows.into_iter().filter(|r| !held.contains(&r.reference)));
                 apply(&mut self.threads, &self.list, all);
                 self.next = next;
-                set_tail(&self.list, &mut self.tail, self.threads.len(), self.next.is_some());
+                set_tail(
+                    &self.list,
+                    &mut self.tail,
+                    self.threads.len(),
+                    self.next.is_some(),
+                );
                 self.pages += 1;
             }
             Err(error) => self.fail(error, MailOperation::Search, "Could not read more mail", cx),
@@ -274,7 +290,8 @@ impl MailPane {
         let kept = kept.map(|at| self.held.remove(at));
         self.draft = kept.as_ref().and_then(|k| k.draft.clone());
         let text = kept.map(|k| k.text).unwrap_or_default();
-        self.compose.update(cx, |c, cx| c.set_value(text, window, cx));
+        self.compose
+            .update(cx, |c, cx| c.set_value(text, window, cx));
         self.read_open(cx);
         cx.notify();
     }
@@ -322,7 +339,10 @@ impl MailPane {
         }
         match result {
             Ok(thread) => {
-                let me = self.account().map(|a| a.choice.account.clone()).unwrap_or_default();
+                let me = self
+                    .account()
+                    .map(|a| a.choice.account.clone())
+                    .unwrap_or_default();
                 self.views = std::rc::Rc::new(
                     thread
                         .messages
@@ -335,7 +355,12 @@ impl MailPane {
                 self.thread_load = Load::Ready;
                 self.good_reading();
             }
-            Err(error) => self.fail(error, MailOperation::Thread, "Could not read the thread", cx),
+            Err(error) => self.fail(
+                error,
+                MailOperation::Thread,
+                "Could not read the thread",
+                cx,
+            ),
         }
         cx.notify();
     }
@@ -343,9 +368,16 @@ impl MailPane {
     /// The thread as the provider has just given it replaces the thread as the list knew it. A provider that marks a thread
     /// read by giving it says so here, and the mailboxes' counts are read again for it.
     fn sync_row(&mut self, summary: &ThreadSummary, cx: &mut Context<Self>) {
-        let me = self.account().map(|a| a.choice.account.clone()).unwrap_or_default();
+        let me = self
+            .account()
+            .map(|a| a.choice.account.clone())
+            .unwrap_or_default();
         let row = thread_row_of(summary, &me, crate::agent_session::now());
-        let Some(at) = self.threads.iter().position(|r| r.reference == row.reference) else {
+        let Some(at) = self
+            .threads
+            .iter()
+            .position(|r| r.reference == row.reference)
+        else {
             return;
         };
         if self.threads[at] == row {

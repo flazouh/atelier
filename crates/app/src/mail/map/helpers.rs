@@ -63,7 +63,12 @@ fn is_override(c: char) -> bool {
 }
 
 fn contact_words(contact: &Contact) -> String {
-    match contact.name.as_deref().map(clean_line).filter(|n| !n.is_empty()) {
+    match contact
+        .name
+        .as_deref()
+        .map(clean_line)
+        .filter(|n| !n.is_empty())
+    {
         Some(name) => name,
         None => clean_line(&contact.address),
     }
@@ -162,7 +167,8 @@ pub(super) fn cut_at(text: &str, limit: usize) -> Option<String> {
 /// not an address the screen opens, so it is not listed.
 pub fn links_of(text: &str) -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
-    for word in text.split(|c: char| c.is_whitespace() || matches!(c, '<' | '>' | '"' | '(' | ')')) {
+    for word in text.split(|c: char| c.is_whitespace() || matches!(c, '<' | '>' | '"' | '(' | ')'))
+    {
         let lower = word.to_ascii_lowercase();
         if !(lower.starts_with("https://") || lower.starts_with("http://")) {
             continue;

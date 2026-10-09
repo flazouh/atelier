@@ -13,7 +13,14 @@ fn hub() -> CapabilityHub {
 
 #[test]
 fn nothing_is_registered_without_the_variable() {
-    for value in [None, Some(""), Some("0"), Some("no"), Some("false"), Some("readonly-ish")] {
+    for value in [
+        None,
+        Some(""),
+        Some("0"),
+        Some("no"),
+        Some("false"),
+        Some("readonly-ish"),
+    ] {
         let hub = hub();
         assert!(!register(&hub, value), "{value:?} asks for nothing");
         assert!(
@@ -37,7 +44,9 @@ fn a_release_build_has_no_demo() {
         .find("mail::demo::register_from_env")
         .expect("main registers the demo");
     assert!(
-        main[..call].trim_end().ends_with("#[cfg(debug_assertions)]\n        let _ ="),
+        main[..call]
+            .trim_end()
+            .ends_with("#[cfg(debug_assertions)]\n        let _ ="),
         "the call is a debug-only call"
     );
 }
@@ -49,7 +58,10 @@ fn the_variable_registers_one_seeded_account() {
         assert!(register(&hub, Some(value)));
         let providers = hub.mail_providers();
         assert_eq!(providers.len(), 1);
-        assert_eq!((providers[0].provider(), providers[0].account()), ("memory", ADDRESS));
+        assert_eq!(
+            (providers[0].provider(), providers[0].account()),
+            ("memory", ADDRESS)
+        );
         assert!(
             MailOperation::ALL.iter().all(|o| providers[0].can(*o)),
             "the seeded account can do everything"
@@ -64,7 +76,11 @@ fn the_read_only_demo_lists_no_call_that_writes() {
     let provider = hub.mail_providers().remove(0);
     let caps = provider.capabilities();
     assert!(!caps.operations.is_empty());
-    assert!(caps.operations.iter().all(|o| READS.contains(o)), "{:?}", caps.operations);
+    assert!(
+        caps.operations.iter().all(|o| READS.contains(o)),
+        "{:?}",
+        caps.operations
+    );
     for write in [
         MailOperation::MarkRead,
         MailOperation::Star,
@@ -79,7 +95,9 @@ fn the_read_only_demo_lists_no_call_that_writes() {
         assert!(!provider.can(write), "{write:?} is not listed");
     }
     // A call that is not listed is refused, whatever the screen does.
-    let thread = provider.search(&SearchQuery::default()).unwrap().items[0].reference.clone();
+    let thread = provider.search(&SearchQuery::default()).unwrap().items[0]
+        .reference
+        .clone();
     assert!(matches!(
         provider.star(&thread, true, &Actor::person("me", "me")),
         Err(CapError::Unsupported { .. })
@@ -90,10 +108,19 @@ fn the_read_only_demo_lists_no_call_that_writes() {
 fn a_failing_demo_answers_the_error_the_screen_has_a_state_for() {
     for (value, error, boxes_fail) in [
         ("offline", CapError::Offline, false),
-        ("rate-limited", CapError::RateLimited { retry_after_ms: 30_000 }, false),
+        (
+            "rate-limited",
+            CapError::RateLimited {
+                retry_after_ms: 30_000,
+            },
+            false,
+        ),
         (
             "error",
-            CapError::Provider { code: "demo".into(), message: "the demo provider failed".into() },
+            CapError::Provider {
+                code: "demo".into(),
+                message: "the demo provider failed".into(),
+            },
             false,
         ),
         ("signed-out", CapError::NotSignedIn, true),
@@ -103,11 +130,23 @@ fn a_failing_demo_answers_the_error_the_screen_has_a_state_for() {
         let provider = hub.mail_providers().remove(0);
         let boxes = provider.mailboxes();
         assert_eq!(boxes.is_err(), boxes_fail, "{value}: the mailboxes");
-        assert_eq!(provider.search(&SearchQuery::default()).unwrap_err(), error, "{value}: the threads");
+        assert_eq!(
+            provider.search(&SearchQuery::default()).unwrap_err(),
+            error,
+            "{value}: the threads"
+        );
         let me = Actor::person("me", "me");
         let any = atelier_capabilities::mail::thread_ref("memory", ADDRESS, "1");
-        assert_eq!(provider.star(&any, true, &me).unwrap_err(), error, "{value}: a change");
-        assert_eq!(provider.subscribe().err(), Some(error), "{value}: the subscription");
+        assert_eq!(
+            provider.star(&any, true, &me).unwrap_err(),
+            error,
+            "{value}: a change"
+        );
+        assert_eq!(
+            provider.subscribe().err(),
+            Some(error),
+            "{value}: the subscription"
+        );
     }
 }
 
@@ -115,7 +154,14 @@ fn a_failing_demo_answers_the_error_the_screen_has_a_state_for() {
 fn the_seed_has_something_of_each_thing_the_screen_draws() {
     let demo = seeded();
     let boxes = demo.mailboxes().unwrap();
-    let find = |role: Role| boxes.iter().find(|b| b.role == role).expect("a mailbox of each role").reference.clone();
+    let find = |role: Role| {
+        boxes
+            .iter()
+            .find(|b| b.role == role)
+            .expect("a mailbox of each role")
+            .reference
+            .clone()
+    };
     let all = |mailbox: &Ref| {
         let mut threads = Vec::new();
         let mut cursor = None;
@@ -135,22 +181,52 @@ fn the_seed_has_something_of_each_thing_the_screen_draws() {
         }
     };
     let inbox = all(&find(Role::Inbox));
-    assert!((10..=14).contains(&inbox.len()), "about ten threads, got {}", inbox.len());
+    assert!(
+        (10..=14).contains(&inbox.len()),
+        "about ten threads, got {}",
+        inbox.len()
+    );
     assert!(inbox.iter().any(|t| t.unread > 0), "some are unread");
     assert!(inbox.iter().any(|t| t.starred), "one is starred");
     assert!(inbox.iter().any(|t| t.has_attachments), "one has a file");
-    assert!(inbox.iter().any(|t| t.message_count >= 3), "one has several messages");
+    assert!(
+        inbox.iter().any(|t| t.message_count >= 3),
+        "one has several messages"
+    );
     let long = inbox
         .iter()
         .map(|t| demo.thread(&t.reference).unwrap())
         .flat_map(|t| t.messages)
         .any(|m| m.text.chars().count() > BODY_LIMIT);
     assert!(long, "one body is long enough to be cut");
-    for role in [Role::Sent, Role::Drafts, Role::Archive, Role::Trash, Role::Spam] {
+    for role in [
+        Role::Sent,
+        Role::Drafts,
+        Role::Archive,
+        Role::Trash,
+        Role::Spam,
+    ] {
         assert!(!all(&find(role)).is_empty(), "{role:?} has a thread");
     }
     assert!(boxes.iter().any(|b| b.role == Role::Custom), "a label");
-    let first_page = demo.search(&SearchQuery { mailbox: Some(find(Role::Inbox)), limit: Some(PAGE), ..SearchQuery::default() }).unwrap();
-    assert!(first_page.next_cursor.is_some(), "the inbox pages, so Load more shows");
-    assert_eq!(MailProvider::capabilities(&Demo { inner: seeded(), mode: Mode::Normal }).limits.page_max, Some(PAGE));
+    let first_page = demo
+        .search(&SearchQuery {
+            mailbox: Some(find(Role::Inbox)),
+            limit: Some(PAGE),
+            ..SearchQuery::default()
+        })
+        .unwrap();
+    assert!(
+        first_page.next_cursor.is_some(),
+        "the inbox pages, so Load more shows"
+    );
+    assert_eq!(
+        MailProvider::capabilities(&Demo {
+            inner: seeded(),
+            mode: Mode::Normal
+        })
+        .limits
+        .page_max,
+        Some(PAGE)
+    );
 }

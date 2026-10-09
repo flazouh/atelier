@@ -164,9 +164,15 @@ pub fn thread_item(ix: usize, row: &ThreadRow, open: bool, press: Press, cx: &Ap
         .flex()
         .items_center()
         .gap(px(6.))
-        .child(div().flex_none().size(px(7.)).rounded_full().when(row.unread, |d| {
-            d.debug_selector(move || dot.clone()).bg(theme.accent)
-        }))
+        .child(
+            div()
+                .flex_none()
+                .size(px(7.))
+                .rounded_full()
+                .when(row.unread, |d| {
+                    d.debug_selector(move || dot.clone()).bg(theme.accent)
+                }),
+        )
         .child(
             div()
                 .flex_1()
@@ -219,7 +225,11 @@ pub fn thread_item(ix: usize, row: &ThreadRow, open: bool, press: Press, cx: &Ap
                 div()
                     .debug_selector(move || star.clone())
                     .flex_none()
-                    .child(Icon::new(IconName::StarFilled).size(px(12.)).color(theme.accent)),
+                    .child(
+                        Icon::new(IconName::StarFilled)
+                            .size(px(12.))
+                            .color(theme.accent),
+                    ),
             )
         });
     let snippet_line = div()
@@ -343,7 +353,12 @@ pub fn message_card(
             .flex()
             .flex_col()
             .gap(px(2.))
-            .child(div().text_size(small).text_color(muted).child("Addresses in this message"))
+            .child(
+                div()
+                    .text_size(small)
+                    .text_color(muted)
+                    .child("Addresses in this message"),
+            )
             .children(view.links.iter().enumerate().map(|(n, link)| {
                 let (address, open) = (link.to_string(), open_address.clone());
                 div()
@@ -364,8 +379,11 @@ pub fn message_card(
             }))
     });
     let files = (!view.attachments.is_empty()).then(|| {
-        div().flex().flex_wrap().gap(px(4.)).children(
-            view.attachments.iter().enumerate().map(|(n, file)| {
+        div()
+            .flex()
+            .flex_wrap()
+            .gap(px(4.))
+            .children(view.attachments.iter().enumerate().map(|(n, file)| {
                 div()
                     .debug_selector(move || format!("mail-file-{ix}-{n}"))
                     .flex()
@@ -379,8 +397,7 @@ pub fn message_card(
                     .child(Icon::new(IconName::AttachFile).size(px(14.)).color(muted))
                     .child(file.name.clone())
                     .child(div().text_color(muted).child(file.detail.clone()))
-            }),
-        )
+            }))
     });
     div()
         .debug_selector(move || format!("mail-message-{ix}"))
@@ -394,12 +411,22 @@ pub fn message_card(
             div()
                 .flex()
                 .flex_col()
-                .child(div().min_w_0().truncate().text_size(small).text_color(muted).child(view.to.clone()))
-                .children(
-                    view.cc
-                        .clone()
-                        .map(|cc| div().min_w_0().truncate().text_size(small).text_color(muted).child(cc)),
-                ),
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .text_size(small)
+                        .text_color(muted)
+                        .child(view.to.clone()),
+                )
+                .children(view.cc.clone().map(|cc| {
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .text_size(small)
+                        .text_color(muted)
+                        .child(cc)
+                })),
         )
         .child(
             div()
@@ -411,13 +438,15 @@ pub fn message_card(
         .when(cut, |d| {
             d.child(
                 div().flex().ml(px(-8.)).child(
-                    div().debug_selector(move || format!("mail-show-all-{ix}")).child(
-                        Button::new(ElementId::Name(format!("mail-show-all-{ix}").into()))
-                            .label("Show all")
-                            .variant(ButtonVariant::Ghost)
-                            .size(ButtonSize::Sm)
-                            .on_click(move |_, window, cx| show_all(window, cx)),
-                    ),
+                    div()
+                        .debug_selector(move || format!("mail-show-all-{ix}"))
+                        .child(
+                            Button::new(ElementId::Name(format!("mail-show-all-{ix}").into()))
+                                .label("Show all")
+                                .variant(ButtonVariant::Ghost)
+                                .size(ButtonSize::Sm)
+                                .on_click(move |_, window, cx| show_all(window, cx)),
+                        ),
                 ),
             )
         })
@@ -547,10 +576,9 @@ pub fn composer(compose: &Compose, theme: &Theme) -> AnyElement {
                                 .text_color(theme.muted_foreground)
                                 .child(status.clone().unwrap_or_default()),
                         )
-                        .children(
-                            save.as_ref()
-                                .map(|p| button("mail-save-draft", "Save draft", ButtonVariant::Ghost, p)),
-                        )
+                        .children(save.as_ref().map(|p| {
+                            button("mail-save-draft", "Save draft", ButtonVariant::Ghost, p)
+                        }))
                         .children(
                             send.as_ref()
                                 .map(|p| button("mail-send", "Send", ButtonVariant::Primary, p)),

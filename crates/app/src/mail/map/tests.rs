@@ -71,7 +71,9 @@ fn the_sidebar_lists_the_roles_in_a_fixed_order_and_the_rest_as_the_provider_has
     let names: Vec<&str> = rows.iter().map(|r| r.name.as_ref()).collect();
     assert_eq!(
         names,
-        ["Inbox", "Sent", "Drafts", "Trash", "Spam", "Archive", "Zeta", "Alpha"]
+        [
+            "Inbox", "Sent", "Drafts", "Trash", "Spam", "Archive", "Zeta", "Alpha"
+        ]
     );
 }
 
@@ -97,11 +99,17 @@ fn a_row_names_the_others_and_never_the_account() {
 #[test]
 fn a_thread_row_holds_what_the_list_draws() {
     let row = thread_row_of(
-        &summary("Re:   plan\u{202E}\u{0007}", vec![Contact::named("Ana", "ana@x.test")]),
+        &summary(
+            "Re:   plan\u{202E}\u{0007}",
+            vec![Contact::named("Ana", "ana@x.test")],
+        ),
         "me@x.test",
         0,
     );
-    assert_eq!(row.subject, "Re: plan", "one line, with no override and no control character");
+    assert_eq!(
+        row.subject, "Re: plan",
+        "one line, with no override and no control character"
+    );
     assert_eq!(row.snippet, "the snippet");
     assert!(row.unread && row.starred && row.attachment);
     assert_eq!(row.count, 3);
@@ -129,9 +137,17 @@ fn a_long_body_is_cut_at_the_limit_with_the_whole_kept() {
     let cut = view.cut.expect("a body of 10000 characters is cut");
     assert!(cut.chars().count() <= BODY_LIMIT);
     assert!(cut.ends_with("word"), "the last word is whole: {cut:?}");
-    assert_eq!(view.text.chars().count(), text.chars().count(), "the whole is kept for Show all");
+    assert_eq!(
+        view.text.chars().count(),
+        text.chars().count(),
+        "the whole is kept for Show all"
+    );
     assert_eq!(cut_at("short", BODY_LIMIT), None);
-    assert_eq!(cut_at("héllo wörld", 4).as_deref(), Some("héll"), "a cut falls on a character, not a byte");
+    assert_eq!(
+        cut_at("héllo wörld", 4).as_deref(),
+        Some("héll"),
+        "a cut falls on a character, not a byte"
+    );
 }
 
 #[test]
@@ -141,9 +157,15 @@ fn the_links_of_a_body_are_listed_as_text_and_only_the_web_ones() {
                 Again https://example.com/a?b=1 and <https://y.test/q>";
     assert_eq!(
         links_of(text),
-        ["https://example.com/a?b=1", "http://x.test/p", "https://y.test/q"]
+        [
+            "https://example.com/a?b=1",
+            "http://x.test/p",
+            "https://y.test/q"
+        ]
     );
-    let many = (0..20).map(|n| format!("https://x.test/{n} ")).collect::<String>();
+    let many = (0..20)
+        .map(|n| format!("https://x.test/{n} "))
+        .collect::<String>();
     assert_eq!(links_of(&many).len(), LINKS_MOST);
 }
 
@@ -151,7 +173,10 @@ fn the_links_of_a_body_are_listed_as_text_and_only_the_web_ones() {
 fn a_message_view_says_who_wrote_to_whom_and_what_it_carries() {
     let mut m = message("hi");
     m.cc = vec![Contact::new("cc@x.test")];
-    m.flags = Flags { read: false, starred: false };
+    m.flags = Flags {
+        read: false,
+        starred: false,
+    };
     m.attachments = vec![
         Attachment {
             reference: attachment_ref("memory", "me@x.test", "1.0"),
@@ -202,7 +227,10 @@ fn sizes_and_dates_read_as_words() {
     // 2026-10-09 14:03:00 UTC
     assert_eq!(date_words(1_791_554_580_000), "9 Oct 2026, 14:03 UTC");
     // A leap day.
-    assert_eq!(date_words(951_782_400_000 + 3_600_000), "29 Feb 2000, 01:00 UTC");
+    assert_eq!(
+        date_words(951_782_400_000 + 3_600_000),
+        "29 Feb 2000, 01:00 UTC"
+    );
     assert_eq!(date_words(-1000), "31 Dec 1969, 23:59 UTC");
 }
 

@@ -182,7 +182,8 @@ impl MailProvider for Fake {
     fn thread(&self, thread: &Ref) -> CapResult<Thread> {
         self.check(MailOperation::Thread)?;
         if self.plan.lock().unwrap().marks_read_on_read {
-            self.inner.mark_read(thread, true, &Actor::person("gmail", "gmail"))?;
+            self.inner
+                .mark_read(thread, true, &Actor::person("gmail", "gmail"))?;
         }
         self.inner.thread(thread)
     }
