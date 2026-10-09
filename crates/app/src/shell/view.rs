@@ -1,6 +1,6 @@
-//! The views of a window, one on screen at a time. The rail holds four lenses: Sessions (every project's
+//! The views of a window, one on screen at a time. The rail holds five lenses: Sessions (every project's
 //! sessions and their panels), Tasks (one project's tasks), Code (one project's pull requests, files and
-//! changes) and Messages (the channels of every chat account). Code is four views: Pulls, Files (the tree and the editor), History (the branch's commits) and
+//! changes) Messages (the channels of every chat account) and Mail (the mailboxes of every mail account). Code is four views: Pulls, Files (the tree and the editor), History (the branch's commits) and
 //! Git (the focused session's changed files and their review).
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -13,6 +13,7 @@ pub enum ShellView {
     Pulls,
     History,
     Messages,
+    Mail,
 }
 
 impl ShellView {
@@ -26,6 +27,7 @@ impl ShellView {
             Self::Pulls => "pulls",
             Self::History => "history",
             Self::Messages => "messages",
+            Self::Mail => "mail",
         }
     }
 
@@ -38,12 +40,13 @@ impl ShellView {
             Some("pulls") => Self::Pulls,
             Some("history") => Self::History,
             Some("messages") => Self::Messages,
+            Some("mail") => Self::Mail,
             _ => Self::Sessions,
         }
     }
 
-    /// The lenses the left rail switches between, in its order: Sessions, Tasks, Code, Messages. Code is named by Git.
-    pub const ON_RAIL: [Self; 4] = [Self::Sessions, Self::Tasks, Self::Git, Self::Messages];
+    /// The lenses the left rail switches between, in its order: Sessions, Tasks, Code, Messages, Mail. Code is named by Git.
+    pub const ON_RAIL: [Self; 5] = [Self::Sessions, Self::Tasks, Self::Git, Self::Messages, Self::Mail];
 
     /// The views of the Code lens, in the order its sidebar lists them.
     pub const IN_CODE: [Self; 4] = [Self::Pulls, Self::Files, Self::History, Self::Git];
