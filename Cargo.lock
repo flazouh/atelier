@@ -576,6 +576,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-gmail"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atelier-i18n"
 version = "0.1.6"
 dependencies = [
