@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-agents"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-i18n",
  "atelier-project",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-app"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-agents",
  "atelier-capabilities",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-capabilities"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "serde",
  "serde_json",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-discord"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-capabilities",
  "serde",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-editor"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "atelier-lsp",
@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-forge"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-forge",
  "atelier-project",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-gallery"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-agents",
  "atelier-editor",
@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-gateway"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-capabilities",
  "getrandom 0.3.4",
@@ -595,7 +595,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-github-issues"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-capabilities",
  "serde",
@@ -605,7 +605,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-gmail"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-capabilities",
  "serde",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-i18n"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "serde_json",
  "ureq",
@@ -622,7 +622,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-linear"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-capabilities",
  "chrono",
@@ -633,7 +633,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-lsp"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-project",
  "lsp-types",
@@ -645,7 +645,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-palette"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-ui",
  "gpui-kit",
@@ -653,7 +653,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-pr-view"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-editor",
  "atelier-forge",
@@ -673,7 +673,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-project"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-tracker",
  "dirs 6.0.0",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-remote"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-project",
  "atelier-tracker",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-review"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-agents",
  "atelier-project",
@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-settings"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "dirs 6.0.0",
  "keyring",
@@ -722,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-slack"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-capabilities",
  "serde",
@@ -731,7 +731,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-tracker"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "atelier-capabilities",
  "rusqlite",
@@ -755,7 +755,7 @@ dependencies = [
 
 [[package]]
 name = "atelier-voice"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "block2 0.6.2",
  "cpal",
