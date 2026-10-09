@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "tool": "messaging_history",
+  "running": {
+    "title": "Reading messages…"
+  },
+  "failed": {
+    "title": "Could not read the messages"
+  },
+  "done": {
+    "title": {
+      "template": "Read {$._found} {$._in}"
+    },
+    "body": {
+      "type": "list",
+      "items": "$.items",
+      "item": {
+        "type": "stack",
+        "direction": "row",
+        "gap": "md",
+        "children": [
+          {
+            "type": "avatar",
+            "name": {
+              "path": "$.author.name"
+            }
+          },
+          {
+            "type": "stack",
+            "direction": "column",
+            "gap": "xs",
+            "children": [
+              {
+                "type": "stack",
+                "direction": "row",
+                "gap": "sm",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": {
+                      "path": "$.author.name"
+                    },
+                    "style": "title",
+                    "max_lines": 1
+                  },
+                  {
+                    "type": "badge",
+                    "value": {
+                      "path": "$.origin"
+                    },
+                    "tone": "neutral",
+                    "when": {
+                      "path": "$.origin",
+                      "exists": true
+                    }
+                  },
+                  {
+                    "type": "text",
+                    "value": {
+                      "path": "$.created_at",
+                      "format": "relative_time"
+                    },
+                    "style": "muted",
+                    "max_lines": 1
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "value": {
+                  "path": "$.text"
+                },
+                "style": "body",
+                "max_lines": 3
+              }
+            ]
+          }
+        ]
+      },
+      "limit": 50,
+      "empty": "No messages.",
+      "on_item": {
+        "type": "open",
+        "label": "Open",
+        "ref": {
+          "path": "$.channel"
+        }
+      }
+    },
+    "footer": [
+      {
+        "type": "open",
+        "label": "Open channel",
+        "ref": {
+          "path": "$.items[0].channel"
+        }
+      }
+    ]
+  }
+}

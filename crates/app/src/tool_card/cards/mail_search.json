@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "tool": "mail_search",
+  "running": {
+    "title": "Searching mail…"
+  },
+  "failed": {
+    "title": "Could not search the mail"
+  },
+  "done": {
+    "title": {
+      "template": "Searched {$._provider.name}, {$._found}"
+    },
+    "body": {
+      "type": "list",
+      "items": "$.items",
+      "item": {
+        "type": "stack",
+        "direction": "row",
+        "gap": "md",
+        "children": [
+          {
+            "type": "icon",
+            "name": "mail",
+            "tone": "neutral"
+          },
+          {
+            "type": "stack",
+            "direction": "column",
+            "gap": "xs",
+            "children": [
+              {
+                "type": "text",
+                "value": {
+                  "path": "$.subject"
+                },
+                "style": "title",
+                "max_lines": 1
+              },
+              {
+                "type": "text",
+                "value": {
+                  "template": "{$.participants[0].address} · {$.snippet}"
+                },
+                "style": "muted",
+                "max_lines": 1
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "value": {
+              "path": "$.last_at",
+              "format": "relative_time"
+            },
+            "style": "muted",
+            "max_lines": 1
+          }
+        ]
+      },
+      "limit": 50,
+      "empty": "No mail matches.",
+      "on_item": {
+        "type": "open",
+        "label": "Open",
+        "ref": {
+          "path": "$.ref"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "tool": "messaging_channels",
+  "running": {
+    "title": "Listing channels…"
+  },
+  "failed": {
+    "title": "Could not list the channels"
+  },
+  "done": {
+    "title": {
+      "template": "Listed {$._found} {$._in}"
+    },
+    "body": {
+      "type": "list",
+      "items": "$.items",
+      "item": {
+        "type": "stack",
+        "direction": "row",
+        "gap": "sm",
+        "children": [
+          {
+            "type": "icon",
+            "name": "chat",
+            "tone": "neutral",
+            "when": {
+              "path": "$.kind",
+              "equals": "public"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "lock",
+            "tone": "neutral",
+            "when": {
+              "path": "$.kind",
+              "equals": "private"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "forum",
+            "tone": "neutral",
+            "when": {
+              "path": "$.kind",
+              "equals": "dm"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "forum",
+            "tone": "neutral",
+            "when": {
+              "path": "$.kind",
+              "equals": "group_dm"
+            }
+          },
+          {
+            "type": "text",
+            "value": {
+              "path": "$.name",
+              "default": "Direct message"
+            },
+            "style": "title",
+            "max_lines": 1
+          },
+          {
+            "type": "badge",
+            "value": "Archived",
+            "tone": "neutral",
+            "when": {
+              "path": "$.archived",
+              "equals": true
+            }
+          }
+        ]
+      },
+      "limit": 50,
+      "empty": "No channels.",
+      "on_item": {
+        "type": "open",
+        "label": "Open",
+        "ref": {
+          "path": "$.ref"
+        }
+      }
+    }
+  }
+}

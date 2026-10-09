@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use atelier_capabilities::{
     CapError, CapResult, Ref,
-    mail::{MailOperation, MailProvider, Thread, ThreadSummary},
+    mail::{MailOperation, MailProvider, Role, Thread, ThreadSummary},
 };
 use gpui_kit::{AppContext, Context, Window};
 
@@ -116,6 +116,33 @@ impl MailPane {
             self.enter_mailbox(first, &mailbox, cx);
         }
         cx.notify();
+    }
+
+    /// Shows what a reference names, in the account it names: a mailbox with its threads, or a thread, with the inbox of the
+    /// account (or its first mailbox) behind it when no mailbox of the account is open. Any other reference shows nothing.
+    pub fn open_ref(&mut self, reference: &Ref, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(at) = self
+            .accounts
+            .iter()
+            .position(|a| a.choice.provider == reference.provider && a.choice.account == reference.account)
+        else {
+            return;
+        };
+        if reference.id.starts_with("b:") {
+            return self.open_mailbox(at, reference, window, cx);
+        }
+        if !reference.id.starts_with("t:") {
+            return;
+        }
+        if self.shown != at || self.mailbox.is_none() {
+            let boxes = &self.accounts[at].boxes;
+            let behind = boxes.iter().find(|b| b.role == Role::Inbox).or(boxes.first()).map(|b| b.reference.clone());
+            match behind {
+                Some(mailbox) => self.open_mailbox(at, &mailbox, window, cx),
+                None => self.shown = at,
+            }
+        }
+        self.open_thread(reference, window, cx);
     }
 
     /// Shows the threads of `mailbox` of account `at`, from the newest.

@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "tool": "tasks_list",
+  "running": {
+    "title": "Listing tasks…"
+  },
+  "failed": {
+    "title": "Could not list the tasks"
+  },
+  "done": {
+    "title": {
+      "template": "Listed {$._found} {$._in}"
+    },
+    "body": {
+      "type": "list",
+      "items": "$.items",
+      "item": {
+        "type": "stack",
+        "direction": "row",
+        "gap": "sm",
+        "children": [
+          {
+            "type": "icon",
+            "name": "status_backlog",
+            "tone": "neutral",
+            "when": {
+              "path": "$.status.category",
+              "equals": "backlog"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "status_todo",
+            "tone": "neutral",
+            "when": {
+              "path": "$.status.category",
+              "equals": "todo"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "status_in_progress",
+            "tone": "neutral",
+            "when": {
+              "path": "$.status.category",
+              "equals": "in_progress"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "status_in_review",
+            "tone": "neutral",
+            "when": {
+              "path": "$.status.category",
+              "equals": "in_review"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "status_done",
+            "tone": "neutral",
+            "when": {
+              "path": "$.status.category",
+              "equals": "done"
+            }
+          },
+          {
+            "type": "icon",
+            "name": "status_canceled",
+            "tone": "neutral",
+            "when": {
+              "path": "$.status.category",
+              "equals": "canceled"
+            }
+          },
+          {
+            "type": "text",
+            "value": {
+              "path": "$.key"
+            },
+            "style": "muted",
+            "max_lines": 1
+          },
+          {
+            "type": "text",
+            "value": {
+              "path": "$.title"
+            },
+            "style": "title",
+            "max_lines": 1
+          },
+          {
+            "type": "badge",
+            "value": "Urgent",
+            "tone": "danger",
+            "when": {
+              "path": "$.priority",
+              "equals": "urgent"
+            }
+          },
+          {
+            "type": "badge",
+            "value": "High",
+            "tone": "warning",
+            "when": {
+              "path": "$.priority",
+              "equals": "high"
+            }
+          },
+          {
+            "type": "avatar",
+            "name": {
+              "path": "$.assignees[0].name"
+            },
+            "when": {
+              "path": "$.assignees[0].name",
+              "exists": true
+            }
+          }
+        ]
+      },
+      "limit": 50,
+      "empty": "No tasks match.",
+      "on_item": {
+        "type": "open",
+        "label": "Open",
+        "ref": {
+          "path": "$.ref"
+        }
+      }
+    }
+  }
+}

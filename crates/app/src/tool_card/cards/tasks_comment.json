@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "tool": "tasks_comment",
+  "running": {
+    "title": "Commenting on a task…"
+  },
+  "failed": {
+    "title": "Could not comment on the task"
+  },
+  "done": {
+    "title": {
+      "template": "Commented on a task {$._in}"
+    },
+    "body": {
+      "type": "stack",
+      "direction": "column",
+      "gap": "xs",
+      "children": [
+        {
+          "type": "text",
+          "value": {
+            "path": "$.comment.author.name"
+          },
+          "style": "muted",
+          "max_lines": 1
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.comment.body"
+          },
+          "style": "body",
+          "max_lines": 4
+        }
+      ]
+    },
+    "footer": [
+      {
+        "type": "open",
+        "label": "Open task",
+        "ref": {
+          "path": "$.comment.task"
+        }
+      }
+    ]
+  }
+}

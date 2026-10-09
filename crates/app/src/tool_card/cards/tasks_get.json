@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "tool": "tasks_get",
+  "running": {
+    "title": "Reading a task…"
+  },
+  "failed": {
+    "title": "Could not read the task"
+  },
+  "done": {
+    "title": {
+      "template": "Read {$.task.key} {$._in}"
+    },
+    "body": {
+      "type": "stack",
+      "direction": "column",
+      "gap": "sm",
+      "children": [
+        {
+          "type": "stack",
+          "direction": "row",
+          "gap": "sm",
+          "children": [
+            {
+              "type": "icon",
+              "name": "status_backlog",
+              "tone": "neutral",
+              "when": {
+                "path": "$.task.status.category",
+                "equals": "backlog"
+              }
+            },
+            {
+              "type": "icon",
+              "name": "status_todo",
+              "tone": "neutral",
+              "when": {
+                "path": "$.task.status.category",
+                "equals": "todo"
+              }
+            },
+            {
+              "type": "icon",
+              "name": "status_in_progress",
+              "tone": "neutral",
+              "when": {
+                "path": "$.task.status.category",
+                "equals": "in_progress"
+              }
+            },
+            {
+              "type": "icon",
+              "name": "status_in_review",
+              "tone": "neutral",
+              "when": {
+                "path": "$.task.status.category",
+                "equals": "in_review"
+              }
+            },
+            {
+              "type": "icon",
+              "name": "status_done",
+              "tone": "neutral",
+              "when": {
+                "path": "$.task.status.category",
+                "equals": "done"
+              }
+            },
+            {
+              "type": "icon",
+              "name": "status_canceled",
+              "tone": "neutral",
+              "when": {
+                "path": "$.task.status.category",
+                "equals": "canceled"
+              }
+            },
+            {
+              "type": "text",
+              "value": {
+                "path": "$.task.key"
+              },
+              "style": "muted",
+              "max_lines": 1
+            },
+            {
+              "type": "badge",
+              "value": {
+                "path": "$.task.status.name"
+              },
+              "tone": "neutral"
+            },
+            {
+              "type": "badge",
+              "value": "Urgent",
+              "tone": "danger",
+              "when": {
+                "path": "$.task.priority",
+                "equals": "urgent"
+              }
+            },
+            {
+              "type": "badge",
+              "value": "High",
+              "tone": "warning",
+              "when": {
+                "path": "$.task.priority",
+                "equals": "high"
+              }
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.task.title"
+          },
+          "style": "title",
+          "max_lines": 2
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.task.description"
+          },
+          "style": "body",
+          "max_lines": 4
+        },
+        {
+          "type": "list",
+          "items": "$.activity",
+          "item": {
+            "type": "text",
+            "value": {
+              "template": "{$.by.name} {$.kind}"
+            },
+            "style": "muted",
+            "max_lines": 1
+          },
+          "limit": 4
+        }
+      ]
+    },
+    "footer": [
+      {
+        "type": "open",
+        "label": "Open task",
+        "ref": {
+          "path": "$.task.ref"
+        }
+      }
+    ]
+  }
+}

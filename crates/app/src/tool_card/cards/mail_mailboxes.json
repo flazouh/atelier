@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "tool": "mail_mailboxes",
+  "running": {
+    "title": "Listing mailboxes…"
+  },
+  "failed": {
+    "title": "Could not list the mailboxes"
+  },
+  "done": {
+    "title": {
+      "template": "Listed {$._found} {$._in}"
+    },
+    "body": {
+      "type": "list",
+      "items": "$.items",
+      "item": {
+        "type": "stack",
+        "direction": "row",
+        "gap": "sm",
+        "children": [
+          {
+            "type": "icon",
+            "name": "mail",
+            "tone": "neutral"
+          },
+          {
+            "type": "text",
+            "value": {
+              "path": "$.name"
+            },
+            "style": "title",
+            "max_lines": 1
+          },
+          {
+            "type": "text",
+            "value": {
+              "template": "{$.unread|count} unread"
+            },
+            "style": "muted",
+            "max_lines": 1
+          }
+        ]
+      },
+      "limit": 50,
+      "empty": "No mailboxes.",
+      "on_item": {
+        "type": "open",
+        "label": "Open",
+        "ref": {
+          "path": "$.ref"
+        }
+      }
+    }
+  }
+}

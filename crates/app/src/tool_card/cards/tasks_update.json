@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "tool": "tasks_update",
+  "running": {
+    "title": "Updating a task…"
+  },
+  "failed": {
+    "title": "Could not update the task"
+  },
+  "done": {
+    "title": {
+      "template": "Updated {$.task.key} {$._in}"
+    },
+    "body": {
+      "type": "stack",
+      "direction": "row",
+      "gap": "sm",
+      "children": [
+        {
+          "type": "icon",
+          "name": "status_backlog",
+          "tone": "neutral",
+          "when": {
+            "path": "$.task.status.category",
+            "equals": "backlog"
+          }
+        },
+        {
+          "type": "icon",
+          "name": "status_todo",
+          "tone": "neutral",
+          "when": {
+            "path": "$.task.status.category",
+            "equals": "todo"
+          }
+        },
+        {
+          "type": "icon",
+          "name": "status_in_progress",
+          "tone": "neutral",
+          "when": {
+            "path": "$.task.status.category",
+            "equals": "in_progress"
+          }
+        },
+        {
+          "type": "icon",
+          "name": "status_in_review",
+          "tone": "neutral",
+          "when": {
+            "path": "$.task.status.category",
+            "equals": "in_review"
+          }
+        },
+        {
+          "type": "icon",
+          "name": "status_done",
+          "tone": "neutral",
+          "when": {
+            "path": "$.task.status.category",
+            "equals": "done"
+          }
+        },
+        {
+          "type": "icon",
+          "name": "status_canceled",
+          "tone": "neutral",
+          "when": {
+            "path": "$.task.status.category",
+            "equals": "canceled"
+          }
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.task.key"
+          },
+          "style": "muted",
+          "max_lines": 1
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.task.title"
+          },
+          "style": "title",
+          "max_lines": 1
+        },
+        {
+          "type": "badge",
+          "value": "Urgent",
+          "tone": "danger",
+          "when": {
+            "path": "$.task.priority",
+            "equals": "urgent"
+          }
+        },
+        {
+          "type": "badge",
+          "value": "High",
+          "tone": "warning",
+          "when": {
+            "path": "$.task.priority",
+            "equals": "high"
+          }
+        }
+      ]
+    },
+    "footer": [
+      {
+        "type": "open",
+        "label": "Open task",
+        "ref": {
+          "path": "$.task.ref"
+        }
+      }
+    ]
+  }
+}

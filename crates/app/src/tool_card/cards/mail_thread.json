@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "tool": "mail_thread",
+  "running": {
+    "title": "Reading a thread…"
+  },
+  "failed": {
+    "title": "Could not read the thread"
+  },
+  "done": {
+    "title": {
+      "template": "Read “{$.thread.subject}” {$._in}"
+    },
+    "body": {
+      "type": "stack",
+      "direction": "column",
+      "gap": "sm",
+      "children": [
+        {
+          "type": "text",
+          "value": {
+            "path": "$.thread.subject"
+          },
+          "style": "title",
+          "max_lines": 1
+        },
+        {
+          "type": "list",
+          "items": "$.thread.messages",
+          "item": {
+            "type": "stack",
+            "direction": "row",
+            "gap": "md",
+            "children": [
+              {
+                "type": "avatar",
+                "name": {
+                  "path": "$.from.address"
+                }
+              },
+              {
+                "type": "stack",
+                "direction": "column",
+                "gap": "xs",
+                "children": [
+                  {
+                    "type": "stack",
+                    "direction": "row",
+                    "gap": "sm",
+                    "children": [
+                      {
+                        "type": "text",
+                        "value": {
+                          "path": "$.from.address"
+                        },
+                        "style": "title",
+                        "max_lines": 1
+                      },
+                      {
+                        "type": "text",
+                        "value": {
+                          "path": "$.date",
+                          "format": "relative_time"
+                        },
+                        "style": "muted",
+                        "max_lines": 1
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "value": {
+                      "path": "$.snippet"
+                    },
+                    "style": "body",
+                    "max_lines": 2
+                  }
+                ]
+              }
+            ]
+          },
+          "limit": 50,
+          "empty": "No messages."
+        }
+      ]
+    },
+    "footer": [
+      {
+        "type": "open",
+        "label": "Open thread",
+        "ref": {
+          "path": "$.thread.ref"
+        }
+      }
+    ]
+  }
+}

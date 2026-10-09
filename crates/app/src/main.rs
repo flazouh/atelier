@@ -63,6 +63,7 @@ mod tool_density;
 mod mail;
 mod messages;
 mod tasks;
+mod tool_card;
 mod tree;
 mod tree_view;
 mod updater;

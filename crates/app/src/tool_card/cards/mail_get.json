@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "tool": "mail_get",
+  "running": {
+    "title": "Reading a message…"
+  },
+  "failed": {
+    "title": "Could not read the message"
+  },
+  "done": {
+    "title": {
+      "template": "Read a message from {$.message.from.address}"
+    },
+    "body": {
+      "type": "stack",
+      "direction": "column",
+      "gap": "xs",
+      "children": [
+        {
+          "type": "text",
+          "value": {
+            "path": "$.message.subject"
+          },
+          "style": "title",
+          "max_lines": 1
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.message.date",
+            "format": "relative_time"
+          },
+          "style": "muted",
+          "max_lines": 1
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.message.text"
+          },
+          "style": "body",
+          "max_lines": 5
+        }
+      ]
+    },
+    "footer": [
+      {
+        "type": "open",
+        "label": "Open thread",
+        "ref": {
+          "path": "$.message.thread"
+        }
+      }
+    ]
+  }
+}

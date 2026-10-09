@@ -1046,6 +1046,7 @@ impl Shell {
                 this.show_view(ShellView::Files, window, cx)
             }
             ProjectEvent::OpenAccounts => this.open_accounts(window, cx),
+            ProjectEvent::OpenRef(reference) => this.open_ref(project, reference, window, cx),
             ProjectEvent::ShowTasks => {
                 if let Some(i) = this.projects.iter().position(|p| p == project) {
                     this.active = i;

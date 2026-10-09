@@ -322,6 +322,7 @@ impl OpenProject {
                 SessionEvent::NewSession => return cx.emit(ProjectEvent::NewSessionHere),
                 SessionEvent::Archive => return cx.emit(ProjectEvent::ArchiveSession(session.read(cx).key.clone())),
                 SessionEvent::Handoff(target) => return cx.emit(ProjectEvent::Handoff { session: session.read(cx).key.clone(), target: target.clone() }),
+                SessionEvent::OpenRef(reference) => return cx.emit(ProjectEvent::OpenRef(reference.clone())),
                 SessionEvent::ShowFiles => return cx.emit(ProjectEvent::ShowFiles),
                 SessionEvent::ShowTasks => return cx.emit(ProjectEvent::ShowTasks),
                 SessionEvent::Renamed => {

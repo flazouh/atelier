@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "tool": "mail_create_draft",
+  "running": {
+    "title": "Drafting a message…"
+  },
+  "failed": {
+    "title": "Could not draft the message"
+  },
+  "done": {
+    "title": {
+      "template": "Drafted a message to {$.draft.to[0].address}"
+    },
+    "body": {
+      "type": "stack",
+      "direction": "column",
+      "gap": "xs",
+      "children": [
+        {
+          "type": "stack",
+          "direction": "row",
+          "gap": "sm",
+          "children": [
+            {
+              "type": "text",
+              "value": {
+                "path": "$.draft.subject"
+              },
+              "style": "title",
+              "max_lines": 1
+            },
+            {
+              "type": "badge",
+              "value": "Draft",
+              "tone": "info"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "value": {
+            "path": "$.draft.text"
+          },
+          "style": "body",
+          "max_lines": 5
+        }
+      ]
+    },
+    "footer": [
+      {
+        "type": "open",
+        "label": "Open thread",
+        "ref": {
+          "path": "$.draft.thread"
+        }
+      }
+    ]
+  }
+}

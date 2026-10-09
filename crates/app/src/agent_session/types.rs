@@ -27,6 +27,8 @@ pub enum SessionEvent {
     Task(crate::tasks::signal::TaskEvent),
     /// The reader pressed the task chip in the header.
     OpenTask,
+    /// The reader pressed a row or a button of a tool card: show what it names in its own screen.
+    OpenRef(atelier_capabilities::Ref),
     /// The reader pressed the panel's close button.
     Close,
     /// The reader asked, in the panel's menu, for a new session in this project.

@@ -15,6 +15,7 @@ mod lens;
 mod mail;
 mod messages;
 mod rail;
+mod refs;
 mod restore;
 mod structs;
 mod tree_menu;

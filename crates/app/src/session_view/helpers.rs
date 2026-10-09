@@ -286,10 +286,14 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
             let density = crate::tool_density::tool_density(cx);
             match super::edit::edit_view(call, &root, density, mark) {
                 Some(view) => edit_diff(session, id("tool"), view).into_any_element(),
-                // A command's log is clipped like a diff, and does not scroll; pressing it opens it wider.
-                None => tool_row(id("tool"), call, &root, mark, density == crate::tool_density::ToolDensity::Detailed)
-                    .preview_rows(PREVIEW_ROWS)
-                    .into_any_element(),
+                None => match super::tool_card::card(session, id("tool"), &call.call, call.output.as_ref(), false, cx) {
+                    // A call of a gateway tool is a card with its provider and its result as rows, when it has one.
+                    Some(card) => card,
+                    // A command's log is clipped like a diff, and does not scroll; pressing it opens it wider.
+                    None => tool_row(id("tool"), call, &root, mark, density == crate::tool_density::ToolDensity::Detailed)
+                        .preview_rows(PREVIEW_ROWS)
+                        .into_any_element(),
+                },
             }
         }
         Item::Subagent { subagent, status, activity, calls, summary } => {
@@ -366,7 +370,12 @@ fn item_body(session: &Entity<AgentSession>, ix: usize, cx: &App) -> Option<AnyE
                 let (session, request) = (session.clone(), request.id.clone());
                 move |_: &_, _: &mut Window, cx: &mut App| session.update(cx, |s, cx| s.answer(&request, kind, cx))
             };
-            approval.on_approve(on(ChoiceKind::Allow)).on_always_allow(on(ChoiceKind::AllowAlways)).on_deny(on(ChoiceKind::Deny)).into_any_element()
+            let approval = approval.on_approve(on(ChoiceKind::Allow)).on_always_allow(on(ChoiceKind::AllowAlways)).on_deny(on(ChoiceKind::Deny));
+            // A call of a gateway tool shows its card, waiting, above the question that asks to allow it.
+            match (*answer == Answer::Asking).then(|| super::tool_card::card(session, id("ask-card"), &request.call, None, true, cx)).flatten() {
+                Some(card) => div().flex().flex_col().gap(px(6.)).child(card).child(approval).into_any_element(),
+                None => approval.into_any_element(),
+            }
         }
         Item::Notice(text) => div()
             .flex()

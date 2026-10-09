@@ -76,6 +76,8 @@ pub enum ProjectEvent {
     ShowTasks,
     /// The Tasks pane asked for the Accounts section of Settings, so the reader can sign in to a provider.
     OpenAccounts,
+    /// A tool card of a session names a task, a channel or a mail: the shell shows it in its own screen.
+    OpenRef(atelier_capabilities::Ref),
 }
 
 /// Why a project's pull requests do not open.

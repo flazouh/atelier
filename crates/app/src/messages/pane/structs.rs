@@ -338,6 +338,23 @@ impl MessagesPane {
         cx.notify();
     }
 
+    /// Shows the channel `channel` names, in the account its reference names. A reference of an account that is not here shows
+    /// nothing, and a message of a channel opens the channel.
+    pub fn open_ref(&mut self, channel: &Ref, cx: &mut Context<Self>) {
+        let Some(at) = self
+            .accounts
+            .iter()
+            .position(|a| a.choice.provider == channel.provider && a.choice.account == channel.account)
+        else {
+            return;
+        };
+        // A channel is `C1`; a message of it is `C1:<time>`.
+        let root = channel.id.split(':').next().unwrap_or_default();
+        let shown = self.accounts[at].rows.iter().find(|r| r.reference == *channel || r.reference.id == root).map(|r| r.reference.clone());
+        // Channels not read yet leave only the reference the card has.
+        self.open_channel(at, &shown.unwrap_or_else(|| channel.clone()), cx);
+    }
+
     /// Shows the history of `channel` of account `at`, from the newest message. Pressing the open channel again closes its thread.
     pub fn open_channel(&mut self, at: usize, channel: &Ref, cx: &mut Context<Self>) {
         if at >= self.accounts.len() {
