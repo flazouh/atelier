@@ -121,7 +121,7 @@ impl Shell {
     }
 
     /// The app quits. An update that is ready and was never pressed installs now, as it did when the reader chose Later.
-    /// [`Updater::later`] only answers the updater once, so a second call, or one with no update waiting, does nothing.
+    /// The Mac side takes its reply out of a slot when it answers, so a second call, or one with no update waiting, does nothing.
     pub fn update_at_quit(&mut self, cx: &mut Context<Self>) {
         if matches!(self.update, UpdateState::Ready { .. })
             && let Some(updater) = cx.try_global::<Updater>()
