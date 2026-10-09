@@ -7,7 +7,7 @@ use gpui_kit::{App, IntoElement, ParentElement, Styled, div, px};
 
 fn notes() -> Vec<ReleaseNote> {
     vec![
-        ReleaseNote::new("Updates in our own window.", "A small button in the title bar opens this changelog.").kind(ReleaseKind::New),
+        ReleaseNote::new("Updates in our own window.", "A small button in the title bar opens this changelog.").kind(ReleaseKind::Added),
         ReleaseNote::new("Restart when you choose.", "Press Later and the update installs when you quit.").kind(ReleaseKind::Improved),
         ReleaseNote::new("Notes always show.", "The changelog travels inside the update, so it is never missing.").kind(ReleaseKind::Fixed),
     ]
@@ -18,7 +18,7 @@ fn earlier() -> Vec<ReleaseVersion> {
         ReleaseVersion::new(
             "0.1.4",
             [
-                ReleaseNote::new("Updates find you sooner.", "Atelier looks every hour, and when you come back to it.").kind(ReleaseKind::New),
+                ReleaseNote::new("Updates find you sooner.", "Atelier looks every hour, and when you come back to it.").kind(ReleaseKind::Added),
                 ReleaseNote::new("The update sheet.", "The picture fills the sheet with round corners.").kind(ReleaseKind::Improved),
             ],
         ),
@@ -44,9 +44,10 @@ fn panel(sheet: ReleaseSheet, cx: &App) -> impl IntoElement {
 }
 
 pub fn update_story(cx: &App) -> impl IntoElement {
-    let restart = ReleaseSheet::new("update-sheet", "0.1.5").notes(notes()).on_later(|_, _| {}).on_install(|_, _| {});
+    let restart = ReleaseSheet::new("update-sheet", "0.1.5").notes(notes()).kind_colors(atelier_palette::kind_color).on_later(|_, _| {}).on_install(|_, _| {});
     let changelog = ReleaseSheet::new("changelog-sheet", "0.1.5")
         .notes(notes())
+        .kind_colors(atelier_palette::kind_color)
         .earlier(earlier())
         .labels("Close", "")
         .on_later(|_, _| {});

@@ -18,6 +18,7 @@ atelier-editor = { path = "crates/editor" }
 atelier-forge = { path = "crates/forge" }
 atelier-i18n = { path = "crates/i18n" }
 atelier-lsp = { path = "crates/lsp" }
+atelier-palette = { path = "crates/palette" }
 atelier-pr-view = { path = "crates/pr-view" }
 atelier-project = { path = "crates/project" }
 atelier-remote = { path = "crates/remote" }

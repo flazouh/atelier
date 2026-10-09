@@ -2,7 +2,7 @@
 //! here, once. Nothing else writes one of these hex numbers; a mark takes a [`Hue`] and asks it for its colour.
 mod helpers;
 mod types;
-pub use helpers::hue_at;
+pub use helpers::{hue_at, kind_color};
 pub use types::Hue;
 #[cfg(test)]
 mod tests;

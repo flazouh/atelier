@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use crate::palette::Hue;
+use atelier_palette::Hue;
 use atelier_agents::session::{Event, PermissionMode, SessionError, TurnOutcome};
 
 /// Whether `event` is the agent at work, which stamps the session's row: its start on a resume is not.

@@ -18,6 +18,7 @@ atelier-editor.workspace = true
 atelier-forge.workspace = true
 atelier-i18n.workspace = true
 atelier-lsp.workspace = true
+atelier-palette.workspace = true
 atelier-pr-view.workspace = true
 atelier-project.workspace = true
 atelier-remote.workspace = true

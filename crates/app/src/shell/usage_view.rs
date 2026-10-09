@@ -6,6 +6,8 @@ use super::structs::Shell;
 use crate::usage_view;
 /// The room the panel leaves above and below it, in design pixels.
 const MARGIN: f32 = 96.;
+/// The room the panel leaves at each side in a narrow window.
+const MARGIN_SIDE: f32 = 24.;
 impl Shell {
     pub(super) fn usage_panel(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let state = self.usage.as_ref()?;
@@ -30,7 +32,7 @@ impl Shell {
             .on_expand(move |id, _, cx| drop(expand.update(cx, |shell, cx| shell.expand_usage(id, cx))));
         Some(
             Modal::new("usage")
-                .width(1120.)
+                .width((f32::from(window.viewport_size().width) - 2. * MARGIN_SIDE).clamp(320., 1120.))
                 .flush()
                 .focus(&self.usage_focus)
                 .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.close_usage(cx))))
