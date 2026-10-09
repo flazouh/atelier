@@ -21,6 +21,7 @@ atelier-editor = { path = "crates/editor" }
 atelier-forge = { path = "crates/forge" }
 atelier-gateway = { path = "crates/gateway" }
 atelier-github-issues = { path = "crates/github-issues" }
+atelier-gmail = { path = "crates/gmail" }
 atelier-i18n = { path = "crates/i18n" }
 atelier-lsp = { path = "crates/lsp" }
 atelier-palette = { path = "crates/palette" }

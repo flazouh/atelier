@@ -251,3 +251,55 @@ fn the_pane_keeps_its_gaps_at_every_zoom(cx: &mut TestAppContext) {
         });
     }
 }
+
+fn leave(built: crate::accounts::Built, cx: &mut VisualTestContext) {
+    use gpui_kit::BorrowAppContext as _;
+    cx.update(|_, cx| {
+        let hub = cx.global::<CapabilityHub>().clone();
+        let turn = hub.checking(&Default::default());
+        assert!(hub.install(built, turn));
+        cx.update_global::<CapabilityHub, _>(|_, _| {});
+    });
+    for _ in 0..4 {
+        cx.run_until_parked();
+    }
+}
+
+#[gpui_kit::test]
+fn the_sign_in_button_opens_the_accounts_section(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    press(&shell, "rail-mail", cx);
+    press(&shell, "mail-open-settings", cx);
+    let pane = shell
+        .read_with(cx, |s, _| s.settings.as_ref().map(|(pane, _)| pane.clone()))
+        .expect("Settings opened");
+    assert_eq!(
+        pane.read_with(cx, |p, _| p.section()),
+        crate::settings_pane::Section::Accounts
+    );
+}
+
+#[gpui_kit::test]
+fn an_account_connected_while_the_screen_is_open_shows_without_a_restart_and_forgetting_takes_it_away(
+    cx: &mut TestAppContext,
+) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    with_accounts(vec![], cx);
+    press(&shell, "rail-mail", cx);
+    assert!(cx.debug_bounds("mail-empty").is_some());
+
+    leave(
+        crate::accounts::Built {
+            mail: vec![acme()],
+            ..Default::default()
+        },
+        cx,
+    );
+    assert!(cx.debug_bounds("mail-empty").is_none(), "the empty state went");
+    assert!(cx.debug_bounds("mail-box-0-0").is_some(), "the new account is listed");
+    assert_eq!(shown(&shell, cx).len(), 2);
+
+    leave(crate::accounts::Built::default(), cx);
+    assert!(cx.debug_bounds("mail-box-0-0").is_none(), "forgotten: gone at once");
+    assert!(cx.debug_bounds("mail-empty").is_some());
+}

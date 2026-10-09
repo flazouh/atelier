@@ -774,10 +774,10 @@ impl Render for MessagesPane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let pane = cx.entity();
-        let open_settings = {
+        let open_accounts = {
             let pane = pane.clone();
             move |_: &mut Window, cx: &mut gpui_kit::App| {
-                pane.update(cx, |_, cx| cx.emit(MessagesEvent::OpenSettings))
+                pane.update(cx, |_, cx| cx.emit(MessagesEvent::OpenAccounts))
             }
         };
         let in_thread = matches!(self.view, View::Thread(_));
@@ -821,9 +821,9 @@ impl Render for MessagesPane {
             .account()
             .map_or_else(|| "this account".to_string(), |a| a.choice.name());
         let body = if self.accounts.is_empty() {
-            no_account(open_settings.clone(), &theme)
+            no_account(open_accounts.clone(), &theme)
         } else if problem == Some(Problem::SignedOut) {
-            signed_out(&name, open_settings.clone(), &theme)
+            signed_out(&name, open_accounts.clone(), &theme)
         } else if let Some(failed) = self
             .account()
             .and_then(|a| a.failed.clone())

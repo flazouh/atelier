@@ -117,7 +117,7 @@ impl Section {
             Section::Sidebar => t(&words::GIST_SIDEBAR),
             Section::Agents => t(&words::GIST_AGENTS),
             Section::Providers => "Where Claude Code gets its model. A session picks one beside its agent.",
-            Section::Accounts => "Linear and GitHub Issues, for the Tasks screen and your agents.",
+            Section::Accounts => "Linear, GitHub Issues, Slack, Discord and Gmail, for your screens and your agents.",
             Section::Dictation => t(&words::GIST_DICTATION),
             Section::Tasks => t(&words::GIST_TASKS),
             Section::PullRequests => t(&words::GIST_PULL_REQUESTS),

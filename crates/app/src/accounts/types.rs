@@ -3,6 +3,9 @@
 pub(crate) enum Kind {
     Linear,
     GithubIssues,
+    Slack,
+    Discord,
+    Gmail,
 }
 
 impl Kind {
@@ -11,6 +14,9 @@ impl Kind {
         match self {
             Kind::Linear => "Linear",
             Kind::GithubIssues => "GitHub Issues",
+            Kind::Slack => "Slack",
+            Kind::Discord => "Discord",
+            Kind::Gmail => "Gmail",
         }
     }
 
@@ -23,6 +29,27 @@ impl Kind {
             Kind::GithubIssues => {
                 "GitHub does not accept the gh login. Run gh auth login in a terminal."
             }
+            Kind::Slack => "slackcli is not logged in. Run slackcli login in a terminal.",
+            Kind::Discord => "discordcli is not logged in. Run discordcli login in a terminal.",
+            Kind::Gmail => {
+                "The browser that gmailcli uses is not signed in to Gmail. Sign in to Gmail there."
+            }
+        }
+    }
+
+    /// What a person does when the command line tool of this kind is not there. Empty for a kind with no tool.
+    pub(crate) fn missing_tool(self) -> &'static str {
+        match self {
+            Kind::Slack => {
+                "slackcli is not installed here, or not at that path. Get it at github.com/flazouh/slackcli."
+            }
+            Kind::Discord => {
+                "discordcli is not installed here, or not at that path. Get it at github.com/flazouh/discordcli."
+            }
+            Kind::Gmail => {
+                "gmailcli is not installed on that machine, or not at that path. Install it there, or set its path."
+            }
+            Kind::Linear | Kind::GithubIssues => "",
         }
     }
 }

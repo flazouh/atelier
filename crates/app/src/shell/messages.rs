@@ -14,7 +14,7 @@ use gpui_kit::{AnyElement, Context, Focusable, Window, div};
 
 use super::{
     lens::{nav_heading, nav_row},
-    structs::{OpenSettings, Shell},
+    structs::Shell,
     view::ShellView,
 };
 use crate::{
@@ -44,13 +44,20 @@ impl Shell {
             None => {
                 let pane = cx.new(|cx| MessagesPane::new(window, cx));
                 let subscription = cx.subscribe_in(&pane, window, |this: &mut Self, _, event: &MessagesEvent, window, cx| match event {
-                    MessagesEvent::OpenSettings => this.open_settings(&OpenSettings, window, cx),
+                    MessagesEvent::OpenAccounts => this.open_accounts(window, cx),
                 });
                 self._subscriptions.push(subscription);
                 self.messages = Some(pane.clone());
                 pane
             }
         };
+        let providers = cx.try_global::<CapabilityHub>().map(CapabilityHub::messaging_providers).unwrap_or_default();
+        pane.update(cx, |pane, cx| pane.set_providers(providers, cx));
+    }
+
+    /// The hub changed: an open Messages pane takes its accounts as they are now. The same accounts change nothing.
+    pub(super) fn refresh_messages(&mut self, cx: &mut Context<Self>) {
+        let Some(pane) = self.messages.clone() else { return };
         let providers = cx.try_global::<CapabilityHub>().map(CapabilityHub::messaging_providers).unwrap_or_default();
         pane.update(cx, |pane, cx| pane.set_providers(providers, cx));
     }

@@ -1,7 +1,8 @@
-//! The Accounts section: the outside services a person connected for their tasks. Linear with an API key, kept in the
-//! system keychain and never in the settings file, and GitHub Issues of one repository over the `gh` login, which holds
-//! no key. A row says how its service stands: working, not signed in, offline. The providers themselves are built by
-//! [`crate::accounts`], which this page asks to start over after each change.
+//! The Accounts section: the outside services a person connected. Linear with an API key, kept in the system keychain
+//! and never in the settings file; GitHub Issues of one repository over the `gh` login, which holds no key; and, in the
+//! Chat and Mail groups, Slack, Discord and Gmail through the reader's own `slackcli`, `discordcli` and `gmailcli`, whose
+//! logins stay with those tools. A row says how its service stands: working, not signed in, offline. The providers
+//! themselves are built by [`crate::accounts`], which this page asks to start over after each change.
 use atelier_capabilities::CapError;
 use atelier_settings::{AccountsSaved, GithubIssuesSaved, LinearSaved, secrets::LINEAR_KEY};
 use atelier_ui::{
@@ -15,6 +16,10 @@ use gpui_kit::{
     AnyElement, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, SharedString,
     Styled, Task, Window, component::input::InputState, div, prelude::FluentBuilder,
 };
+
+mod chat;
+mod mail;
+mod parts;
 
 use super::{
     SettingsPane,
@@ -66,6 +71,10 @@ pub(crate) struct AccountsPage {
     linear_field: Option<Entity<InputState>>,
     /// The field the repository is typed in. Made when the section is first drawn.
     github_field: Option<Entity<InputState>>,
+    /// The Slack and Discord cards.
+    pub(crate) chat: chat::ChatPage,
+    /// The Gmail card.
+    pub(crate) mail: mail::MailPage,
     _reading: Option<Task<()>>,
     _linear: Option<Task<()>>,
     _github: Option<Task<()>>,
@@ -328,12 +337,17 @@ impl SettingsPane {
             cx.observe(&field, |_, _, cx| cx.notify()).detach();
             self.accounts.github_field = Some(field);
         }
+        self.ensure_chat_fields(window, cx);
+        self.ensure_mail_fields(window, cx);
         let rows = cx
             .try_global::<CapabilityHub>()
             .map(CapabilityHub::rows)
             .unwrap_or_default();
         let linear = self.linear_card(&rows, &theme, cx);
         let github = self.github_card(&rows, &theme, cx);
+        let slack = self.slack_card(&rows, &theme, cx);
+        let discord = self.discord_card(&rows, &theme, cx);
+        let gmail = self.gmail_card(&rows, &theme, cx);
         div()
             .flex()
             .flex_col()
@@ -342,6 +356,10 @@ impl SettingsPane {
             })
             .child(group("Tasks", "Where your tasks live besides this project. A connected account shows in the Tasks screen and reaches your agents.", &theme))
             .child(div().flex().flex_col().gap(px(12.)).child(linear).child(github))
+            .child(group("Chat", "Where your conversations live. A connected account shows in the Messages screen and reaches your agents. Each one uses the login of its own command line tool.", &theme))
+            .child(div().flex().flex_col().gap(px(12.)).child(slack).child(discord))
+            .child(group("Mail", "Your mailbox, for the Mail screen and your agents.", &theme))
+            .child(div().flex().flex_col().gap(px(12.)).child(gmail))
             .into_any_element()
     }
 

@@ -53,6 +53,6 @@ pub(super) enum View {
 
 /// What the pane asks of the app.
 pub enum MessagesEvent {
-    /// The reader asked for Settings, to connect or sign in to an account.
-    OpenSettings,
+    /// The reader asked for the Accounts section of Settings, to connect or sign in to an account.
+    OpenAccounts,
 }

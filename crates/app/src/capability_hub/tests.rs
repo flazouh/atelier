@@ -285,8 +285,10 @@ fn built(
         rows: Rows {
             linear: row(!providers.is_empty()),
             github: Row::Off,
+            ..Default::default()
         },
         providers,
+        ..Default::default()
     }
 }
 
@@ -433,4 +435,75 @@ fn the_screen_and_an_agent_see_the_same_connected_account() {
         listed.to_string().contains("From Linear"),
         "the agent reads the account: {listed}"
     );
+}
+#[test]
+fn connected_chat_and_mail_accounts_are_the_very_objects_the_screens_and_the_gateway_read() {
+    use atelier_capabilities::{
+        mail::{MailProvider, MemoryMail},
+        messaging::{ChannelKind, MemoryMessaging, MessagingProvider},
+    };
+    let base = tempfile::tempdir().unwrap();
+    let project = project(base.path(), "atelier");
+    let hub = hub(base.path(), true);
+    let chat = MemoryMessaging::new("acme");
+    chat.add_channel("general", ChannelKind::Public);
+    let chat: Arc<dyn MessagingProvider> = Arc::new(chat);
+    let mail: Arc<dyn MailProvider> = Arc::new(MemoryMail::new("me@acme.test"));
+    let turn = hub.checking(&Default::default());
+    let found = crate::accounts::Built {
+        messaging: vec![chat.clone()],
+        mail: vec![mail.clone()],
+        ..Default::default()
+    };
+    assert!(hub.install(found, turn));
+    // The screens ask the hub, the gateway asks the registry: both hold the object the account made.
+    let on_screen = hub.messaging_providers();
+    assert!(std::ptr::addr_eq(Arc::as_ptr(&on_screen[0]), Arc::as_ptr(&chat)));
+    assert!(std::ptr::addr_eq(Arc::as_ptr(&hub.mail_providers()[0]), Arc::as_ptr(&mail)));
+    let in_gateway = hub.registry().read().unwrap().messaging("memory", "acme");
+    assert!(in_gateway.is_some_and(|held| std::ptr::addr_eq(Arc::as_ptr(&held), Arc::as_ptr(&chat))));
+    let grant = hub.grant(&project).expect("a grant");
+    let access = grant.access().clone();
+    let channels = call(&access.url, &access.token, "messaging_channels", json!({}));
+    assert!(channels.to_string().contains("general"), "{channels}");
+    let boxes = call(&access.url, &access.token, "mail_mailboxes", json!({}));
+    assert!(boxes.to_string().contains("Inbox"), "{boxes}");
+}
+
+#[test]
+fn forgetting_takes_the_chat_and_mail_accounts_out_and_leaves_the_others() {
+    use atelier_capabilities::{mail::MemoryMail, messaging::MemoryMessaging};
+    let base = tempfile::tempdir().unwrap();
+    let hub = hub(base.path(), false);
+    // An account that came another way (the debug demo) is not the accounts' to take away.
+    hub.add_messaging(Arc::new(MemoryMessaging::new("demo")));
+    let turn = hub.checking(&Default::default());
+    let found = crate::accounts::Built {
+        messaging: vec![Arc::new(MemoryMessaging::new("acme"))],
+        mail: vec![Arc::new(MemoryMail::new("me@acme.test"))],
+        ..Default::default()
+    };
+    assert!(hub.install(found, turn));
+    let names = |hub: &CapabilityHub| -> Vec<String> { hub.messaging_providers().iter().map(|p| p.account().to_string()).collect() };
+    assert_eq!(names(&hub), ["acme", "demo"]);
+
+    let turn = hub.checking(&Default::default());
+    assert!(hub.install(crate::accounts::Built::default(), turn));
+    assert_eq!(names(&hub), ["demo"], "only the connected one went");
+    assert!(hub.mail_providers().is_empty());
+}
+
+#[test]
+fn a_saved_chat_or_mail_account_reads_checking_until_its_answer_comes() {
+    use crate::accounts::Row;
+    let base = tempfile::tempdir().unwrap();
+    let hub = hub(base.path(), false);
+    let saved = atelier_settings::AccountsSaved {
+        slack: Some(Default::default()),
+        gmail: Some(Default::default()),
+        ..Default::default()
+    };
+    hub.checking(&saved);
+    let rows = hub.rows();
+    assert_eq!((rows.slack, rows.discord, rows.gmail), (Row::Checking, Row::Off, Row::Checking));
 }

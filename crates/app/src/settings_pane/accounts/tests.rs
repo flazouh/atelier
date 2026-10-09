@@ -15,6 +15,8 @@ use atelier_ui::{
 use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 
 use super::Checked;
+
+mod chat_mail;
 use crate::{
     accounts::{AccountServices, Row},
     capability_hub::CapabilityHub,
@@ -65,6 +67,9 @@ fn open_with<'a>(
         secrets: secrets.clone(),
         linear,
         github,
+        slack: chat_mail::slack,
+        discord: chat_mail::discord,
+        gmail: chat_mail::gmail,
     };
     cx.update(|cx| {
         gpui_kit::init(cx);
@@ -363,6 +368,7 @@ fn a_keychain_that_will_not_keep_the_key_is_said_in_words_and_nothing_is_connect
             secrets: Arc::new(Locked),
             linear,
             github,
+            ..AccountServices::isolated()
         })
     });
 
