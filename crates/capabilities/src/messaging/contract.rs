@@ -406,7 +406,7 @@ pub fn references_parse_back_and_unknown_things_are_not_found(make: Make) {
         ..public.clone()
     };
     let nothing = Ref {
-        id: format!("{}:0.0", public.id),
+        id: format!("{}:1000000000.000001", public.id),
         ..public.clone()
     };
     assert!(
