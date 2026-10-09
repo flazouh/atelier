@@ -10,7 +10,7 @@ use gpui_kit::{
     Entity, Focusable, ListOffset, ListState, TestAppContext, VisualTestContext, px, size,
 };
 
-use super::*;
+use super::{helpers::set_head, *};
 use crate::messages::map::{Body, Line};
 
 mod fake;
@@ -408,13 +408,13 @@ fn an_older_page_is_added_above_without_moving_what_the_reader_is_looking_at() {
     }
     let list = ListState::new(0, gpui_kit::ListAlignment::Bottom, px(100.));
     let mut shown = Rc::new(Vec::new());
-    apply(&mut shown, &list, (5..10).map(line).collect());
+    apply(&mut shown, &list, 0, (5..10).map(line).collect());
     assert_eq!(list.item_count(), 5);
     list.scroll_to(ListOffset {
         item_ix: 2,
         offset_in_item: px(10.),
     });
-    apply(&mut shown, &list, (2..10).map(line).collect());
+    apply(&mut shown, &list, 0, (2..10).map(line).collect());
     assert_eq!(list.item_count(), 8);
     assert_eq!(
         list.logical_scroll_top().item_ix,
@@ -423,12 +423,37 @@ fn an_older_page_is_added_above_without_moving_what_the_reader_is_looking_at() {
     );
     assert_eq!(list.logical_scroll_top().offset_in_item, px(10.));
     // The same lines again change nothing.
-    apply(&mut shown, &list, (2..10).map(line).collect());
+    apply(&mut shown, &list, 0, (2..10).map(line).collect());
     assert_eq!(list.item_count(), 8);
     // A row that changed in place is one row of the list.
     let mut changed: Vec<Line> = (2..10).map(line).collect();
     changed[3].replies = 4;
-    apply(&mut shown, &list, changed);
+    apply(&mut shown, &list, 0, changed);
     assert_eq!(list.item_count(), 8);
     assert_eq!(shown[3].replies, 4);
+}
+
+#[test]
+fn the_load_older_row_comes_and_goes_above_the_messages_without_moving_the_view() {
+    let list = ListState::new(5, gpui_kit::ListAlignment::Bottom, px(100.));
+    list.scroll_to(ListOffset {
+        item_ix: 2,
+        offset_in_item: px(4.),
+    });
+    let mut shown = false;
+    set_head(&list, &mut shown, true);
+    assert!(shown);
+    assert_eq!(list.item_count(), 6, "one row more, at the head");
+    assert_eq!(
+        list.logical_scroll_top().item_ix,
+        3,
+        "the row that was third is fourth now, and still on top"
+    );
+    set_head(&list, &mut shown, true);
+    assert_eq!(list.item_count(), 6, "already there");
+    set_head(&list, &mut shown, false);
+    assert_eq!(
+        (list.item_count(), list.logical_scroll_top().item_ix),
+        (5, 2)
+    );
 }

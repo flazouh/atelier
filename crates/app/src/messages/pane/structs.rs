@@ -23,7 +23,7 @@ use super::super::{
 };
 use super::helpers::{
     Channels, Fetched, apply, banner, load_older, no_account, react, read_channels, read_history,
-    read_older, read_thread, say, signed_out,
+    read_older, read_thread, say, set_head, signed_out,
 };
 use super::types::{Load, MessagesEvent, POLL, Problem, Reaction, View};
 
@@ -67,6 +67,8 @@ pub struct MessagesPane {
     channel: Option<Ref>,
     view: View,
     history: Rc<Vec<Line>>,
+    /// The list has a "Load older" row before the lines.
+    head: bool,
     /// The cursor of the page before the oldest one read.
     older: Option<String>,
     /// How many pages of history are read, so a reading after a change keeps what the reader loaded.
@@ -139,6 +141,7 @@ impl MessagesPane {
             channel: None,
             view: View::Channel,
             history: Rc::default(),
+            head: false,
             older: None,
             pages: 1,
             loading_older: false,
@@ -231,6 +234,7 @@ impl MessagesPane {
     fn clear_open(&mut self, cx: &mut Context<Self>) {
         (self.history, self.thread) = (Rc::default(), Rc::default());
         (self.list, self.thread_list) = (new_list(), new_list());
+        self.head = false;
         (self.older, self.pages, self.loading_older) = (None, 1, false);
         (self.history_load, self.thread_load) = (Load::Loading, Load::Loading);
         (self.problem, self.said, self.said_reading) = (None, None, false);
@@ -411,8 +415,9 @@ impl MessagesPane {
         }
         match result {
             Ok(Fetched { lines, next }) => {
-                apply(&mut self.history, &self.list, lines);
+                apply(&mut self.history, &self.list, usize::from(self.head), lines);
                 self.older = next;
+                set_head(&self.list, &mut self.head, self.older.is_some());
                 self.history_load = Load::Ready;
                 self.good_reading();
             }
@@ -473,8 +478,9 @@ impl MessagesPane {
                     .filter(|l| !held.contains(&l.reference))
                     .collect();
                 all.extend(self.history.iter().cloned());
-                apply(&mut self.history, &self.list, all);
+                apply(&mut self.history, &self.list, usize::from(self.head), all);
                 self.older = next;
+                set_head(&self.list, &mut self.head, self.older.is_some());
                 self.pages += 1;
             }
             Err(error) => self.fail(
@@ -523,7 +529,7 @@ impl MessagesPane {
         }
         match result {
             Ok(Fetched { lines, .. }) => {
-                apply(&mut self.thread, &self.thread_list, lines);
+                apply(&mut self.thread, &self.thread_list, 0, lines);
                 self.thread_load = Load::Ready;
                 self.good_reading();
             }
@@ -849,17 +855,6 @@ impl Render for MessagesPane {
                 &theme,
             )
         });
-        let older = (self.older.is_some()
-            && !in_thread
-            && self.channel.is_some()
-            && matches!(self.history_load, Load::Ready)
-            && problem != Some(Problem::SignedOut))
-        .then(|| {
-            let pane = pane.clone();
-            load_older(self.loading_older, move |_, cx| {
-                pane.update(cx, |p, cx| p.load_older(cx))
-            })
-        });
         let composer = self.composer_shown().then(|| {
             div()
                 .id("messages-composer")
@@ -899,17 +894,21 @@ impl Render for MessagesPane {
                 )
             })
             .children(notice)
-            .children(older)
             .child(div().flex_1().min_h_0().child(body))
             .children(composer)
     }
 }
 
 impl MessagesPane {
-    /// The messages of the open channel or thread, as a list that lays out the rows on screen.
+    /// The messages of the open channel or thread, as a list that lays out the rows on screen. In a channel with an older page,
+    /// the first row is the one that reads it.
     fn messages(&self, cx: &mut Context<Self>) -> gpui_kit::AnyElement {
-        let (lines, state, link): (Rc<Vec<Line>>, ListState, Option<OpenThread>) = match &self.view
-        {
+        let (lines, state, link, head): (
+            Rc<Vec<Line>>,
+            ListState,
+            Option<OpenThread>,
+            Option<bool>,
+        ) = match &self.view {
             View::Channel => {
                 let weak = cx.entity().downgrade();
                 let open: OpenThread = Rc::new(move |root, _, cx| {
@@ -919,16 +918,35 @@ impl MessagesPane {
                     self.history.clone(),
                     self.list.clone(),
                     self.threads().then_some(open),
+                    self.head.then_some(self.loading_older),
                 )
             }
-            View::Thread(_) => (self.thread.clone(), self.thread_list.clone(), None),
+            View::Thread(_) => (self.thread.clone(), self.thread_list.clone(), None, None),
         };
         if lines.is_empty() {
-            return say("No messages yet.".into(), cx.theme());
+            let words = if self.effective_problem().is_some() {
+                "The messages could not be read."
+            } else {
+                "No messages yet."
+            };
+            return say(words.into(), cx.theme());
         }
-        list(state, move |ix, _, cx| match lines.get(ix) {
-            Some(line) => draw_line(ix, line, link.clone(), cx),
-            None => div().into_any_element(),
+        let pane = cx.entity();
+        let first = usize::from(head.is_some());
+        list(state, move |ix, _, cx| {
+            match (head, ix.checked_sub(first)) {
+                (Some(loading), None) => {
+                    let pane = pane.clone();
+                    load_older(loading, move |_, cx| {
+                        pane.update(cx, |p, cx| p.load_older(cx))
+                    })
+                }
+                (_, Some(at)) => match lines.get(at) {
+                    Some(line) => draw_line(at, line, link.clone(), cx),
+                    None => div().into_any_element(),
+                },
+                (None, None) => div().into_any_element(),
+            }
         })
         .size_full()
         .into_any_element()

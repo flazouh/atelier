@@ -137,7 +137,8 @@ fn lines_of<'a>(
 /// Puts `next` where `current` is, and tells the list only what changed: the rows from the first that differs to the last
 /// that differs. A row before the part that changes stays where it is, and when the change is above the first row in view
 /// (an older page came in) the view is moved by as many rows as were added, so the reader keeps the place they were at.
-pub(super) fn apply(current: &mut Rc<Vec<Line>>, list: &ListState, next: Vec<Line>) {
+/// `head` is the number of rows the list has before the lines (the "Load older" row).
+pub(super) fn apply(current: &mut Rc<Vec<Line>>, list: &ListState, head: usize, next: Vec<Line>) {
     let old = Rc::clone(current);
     let before = old.iter().zip(&next).take_while(|(a, b)| a == b).count();
     let room = old.len().min(next.len()) - before;
@@ -148,7 +149,7 @@ pub(super) fn apply(current: &mut Rc<Vec<Line>>, list: &ListState, next: Vec<Lin
         .take(room)
         .take_while(|(a, b)| a == b)
         .count();
-    let removed = before..old.len() - after;
+    let removed = head + before..head + old.len() - after;
     let added = next.len() - before - after;
     if removed.is_empty() && added == 0 {
         return;
@@ -284,13 +285,36 @@ pub(super) fn say(words: gpui_kit::SharedString, theme: &Theme) -> AnyElement {
         .into_any_element()
 }
 
-/// The row over the history that reads the page before it.
+/// Shows or hides the "Load older" row at the head of the list, where the reader finds it above the oldest message. The view
+/// keeps its place: a row added above it moves it one row down.
+pub(super) fn set_head(list: &ListState, shown: &mut bool, want: bool) {
+    if *shown == want {
+        return;
+    }
+    let place = list.logical_scroll_top();
+    list.splice(0..usize::from(*shown), usize::from(want));
+    if !list.is_following_tail() {
+        let item_ix = if want {
+            place.item_ix + 1
+        } else {
+            place.item_ix.saturating_sub(1)
+        };
+        list.scroll_to(ListOffset {
+            item_ix,
+            offset_in_item: place.offset_in_item,
+        });
+    }
+    *shown = want;
+}
+
+/// The row over the oldest message that reads the page before it.
 pub(super) fn load_older(
     loading: bool,
     load: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     div()
         .id("messages-load-older-row")
+        .w_full()
         .flex()
         .flex_none()
         .justify_center()

@@ -87,7 +87,8 @@ pub fn draw_line(ix: usize, line: &Line, thread: Option<OpenThread>, cx: &App) -
             format!("{} replies", line.replies)
         };
         // The row stretches over the column; the named box is as wide as the button, so a press on its middle is on the button.
-        div().flex().child(
+        // The button's own padding is taken back, so its words stand under the message's words.
+        div().flex().ml(px(-8.)).child(
             div()
                 .debug_selector(move || format!("message-replies-{ix}"))
                 .child(
