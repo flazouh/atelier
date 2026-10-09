@@ -993,7 +993,8 @@ impl AgentSession {
         }
     }
 
-    /// Stops the agent: dropping its session ends it.
+    /// Ends the agent at once: dropping its session ends it. Only tests use it; the composer interrupts the turn instead.
+    #[cfg(test)]
     pub fn stop(&mut self, cx: &mut Context<Self>) {
         self.session = None;
         cx.notify();

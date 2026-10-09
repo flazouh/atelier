@@ -734,7 +734,6 @@ fn provider_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElemen
 }
 
 /// The panel's top line: the title (a press renames it) and what the session is doing. The composer stops a turn.
-
 pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
     let (key, renaming, shown_title, task, project, badge, session_id, agent) = {
