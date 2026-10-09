@@ -35,16 +35,26 @@ impl Global for AccountServices {}
 impl AccountServices {
     /// The system keychain, Linear itself, and the `gh` on the path.
     pub(crate) fn system() -> Self {
-        Self { secrets: Arc::new(Keychain), linear: helpers::linear_system, github: helpers::github_system }
+        Self {
+            secrets: Arc::new(Keychain),
+            linear: helpers::linear_system,
+            github: helpers::github_system,
+        }
     }
 
     /// Memory for the keychain and no network: what a test gets unless it sets its own.
     pub(crate) fn isolated() -> Self {
-        Self { secrets: Arc::new(InMemory::default()), linear: |_| Err(CapError::Offline), github: |_| Err(CapError::Offline) }
+        Self {
+            secrets: Arc::new(InMemory::default()),
+            linear: |_| Err(CapError::Offline),
+            github: |_| Err(CapError::Offline),
+        }
     }
 }
 
 /// The services the app has, else the isolated ones.
 pub(crate) fn services(cx: &App) -> AccountServices {
-    cx.try_global::<AccountServices>().cloned().unwrap_or_else(AccountServices::isolated)
+    cx.try_global::<AccountServices>()
+        .cloned()
+        .unwrap_or_else(AccountServices::isolated)
 }

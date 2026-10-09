@@ -17,8 +17,12 @@ impl Kind {
     /// The word that tells a person what to do about a refusal.
     pub(crate) fn refusal(self) -> &'static str {
         match self {
-            Kind::Linear => "Linear does not accept this key. Make a new one in Linear under Settings, Security and access.",
-            Kind::GithubIssues => "GitHub does not accept the gh login. Run gh auth login in a terminal.",
+            Kind::Linear => {
+                "Linear does not accept this key. Make a new one in Linear under Settings, Security and access."
+            }
+            Kind::GithubIssues => {
+                "GitHub does not accept the gh login. Run gh auth login in a terminal."
+            }
         }
     }
 }
@@ -37,10 +41,4 @@ pub(crate) enum Row {
     Offline,
     /// Anything else, in plain words.
     Failed(String),
-}
-
-impl Row {
-    pub(crate) fn is_connected(&self) -> bool {
-        matches!(self, Row::Connected(_))
-    }
 }

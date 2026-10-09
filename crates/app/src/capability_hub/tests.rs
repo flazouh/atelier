@@ -232,18 +232,38 @@ fn memory(account: &str) -> Arc<dyn atelier_capabilities::tasks::TasksProvider> 
 }
 
 /// What a refresh found: these providers work, and the rows say so.
-fn built(providers: Vec<Arc<dyn atelier_capabilities::tasks::TasksProvider>>) -> crate::accounts::Built {
+fn built(
+    providers: Vec<Arc<dyn atelier_capabilities::tasks::TasksProvider>>,
+) -> crate::accounts::Built {
     use crate::accounts::{Row, Rows};
-    let row = |on: bool| if on { Row::Connected("Ada".into()) } else { Row::Off };
-    crate::accounts::Built { rows: Rows { linear: row(!providers.is_empty()), github: Row::Off }, providers }
+    let row = |on: bool| {
+        if on {
+            Row::Connected("Ada".into())
+        } else {
+            Row::Off
+        }
+    };
+    crate::accounts::Built {
+        rows: Rows {
+            linear: row(!providers.is_empty()),
+            github: Row::Off,
+        },
+        providers,
+    }
 }
 
-fn same(a: &Arc<dyn atelier_capabilities::tasks::TasksProvider>, b: &Arc<dyn atelier_capabilities::tasks::TasksProvider>) -> bool {
+fn same(
+    a: &Arc<dyn atelier_capabilities::tasks::TasksProvider>,
+    b: &Arc<dyn atelier_capabilities::tasks::TasksProvider>,
+) -> bool {
     std::ptr::addr_eq(Arc::as_ptr(a), Arc::as_ptr(b))
 }
 
 fn saved_linear() -> atelier_settings::AccountsSaved {
-    atelier_settings::AccountsSaved { linear: Some(Default::default()), ..Default::default() }
+    atelier_settings::AccountsSaved {
+        linear: Some(Default::default()),
+        ..Default::default()
+    }
 }
 
 #[test]
@@ -255,12 +275,22 @@ fn a_connected_account_is_in_the_registry_until_it_is_taken_out() {
     let turn = hub.checking(&saved_linear());
     assert!(hub.install(built(vec![acme.clone()]), turn));
     let held = hub.registry().read().unwrap().tasks("memory", "acme");
-    assert!(held.is_some_and(|held| same(&held, &acme)), "the gateway's registry holds the very provider");
+    assert!(
+        held.is_some_and(|held| same(&held, &acme)),
+        "the gateway's registry holds the very provider"
+    );
     assert_eq!(hub.accounts().len(), 1);
 
     let turn = hub.checking(&Default::default());
     assert!(hub.install(built(Vec::new()), turn));
-    assert!(hub.registry().read().unwrap().tasks("memory", "acme").is_none(), "gone from the registry");
+    assert!(
+        hub.registry()
+            .read()
+            .unwrap()
+            .tasks("memory", "acme")
+            .is_none(),
+        "gone from the registry"
+    );
     assert!(hub.accounts().is_empty());
 }
 
@@ -271,7 +301,10 @@ fn the_answer_of_an_older_refresh_is_dropped() {
     let old = hub.checking(&saved_linear());
     let new = hub.checking(&Default::default());
 
-    assert!(!hub.install(built(vec![memory("acme")]), old), "a newer refresh began");
+    assert!(
+        !hub.install(built(vec![memory("acme")]), old),
+        "a newer refresh began"
+    );
     assert!(hub.accounts().is_empty());
     assert!(hub.install(built(Vec::new()), new));
 }
@@ -282,7 +315,10 @@ fn a_saved_account_reads_checking_until_its_answer_comes() {
     let base = tempfile::tempdir().unwrap();
     let hub = hub(base.path(), true);
     hub.checking(&saved_linear());
-    assert_eq!((hub.rows().linear, hub.rows().github), (Row::Checking, Row::Off));
+    assert_eq!(
+        (hub.rows().linear, hub.rows().github),
+        (Row::Checking, Row::Off)
+    );
 }
 
 #[test]
@@ -293,12 +329,29 @@ fn the_screen_and_the_gateway_read_the_same_local_provider() {
 
     let for_the_screen = hub.local_tasks(&project).unwrap();
     hub.grant(&project).unwrap();
-    let for_the_gateway = hub.registry().read().unwrap().tasks("local", "atelier").unwrap();
+    let for_the_gateway = hub
+        .registry()
+        .read()
+        .unwrap()
+        .tasks("local", "atelier")
+        .unwrap();
 
-    assert!(same(&for_the_screen, &for_the_gateway), "one provider for the project, not one each");
-    let opened = crate::tasks::source::TasksSource::open(&(Arc::new(project) as Arc<dyn Project>), &hub).unwrap();
-    assert!(same(&opened.provider().unwrap(), &for_the_gateway), "and the screen's source holds it");
-    assert_eq!(hub.registry().read().unwrap().all_tasks().len(), 1, "registered once");
+    assert!(
+        same(&for_the_screen, &for_the_gateway),
+        "one provider for the project, not one each"
+    );
+    let opened =
+        crate::tasks::source::TasksSource::open(&(Arc::new(project) as Arc<dyn Project>), &hub)
+            .unwrap();
+    assert!(
+        same(&opened.provider().unwrap(), &for_the_gateway),
+        "and the screen's source holds it"
+    );
+    assert_eq!(
+        hub.registry().read().unwrap().all_tasks().len(),
+        1,
+        "registered once"
+    );
 }
 
 #[test]
@@ -307,17 +360,39 @@ fn the_screen_and_an_agent_see_the_same_connected_account() {
     let project = Arc::new(project(base.path(), "atelier"));
     let hub = hub(base.path(), true);
     let acme = memory("acme");
-    acme.create(&atelier_capabilities::tasks::NewTask::titled("From Linear"), &Actor::person("ada", "Ada")).unwrap();
+    acme.create(
+        &atelier_capabilities::tasks::NewTask::titled("From Linear"),
+        &Actor::person("ada", "Ada"),
+    )
+    .unwrap();
     let turn = hub.checking(&saved_linear());
     hub.install(built(vec![acme.clone()]), turn);
 
-    let mut source = crate::tasks::source::TasksSource::open(&(project.clone() as Arc<dyn Project>), &hub).unwrap();
+    let mut source =
+        crate::tasks::source::TasksSource::open(&(project.clone() as Arc<dyn Project>), &hub)
+            .unwrap();
     source.set_accounts(hub.accounts());
-    let words: Vec<_> = source.choices().iter().map(|c| c.words().to_string()).collect();
-    assert_eq!(words, ["Local · atelier", "Memory · acme"], "the switcher lists both");
+    let words: Vec<_> = source
+        .choices()
+        .iter()
+        .map(|c| c.words().to_string())
+        .collect();
+    assert_eq!(
+        words,
+        ["Local · atelier", "Memory · acme"],
+        "the switcher lists both"
+    );
 
     let grant = hub.grant(project.as_ref()).unwrap();
-    let listed = call(&grant.access().url, &grant.access().token, "tasks_list", json!({ "account": "memory/acme" }));
+    let listed = call(
+        &grant.access().url,
+        &grant.access().token,
+        "tasks_list",
+        json!({ "account": "memory/acme" }),
+    );
     assert_eq!(listed["result"]["isError"], json!(false), "{listed}");
-    assert!(listed.to_string().contains("From Linear"), "the agent reads the account: {listed}");
+    assert!(
+        listed.to_string().contains("From Linear"),
+        "the agent reads the account: {listed}"
+    );
 }

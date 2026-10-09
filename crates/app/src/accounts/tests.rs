@@ -1,6 +1,9 @@
 use std::{io, sync::Arc};
 
-use atelier_capabilities::{CapError, CapResult, tasks::{MemoryTasks, TasksProvider}};
+use atelier_capabilities::{
+    CapError, CapResult,
+    tasks::{MemoryTasks, TasksProvider},
+};
 use atelier_settings::{
     AccountsSaved, GithubIssuesSaved, LinearSaved,
     secrets::{InMemory, LINEAR_KEY, Secrets},
@@ -28,15 +31,28 @@ fn github(repo: &str) -> CapResult<Arc<dyn TasksProvider>> {
 }
 
 fn services(secrets: &Arc<InMemory>) -> AccountServices {
-    AccountServices { secrets: secrets.clone(), linear, github }
+    AccountServices {
+        secrets: secrets.clone(),
+        linear,
+        github,
+    }
 }
 
 fn with_linear() -> AccountsSaved {
-    AccountsSaved { linear: Some(LinearSaved::default()), ..Default::default() }
+    AccountsSaved {
+        linear: Some(LinearSaved::default()),
+        ..Default::default()
+    }
 }
 
 fn with_github(repo: &str) -> AccountsSaved {
-    AccountsSaved { github_issues: Some(GithubIssuesSaved { repo: repo.into(), person: None }), ..Default::default() }
+    AccountsSaved {
+        github_issues: Some(GithubIssuesSaved {
+            repo: repo.into(),
+            person: None,
+        }),
+        ..Default::default()
+    }
 }
 
 /// A keychain that fails the test when it is asked.
@@ -56,7 +72,11 @@ impl Secrets for Untouched {
 
 #[test]
 fn nothing_connected_builds_nothing_and_never_asks_the_keychain() {
-    let services = AccountServices { secrets: Arc::new(Untouched), linear, github };
+    let services = AccountServices {
+        secrets: Arc::new(Untouched),
+        linear,
+        github,
+    };
     let built = build(&AccountsSaved::default(), &services);
     assert!(built.providers.is_empty());
     assert_eq!((built.rows.linear, built.rows.github), (Row::Off, Row::Off));
@@ -88,7 +108,10 @@ fn a_connected_account_with_no_key_in_the_keychain_is_not_signed_in() {
 
 #[test]
 fn no_network_leaves_the_provider_out_and_the_row_says_offline() {
-    let built = build(&with_github("acme/offline"), &services(&Arc::new(InMemory::default())));
+    let built = build(
+        &with_github("acme/offline"),
+        &services(&Arc::new(InMemory::default())),
+    );
     assert!(built.providers.is_empty());
     assert_eq!(built.rows.github, Row::Offline);
 }
@@ -97,16 +120,38 @@ fn no_network_leaves_the_provider_out_and_the_row_says_offline() {
 fn one_bad_account_does_not_hide_the_good_one() {
     let secrets = Arc::new(InMemory::default());
     secrets.write(LINEAR_KEY, REFUSED_KEY).unwrap();
-    let saved = AccountsSaved { github_issues: with_github("acme/web").github_issues, ..with_linear() };
+    let saved = AccountsSaved {
+        github_issues: with_github("acme/web").github_issues,
+        ..with_linear()
+    };
     let built = build(&saved, &services(&secrets));
-    assert_eq!(built.providers.iter().map(|p| p.account().to_string()).collect::<Vec<_>>(), ["acme.web"]);
-    assert_eq!((built.rows.linear, built.rows.github.is_connected()), (Row::NotSignedIn, true));
+    assert_eq!(
+        built
+            .providers
+            .iter()
+            .map(|p| p.account().to_string())
+            .collect::<Vec<_>>(),
+        ["acme.web"]
+    );
+    assert_eq!(
+        (
+            built.rows.linear,
+            matches!(built.rows.github, Row::Connected(_))
+        ),
+        (Row::NotSignedIn, true)
+    );
 }
 
 #[test]
 fn a_repository_gh_cannot_see_says_so_in_plain_words() {
-    let built = build(&with_github("acme/private"), &services(&Arc::new(InMemory::default())));
-    assert_eq!(built.rows.github, Row::Failed("GitHub does not show this repository to your gh login.".into()));
+    let built = build(
+        &with_github("acme/private"),
+        &services(&Arc::new(InMemory::default())),
+    );
+    assert_eq!(
+        built.rows.github,
+        Row::Failed("GitHub does not show this repository to your gh login.".into())
+    );
 }
 
 #[test]
@@ -114,6 +159,14 @@ fn errors_come_in_words_a_person_can_act_on() {
     assert!(plain_words(Kind::Linear, &CapError::NotSignedIn).contains("does not accept this key"));
     assert!(plain_words(Kind::GithubIssues, &CapError::NotSignedIn).contains("gh auth login"));
     assert!(plain_words(Kind::Linear, &CapError::Offline).contains("could not be reached"));
-    assert!(plain_words(Kind::Linear, &CapError::RateLimited { retry_after_ms: 1500 }).contains("2 s"));
+    assert!(
+        plain_words(
+            Kind::Linear,
+            &CapError::RateLimited {
+                retry_after_ms: 1500
+            }
+        )
+        .contains("2 s")
+    );
     assert!(plain_words(Kind::GithubIssues, &CapError::invalid("repo")).contains("owner/repo"));
 }

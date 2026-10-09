@@ -139,7 +139,10 @@ impl CapabilityHub {
         let key = ProjectKey::Local {
             path: project.root().to_string_lossy().into_owned(),
         };
-        let taken: Vec<String> = known.iter().map(|k| k.provider.account().to_string()).collect();
+        let taken: Vec<String> = known
+            .iter()
+            .map(|k| k.provider.account().to_string())
+            .collect();
         let account = unique_account(&taken, key.folder());
         let provider: Arc<dyn TasksProvider> = Arc::new(LocalTasks::new(
             tracker.clone(),
@@ -153,7 +156,10 @@ impl CapabilityHub {
                 .unwrap_or_else(|p| p.into_inner())
                 .add_tasks(provider.clone());
         }
-        known.push(Local { tracker, provider: provider.clone() });
+        known.push(Local {
+            tracker,
+            provider: provider.clone(),
+        });
         Ok(provider)
     }
 
@@ -173,7 +179,10 @@ impl CapabilityHub {
         let mut linked = self.linked();
         linked.turn += 1;
         let state = |on: bool| if on { Row::Checking } else { Row::Off };
-        linked.rows = Rows { linear: state(saved.linear.is_some()), github: state(saved.github_issues.is_some()) };
+        linked.rows = Rows {
+            linear: state(saved.linear.is_some()),
+            github: state(saved.github_issues.is_some()),
+        };
         linked.turn
     }
 
@@ -184,7 +193,11 @@ impl CapabilityHub {
         if linked.turn != turn {
             return false;
         }
-        let mut registry = self.inner.registry.write().unwrap_or_else(|p| p.into_inner());
+        let mut registry = self
+            .inner
+            .registry
+            .write()
+            .unwrap_or_else(|p| p.into_inner());
         for old in &linked.providers {
             registry.remove_tasks(old.provider(), old.account());
         }

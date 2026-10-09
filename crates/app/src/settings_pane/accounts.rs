@@ -12,8 +12,8 @@ use atelier_ui::{
     typography::{MONO_FONT_FAMILY, TextSize},
 };
 use gpui_kit::{
-    AnyElement, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, SharedString, Styled, Task, Window,
-    component::input::InputState, div, prelude::FluentBuilder,
+    AnyElement, AppContext, Context, Entity, Focusable, IntoElement, ParentElement, SharedString,
+    Styled, Task, Window, component::input::InputState, div, prelude::FluentBuilder,
 };
 
 use super::{
@@ -73,7 +73,10 @@ pub(crate) struct AccountsPage {
 
 impl AccountsPage {
     pub(crate) fn new(saved: AccountsSaved) -> Self {
-        Self { saved, ..Self::default() }
+        Self {
+            saved,
+            ..Self::default()
+        }
     }
 }
 
@@ -102,7 +105,10 @@ impl SettingsPane {
             _ = this.update(cx, |pane, cx| {
                 match key {
                     Ok(key) => pane.accounts.linear_tail = key.as_deref().map(tail),
-                    Err(why) => pane.accounts.problem = Some(format!("The keychain could not be read: {why}")),
+                    Err(why) => {
+                        pane.accounts.problem =
+                            Some(format!("The keychain could not be read: {why}"))
+                    }
                 }
                 cx.notify();
             });
@@ -112,7 +118,9 @@ impl SettingsPane {
     /// Asks Linear who `typed` is, or the kept key when none is typed.
     pub(crate) fn test_linear(&mut self, typed: Option<String>, cx: &mut Context<Self>) {
         let services = accounts::services(cx);
-        let typed = typed.map(|key| key.trim().to_string()).filter(|key| !key.is_empty());
+        let typed = typed
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty());
         self.accounts.linear_check = Checked::Checking;
         let work = cx.background_spawn(async move {
             let key = match typed {
@@ -123,7 +131,9 @@ impl SettingsPane {
                     Err(why) => return Err(format!("The keychain could not be read: {why}")),
                 },
             };
-            accounts::connect_linear(&services, &key).map(|(_, name)| name).map_err(|e| accounts::plain_words(Kind::Linear, &e))
+            accounts::connect_linear(&services, &key)
+                .map(|(_, name)| name)
+                .map_err(|e| accounts::plain_words(Kind::Linear, &e))
         });
         self.accounts._linear = Some(cx.spawn(async move |this, cx| {
             let outcome = work.await;
@@ -146,8 +156,13 @@ impl SettingsPane {
         self.accounts.linear_check = Checked::Checking;
         self.accounts.linear_field = None;
         let work = cx.background_spawn(async move {
-            services.secrets.write(LINEAR_KEY, &key).map_err(|e| format!("The keychain could not keep the key: {e}"))?;
-            let found = accounts::connect_linear(&services, &key).map(|(_, name)| name).map_err(|e| accounts::plain_words(Kind::Linear, &e));
+            services
+                .secrets
+                .write(LINEAR_KEY, &key)
+                .map_err(|e| format!("The keychain could not keep the key: {e}"))?;
+            let found = accounts::connect_linear(&services, &key)
+                .map(|(_, name)| name)
+                .map_err(|e| accounts::plain_words(Kind::Linear, &e));
             Ok::<_, String>((tail(&key), found))
         });
         self.accounts._linear = Some(cx.spawn(async move |this, cx| {
@@ -156,7 +171,9 @@ impl SettingsPane {
                 match outcome {
                     Ok((tail, found)) => {
                         pane.accounts.linear_tail = Some(tail);
-                        pane.accounts.saved.linear = Some(LinearSaved { person: found.clone().ok() });
+                        pane.accounts.saved.linear = Some(LinearSaved {
+                            person: found.clone().ok(),
+                        });
                         pane.accounts.linear_check = Checked::of(found);
                         pane.accounts_changed(cx);
                     }
@@ -184,7 +201,10 @@ impl SettingsPane {
                         pane.accounts.saved.linear = None;
                         pane.accounts_changed(cx);
                     }
-                    Err(why) => pane.accounts.problem = Some(format!("The keychain could not forget the key: {why}")),
+                    Err(why) => {
+                        pane.accounts.problem =
+                            Some(format!("The keychain could not forget the key: {why}"))
+                    }
                 }
                 cx.notify();
             });
@@ -196,7 +216,9 @@ impl SettingsPane {
         let services = accounts::services(cx);
         self.accounts.github_check = Checked::Checking;
         let work = cx.background_spawn(async move {
-            accounts::connect_github(&services, &repo).map(|(_, name)| name).map_err(|e| accounts::plain_words(Kind::GithubIssues, &e))
+            accounts::connect_github(&services, &repo)
+                .map(|(_, name)| name)
+                .map_err(|e| accounts::plain_words(Kind::GithubIssues, &e))
         });
         self.accounts._github = Some(cx.spawn(async move |this, cx| {
             let outcome = work.await;
@@ -219,12 +241,17 @@ impl SettingsPane {
         self.accounts.github_check = Checked::Checking;
         let kept = repo.clone();
         let work = cx.background_spawn(async move {
-            accounts::connect_github(&services, &kept).map(|(_, name)| name).map_err(|e| accounts::plain_words(Kind::GithubIssues, &e))
+            accounts::connect_github(&services, &kept)
+                .map(|(_, name)| name)
+                .map_err(|e| accounts::plain_words(Kind::GithubIssues, &e))
         });
         self.accounts._github = Some(cx.spawn(async move |this, cx| {
             let found = work.await;
             _ = this.update(cx, |pane, cx| {
-                pane.accounts.saved.github_issues = Some(GithubIssuesSaved { repo, person: found.clone().ok() });
+                pane.accounts.saved.github_issues = Some(GithubIssuesSaved {
+                    repo,
+                    person: found.clone().ok(),
+                });
                 pane.accounts.github_check = Checked::of(found);
                 pane.accounts_changed(cx);
                 cx.notify();
@@ -245,7 +272,12 @@ impl SettingsPane {
 
     /// Fills the repository field with the open project's repository.
     pub(crate) fn use_project_repo(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(repo), Some(field)) = (self.accounts.project_repo.clone(), self.accounts.github_field.clone()) else { return };
+        let (Some(repo), Some(field)) = (
+            self.accounts.project_repo.clone(),
+            self.accounts.github_field.clone(),
+        ) else {
+            return;
+        };
         field.update(cx, |field, cx| field.set_value(repo, window, cx));
         cx.notify();
     }
@@ -259,16 +291,30 @@ impl SettingsPane {
     }
 
     fn open_linear_field(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let field = cx.new(|cx| InputState::new(window, cx).placeholder(LINEAR_PLACEHOLDER).masked(true));
+        let field = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder(LINEAR_PLACEHOLDER)
+                .masked(true)
+        });
         field.read(cx).focus_handle(cx).focus(window, cx);
         self.accounts.linear_field = Some(field);
         cx.notify();
     }
 
-    pub(super) fn accounts_body(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn accounts_body(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         if self.accounts.github_field.is_none() {
-            let repo = self.accounts.saved.github_issues.as_ref().map(|g| g.repo.clone()).unwrap_or_default();
+            let repo = self
+                .accounts
+                .saved
+                .github_issues
+                .as_ref()
+                .map(|g| g.repo.clone())
+                .unwrap_or_default();
             let field = cx.new(|cx| {
                 let mut field = InputState::new(window, cx).placeholder(REPO_PLACEHOLDER);
                 field.set_value(repo, window, cx);
@@ -278,7 +324,10 @@ impl SettingsPane {
             cx.observe(&field, |_, _, cx| cx.notify()).detach();
             self.accounts.github_field = Some(field);
         }
-        let rows = cx.try_global::<CapabilityHub>().map(CapabilityHub::rows).unwrap_or_default();
+        let rows = cx
+            .try_global::<CapabilityHub>()
+            .map(CapabilityHub::rows)
+            .unwrap_or_default();
         let linear = self.linear_card(&rows, &theme, cx);
         let github = self.github_card(&rows, &theme, cx);
         div()
@@ -298,7 +347,15 @@ impl SettingsPane {
         let row = &rows.linear;
         let detail = match row {
             Row::Connected(name) => format!("Signed in as {name}"),
-            _ => page.saved.linear.as_ref().and_then(|l| l.person.clone()).map_or_else(|| "Tasks from your Linear workspace".to_string(), |p| format!("Signed in as {p}")),
+            _ => page
+                .saved
+                .linear
+                .as_ref()
+                .and_then(|l| l.person.clone())
+                .map_or_else(
+                    || "Tasks from your Linear workspace".to_string(),
+                    |p| format!("Signed in as {p}"),
+                ),
         };
         let body = match (&page.linear_field, &page.linear_tail) {
             (Some(field), kept) => {
@@ -308,7 +365,11 @@ impl SettingsPane {
                     .flex()
                     .flex_col()
                     .gap(px(8.))
-                    .child(TextInput::new("linear-key", field).surface(theme.background).left_icon(IconName::Lock))
+                    .child(
+                        TextInput::new("linear-key", field)
+                            .surface(theme.background)
+                            .left_icon(IconName::Lock),
+                    )
                     .children(check_line(&page.linear_check, theme))
                     .child(
                         div()
@@ -316,28 +377,40 @@ impl SettingsPane {
                             .gap(px(6.))
                             .child(marked(
                                 "linear-test",
-                                Button::new("linear-test").label("Test").variant(ButtonVariant::Secondary).disabled(page.linear_check == Checked::Checking).on_click(move |_, _, cx| {
-                                    let typed = typed_for_test.read(cx).value().to_string();
-                                    test.update(cx, |p, cx| p.test_linear(Some(typed), cx)).ok();
-                                }),
+                                Button::new("linear-test")
+                                    .label("Test")
+                                    .variant(ButtonVariant::Secondary)
+                                    .disabled(page.linear_check == Checked::Checking)
+                                    .on_click(move |_, _, cx| {
+                                        let typed = typed_for_test.read(cx).value().to_string();
+                                        test.update(cx, |p, cx| p.test_linear(Some(typed), cx))
+                                            .ok();
+                                    }),
                             ))
                             .child(marked(
                                 "linear-save",
-                                Button::new("linear-save").label("Save in the keychain").variant(ButtonVariant::Secondary).on_click(move |_, _, cx| {
-                                    let typed = typed_for_save.read(cx).value().to_string();
-                                    save.update(cx, |p, cx| p.save_linear(typed, cx)).ok();
-                                }),
+                                Button::new("linear-save")
+                                    .label("Save in the keychain")
+                                    .variant(ButtonVariant::Secondary)
+                                    .on_click(move |_, _, cx| {
+                                        let typed = typed_for_save.read(cx).value().to_string();
+                                        save.update(cx, |p, cx| p.save_linear(typed, cx)).ok();
+                                    }),
                             ))
                             .when(kept.is_some(), |d| {
                                 d.child(marked(
                                     "linear-cancel",
-                                    Button::new("linear-cancel").label("Cancel").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
-                                        cancel.update(cx, |p, cx| {
-                                            p.accounts.linear_field = None;
-                                            cx.notify();
-                                        })
-                                        .ok();
-                                    }),
+                                    Button::new("linear-cancel")
+                                        .label("Cancel")
+                                        .variant(ButtonVariant::Ghost)
+                                        .on_click(move |_, _, cx| {
+                                            cancel
+                                                .update(cx, |p, cx| {
+                                                    p.accounts.linear_field = None;
+                                                    cx.notify();
+                                                })
+                                                .ok();
+                                        }),
                                 ))
                             }),
                     )
@@ -360,9 +433,28 @@ impl SettingsPane {
                             .bg(theme.background)
                             .border_1()
                             .border_color(theme.divider)
-                            .child(Icon::new(IconName::Lock).size(px(14.)).color(theme.muted_foreground))
-                            .child(div().flex_1().min_w_0().truncate().text_size(TextSize::Xs.font_size()).font_family(MONO_FONT_FAMILY).text_color(theme.foreground).child(masked(tail)))
-                            .child(div().flex_none().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child("System keychain")),
+                            .child(
+                                Icon::new(IconName::Lock)
+                                    .size(px(14.))
+                                    .color(theme.muted_foreground),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_size(TextSize::Xs.font_size())
+                                    .font_family(MONO_FONT_FAMILY)
+                                    .text_color(theme.foreground)
+                                    .child(masked(tail)),
+                            )
+                            .child(
+                                div()
+                                    .flex_none()
+                                    .text_size(TextSize::Xs.font_size())
+                                    .text_color(theme.muted_foreground)
+                                    .child("System keychain"),
+                            ),
                     )
                     .children(row_note(Kind::Linear, row, theme))
                     .children(check_line(&page.linear_check, theme))
@@ -373,22 +465,34 @@ impl SettingsPane {
                             .gap(px(6.))
                             .child(marked(
                                 "linear-test",
-                                Button::new("linear-test").label("Test").variant(ButtonVariant::Secondary).disabled(page.linear_check == Checked::Checking).on_click(move |_, _, cx| {
-                                    test.update(cx, |p, cx| p.test_linear(None, cx)).ok();
-                                }),
+                                Button::new("linear-test")
+                                    .label("Test")
+                                    .variant(ButtonVariant::Secondary)
+                                    .disabled(page.linear_check == Checked::Checking)
+                                    .on_click(move |_, _, cx| {
+                                        test.update(cx, |p, cx| p.test_linear(None, cx)).ok();
+                                    }),
                             ))
                             .child(marked(
                                 "linear-replace",
-                                Button::new("linear-replace").label("Replace key").variant(ButtonVariant::Ghost).on_click(move |_, window, cx| {
-                                    replace.update(cx, |p, cx| p.open_linear_field(window, cx)).ok();
-                                }),
+                                Button::new("linear-replace")
+                                    .label("Replace key")
+                                    .variant(ButtonVariant::Ghost)
+                                    .on_click(move |_, window, cx| {
+                                        replace
+                                            .update(cx, |p, cx| p.open_linear_field(window, cx))
+                                            .ok();
+                                    }),
                             ))
                             .child(div().flex_1())
                             .child(marked(
                                 "linear-forget",
-                                Button::new("linear-forget").label("Forget").variant(ButtonVariant::Ghost).on_click(move |_, _, cx| {
-                                    forget.update(cx, |p, cx| p.forget_linear(cx)).ok();
-                                }),
+                                Button::new("linear-forget")
+                                    .label("Forget")
+                                    .variant(ButtonVariant::Ghost)
+                                    .on_click(move |_, _, cx| {
+                                        forget.update(cx, |p, cx| p.forget_linear(cx)).ok();
+                                    }),
                             )),
                     )
                     .into_any_element()
@@ -401,20 +505,37 @@ impl SettingsPane {
                     .gap(px(6.))
                     .child(marked(
                         "linear-add",
-                        Button::new("linear-add").label("Add a key").icon(IconName::Add).variant(ButtonVariant::Secondary).on_click(move |_, window, cx| {
-                            add.update(cx, |p, cx| p.open_linear_field(window, cx)).ok();
-                        }),
+                        Button::new("linear-add")
+                            .label("Add a key")
+                            .icon(IconName::Add)
+                            .variant(ButtonVariant::Secondary)
+                            .on_click(move |_, window, cx| {
+                                add.update(cx, |p, cx| p.open_linear_field(window, cx)).ok();
+                            }),
                     ))
                     .child(div().flex_1())
-                    .child(Button::new("linear-site").label("Get a key").trailing_icon(IconName::OpenInNew).variant(ButtonVariant::Ghost).on_click(|_, _, cx| {
-                        cx.open_url(LINEAR_KEYS_SITE);
-                    }))
+                    .child(
+                        Button::new("linear-site")
+                            .label("Get a key")
+                            .trailing_icon(IconName::OpenInNew)
+                            .variant(ButtonVariant::Ghost)
+                            .on_click(|_, _, cx| {
+                                cx.open_url(LINEAR_KEYS_SITE);
+                            }),
+                    )
                     .into_any_element()
             }
         };
         card("linear", theme)
             .w_full()
-            .child(card_head_of(icon_tile(IconName::Checklist, theme), "Linear", &detail, false, badge_of(row, page.saved.linear.is_some()), theme))
+            .child(card_head_of(
+                icon_tile(IconName::Checklist, theme),
+                "Linear",
+                &detail,
+                false,
+                badge_of(row, page.saved.linear.is_some()),
+                theme,
+            ))
             .child(body)
             .into_any_element()
     }
@@ -423,7 +544,9 @@ impl SettingsPane {
         let this = cx.entity().downgrade();
         let page = &self.accounts;
         let row = &rows.github;
-        let Some(field) = page.github_field.clone() else { return div().into_any_element() };
+        let Some(field) = page.github_field.clone() else {
+            return div().into_any_element();
+        };
         let typed = field.read(cx).value().trim().to_string();
         let saved_repo = page.saved.github_issues.as_ref().map(|g| g.repo.clone());
         let detail = match (row, &saved_repo) {
@@ -433,7 +556,8 @@ impl SettingsPane {
         };
         // Offered while the field holds something else, so a person who typed their own repository is not nagged.
         let offer = page.project_repo.clone().filter(|repo| *repo != typed);
-        let (test, save, use_repo, forget) = (this.clone(), this.clone(), this.clone(), this.clone());
+        let (test, save, use_repo, forget) =
+            (this.clone(), this.clone(), this.clone(), this.clone());
         let (for_test, for_save) = (field.clone(), field.clone());
         card("github-issues", theme)
             .w_full()
@@ -510,7 +634,13 @@ fn row_note(kind: Kind, row: &Row, theme: &Theme) -> Option<AnyElement> {
         Row::Failed(words) => words.clone(),
         Row::Off | Row::Checking | Row::Connected(_) => return None,
     };
-    Some(div().text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(SharedString::from(words)).into_any_element())
+    Some(
+        div()
+            .text_size(TextSize::Xs.font_size())
+            .text_color(theme.danger)
+            .child(SharedString::from(words))
+            .into_any_element(),
+    )
 }
 
 /// What a Test or a Save found, in one line.
@@ -521,7 +651,13 @@ fn check_line(check: &Checked, theme: &Theme) -> Option<AnyElement> {
         Checked::Works(name) => (format!("Works. Signed in as {name}."), theme.success),
         Checked::Refused(why) => (why.clone(), theme.danger),
     };
-    Some(div().text_size(TextSize::Xs.font_size()).text_color(colour).child(SharedString::from(words)).into_any_element())
+    Some(
+        div()
+            .text_size(TextSize::Xs.font_size())
+            .text_color(colour)
+            .child(SharedString::from(words))
+            .into_any_element(),
+    )
 }
 
 #[cfg(test)]

@@ -42,7 +42,14 @@ fn a_removed_tasks_provider_is_gone_and_the_others_stay() {
     let mut r = Registry::new();
     r.add_tasks(Arc::new(MemoryTasks::new("a")));
     r.add_tasks(Arc::new(MemoryTasks::new("b")));
-    assert_eq!(r.remove_tasks("memory", "a").map(|p| p.account().to_string()), Some("a".into()));
+    assert_eq!(
+        r.remove_tasks("memory", "a")
+            .map(|p| p.account().to_string()),
+        Some("a".into())
+    );
     assert!(r.tasks("memory", "a").is_none() && r.tasks("memory", "b").is_some());
-    assert!(r.remove_tasks("memory", "a").is_none(), "removing twice finds nothing");
+    assert!(
+        r.remove_tasks("memory", "a").is_none(),
+        "removing twice finds nothing"
+    );
 }

@@ -18,7 +18,9 @@ pub(super) fn linear_system(key: &str) -> CapResult<Arc<dyn TasksProvider>> {
 }
 
 pub(super) fn github_system(repo: &str) -> CapResult<Arc<dyn TasksProvider>> {
-    Ok(Arc::new(atelier_github_issues::GithubIssues::through_gh(repo)?))
+    Ok(Arc::new(atelier_github_issues::GithubIssues::through_gh(
+        repo,
+    )?))
 }
 
 /// The name a person goes by in the service.
@@ -27,17 +29,26 @@ fn name_of(actor: &Actor) -> String {
 }
 
 /// Signs in to Linear with `key` and asks who it is.
-pub(crate) fn connect_linear(services: &AccountServices, key: &str) -> CapResult<(Arc<dyn TasksProvider>, String)> {
+pub(crate) fn connect_linear(
+    services: &AccountServices,
+    key: &str,
+) -> CapResult<(Arc<dyn TasksProvider>, String)> {
     let provider = (services.linear)(key)?;
     let name = name_of(&provider.whoami()?);
     Ok((provider, name))
 }
 
 /// Opens `repo` over the `gh` login: asks who it is, and reads one issue so a repository `gh` cannot see fails here.
-pub(crate) fn connect_github(services: &AccountServices, repo: &str) -> CapResult<(Arc<dyn TasksProvider>, String)> {
+pub(crate) fn connect_github(
+    services: &AccountServices,
+    repo: &str,
+) -> CapResult<(Arc<dyn TasksProvider>, String)> {
     let provider = (services.github)(repo.trim())?;
     let name = name_of(&provider.whoami()?);
-    provider.list(&Query { limit: Some(1), ..Query::default() })?;
+    provider.list(&Query {
+        limit: Some(1),
+        ..Query::default()
+    })?;
     Ok((provider, name))
 }
 
@@ -45,11 +56,24 @@ pub(crate) fn connect_github(services: &AccountServices, repo: &str) -> CapResul
 pub(crate) fn plain_words(kind: Kind, error: &CapError) -> String {
     match error {
         CapError::NotSignedIn => kind.refusal().into(),
-        CapError::Offline => format!("{} could not be reached. Check the connection.", kind.name()),
-        CapError::RateLimited { retry_after_ms } => format!("{} asks to wait {} s before the next try.", kind.name(), retry_after_ms.div_ceil(1000)),
-        CapError::NotFound { .. } if kind == Kind::GithubIssues => "GitHub does not show this repository to your gh login.".into(),
-        CapError::Invalid { .. } if kind == Kind::GithubIssues => "Write the repository as owner/repo.".into(),
-        CapError::Provider { code, .. } if code == "gh_missing" => "The gh command line tool is not installed here.".into(),
+        CapError::Offline => format!(
+            "{} could not be reached. Check the connection.",
+            kind.name()
+        ),
+        CapError::RateLimited { retry_after_ms } => format!(
+            "{} asks to wait {} s before the next try.",
+            kind.name(),
+            retry_after_ms.div_ceil(1000)
+        ),
+        CapError::NotFound { .. } if kind == Kind::GithubIssues => {
+            "GitHub does not show this repository to your gh login.".into()
+        }
+        CapError::Invalid { .. } if kind == Kind::GithubIssues => {
+            "Write the repository as owner/repo.".into()
+        }
+        CapError::Provider { code, .. } if code == "gh_missing" => {
+            "The gh command line tool is not installed here.".into()
+        }
         other => format!("{} answered with a problem: {other}.", kind.name()),
     }
 }
@@ -62,7 +86,11 @@ fn row_of(kind: Kind, error: &CapError) -> Row {
     }
 }
 
-fn settle(kind: Kind, connected: CapResult<(Arc<dyn TasksProvider>, String)>, providers: &mut Vec<Arc<dyn TasksProvider>>) -> Row {
+fn settle(
+    kind: Kind,
+    connected: CapResult<(Arc<dyn TasksProvider>, String)>,
+    providers: &mut Vec<Arc<dyn TasksProvider>>,
+) -> Row {
     match connected {
         Ok((provider, name)) => {
             providers.push(provider);
@@ -87,20 +115,31 @@ pub(crate) fn build(saved: &AccountsSaved, services: &AccountServices) -> Built 
     };
     let github = match &saved.github_issues {
         None => Row::Off,
-        Some(github) => settle(Kind::GithubIssues, connect_github(services, &github.repo), &mut providers),
+        Some(github) => settle(
+            Kind::GithubIssues,
+            connect_github(services, &github.repo),
+            &mut providers,
+        ),
     };
-    Built { rows: Rows { linear, github }, providers }
+    Built {
+        rows: Rows { linear, github },
+        providers,
+    }
 }
 
 /// Builds the providers for `saved` on a background thread, then gives them to the hub and tells every screen that
 /// reads it. The rows say "Checking" meanwhile. Call it at startup and after each change in Settings.
 pub(crate) fn refresh(saved: AccountsSaved, cx: &mut App) {
-    let Some(hub) = cx.try_global::<CapabilityHub>().cloned() else { return };
+    let Some(hub) = cx.try_global::<CapabilityHub>().cloned() else {
+        return;
+    };
     let services = services(cx);
     let turn = hub.checking(&saved);
     tell(cx);
     cx.spawn(async move |cx| {
-        let built = cx.background_spawn(async move { build(&saved, &services) }).await;
+        let built = cx
+            .background_spawn(async move { build(&saved, &services) })
+            .await;
         cx.update(|cx| {
             // A newer refresh began while this one asked the network: its answer is the one to keep.
             if hub.install(built, turn) {
