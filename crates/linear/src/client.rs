@@ -21,6 +21,8 @@ impl std::fmt::Debug for Client {
 
 /// How long a rate limited call waits when Linear does not say.
 const DEFAULT_RETRY_MS: u64 = 60_000;
+/// How long a connection may take to open before the next address is tried.
+const CONNECT_SECONDS: u64 = 3;
 
 impl Client {
     pub fn new(endpoint: &str, api_key: &str) -> Self {
@@ -34,6 +36,9 @@ impl Client {
         let agent: ureq::Agent = ureq::Agent::config_builder()
             .http_status_as_error(false)
             .timeout_global(Some(Duration::from_secs(30)))
+            // A host with no IPv6 waits for the first address before it tries the next: a short connect timeout makes that
+            // fallback quick.
+            .timeout_connect(Some(Duration::from_secs(CONNECT_SECONDS)))
             .build()
             .into();
         Self {
