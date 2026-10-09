@@ -19,6 +19,14 @@ use crate::{
 const NO_NOTES: &str = "This version has no release notes.";
 
 impl Shell {
+    /// The room the chip takes in the title bar now: none when there is no chip.
+    pub(super) fn update_chip_room(&self) -> f32 {
+        let shown = match &self.update {
+            UpdateState::Downloading { .. } | UpdateState::Ready { .. } | UpdateState::Installing => true,
+            UpdateState::Idle | UpdateState::Checking { .. } => self.whats_new.is_some(),
+        };
+        if shown { super::types::UPDATE_ROOM } else { 0. }
+    }
     /// The chip at the right of the title bar: how far the download is, and the button to open the update once it is ready.
     pub(super) fn update_chip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let muted = cx.theme().muted_foreground;

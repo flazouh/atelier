@@ -1527,7 +1527,7 @@ impl Shell {
                 // The window's own line takes the bar's top pixel on a Mac: the tabs centre in what is left, so the room above
                 // them (line to tab) is the room below them (tab to panes).
                 .when(cfg!(target_os = "macos"), |d| d.pt(px(1.)))
-                .mr(px(tab_room(self.width, self.session_right)))
+                .mr(px(tab_room(self.width, self.session_right, self.update_chip_room())))
                 .child(self.tab_strip.clone()),
             TitleTabs::Files => match self.active() {
                 Some(project) => div()
@@ -1688,8 +1688,8 @@ impl Shell {
         // The Settings button holds the window's top right corner; the layout menu stands left of it.
         let at = div().absolute().top(px(7.));
         let at = match self.session_right {
-            Some(right) => at.left(px((right - 36.).min(self.width - 72.))),
-            None => at.right(px(48.)),
+            Some(right) => at.left(px((right - 36.).min(self.width - 72. - self.update_chip_room()))),
+            None => at.right(px(48. + self.update_chip_room())),
         };
         Some(at.child(div().relative().child(button).children(menu)).into_any_element())
     }

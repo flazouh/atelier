@@ -86,12 +86,12 @@ pub(super) fn changes_badge(uncommitted: Option<&crate::history::Read<Vec<crate:
 
 /// How much of the title bar's free room, at its right, the session tabs leave to the ⋯ of the layout menu: the ⋯ stands
 /// at the right of the session area, or left of the Settings button when that area reaches the window's edge.
-pub(super) fn tab_room(width: f32, session_right: Option<f32>) -> f32 {
+pub(super) fn tab_room(width: f32, session_right: Option<f32>, chip: f32) -> f32 {
     // The room ends 48 px short of the window's edge (the Settings button, its gap and the bar's padding); the ⋯ is 28 wide.
-    let region_right = width - 48.;
+    let region_right = width - 48. - chip;
     let more_left = match session_right {
-        Some(right) => (right - 36.).min(width - 72.),
-        None => width - 48. - 28.,
+        Some(right) => (right - 36.).min(width - 72. - chip),
+        None => width - 48. - chip - 28.,
     };
     (region_right - (more_left - 8.)).max(0.)
 }

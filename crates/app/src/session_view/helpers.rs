@@ -733,23 +733,17 @@ fn provider_picker(session: &Entity<AgentSession>, cx: &App) -> Option<AnyElemen
     )
 }
 
-/// The panel's top line: the title (a press renames it), what the session is doing, and Stop while
-/// its agent runs.
-/// A9: Stop shows while a turn goes on (working, or waiting for the reader), not while the agent idles.
-pub(super) fn shows_stop(running: bool, status: &SessionStatus) -> bool {
-    running && matches!(status, SessionStatus::Working | SessionStatus::NeedsYou(_))
-}
+/// The panel's top line: the title (a press renames it) and what the session is doing. The composer stops a turn.
 
 pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &mut App) -> impl IntoElement {
     let theme = cx.theme().clone();
-    let (key, renaming, shown_title, running, task, project, badge, session_id, agent) = {
+    let (key, renaming, shown_title, task, project, badge, session_id, agent) = {
         let s = session.read(cx);
         let agent = atelier_ui::session_row::agent_icon(gpui_kit::ElementId::Name(format!("{}-agent-mark", s.key).into()), &s.agent.look, &s.status, &theme, true);
         (
             s.key.clone(),
             s.renaming.clone(),
             s.shown_title(),
-            shows_stop(s.running(), &s.status),
             s.task.clone(),
             s.project_name(),
             s.badge.clone(),
@@ -786,13 +780,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
                 .into_any_element()
         }
     };
-    let stop = running.then(|| {
-        let stop = session.clone();
-        Button::new(gpui_kit::ElementId::Name(format!("{key}-stop").into()))
-            .label("Stop")
-            .variant(ButtonVariant::Ghost)
-            .on_click(move |_, _, cx| stop.update(cx, |s, cx| s.stop(cx)))
-    });
     // The task the session began from: a press opens it in the Tasks pane.
     let chip = task.map(|task| {
         let open = session.clone();
@@ -864,7 +851,6 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
         .child(title)
         .children(provider)
         .children(chip)
-        .children(stop)
         .child(more)
         .child(close)
 }

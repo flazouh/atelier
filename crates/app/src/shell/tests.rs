@@ -272,6 +272,22 @@ fn zoomed_in_a_tall_panel_stays_inside_the_window(cx: &mut TestAppContext) {
         "the panel {panel:?} is inside the window {window:?}"
     );
 }
+/// The What is new chip in the title bar does not lie over the ⋯ layout menu, at any width.
+#[gpui_kit::test]
+fn the_whats_new_chip_and_the_layout_menu_do_not_overlap(cx: &mut TestAppContext) {
+    for width in [1400., 1000., 760.] {
+        let (shell, cx, _dir) = with_a_session(cx, width);
+        shell.update(cx, |s, cx| {
+            s.whats_new = Some(atelier_settings::WhatsNew { version: "0.1.7".into(), notes: String::new() });
+            cx.notify();
+        });
+        settle(&shell, cx);
+        settle(&shell, cx);
+        let chip = cx.debug_bounds("whats-new-chip").expect("the chip is drawn");
+        let layout = cx.debug_bounds("layout-menu").expect("the layout menu is drawn");
+        assert!(layout.right() <= chip.left(), "{width}: the layout menu {layout:?} stands left of the chip {chip:?}");
+    }
+}
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
 fn a_notice_floats_and_goes_after_a_few_seconds(cx: &mut TestAppContext) {
@@ -1068,10 +1084,13 @@ fn an_unchanged_file_has_no_mark_and_a_changed_one_has_a_review_row_in_its_menu(
 fn the_tabs_leave_room_for_the_layout_menu() {
     use super::helpers::tab_room;
     // The session area reaches the window's edge: the ⋯ is left of the Settings button.
-    assert_eq!(tab_room(1400., Some(1400.)), 32.);
+    assert_eq!(tab_room(1400., Some(1400.), 0.), 32.);
     // A pane at the right shortens the area: the ⋯ is at its right edge, and the tabs end before it.
-    assert_eq!(tab_room(1400., Some(1000.)), 1400. - 48. - (1000. - 36. - 8.));
-    assert_eq!(tab_room(1400., None), 36.);
+    assert_eq!(tab_room(1400., Some(1000.), 0.), 1400. - 48. - (1000. - 36. - 8.));
+    assert_eq!(tab_room(1400., None, 0.), 36.);
+    // A chip in the title bar takes its room from the tabs, and the ⋯ stands left of it.
+    assert_eq!(tab_room(1400., Some(1400.), 120.), 32.);
+    assert_eq!(tab_room(1400., None, 120.), 36.);
 }
 
 /// The sidebar lists by project, or in one list by priority with a heading for each section; the choice is behind

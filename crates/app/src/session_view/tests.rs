@@ -57,16 +57,6 @@ fn a_press_on_an_input_in_a_panel_focuses_the_input(cx: &mut TestAppContext) {
     assert!(focused, "the input kept the focus");
 }
 
-/// A9: Stop shows only while a turn goes on.
-#[test]
-fn stop_shows_only_while_a_turn_runs() {
-    use super::shows_stop;
-    assert!(shows_stop(true, &SessionStatus::Working));
-    assert!(!shows_stop(true, &SessionStatus::Idle));
-    assert!(!shows_stop(true, &SessionStatus::Finished));
-    assert!(!shows_stop(false, &SessionStatus::Working));
-    assert!(!shows_stop(false, &SessionStatus::Failed("gone".into())));
-}
 
 #[test]
 fn cards_and_flat_rows_stack_close_and_prose_keeps_its_room() {
