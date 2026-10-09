@@ -21,7 +21,9 @@ fn main() -> std::io::Result<()> {
     let memory = Arc::new(MemoryTasks::new("smoke"));
     let me = Actor::person("alex", "Alex");
     for title in ["Write the release notes", "Fix the login on Safari"] {
-        memory.create(&NewTask::titled(title), &me).expect("a seeded task");
+        memory
+            .create(&NewTask::titled(title), &me)
+            .expect("a seeded task");
     }
     let mut registry = Registry::new();
     registry.add_tasks(memory);

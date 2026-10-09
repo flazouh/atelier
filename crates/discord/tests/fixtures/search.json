@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "id": "1425768080998400000", "channelId": "1200000000000000001", "guildId": "1100000000000000001",
+      "authorId": "1500000000000000001", "author": "Sam",
+      "message": "Morning. The build is green.", "at": "2025-10-09T08:53:20.000000+00:00",
+      "url": "https://discord.com/channels/1100000000000000001/1200000000000000001/1425768080998400000",
+      "attachments": [], "replyTo": null
+    }
+  ],
+  "total": 41,
+  "hasMore": true,
+  "nextOffset": 1
+}

@@ -1,0 +1,44 @@
+{
+  "channel": "#general",
+  "rows": [
+    {
+      "author": "sam",
+      "message": "Morning. The build is green.",
+      "at": "2025-10-09T08:53:20.000Z",
+      "url": "https://app.slack.com/client/T01ACME/C01GENERAL/p1760000000000100",
+      "files": []
+    },
+    {
+      "author": "alex",
+      "message": "Who can review the release notes?",
+      "at": "2025-10-09T08:54:40.000Z",
+      "url": "https://app.slack.com/client/T01ACME/C01GENERAL/p1760000080000200",
+      "replies": 2,
+      "files": []
+    },
+    {
+      "author": "sam",
+      "message": "[file] shot.png (image/png, 412 KB)",
+      "at": "2025-10-09T08:56:00.000Z",
+      "url": "https://app.slack.com/client/T01ACME/C01GENERAL/p1760000160000300",
+      "files": [
+        {
+          "id": "F01SHOT",
+          "kind": "file",
+          "name": "shot.png",
+          "title": "shot",
+          "filetype": "png",
+          "mimetype": "image/png",
+          "size": 421888,
+          "permalink": "https://acme.slack.com/files/U02/F01SHOT/shot.png"
+        },
+        {
+          "id": "F02NOTES",
+          "kind": "canvas",
+          "title": "Notes",
+          "filetype": "quip"
+        }
+      ]
+    }
+  ]
+}

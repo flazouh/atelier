@@ -524,6 +524,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-discord"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atelier-editor"
 version = "0.1.6"
 dependencies = [
@@ -580,9 +589,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-github-issues"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "atelier-gmail"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atelier-i18n"
 version = "0.1.6"
 dependencies = [
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
+name = "atelier-linear"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "chrono",
+ "serde",
  "serde_json",
  "ureq",
 ]
@@ -674,6 +713,15 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "atelier-slack"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

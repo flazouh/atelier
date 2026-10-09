@@ -1,0 +1,69 @@
+{
+  "data": {
+    "issue": {
+      "comments": {
+        "nodes": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "body": "Text number 1.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+            "createdAt": "2026-10-09T01:03:12.548Z",
+            "updatedAt": "2026-10-09T01:03:12.521Z",
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000003",
+            "body": "Text number 2.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+            "createdAt": "2026-10-09T00:46:48.142Z",
+            "updatedAt": "2026-10-09T00:46:48.127Z",
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000004",
+            "body": "Text number 3.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+            "createdAt": "2026-10-09T00:42:56.712Z",
+            "updatedAt": "2026-10-09T00:42:56.699Z",
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000005",
+            "body": "Text number 4.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+            "createdAt": "2026-10-09T00:37:40.645Z",
+            "updatedAt": "2026-10-09T00:37:40.611Z",
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000006",
+            "body": "Text number 5.\n\nWith a **bold** word and a list:\n\n- one\n- two",
+            "createdAt": "2026-10-09T00:37:22.043Z",
+            "updatedAt": "2026-10-09T00:37:22.018Z",
+            "user": {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "name": "Person 1"
+            },
+            "botActor": null
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "00000000-0000-4000-8000-000000000006"
+        }
+      }
+    }
+  }
+}
