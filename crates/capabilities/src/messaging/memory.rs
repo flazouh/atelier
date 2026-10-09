@@ -9,8 +9,8 @@ use std::{
 use super::{
     helpers::{message_ref, origin_of, person_ref, require_message, workspace_ref},
     structs::{
-        Channel, ChannelQuery, Event, Filter, Message, MessagingCapabilities, NewMessage, Page,
-        Person, Reaction, SearchQuery, Workspace,
+        Attachment, Channel, ChannelQuery, Event, Filter, Message, MessagingCapabilities,
+        NewMessage, Page, Person, Reaction, SearchQuery, Workspace,
     },
     traits::MessagingProvider,
     types::{ChannelKind, EventKind, Feature, Formatting, Operation},
@@ -28,6 +28,8 @@ pub struct MemoryMessaging {
     account: String,
     me: Actor,
     clock: Box<dyn Fn() -> i64 + Send + Sync>,
+    /// The most a page holds. A screen that wants to show its paging lowers it.
+    page_max: usize,
     inner: Mutex<Inner>,
 }
 
@@ -60,8 +62,8 @@ fn acting_id(by: &Actor) -> &str {
     }
 }
 
-fn limit_of(limit: Option<u32>) -> usize {
-    (limit.map_or(PAGE_DEFAULT, |n| n as usize)).clamp(1, PAGE_MAX)
+fn limit_of(limit: Option<u32>, page_max: usize) -> usize {
+    (limit.map_or(PAGE_DEFAULT, |n| n as usize)).clamp(1, page_max)
 }
 
 impl MemoryMessaging {
@@ -75,7 +77,24 @@ impl MemoryMessaging {
             }),
             me,
             clock: Box::new(system_clock),
+            page_max: PAGE_MAX,
         }
+    }
+
+    /// Names the person who uses the account. The origin of an agent's message is built from this name.
+    pub fn with_me(mut self, name: &str) -> Self {
+        self.me.name = name.to_string();
+        let me = self.me.clone();
+        if let Some(known) = self.inner.get_mut().ok().and_then(|inner| inner.people.first_mut()) {
+            *known = me;
+        }
+        self
+    }
+
+    /// Lowers the most a page holds, to `max` (1 to 100), and says so in the capabilities.
+    pub fn with_page_max(mut self, max: u32) -> Self {
+        self.page_max = (max as usize).clamp(1, PAGE_MAX);
+        self
     }
 
     /// Reads time from `clock`, in milliseconds, so a test moves it.
@@ -100,6 +119,24 @@ impl MemoryMessaging {
             raw: None,
         });
         reference
+    }
+
+    /// Gives a message a file, for a screen that needs one to show. `NotFound` for a message the provider lacks.
+    pub fn attach(&self, message: &Ref, attachment: Attachment) -> CapResult<()> {
+        let mut inner = self.lock()?;
+        let (at, _) = Self::find(&inner, message)?;
+        inner.messages[at].message.attachments.push(attachment);
+        Ok(())
+    }
+
+    /// Says how many messages of a channel the person has not read. `NotFound` for a channel the provider lacks.
+    pub fn set_unread(&self, channel: &Ref, unread: u32) -> CapResult<()> {
+        let mut inner = self.lock()?;
+        Self::channel_exists(&inner, channel)?;
+        if let Some(c) = inner.channels.iter_mut().find(|c| c.reference == *channel) {
+            c.unread = Some(unread);
+        }
+        Ok(())
     }
 
     fn make_ref(&self, id: &str) -> Ref {
@@ -201,7 +238,7 @@ impl MessagingProvider for MemoryMessaging {
             features: vec![Feature::Threads, Feature::Reactions, Feature::Edits],
             formatting: Formatting::Rich,
             limits: Limits {
-                page_max: Some(PAGE_MAX as u32),
+                page_max: Some(self.page_max as u32),
                 per_minute: None,
             },
             auth: vec![AuthKind::None],
@@ -239,7 +276,7 @@ impl MessagingProvider for MemoryMessaging {
                 .parse::<usize>()
                 .map_err(|_| CapError::invalid("cursor"))?,
         };
-        let limit = limit_of(query.limit);
+        let limit = limit_of(query.limit, self.page_max);
         let items: Vec<Channel> = all
             .iter()
             .skip(start)
@@ -272,7 +309,7 @@ impl MessagingProvider for MemoryMessaging {
                 s.message.channel == *channel && s.message.parent.is_none() && s.seq < before
             })
             .collect();
-        let limit = limit_of(limit);
+        let limit = limit_of(limit, self.page_max);
         let items: Vec<Message> = older
             .iter()
             .take(limit)
@@ -303,7 +340,7 @@ impl MessagingProvider for MemoryMessaging {
                 .parse::<usize>()
                 .map_err(|_| CapError::invalid("cursor"))?,
         };
-        let items: Vec<Message> = all.iter().skip(start).take(PAGE_MAX).cloned().collect();
+        let items: Vec<Message> = all.iter().skip(start).take(self.page_max).cloned().collect();
         let next_cursor =
             (start + items.len() < all.len()).then(|| (start + items.len()).to_string());
         Ok(Page { items, next_cursor })
@@ -410,7 +447,7 @@ impl MessagingProvider for MemoryMessaging {
             })
             .filter(|s| s.message.text.to_lowercase().contains(&needle))
             .collect();
-        let limit = limit_of(query.limit);
+        let limit = limit_of(query.limit, self.page_max);
         let items: Vec<Message> = hits
             .iter()
             .take(limit)
