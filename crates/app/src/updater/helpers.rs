@@ -83,11 +83,6 @@ fn numbers(version: &str) -> Option<Vec<u32>> {
     version.trim().split('.').map(|part| part.parse().ok()).collect()
 }
 
-/// Whether `version` is an older release than `than`. False when either is not a version.
-pub fn is_older(version: &str, than: &str) -> bool {
-    matches!((numbers(version), numbers(than)), (Some(version), Some(than)) if version < than)
-}
-
 /// What to do at start with the changelog kept for `kept`, when `running` is the version that runs.
 pub fn remembered(kept: &str, running: &str) -> Remembered {
     match (numbers(kept), numbers(running)) {

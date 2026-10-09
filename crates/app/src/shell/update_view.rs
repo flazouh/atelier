@@ -8,7 +8,7 @@ use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentEleme
 use super::{helpers::sheet_width, structs::Shell};
 use crate::{
     changelog,
-    updater::{UpdateState, is_older, release_date, release_notes, running_version},
+    updater::{UpdateState, release_date, release_notes, running_version},
 };
 
 /// What a changelog the feed did not carry says.
@@ -78,17 +78,12 @@ impl Shell {
         None
     }
 
-    /// The changelog of the update this version came from, after the restart: its notes first, the older releases under.
+    /// The changelog of the update this version came from, after the restart: only its own notes, the older releases under.
     fn whats_new_panel(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let record = self.whats_new.as_ref()?;
         let date = release_date(&record.notes).or_else(|| changelog::notes_of(&record.version).and_then(release_date));
-        let earlier = changelog::releases()
-            .iter()
-            .filter(|(version, _)| is_older(version, &record.version))
-            .map(|(version, markdown)| release_of(version, markdown))
-            .collect();
         let current = (SharedString::from(record.version.clone()), date.map(SharedString::from), notes_of(&record.notes));
-        Some(self.changelog_modal("whats-new", current, earlier, Self::dismiss_whats_new, window, cx))
+        Some(self.changelog_modal("whats-new", current, Vec::new(), Self::dismiss_whats_new, window, cx))
     }
 
     /// The notes of the version that runs, with every earlier version under them.

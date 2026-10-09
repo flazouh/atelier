@@ -263,7 +263,7 @@ fn the_first_start_of_an_updated_version_opens_the_changelog_by_itself_and_close
     assert!(cx.debug_bounds("whats-new-chip").is_none(), "there is no chip any more");
     assert!(cx.debug_bounds("release-install").is_none() && cx.debug_bounds("release-later").is_none(), "and no buttons but Close");
     assert!(cx.debug_bounds("release-earlier-0").is_none(), "the old layout is gone");
-    assert!(cx.debug_bounds("release-0").is_some() && cx.debug_bounds("release-1").is_some(), "the new version first, the older ones under it");
+    assert!(cx.debug_bounds("release-0").is_some() && cx.debug_bounds("release-1").is_none(), "the new version only, no older one");
     let close = cx.debug_bounds("release-close").expect("Close is there");
     cx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
@@ -299,7 +299,7 @@ fn escape_closes_the_whats_new_sheet_too(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_sheet_of_an_update_shows_the_new_version_first_with_its_date_and_the_older_releases_under_it(cx: &mut TestAppContext) {
+fn the_sheet_of_an_update_shows_only_the_new_version_with_its_date(cx: &mut TestAppContext) {
     let (shell, cx) = open_shell_with(cx, atelier_settings::Settings::default());
     shell.update(cx, |s, cx| {
         s.whats_new = Some(atelier_settings::WhatsNew {
@@ -312,9 +312,8 @@ fn the_sheet_of_an_update_shows_the_new_version_first_with_its_date_and_the_olde
     settle(&shell, cx);
     assert!(cx.debug_bounds("release-sheet").is_some());
     assert!(cx.debug_bounds("release-date-0").is_some(), "the new version has its date");
-    let older = crate::changelog::releases().iter().filter(|(v, _)| crate::updater::is_older(v, "0.1.5")).count();
-    assert_eq!(older, (1..=older).filter(|n| drawn(cx, format!("release-{n}"))).count(), "every older release is listed");
-    assert!(!drawn(cx, format!("release-{}", older + 1)), "and no newer one");
+    assert!(drawn(cx, "release-0".to_string()), "the new version is listed");
+    assert!(!drawn(cx, "release-1".to_string()), "and no earlier one");
 }
 
 #[gpui_kit::test]
