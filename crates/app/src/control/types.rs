@@ -23,6 +23,9 @@ pub enum Request {
     Open { path: String, host: Option<String> },
     /// Press Check for Updates, as the app menu does.
     CheckUpdates,
+    /// Tells the window one thing the platform updater says, as the Mac's does, so a download and its button can be seen
+    /// without a release feed: `{"cmd":"update","event":{"kind":"found","version":"0.2.0","user":false}}`.
+    Update { event: crate::updater::UpdateEvent },
     /// Types `text` over the file `path` of the open project, which leaves a tab with an edit that is not saved.
     Edit { path: String, text: String },
 }

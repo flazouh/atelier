@@ -7,6 +7,7 @@
 #   tools/atelier-ctl.sh send "a message"
 #   tools/atelier-ctl.sh limit                  pretend the front session hit its weekly limit
 #   tools/atelier-ctl.sh open PATH [HOST]       open a folder, over SSH on HOST when named
+#   tools/atelier-ctl.sh update EVENT           tell the window one updater event, e.g. update '{"kind":"ready"}'
 #   tools/atelier-ctl.sh marks                  the names that can be pressed, as last drawn
 #   tools/atelier-ctl.sh click X Y [right]      press a point of the window, with the other button when asked
 #   tools/atelier-ctl.sh press NAME             press a named element with no pointer, e.g. settings-entry,
@@ -29,6 +30,8 @@ if cmd == "find" or cmd == "click":
         request["x"], request["y"] = float(rest[0]), float(rest[1])
         if len(rest) == 3:
             request["button"] = rest[2]
+if cmd == "update":
+    request["event"] = json.loads(rest[0])
 if cmd == "view":
     request["name"] = rest[0]
 if cmd == "open":

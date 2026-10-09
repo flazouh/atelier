@@ -20,3 +20,10 @@ fn every_release_has_notes_the_sheet_can_list() {
         assert!(!release_notes(markdown).is_empty(), "{version} has no bullet with a lead");
     }
 }
+
+#[test]
+fn every_release_has_a_date_the_sheet_can_show() {
+    for (version, markdown) in releases() {
+        assert!(crate::updater::release_date(markdown).is_some(), "{version} has no `Released: YYYY-MM-DD` line right under its heading");
+    }
+}

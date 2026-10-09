@@ -272,21 +272,51 @@ fn zoomed_in_a_tall_panel_stays_inside_the_window(cx: &mut TestAppContext) {
         "the panel {panel:?} is inside the window {window:?}"
     );
 }
-/// The What is new chip in the title bar does not lie over the ⋯ layout menu, at any width.
+/// The update chip in the title bar (the percentage, then the button) does not lie over the ⋯ layout menu, at any width.
 #[gpui_kit::test]
-fn the_whats_new_chip_and_the_layout_menu_do_not_overlap(cx: &mut TestAppContext) {
+fn the_update_button_and_the_layout_menu_do_not_overlap(cx: &mut TestAppContext) {
     for width in [1400., 1000., 760.] {
         let (shell, cx, _dir) = with_a_session(cx, width);
         shell.update(cx, |s, cx| {
-            s.whats_new = Some(atelier_settings::WhatsNew { version: "0.1.7".into(), notes: String::new() });
+            s.update = crate::updater::UpdateState::Ready { version: "0.1.10".into(), notes: String::new() };
             cx.notify();
         });
         settle(&shell, cx);
         settle(&shell, cx);
-        let chip = cx.debug_bounds("whats-new-chip").expect("the chip is drawn");
+        let chip = cx.debug_bounds("update-chip").expect("the button is drawn");
         let layout = cx.debug_bounds("layout-menu").expect("the layout menu is drawn");
-        assert!(layout.right() <= chip.left(), "{width}: the layout menu {layout:?} stands left of the chip {chip:?}");
+        assert!(layout.right() <= chip.left(), "{width}: the layout menu {layout:?} stands left of the button {chip:?}");
     }
+}
+/// The changelog sheet is 860 wide in a wide window and stays inside a narrow one, at any zoom.
+#[gpui_kit::test]
+fn the_changelog_sheet_keeps_inside_the_window_when_it_is_narrow_or_zoomed(cx: &mut TestAppContext) {
+    for (width, zoom) in [(1400., 1.), (700., 1.), (640., 1.), (900., 1.7), (640., 1.7)] {
+        let (shell, cx, _dir) = with_a_session(cx, width);
+        atelier_ui::scale::set_zoom(zoom);
+        shell.update(cx, |s, cx| s.show_changelog(cx));
+        settle(&shell, cx);
+        settle(&shell, cx);
+        let panel = cx.debug_bounds("update-panel").expect("the panel is drawn");
+        let window = cx.update(|window, _| window.viewport_size());
+        atelier_ui::scale::set_zoom(1.);
+        assert!(
+            panel.left() >= gpui_kit::px(0.) && panel.right() <= window.width && panel.top() >= gpui_kit::px(0.) && panel.bottom() <= window.height,
+            "{width} at {zoom}x: the panel {panel:?} is inside the window {window:?}"
+        );
+        if width >= 1400. {
+            assert_eq!(f32::from(panel.size.width), 860., "a wide window gives it 860");
+        }
+    }
+}
+/// How wide the sheet is: 860, or the window's less a margin at each side, and never under 320.
+#[test]
+fn the_sheet_is_860_wide_and_narrower_in_a_narrow_window() {
+    use super::helpers::sheet_width;
+    assert_eq!(sheet_width(1400.), 860.);
+    assert_eq!(sheet_width(908.), 860.);
+    assert_eq!(sheet_width(700.), 652.);
+    assert_eq!(sheet_width(300.), 320.);
 }
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]

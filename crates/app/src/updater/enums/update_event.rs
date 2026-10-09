@@ -22,6 +22,4 @@ pub enum UpdateEvent {
     Failed { message: String },
     /// The update ended with nothing more to show.
     Idle,
-    /// The updater asks for the update to be put in front of the reader.
-    Focus,
 }

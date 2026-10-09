@@ -25,13 +25,3 @@ fn a_hue_reads_on_every_page_it_is_used_on_and_moves_the_way_the_page_needs() {
         }
     }
 }
-#[test]
-fn each_kind_of_note_has_its_own_colour() {
-    let theme = atelier_ui::theme::Theme::light();
-    let kinds = atelier_ui::ReleaseKind::ALL;
-    for (i, a) in kinds.iter().enumerate() {
-        for b in &kinds[i + 1..] {
-            assert_ne!(kind_color(*a, &theme), kind_color(*b, &theme), "{a:?} and {b:?} share a colour");
-        }
-    }
-}

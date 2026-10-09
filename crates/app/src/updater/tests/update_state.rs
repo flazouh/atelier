@@ -27,10 +27,10 @@ fn the_daily_look_downloads_in_silence_and_waits_for_the_reader() {
 }
 
 #[test]
-fn a_look_the_reader_asked_for_opens_the_update_when_it_is_ready() {
+fn a_look_the_reader_asked_for_opens_nothing_either_and_the_update_waits_behind_its_button() {
     let (state, said) = run(vec![UpdateEvent::Checking { user: true }, found(true), UpdateEvent::Ready]);
     assert!(matches!(state, UpdateState::Ready { .. }));
-    assert_eq!(said.last(), Some(&Reaction::Show));
+    assert!(said.iter().all(|r| *r == Reaction::Nothing), "no modal and no notice: {said:?}");
 }
 
 #[test]
@@ -77,13 +77,6 @@ fn a_second_look_or_a_second_find_does_not_restart_what_goes_on() {
     assert_eq!(again, state);
     let (again, _) = state.clone().apply(found(true));
     assert_eq!(again, state);
-}
-
-#[test]
-fn the_updater_putting_a_ready_update_in_front_opens_it_and_nothing_else_does() {
-    let (ready, _) = run(vec![UpdateEvent::Checking { user: false }, found(false), UpdateEvent::Ready]);
-    assert_eq!(ready.clone().apply(UpdateEvent::Focus).1, Reaction::Show);
-    assert_eq!(UpdateState::Idle.apply(UpdateEvent::Focus).1, Reaction::Nothing);
 }
 
 #[test]

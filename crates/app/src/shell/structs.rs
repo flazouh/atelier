@@ -128,10 +128,9 @@ pub struct Shell {
     files_narrow: FilesPane,
     /// The ⋯ layout menu is open.
     layout_menu: bool,
-    /// Where an update stands, and whether its changelog is open in front of the reader.
+    /// Where an update stands.
     pub(super) update: crate::updater::UpdateState,
-    pub(super) update_modal: bool,
-    /// The changelog of the update this version came from, shown once as a chip, and whether its sheet is open.
+    /// The changelog of the update this version came from, kept until the reader closes its sheet, and whether the sheet is open.
     pub(super) whats_new: Option<atelier_settings::WhatsNew>,
     pub(super) whats_new_open: bool,
     /// The changelog the version in the title bar opens.
@@ -156,6 +155,8 @@ pub struct Shell {
 impl Shell {
     pub fn new(saved: &atelier_settings::Settings, cx: &mut Context<Self>) -> Self {
         let (vitals, _vitals) = Self::start_vitals(cx);
+        // The first start after an update opens the changelog by itself, once: closing it forgets the kept record.
+        let whats_new = Self::remembered_at_start(saved, cx);
         // The zoom the reader left it at.
         atelier_ui::scale::set_zoom(saved.ui_zoom.unwrap_or(1.));
         // Projects are added from the title bar, beside the switcher.
@@ -213,9 +214,8 @@ impl Shell {
             files_narrow: FilesPane::default(),
             layout_menu: false,
             update: crate::updater::UpdateState::default(),
-            update_modal: false,
-            whats_new: Self::remembered_at_start(saved, cx),
-            whats_new_open: false,
+            whats_new_open: whats_new.is_some(),
+            whats_new,
             changelog_open: false,
             update_focus: cx.focus_handle(),
             opened: None,
@@ -2234,7 +2234,7 @@ impl Shell {
                     )
             }))
             .children(self.tree_menu(cx))
-            .children(self.update_panel(cx))
+            .children(self.update_panel(window, cx))
             .children(self.opened.as_ref().map(|(_, page)| page.clone()))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().occlude().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.

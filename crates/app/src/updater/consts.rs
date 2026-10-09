@@ -10,8 +10,8 @@ pub const UP_TO_DATE_NOTICE: &str = "atelier is up to date.";
 /// What the reader reads when the look starts.
 pub const CHECKING_NOTICE: &str = "Looking for updates…";
 
-/// What the reader reads when the update has to wait, but is kept.
-pub const UPDATE_LATER_NOTICE: &str = "The update installs when you quit atelier.";
+/// What the reader reads when asking again while the update waits for the restart.
+pub const UPDATE_READY_NOTICE: &str = "The update is ready. Press the Update button in the title bar to restart.";
 
 /// What the reader reads when asking again while the update downloads.
 pub const DOWNLOADING_NOTICE: &str = "The update is downloading.";
