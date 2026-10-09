@@ -11,6 +11,8 @@ use atelier_settings::{
 
 use super::{AccountServices, Kind, Row, build, plain_words};
 
+mod chat_mail;
+
 const GOOD_KEY: &str = "lin_api_good";
 const REFUSED_KEY: &str = "lin_api_revoked";
 
