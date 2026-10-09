@@ -137,3 +137,13 @@ fn an_outdated_helper_is_told_as_outdated_not_as_missing() {
     assert!(!words.contains("no helper built"), "{words}");
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn a_helper_with_an_older_version_text_but_this_protocol_is_accepted() {
+    let n = crate::protocol::VERSION;
+    assert!(speaks_this_protocol(&format!("0.1.1 protocol {n}\n")), "an older build of the same protocol works");
+    assert!(speaks_this_protocol(&version_line()));
+    assert!(!speaks_this_protocol(&format!("0.1.12 protocol {}", n + 1)), "another protocol does not");
+    assert!(!speaks_this_protocol("protocol"));
+    assert!(!speaks_this_protocol(""));
+}
