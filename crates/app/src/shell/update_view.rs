@@ -1,5 +1,5 @@
 //! The update's own look: the design system's update button in the title bar (a ring that fills while an update
-//! downloads, then "Update to vX"), and the changelog sheet
+//! downloads, then "Update"), and the changelog sheet
 //! (the same one the version in the status bar opens, and the first start after an update opens by itself). Sparkle's own
 //! windows are not used.
 use atelier_ui::{ReleaseNote, ReleaseSheet, ReleaseVersion, UpdateButton, modal::Modal};
@@ -51,12 +51,11 @@ impl Shell {
             UpdateState::Downloading { fraction, .. } => {
                 Some(button.downloading(*fraction as f32, format!("Updating {}%", (fraction * 100.).floor() as u32)).into_any_element())
             }
-            UpdateState::Ready { version, .. } => {
+            UpdateState::Ready { .. } => {
                 let this = cx.entity().downgrade();
-                let label = if version.is_empty() { "Update and restart".to_string() } else { format!("Update to v{version}") };
                 Some(
                     button
-                        .ready(label)
+                        .ready("Update")
                         .on_click(move |_, cx| drop(this.update(cx, |shell, cx| shell.update_install(cx))))
                         .into_any_element(),
                 )
