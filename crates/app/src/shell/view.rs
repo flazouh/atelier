@@ -14,6 +14,8 @@ pub enum ShellView {
     History,
     Messages,
     Mail,
+    /// Not a lens of its own: the rail's door to the Usage view a module opens over the window.
+    Usage,
 }
 
 impl ShellView {
@@ -28,6 +30,7 @@ impl ShellView {
             Self::History => "history",
             Self::Messages => "messages",
             Self::Mail => "mail",
+            Self::Usage => "usage",
         }
     }
 
@@ -46,7 +49,7 @@ impl ShellView {
     }
 
     /// The lenses the left rail switches between, in its order: Sessions, Tasks, Code, Messages, Mail. Code is named by Git.
-    pub const ON_RAIL: [Self; 5] = [Self::Sessions, Self::Tasks, Self::Git, Self::Messages, Self::Mail];
+    pub const ON_RAIL: [Self; 6] = [Self::Sessions, Self::Tasks, Self::Git, Self::Messages, Self::Mail, Self::Usage];
 
     /// The views of the Code lens, in the order its sidebar lists them.
     pub const IN_CODE: [Self; 4] = [Self::Pulls, Self::Files, Self::History, Self::Git];

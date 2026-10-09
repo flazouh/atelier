@@ -270,8 +270,8 @@ impl Heading {
             limit: closest.map(|s| UsageStat {
                 label: "Closest to a limit".into(),
                 value: s.value.clone(),
-                unit: format!("{} · {}", s.group, s.name).into(),
-                note: s.note.clone(),
+                unit: "used".into(),
+                note: format!("{} · {}", s.name.clone(), s.note).into(),
                 used: s.limit,
             }),
         }

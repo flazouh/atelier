@@ -61,9 +61,9 @@ fn mail_is_a_view_the_settings_can_keep() {
     assert_eq!(ShellView::Mail.words(), "mail");
     assert_eq!(ShellView::from_words(Some("mail")), ShellView::Mail);
     assert_eq!(
-        ShellView::ON_RAIL.last(),
+        ShellView::ON_RAIL.get(4),
         Some(&ShellView::Mail),
-        "the rail ends with Mail"
+        "Mail comes after the lenses and before the Usage door"
     );
     assert_eq!(ShellView::Mail.lens(), ShellView::Mail);
     assert!(!ShellView::Mail.in_code());

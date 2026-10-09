@@ -20,6 +20,7 @@ fn rail_view(view: ShellView, needs_you: usize) -> RailView {
         ShellView::Git => RailView { icon: IconName::Code, label: "Code".into(), debug: "rail-git", count: 0 },
         ShellView::Messages => RailView { icon: IconName::ChatBubble, label: "Messages".into(), debug: "rail-messages", count: 0 },
         ShellView::Mail => RailView { icon: IconName::Mail, label: "Mail".into(), debug: "rail-mail", count: 0 },
+        ShellView::Usage => RailView { icon: IconName::BarChart, label: "Usage".into(), debug: "rail-usage", count: 0 },
         _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions", count: needs_you },
     }
 }
@@ -29,7 +30,8 @@ impl Shell {
     pub(super) fn view_rail(&self, open: bool, cx: &mut Context<Self>) -> AnyElement {
         let needs_you = self.needs_you(cx);
         let views = ShellView::ON_RAIL.into_iter().map(|v| rail_view(v, needs_you)).collect();
-        let selected = ShellView::ON_RAIL.iter().position(|v| *v == self.view.lens()).unwrap_or(usize::MAX);
+        let lens = if self.opened.is_some() { ShellView::Usage } else { self.view.lens() };
+        let selected = ShellView::ON_RAIL.iter().position(|v| *v == lens).unwrap_or(usize::MAX);
         let this = cx.entity().downgrade();
         ViewRail::new("view-rail", views, selected, open)
             .on_select(move |i, window, cx| {
@@ -41,7 +43,10 @@ impl Shell {
     /// A press on the rail. Another view comes to the front with the sidebar shown; the view in front
     /// hides or shows the sidebar.
     pub(super) fn pick_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
-        // A view a module opened over the window gives way to the lens the reader picks.
+        // The Usage door opens (or closes) the view a module draws over the window; any other lens closes it.
+        if view == ShellView::Usage {
+            return if self.opened.is_some() { self.close_view(cx) } else { self.open_view("usage", cx) };
+        }
         if self.opened.take().is_some() {
             cx.notify();
         }
