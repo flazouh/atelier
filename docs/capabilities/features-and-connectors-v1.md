@@ -70,11 +70,13 @@ Order: Sessions, Workspace, Tasks, Code, then the connectors in the order the pe
 
 ## 6. Telegram, the first client
 
-- **Client:** a user client over MTProto, not a bot. The Rust options are `grammers-client` and `tdlib-rs`. We pick one in a spike, in a plugin-sized crate, behind the chat interface.
-- **Rules from Telegram's terms:** our own `api_id`, the name "Unofficial" in the client's identity, no copying of their logos, show that the Telegram API is used. We do nothing the person did not ask for.
-- **The agent and your chats:** the agent sees nothing of your Telegram until you point it at something: "Share with agent" on a chat, a message or a selection. It reads what you shared. A person may also switch on reading of the whole account in Settings. It is the person's data and the person's choice. Writing still asks each time.
-- **The one risk, said once:** Telegram's terms forbid the developer to use their data to train or develop AI. They are written for the app developer, who holds the `api_id`. If Telegram counts an agent that reads chats as AI use, they may revoke our `api_id`, and then every user's Telegram client stops until we get a new one. For a personal tool this risk is small. For a product sold per seat it is larger, so a lawyer reads the clause before we sell it. It does not stop use now.
-- **Login:** phone number and code, in Atelier; the session is kept in the keychain.
+- **What it is:** a full Telegram client you install and connect. Its rail icon opens the wide sidebar with your chats and the pane with the messages, written and read by you. It is a user client over MTProto, not a bot. The Rust options are `grammers-client` and `tdlib-rs`; a spike picks one.
+- **Login:** a QR code. Telegram supports QR login: you scan the code in the phone app, and no phone number is typed. A phone number and code is the fallback. The session is kept in the keychain.
+- **The agent:** once connected, the agent can read when you ask it to ("check my chat with Ana"), as it can for Slack and Gmail. Reads are free; writing asks each time and shows the exact text. There is no extra gate: it is your data and your choice to ask.
+- **The key:** every third-party Telegram client uses its own `api_id` and `api_hash`, free from `my.telegram.org`, shipped in the client; it is not a secret. We register one for Atelier.
+- **Rules of the terms we keep:** our own `api_id`, a name that says it is unofficial, no copying of their logos, show that the Telegram API is used, and no action the person did not ask for.
+- **The one risk, said once:** Telegram's terms forbid the developer to use their data to train or develop AI. They are written for the developer who holds the `api_id`. If Telegram counts an agent that reads chats as AI use, they may revoke our key, and every user's Telegram client stops until we get a new one. For a personal tool the risk is small. For a product sold per seat it is larger, so a lawyer reads the clause before we sell it. It does not stop use now.
+- **Install:** it ships as the first client crate in the repo. When the plugin host exists (a later step), it becomes an installable plugin with the same interface.
 
 ## 7. What changes in the code we have
 
@@ -104,4 +106,4 @@ The providers, the gateway, the agent tools, the contract suites and the screens
 1. **Name.** "Workspace" for the agentic space. Is that the word you want in the app?
 2. **Several backends at once?** Today a project could show Linear and native together. Do you want only one active per feature, or a union?
 3. **Native workspace and sessions.** Should every agent session also appear as a thread in a channel automatically, or only when someone sends it there?
-4. **Telegram and the agent.** Share-on-demand by default, whole-account reading as a setting. Agree?
+4. **Telegram and the agent.** Connected means the agent can read when you ask, as for Slack and Gmail. Agree?
