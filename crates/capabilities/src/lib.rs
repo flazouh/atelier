@@ -14,6 +14,7 @@ mod capability;
 pub mod card;
 mod error;
 pub mod mail;
+pub mod messaging;
 mod reference;
 mod registry;
 mod subscription;

@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atelier.dev/schemas/messaging/v1.json",
+  "title": "Atelier capability: messaging (v1 draft)",
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "description": "messaging:<provider>:<account>:<id>. Channel id <channel>, message id <channel>:<ts>, person id user/<user>, workspace id workspace.",
+      "pattern": "^messaging:[a-z0-9_-]+:[A-Za-z0-9_.-]+:.+$"
+    },
+    "millis": { "type": "integer", "description": "Milliseconds since the epoch, UTC" },
+    "actor": {
+      "type": "object",
+      "required": ["kind", "id", "name"],
+      "properties": {
+        "kind": { "enum": ["person", "agent"] },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "on_behalf_of": { "type": "string", "description": "Id of the person an agent works for" }
+      },
+      "additionalProperties": false
+    },
+    "workspace": {
+      "type": "object",
+      "required": ["ref", "name"],
+      "properties": { "ref": { "$ref": "#/$defs/ref" }, "name": { "type": "string" }, "raw": {} },
+      "additionalProperties": false
+    },
+    "channel_kind": { "enum": ["public", "private", "dm", "group_dm"] },
+    "channel": {
+      "type": "object",
+      "required": ["ref", "name", "kind", "archived"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "name": { "type": "string" },
+        "kind": { "$ref": "#/$defs/channel_kind" },
+        "topic": { "type": "string" },
+        "archived": { "type": "boolean" },
+        "member_count": { "type": "integer", "minimum": 0 },
+        "unread": { "type": "integer", "minimum": 0 },
+        "created_at": { "$ref": "#/$defs/millis" },
+        "raw": {}
+      },
+      "additionalProperties": false
+    },
+    "person": {
+      "type": "object",
+      "required": ["ref", "name", "handle", "is_bot"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "name": { "type": "string" },
+        "handle": { "type": "string" },
+        "display_name": { "type": "string" },
+        "is_bot": { "type": "boolean" },
+        "avatar_url": { "type": "string" },
+        "raw": {}
+      },
+      "additionalProperties": false
+    },
+    "reaction": {
+      "type": "object",
+      "required": ["name", "count", "me"],
+      "properties": {
+        "name": { "type": "string", "description": "Emoji short name without colons" },
+        "count": { "type": "integer", "minimum": 0 },
+        "by": { "type": "array", "items": { "type": "string" }, "description": "Actor ids, when the provider says them" },
+        "me": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "attachment": {
+      "type": "object",
+      "required": ["id", "name", "url", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "mime": { "type": "string" },
+        "size": { "type": "integer", "minimum": 0 },
+        "url": { "type": "string" },
+        "kind": { "enum": ["file", "image", "link", "other"] }
+      },
+      "additionalProperties": false
+    },
+    "message": {
+      "type": "object",
+      "required": ["ref", "channel", "text", "author", "created_at", "attachments", "reactions", "reply_count"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/ref" },
+        "channel": { "$ref": "#/$defs/ref" },
+        "parent": { "$ref": "#/$defs/ref", "description": "The root message, when this is a reply" },
+        "text": { "type": "string", "description": "Markdown subset: bold, italic, strike, code, fenced code, quote, lists, links" },
+        "author": { "$ref": "#/$defs/actor" },
+        "created_at": { "$ref": "#/$defs/millis" },
+        "edited_at": { "$ref": "#/$defs/millis" },
+        "attachments": { "type": "array", "items": { "$ref": "#/$defs/attachment" } },
+        "reactions": { "type": "array", "items": { "$ref": "#/$defs/reaction" } },
+        "reply_count": { "type": "integer", "minimum": 0 },
+        "origin": { "type": "string", "description": "Set when an agent sent the message, for example \"Sam's agent\"" },
+        "raw": {}
+      },
+      "additionalProperties": false
+    },
+    "page": {
+      "type": "object",
+      "required": ["items"],
+      "properties": { "items": { "type": "array" }, "next_cursor": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["operations", "features", "formatting", "limits", "auth"],
+      "properties": {
+        "operations": {
+          "type": "array",
+          "items": { "enum": ["channels", "history", "thread", "send", "subscribe", "search", "edit", "delete", "react", "mark_read", "person", "export", "import"] }
+        },
+        "features": { "type": "array", "items": { "enum": ["threads", "reactions", "edits", "attachments", "presence", "typing"] } },
+        "formatting": { "enum": ["plain", "basic", "rich"] },
+        "limits": { "type": "object", "properties": { "page_max": { "type": "integer" }, "per_minute": { "type": "integer" } } },
+        "auth": { "type": "array", "items": { "enum": ["oauth", "token", "browser_session", "none"] } }
+      },
+      "additionalProperties": false
+    },
+    "error": {
+      "oneOf": [
+        { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["not_found", "offline", "not_signed_in", "storage"] } } },
+        { "type": "object", "required": ["kind", "field"], "properties": { "kind": { "const": "invalid" }, "field": { "type": "string" } } },
+        { "type": "object", "required": ["kind", "retry_after_ms"], "properties": { "kind": { "const": "rate_limited" }, "retry_after_ms": { "type": "integer" } } },
+        { "type": "object", "required": ["kind", "feature"], "properties": { "kind": { "const": "unsupported" }, "feature": { "type": "string" } } },
+        { "type": "object", "required": ["kind", "code", "message"], "properties": { "kind": { "const": "provider" }, "code": { "type": "string" }, "message": { "type": "string" } } }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "required": ["kind", "channel", "message"],
+      "properties": {
+        "kind": { "enum": ["posted", "edited", "deleted", "reaction_added", "reaction_removed"] },
+        "channel": { "$ref": "#/$defs/ref" },
+        "message": { "$ref": "#/$defs/ref" },
+        "data": { "$ref": "#/$defs/message", "description": "The message as it is now; absent for deleted" },
+        "reaction": { "type": "string" },
+        "by": { "$ref": "#/$defs/actor" }
+      },
+      "additionalProperties": false
+    },
+    "new_message": {
+      "type": "object",
+      "required": ["channel", "text"],
+      "properties": {
+        "channel": { "$ref": "#/$defs/ref" },
+        "text": { "type": "string", "minLength": 1 },
+        "in_thread_of": { "$ref": "#/$defs/ref" }
+      },
+      "additionalProperties": false
+    },
+    "envelope": {
+      "type": "object",
+      "description": "One entity in an export or import batch (not implemented by any provider in v1)",
+      "required": ["type", "entity"],
+      "properties": {
+        "type": { "enum": ["channel", "message", "person", "workspace"] },
+        "entity": {},
+        "raw": {}
+      }
+    }
+  }
+}
