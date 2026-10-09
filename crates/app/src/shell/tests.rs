@@ -255,6 +255,23 @@ fn the_dashboard_reads_the_logs_and_survives_a_broken_line_and_a_folder_with_not
     let (accounts, skipped) = cx.update(|_, cx| (cx.global::<UsageStore>().seen.accounts.len(), cx.global::<UsageStore>().seen.skipped));
     assert_eq!((accounts, skipped), (3, 1), "three accounts, and the one broken line counted, not read");
 }
+/// Zoomed in, the changelog is taller than the window: its panel stays inside the window.
+#[gpui_kit::test]
+fn zoomed_in_a_tall_panel_stays_inside_the_window(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 900.);
+    atelier_ui::scale::set_zoom(1.7);
+    settle(&shell, cx);
+    shell.update(cx, |s, cx| s.show_changelog(cx));
+    settle(&shell, cx);
+    settle(&shell, cx);
+    let panel = cx.debug_bounds("update-panel").expect("the panel is drawn");
+    let window = cx.update(|window, _| window.viewport_size());
+    atelier_ui::scale::set_zoom(1.);
+    assert!(
+        panel.top() >= gpui_kit::px(0.) && panel.bottom() <= window.height,
+        "the panel {panel:?} is inside the window {window:?}"
+    );
+}
 /// A notice shows over the foot of the window, and goes by itself.
 #[gpui_kit::test]
 fn a_notice_floats_and_goes_after_a_few_seconds(cx: &mut TestAppContext) {

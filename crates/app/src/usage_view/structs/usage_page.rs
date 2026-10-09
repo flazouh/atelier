@@ -108,7 +108,7 @@ impl Render for UsagePage {
             .on_select(move |s, _, cx| drop(select.update(cx, |page, cx| page.select(s, cx))))
             .on_expand(move |id, _, cx| drop(expand.update(cx, |page, cx| page.expand(id, cx))));
         Modal::new("usage")
-            .width((f32::from(window.viewport_size().width) - 2. * MARGIN_SIDE).clamp(320., 1120.))
+            .width((atelier_ui::scale::design(window.viewport_size().width) - 2. * MARGIN_SIDE).clamp(320., 1120.))
             .flush()
             .focus(&self.focus)
             .on_close(move |_, cx| host.close_view(cx))
