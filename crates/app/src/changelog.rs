@@ -2,7 +2,7 @@
 //! needs no network and is there for the version that runs.
 mod helpers;
 
-pub use helpers::{notes_of, releases};
+pub use helpers::{notes_of, register, releases};
 
 #[cfg(test)]
 mod tests;

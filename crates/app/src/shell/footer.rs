@@ -2,7 +2,7 @@
 //! provider's allowance is used. The numbers live in [`Vitals`], an entity of its own, so a sample each second draws
 //! the bar and not the whole window; the shell feeds it.
 
-use std::{rc::Rc, sync::Arc, time::SystemTime};
+use std::{sync::Arc, time::SystemTime};
 
 use atelier_project::Project;
 use atelier_settings::secrets::{OPENROUTER_KEY, Secrets};
@@ -12,7 +12,6 @@ use gpui_kit::{AnyElement, App, AppContext, Context, Entity, InteractiveElement,
 use super::structs::Shell;
 use crate::{
     providers::{self, Choice},
-    updater::running_version,
     vitals::{LOAD_EVERY, PROVIDERS_EVERY, SysinfoProbe, Vitals},
 };
 
@@ -36,16 +35,9 @@ impl Shell {
     /// The numbers the bar shows, and the two loops that keep them: the machine each second, the providers each minute.
     pub(super) fn start_vitals(cx: &mut Context<Self>) -> (Entity<Vitals>, Vec<Task<()>>) {
         let vitals = cx.new(|_| Vitals::new(Box::new(SysinfoProbe::new())));
-        // The version at the left of the bar opens the changelog.
-        let (shell, usage) = (cx.weak_entity(), cx.weak_entity());
-        vitals.update(cx, |vitals, _| {
-            vitals.set_version(
-                running_version(),
-                Rc::new(move |_, cx| drop(shell.update(cx, |shell, cx| shell.show_changelog(cx)))),
-            );
-            // The usage chips open the dashboard.
-            vitals.set_on_usage(Rc::new(move |_, cx| drop(usage.update(cx, |shell, cx| shell.show_usage(cx)))));
-        });
+        // The cards of the bar ask the shell to open the changelog and the views.
+        let shell = cx.weak_entity();
+        vitals.update(cx, |vitals, _| vitals.set_shell(shell));
         let load = cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor().timer(LOAD_EVERY).await;

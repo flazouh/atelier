@@ -3,12 +3,13 @@
 //! it a sample of the machine every second, and a reading of each provider every minute.
 
 mod consts;
+mod helpers;
 mod impls;
 mod structs;
 mod traits;
-mod types;
 
 pub use consts::{LOAD_EVERY, PROVIDERS_EVERY};
+pub use helpers::register;
 pub use structs::{SysinfoProbe, Vitals};
 
 #[cfg(test)]

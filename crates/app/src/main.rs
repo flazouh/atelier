@@ -50,6 +50,7 @@ mod session_view;
 mod settings_pane;
 mod ship;
 mod shell;
+mod slots;
 mod sidebar_layout;
 mod ssh_form;
 mod status;
@@ -84,6 +85,7 @@ fn main() {
         file_glyphs::install(cx);
         cx.set_global(agent_session::RunPickedSkills(saved.run_picked_skills.unwrap_or(false)));
         cx.set_global(capability_hub::CapabilityHub::for_this_app(saved.capabilities.agent_tools.unwrap_or(true)));
+        cx.set_global(slots::builtin());
         cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));
         pr_glance::install(&saved.pr_card_off, cx);
         cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));
