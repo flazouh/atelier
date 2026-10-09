@@ -1,0 +1,14 @@
+{
+  "rows": [
+    { "id": "1200000000000000010", "name": "Text Channels", "type": 4, "guildId": "1100000000000000001", "parentId": null, "url": "https://discord.com/channels/1100000000000000001/1200000000000000010" },
+    { "id": "1200000000000000001", "name": "general", "type": 0, "guildId": "1100000000000000001", "parentId": "1200000000000000010", "url": "https://discord.com/channels/1100000000000000001/1200000000000000001" },
+    { "id": "1200000000000000002", "name": "Lounge", "type": 2, "guildId": "1100000000000000001", "parentId": "1200000000000000010", "url": "https://discord.com/channels/1100000000000000001/1200000000000000002" },
+    { "id": "1200000000000000003", "name": "announcements", "type": 5, "guildId": "1100000000000000001", "parentId": "1200000000000000010", "url": "https://discord.com/channels/1100000000000000001/1200000000000000003" },
+    { "id": "1200000000000000004", "name": "release-notes", "type": 11, "guildId": "1100000000000000001", "parentId": "1200000000000000001", "url": "https://discord.com/channels/1100000000000000001/1200000000000000004" },
+    { "id": "1200000000000000005", "name": "staff-only", "type": 12, "guildId": "1100000000000000001", "parentId": "1200000000000000001", "url": "https://discord.com/channels/1100000000000000001/1200000000000000005" }
+  ],
+  "serverId": "1100000000000000001",
+  "total": 6,
+  "hasMore": false,
+  "nextOffset": null
+}
