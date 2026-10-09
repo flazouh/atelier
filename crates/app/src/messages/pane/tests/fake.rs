@@ -20,6 +20,7 @@ struct Plan {
     left_out: Vec<Operation>,
     features_off: Vec<Feature>,
     formatting: Option<Formatting>,
+    read_only: bool,
     calls: HashMap<Operation, usize>,
 }
 
@@ -73,6 +74,11 @@ impl Fake {
         self.plan.lock().unwrap().features_off.push(feature);
     }
 
+    /// The account lists `ReadOnly` and refuses every write, as Discord does without `allow_writes`. `send` stays listed.
+    pub fn read_only(&self) {
+        self.plan.lock().unwrap().read_only = true;
+    }
+
     pub fn keeping(&self, formatting: Formatting) {
         self.plan.lock().unwrap().formatting = Some(formatting);
     }
@@ -115,6 +121,9 @@ impl MessagingProvider for Fake {
         if let Some(formatting) = plan.formatting {
             caps.formatting = formatting;
         }
+        if plan.read_only {
+            caps.features.push(Feature::ReadOnly);
+        }
         caps
     }
 
@@ -148,6 +157,12 @@ impl MessagingProvider for Fake {
 
     fn send(&self, new: &NewMessage, by: &Actor) -> CapResult<Message> {
         self.check(Operation::Send)?;
+        if self.plan.lock().unwrap().read_only {
+            return Err(CapError::Provider {
+                code: "read_only".into(),
+                message: "this account may not write".into(),
+            });
+        }
         self.inner.send(new, by)
     }
 

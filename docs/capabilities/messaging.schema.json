@@ -114,7 +114,7 @@
           "type": "array",
           "items": { "enum": ["channels", "history", "thread", "send", "subscribe", "search", "edit", "delete", "react", "mark_read", "person", "export", "import"] }
         },
-        "features": { "type": "array", "items": { "enum": ["threads", "reactions", "edits", "attachments", "presence", "typing"] } },
+        "features": { "type": "array", "items": { "enum": ["threads", "reactions", "edits", "attachments", "presence", "typing", "read_only"] } },
         "formatting": { "enum": ["plain", "basic", "rich"] },
         "limits": { "type": "object", "properties": { "page_max": { "type": "integer" }, "per_minute": { "type": "integer" } } },
         "auth": { "type": "array", "items": { "enum": ["oauth", "token", "browser_session", "none"] } }

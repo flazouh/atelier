@@ -140,3 +140,55 @@ fn the_seed_has_something_of_each_thing_the_screen_draws() {
         "the first channel pages, so Load older shows"
     );
 }
+
+#[test]
+fn the_readonly_value_registers_an_account_that_lists_read_only_and_refuses_a_send() {
+    let hub = hub();
+    assert!(register(&hub, Some("readonly")));
+    let providers = hub.messaging_providers();
+    assert_eq!(providers.len(), 1);
+    let p = &providers[0];
+    assert_eq!((p.provider(), p.account()), ("memory", "demo"));
+    assert!(
+        p.capabilities()
+            .has(atelier_capabilities::messaging::Feature::ReadOnly)
+    );
+    assert!(!p.offers(atelier_capabilities::messaging::Operation::Send));
+    let channels = p.channels(&ChannelQuery::default()).unwrap().items;
+    assert!(
+        !p.history(&channels[0].reference, None, None)
+            .unwrap()
+            .items
+            .is_empty(),
+        "it reads"
+    );
+    let sent = p.send(
+        &atelier_capabilities::messaging::NewMessage::to(&channels[0].reference, "x"),
+        &Actor::person("me", "me"),
+    );
+    assert!(
+        matches!(&sent, Err(atelier_capabilities::CapError::Provider { code, .. }) if code == "read_only"),
+        "{sent:?}"
+    );
+}
+
+/// A release build has no demo at all: the module, and the call that registers it, stand behind `debug_assertions`. A
+/// debug test cannot compile a release build, so it reads the two places the gate is written.
+#[test]
+fn a_release_build_has_no_demo() {
+    let module = include_str!("../../messages.rs");
+    assert!(
+        module.contains("#[cfg(debug_assertions)]\npub mod demo;"),
+        "the module is a debug-only module"
+    );
+    let main = include_str!("../../main.rs");
+    let call = main
+        .find("messages::demo::register_from_env")
+        .expect("main registers the demo");
+    assert!(
+        main[..call]
+            .trim_end()
+            .ends_with("#[cfg(debug_assertions)]\n        let _ ="),
+        "the call is a debug-only call"
+    );
+}

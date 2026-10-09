@@ -59,10 +59,15 @@ impl MessagingProvider for DiscordMessaging {
         if self.core.can_search() {
             operations.push(Operation::Search);
         }
+        // A reply is a thread here (see `thread`). Discord keeps no reaction or edit time in what the tool prints.
+        let mut features = vec![Feature::Threads, Feature::Attachments];
+        // `send` is core, so it stays listed; this tells the screen and the agent tools that it will be refused.
+        if !self.core.config.allow_writes {
+            features.push(Feature::ReadOnly);
+        }
         MessagingCapabilities {
             operations,
-            // A reply is a thread here (see `thread`). Discord keeps no reaction or edit time in what the tool prints.
-            features: vec![Feature::Threads, Feature::Attachments],
+            features,
             // Discord shows bold, italic, strike, code, quotes and lists, but not `[text](url)` from a person.
             formatting: Formatting::Basic,
             limits: Limits {

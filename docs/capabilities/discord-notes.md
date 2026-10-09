@@ -13,7 +13,8 @@ people notice and report.
 So the provider reads by default:
 
 - `DiscordConfig::allow_writes` is `false` unless the app sets it. With `false`, `send` runs no command and returns
-  `Provider { code: "read_only" }`. It stays in the core list of operations because the contract needs it there.
+  `Provider { code: "read_only" }`. It stays in the core list of operations because the contract needs it there, so the provider also lists the
+  `read_only` feature (exactly when `allow_writes` is `false`) and the screen and the agent tools hide what writes.
 - Every write the app asks for still goes through the "ask every time" rule of the spec (section 8). The flag is a second
   lock. The app should set it only after the person turns it on for one account, knowing this risk.
 - Every look of a subscription is a request on the same token. The default is one look every 15 seconds for each channel,

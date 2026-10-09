@@ -39,6 +39,22 @@ fn discord_passes_the_contract_on_a_fake_discord() {
     });
 }
 
+/// A block with no `allow_writes` is read-only, and the contract holds it to refusing every write.
+#[test]
+fn a_default_block_passes_the_read_only_contract() {
+    contract::run(&|| {
+        let mut config = DiscordConfig::new(GUILD);
+        config.include_dms = true;
+        Seed {
+            provider: Box::new(fake_provider(config)),
+            public: format!("messaging:discord:{GUILD}:{GENERAL}")
+                .parse()
+                .unwrap(),
+            dm: format!("messaging:discord:dm:{DM}").parse().unwrap(),
+        }
+    });
+}
+
 #[test]
 fn a_server_provider_without_dms_lists_search_and_finds_by_word_channel_and_author() {
     let mut config = DiscordConfig::new(GUILD);

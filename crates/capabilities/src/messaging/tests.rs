@@ -1,8 +1,9 @@
 use super::{
-    Attachment, AttachmentKind, ChannelKind, MemoryMessaging, Message, MessagingProvider,
-    NewMessage, contract, contract::Seed, message_ref, split_message,
+    Attachment, AttachmentKind, Channel, ChannelKind, ChannelQuery, Event, Feature, Filter,
+    MemoryMessaging, Message, MessagingCapabilities, MessagingProvider, NewMessage, Operation,
+    Page, Workspace, contract, contract::Seed, message_ref, split_message,
 };
-use crate::Ref;
+use crate::{Actor, CapError, CapResult, Ref, Subscription};
 
 fn seed() -> Seed {
     let p = MemoryMessaging::new("test");
@@ -18,6 +19,105 @@ fn seed() -> Seed {
 #[test]
 fn the_memory_provider_passes_the_contract() {
     contract::run(&seed);
+}
+
+/// A memory provider that may not write: it lists `ReadOnly` and `send` (the core), and refuses the write, as Discord
+/// does when it has no `allow_writes`.
+struct ReadOnlyMemory(MemoryMessaging);
+
+impl MessagingProvider for ReadOnlyMemory {
+    fn provider(&self) -> &str {
+        self.0.provider()
+    }
+    fn account(&self) -> &str {
+        self.0.account()
+    }
+    fn capabilities(&self) -> MessagingCapabilities {
+        MessagingCapabilities {
+            operations: MessagingCapabilities::CORE.to_vec(),
+            features: vec![Feature::ReadOnly],
+            ..self.0.capabilities()
+        }
+    }
+    fn whoami(&self) -> CapResult<Actor> {
+        self.0.whoami()
+    }
+    fn workspace(&self) -> CapResult<Workspace> {
+        self.0.workspace()
+    }
+    fn channels(&self, query: &ChannelQuery) -> CapResult<Page<Channel>> {
+        self.0.channels(query)
+    }
+    fn history(
+        &self,
+        c: &Ref,
+        cursor: Option<&str>,
+        limit: Option<u32>,
+    ) -> CapResult<Page<Message>> {
+        self.0.history(c, cursor, limit)
+    }
+    fn thread(&self, root: &Ref, cursor: Option<&str>) -> CapResult<Page<Message>> {
+        self.0.thread(root, cursor)
+    }
+    fn send(&self, _: &NewMessage, _: &Actor) -> CapResult<Message> {
+        Err(CapError::Provider {
+            code: "read_only".into(),
+            message: "this account may not write".into(),
+        })
+    }
+    fn subscribe(&self, filter: &Filter) -> CapResult<Subscription<Event>> {
+        self.0.subscribe(filter)
+    }
+}
+
+#[test]
+fn a_read_only_provider_passes_the_contract_that_asks_it_to_change_nothing() {
+    contract::run(&|| {
+        let p = MemoryMessaging::new("test");
+        let public = p.add_channel("general", ChannelKind::Public);
+        let dm = p.add_channel("sam", ChannelKind::Dm);
+        Seed {
+            provider: Box::new(ReadOnlyMemory(p)),
+            public,
+            dm,
+        }
+    });
+}
+
+#[test]
+fn a_read_only_account_lists_send_but_does_not_offer_a_call_that_writes() {
+    let p = ReadOnlyMemory(MemoryMessaging::new("test"));
+    assert!(p.can(Operation::Send), "send is core, so it is listed");
+    assert!(!p.offers(Operation::Send), "but it is not offered");
+    assert!(p.offers(Operation::History), "a read stays");
+    let writable = MemoryMessaging::new("test");
+    assert!(
+        writable.offers(Operation::Send),
+        "a writable account offers it"
+    );
+    assert!(
+        !writable.capabilities().has(Feature::ReadOnly),
+        "the memory provider lists no ReadOnly"
+    );
+}
+
+#[test]
+fn every_write_operation_is_named_and_no_read_is() {
+    let writes: Vec<Operation> = MessagingCapabilities::ALL
+        .into_iter()
+        .filter(|o| o.writes())
+        .collect();
+    assert_eq!(
+        writes,
+        [
+            Operation::Send,
+            Operation::Edit,
+            Operation::Delete,
+            Operation::React,
+            Operation::MarkRead,
+            Operation::Import
+        ]
+    );
 }
 
 #[test]

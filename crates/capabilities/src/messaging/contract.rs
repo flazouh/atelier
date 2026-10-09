@@ -25,7 +25,12 @@ pub struct Seed {
 /// Makes a fresh seed.
 pub type Make<'a> = &'a dyn Fn() -> Seed;
 
+/// A provider that lists `ReadOnly` is held to [`read_only_changes_nothing`] alone: the other checks send first, and
+/// a read-only account may not.
 pub fn run(make: Make) {
+    if make().provider.capabilities().has(Feature::ReadOnly) {
+        return read_only_changes_nothing(make);
+    }
     send_then_history(make);
     replies_go_to_the_thread(make);
     pages_do_not_repeat_or_skip(make);
@@ -39,6 +44,70 @@ pub fn run(make: Make) {
     mark_read(make);
 }
 
+/// Check 12: a provider that lists `ReadOnly` offers no call that writes, and each write call it still lists answers
+/// `Provider { code: "read_only" }` and changes nothing.
+pub fn read_only_changes_nothing(make: Make) {
+    let Seed {
+        provider: p,
+        public,
+        dm,
+    } = make();
+    let caps = p.capabilities();
+    assert!(caps.has(Feature::ReadOnly), "the provider lists ReadOnly");
+    for op in super::structs::MessagingCapabilities::ALL {
+        assert!(
+            !(op.writes() && caps.offers(op)),
+            "{op:?} writes, so a read-only account does not offer it"
+        );
+    }
+    let by = me(&*p);
+    let before = p.history(&public, None, None).expect("history");
+    let nowhere = super::helpers::message_ref(&public, "1");
+    let refused = [
+        (
+            "send",
+            p.send(&NewMessage::to(&public, "no"), &by).map(drop),
+        ),
+        (
+            "reply",
+            p.send(&NewMessage::reply(&nowhere, &public, "no"), &by)
+                .map(drop),
+        ),
+        (
+            "send to a dm",
+            p.send(&NewMessage::to(&dm, "no"), &by).map(drop),
+        ),
+    ];
+    for (call, result) in refused {
+        assert!(
+            matches!(&result, Err(CapError::Provider { code, .. }) if code == "read_only"),
+            "{call} answers read_only, got {result:?}"
+        );
+    }
+    let write_calls = [
+        (Operation::Edit, p.edit(&nowhere, "x", &by).map(drop)),
+        (Operation::Delete, p.delete(&nowhere, &by)),
+        (
+            Operation::React,
+            p.react(&nowhere, "eyes", true, &by).map(drop),
+        ),
+        (Operation::MarkRead, p.mark_read(&public, None)),
+    ];
+    for (op, result) in write_calls {
+        match (caps.can(op), &result) {
+            (true, Err(CapError::Provider { code, .. })) if code == "read_only" => {}
+            (true, other) => panic!("{op:?} is listed, so it answers read_only, got {other:?}"),
+            (false, Err(CapError::Unsupported { .. })) => {}
+            (false, other) => panic!("{op:?} is not listed, so it is unsupported, got {other:?}"),
+        }
+    }
+    let after = p.history(&public, None, None).expect("history");
+    assert_eq!(
+        text_of(&after.items),
+        text_of(&before.items),
+        "nothing changed"
+    );
+}
 fn me(p: &dyn MessagingProvider) -> Actor {
     p.whoami().expect("whoami")
 }

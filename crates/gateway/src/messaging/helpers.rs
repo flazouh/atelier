@@ -190,8 +190,14 @@ fn chosen(
 impl Chosen {
     /// The call is for an account that cannot do it: say so, and name the account.
     fn needs(&self, operation: Operation, feature: &str) -> Result<(), String> {
-        if self.provider.can(operation) {
+        if self.provider.offers(operation) {
             Ok(())
+        } else if self.provider.can(operation) {
+            // Listed, and refused by the account: say it plainly so the agent does not try again.
+            Err(format!(
+                "Could not {feature}: {} is read-only, so nothing can be changed there.",
+                self.place
+            ))
         } else {
             Err(failed(feature, &self.place, CapError::unsupported(feature)))
         }
