@@ -115,6 +115,7 @@ pub fn banner(problem: Problem, retry: impl Fn(&mut Window, &mut App) + 'static,
     };
     let row = div()
         .id("tasks-banner")
+        .debug_selector(|| "tasks-banner".into())
         .flex()
         .flex_none()
         .items_center()
@@ -125,6 +126,7 @@ pub fn banner(problem: Problem, retry: impl Fn(&mut Window, &mut App) + 'static,
     let row = if problem == Problem::Offline {
         row.child(
             Button::new("tasks-retry")
+                .debug_name("tasks-retry")
                 .label("Retry")
                 .variant(ButtonVariant::Ghost)
                 .size(ButtonSize::Sm)
@@ -140,6 +142,7 @@ pub fn banner(problem: Problem, retry: impl Fn(&mut Window, &mut App) + 'static,
 pub fn signed_out(provider: &str, open_settings: impl Fn(&mut Window, &mut App) + 'static, theme: &Theme) -> gpui_kit::AnyElement {
     div()
         .id("tasks-signed-out")
+        .debug_selector(|| "tasks-signed-out".into())
         .flex_1()
         .flex()
         .flex_col()
@@ -150,6 +153,7 @@ pub fn signed_out(provider: &str, open_settings: impl Fn(&mut Window, &mut App) 
         .child(div().text_color(theme.muted_foreground).child(format!("Sign in to {provider} to see its tasks.")))
         .child(
             Button::new("tasks-sign-in")
+                .debug_name("tasks-sign-in")
                 .label("Open settings")
                 .variant(ButtonVariant::Secondary)
                 .size(ButtonSize::Sm)
@@ -162,6 +166,7 @@ pub fn signed_out(provider: &str, open_settings: impl Fn(&mut Window, &mut App) 
 pub fn load_more(loading: bool, load: impl Fn(&mut Window, &mut App) + 'static) -> impl IntoElement {
     div().id("tasks-load-more-row").flex().flex_none().justify_center().py(px(6.)).child(
         Button::new("tasks-load-more")
+            .debug_name("tasks-load-more")
             .label(if loading { "Loading…" } else { "Load more" })
             .variant(ButtonVariant::Ghost)
             .size(ButtonSize::Sm)

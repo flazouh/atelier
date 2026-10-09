@@ -470,6 +470,12 @@ fn a_failed_lookup_gives_no_chip(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert!(cx.update(|_, cx| project.read(cx).chips().is_empty()));
 }
+/// The reference the Tasks pane gives the local task with this key.
+fn local_ref(tasks: &Option<crate::tasks::Slot>, key: &str, cx: &gpui_kit::App) -> atelier_capabilities::Ref {
+    let account = tasks.as_ref().unwrap().pane.read(cx).provider().unwrap().account().to_string();
+    atelier_capabilities::Ref::new("tasks", "local", &account, key).unwrap()
+}
+
 /// The tasks take the right pane when asked for, and give it back when asked again.
 #[gpui_kit::test]
 fn the_tasks_take_the_right_pane_and_give_it_back(cx: &mut TestAppContext) {
@@ -495,7 +501,7 @@ fn a_session_started_from_a_task_moves_it_along(cx: &mut TestAppContext) {
     let mut new = NewTask::titled("Add a line to the README");
     new.description = "Say hello.".into();
     let task = tracker.create(&new, "me").unwrap();
-    cx.update(|window, cx| project.update(cx, |p, cx| p.start_from_task(task.id.clone(), window, cx)));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.start_from_task(local_ref(&p.tasks, &task.key, cx), window, cx)));
     cx.run_until_parked();
     let now = tracker.get(&task.id).unwrap().unwrap();
     assert_eq!(now.assignee, Some(atelier_tracker::Assignee::Agent("Fake".into())), "the agent of the project takes it");
@@ -570,7 +576,7 @@ fn a_session_tells_its_task_while_the_tasks_pane_is_closed(cx: &mut TestAppConte
     cx.run_until_parked();
     let tracker = cx.update(|_, cx| project.read(cx).tasks.as_ref().unwrap().pane.read(cx).tracker().unwrap());
     let task = tracker.create(&NewTask::titled("Work"), "me").unwrap();
-    cx.update(|window, cx| project.update(cx, |p, cx| p.start_from_task(task.id.clone(), window, cx)));
+    cx.update(|window, cx| project.update(cx, |p, cx| p.start_from_task(local_ref(&p.tasks, &task.key, cx), window, cx)));
     cx.run_until_parked();
     assert_eq!(tracker.get(&task.id).unwrap().unwrap().status, Status::InReview);
     // The pane goes (a window that never opened it after a restart is the same): the reply still reaches the task.

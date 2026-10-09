@@ -89,7 +89,7 @@ pub struct TasksPane {
     scope: Scope,
     pub(super) open: Option<SharedString>,
     pub(super) creating: bool,
-    said: Option<SharedString>,
+    pub(super) said: Option<SharedString>,
     /// The task to put the cursor on when the tasks are read again: the one just made.
     select_after: Option<SharedString>,
     pub(super) width: f32,
@@ -737,6 +737,7 @@ impl Render for TasksPane {
             .when(self.vocab.can(Operation::Create), |d| {
                 d.child(
                     Button::new("tasks-new")
+                        .debug_name("tasks-new")
                         .label("New task")
                         .variant(ButtonVariant::Secondary)
                         .size(ButtonSize::Sm)

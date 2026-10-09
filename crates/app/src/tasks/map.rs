@@ -7,4 +7,4 @@ pub use helpers::{
     activity_data, agent_id, first_message, label_of, local_id, new_task_of, patches_of, status_to, task_data,
 };
 #[cfg(test)]
-pub use helpers::{actor_id_of, assignee_of, priority_of, priority_to, status_of};
+pub use helpers::{actor_id_of, priority_of, priority_to, status_of};
