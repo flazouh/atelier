@@ -138,6 +138,8 @@ fn def(
             "additionalProperties": false,
         }),
         permission,
+        // Mail lives at Gmail and the like.
+        open_world: true,
     }
 }
 

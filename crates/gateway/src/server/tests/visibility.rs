@@ -126,7 +126,11 @@ fn hints_tell_a_client_which_tools_only_read() {
             json!(false),
             "{name}"
         );
+        // Chat and mail reach outside services.
+        assert_eq!(tool["annotations"]["openWorldHint"], json!(true), "{name}");
         assert_eq!(tool["inputSchema"]["type"], "object");
+        // Chat and mail reach outside services.
+        assert_eq!(tool["annotations"]["openWorldHint"], json!(true), "{name}");
         assert!(
             tool["inputSchema"]["properties"]["account"].is_object(),
             "{name}"

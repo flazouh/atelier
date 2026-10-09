@@ -140,6 +140,8 @@ fn def(
             "additionalProperties": false,
         }),
         permission,
+        // Chat lives at Slack, Discord and the like.
+        open_world: true,
     }
 }
 
