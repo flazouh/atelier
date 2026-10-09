@@ -44,3 +44,23 @@ fn ten_thousand_sessions_read_fast() {
     assert!(cold.as_secs_f64() < 10.0, "cold read took {cold:?}");
     assert!(warm.as_secs_f64() < 1.0, "warm read took {warm:?}");
 }
+
+/// Reads the logs of the machine it runs on and says how long that took. Run it by hand:
+/// `cargo test --release -p atelier-agents real_logs -- --ignored --nocapture`.
+#[test]
+#[ignore = "reads this machine's real logs"]
+fn real_logs_are_read_in_a_few_seconds_and_again_in_a_few_ms() {
+    use crate::usage_history::{Cache, Day, Roots, read_cached};
+    let roots = Roots::from_env();
+    let today = Day::from_epoch_secs(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64, 0);
+    let mut cache = Cache::default();
+    let cold = std::time::Instant::now();
+    let first = read_cached(&roots, today.minus_days(30), 0, &mut cache);
+    let cold = cold.elapsed();
+    let warm = std::time::Instant::now();
+    let second = read_cached(&roots, today.minus_days(30), 0, &mut cache);
+    let warm = warm.elapsed();
+    let sessions: usize = first.accounts.iter().map(|a| a.sessions.len()).sum();
+    println!("accounts {} sessions {sessions} skipped {} cold {cold:?} warm {warm:?}", first.accounts.len(), first.skipped);
+    assert_eq!(first.accounts.len(), second.accounts.len());
+}

@@ -140,6 +140,8 @@ pub struct Shell {
     pub(super) usage_seen: std::sync::Arc<atelier_agents::usage_history::UsageHistory>,
     pub(super) usage_cache: std::sync::Arc<std::sync::Mutex<atelier_agents::usage_history::Cache>>,
     pub(super) usage_focus: FocusHandle,
+    /// The folders whose logs the dashboard reads: this computer's, unless a test says otherwise.
+    pub(super) usage_roots: atelier_agents::usage_history::Roots,
     /// The sessions the reader archived, by the agent's id.
     pub(super) archived: std::collections::BTreeSet<String>,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
@@ -217,6 +219,7 @@ impl Shell {
             usage_seen: Default::default(),
             usage_cache: Default::default(),
             usage_focus: cx.focus_handle(),
+            usage_roots: atelier_agents::usage_history::Roots::from_env(),
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             session_filter: None,
             switcher_open: false,
@@ -2197,7 +2200,7 @@ impl Shell {
             }))
             .children(self.tree_menu(cx))
             .children(self.update_panel(cx))
-            .children(self.usage_panel(cx))
+            .children(self.usage_panel(window, cx))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().occlude().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {

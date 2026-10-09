@@ -1,10 +1,13 @@
 //! The usage dashboard as a panel over the window.
 use atelier_ui::{UsageDashboard, modal::Modal};
-use gpui_kit::{AnyElement, Context, IntoElement, ParentElement, div, InteractiveElement};
+use atelier_ui::scale::px;
+use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, StatefulInteractiveElement, Styled, Window, div};
 use super::structs::Shell;
 use crate::usage_view;
+/// The room the panel leaves above and below it, in design pixels.
+const MARGIN: f32 = 96.;
 impl Shell {
-    pub(super) fn usage_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(super) fn usage_panel(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let state = self.usage.as_ref()?;
         let readings = self.vitals.read(cx).providers().to_vec();
         let (today, _) = usage_view::today();
@@ -31,7 +34,15 @@ impl Shell {
                 .flush()
                 .focus(&self.usage_focus)
                 .on_close(move |_, cx| drop(close.update(cx, |shell, cx| shell.close_usage(cx))))
-                .child(div().track_focus(&self.usage_focus).child(dashboard))
+                .child(
+                    // The window is the limit: a dashboard taller than it scrolls inside the panel.
+                    div()
+                        .id("usage-scroll")
+                        .track_focus(&self.usage_focus)
+                        .max_h(window.viewport_size().height - px(MARGIN))
+                        .overflow_y_scroll()
+                        .child(dashboard),
+                )
                 .into_any_element(),
         )
     }

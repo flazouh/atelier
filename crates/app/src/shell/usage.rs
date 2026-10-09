@@ -1,7 +1,7 @@
 //! The usage dashboard's state: opened by a press on the usage chips in the status bar. The logs are read off the UI
 //! thread, and what was read stays for the next opening, so the dashboard shows at once and then refreshes.
 use std::sync::Arc;
-use atelier_agents::usage_history::{Roots, read_cached};
+use atelier_agents::usage_history::read_cached;
 use atelier_ui::{Selection, UsageRange};
 use gpui_kit::{Context, SharedString};
 use super::structs::Shell;
@@ -39,7 +39,7 @@ impl Shell {
     }
     /// Reads the session logs of the last month in the background; a file that did not change is not read again.
     fn read_usage(&mut self, cx: &mut Context<Self>) {
-        let cache = self.usage_cache.clone();
+        let (cache, roots) = (self.usage_cache.clone(), self.usage_roots.clone());
         let (today, offset) = usage_view::today();
         cx.spawn(async move |this, cx| {
             let history = cx
@@ -47,7 +47,7 @@ impl Shell {
                 .spawn(async move {
                     let since = today.minus_days(i64::from(consts_longest()));
                     let mut cache = cache.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                    read_cached(&Roots::from_env(), since, offset, &mut cache)
+                    read_cached(&roots, since, offset, &mut cache)
                 })
                 .await;
             drop(this.update(cx, |shell, cx| {
