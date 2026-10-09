@@ -14,15 +14,12 @@ use crate::agent_session::AgentSession;
 use crate::open_project::OpenProject;
 use crate::review_pane::Scope;
 
-/// The rail's mark for Mail. An envelope belongs here; atelier-ui has none yet.
-const MAIL_ICON: IconName = IconName::Description;
-
 fn rail_view(view: ShellView, needs_you: usize) -> RailView {
     match view {
         ShellView::Tasks => RailView { icon: IconName::Checklist, label: "Tasks".into(), debug: "rail-tasks", count: 0 },
         ShellView::Git => RailView { icon: IconName::Code, label: "Code".into(), debug: "rail-git", count: 0 },
         ShellView::Messages => RailView { icon: IconName::ChatBubble, label: "Messages".into(), debug: "rail-messages", count: 0 },
-        ShellView::Mail => RailView { icon: MAIL_ICON, label: "Mail".into(), debug: "rail-mail", count: 0 },
+        ShellView::Mail => RailView { icon: IconName::Mail, label: "Mail".into(), debug: "rail-mail", count: 0 },
         _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions", count: needs_you },
     }
 }
