@@ -145,6 +145,11 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
         },
         Request::Marks => json!({ "marks": super::marks::names(cx) }),
         Request::View { name } => {
+            // A view a module registered (Usage) opens over the window, as its door in the status bar does.
+            if cx.global::<crate::slots::Slots>().view(&name).is_some() {
+                shell.open_view(&name, cx);
+                return json!({ "ok": true, "view": name });
+            }
             let view = crate::shell::ShellView::from_words(Some(&name));
             if view.words() != name {
                 return json!({ "error": format!("no view named {name}") });

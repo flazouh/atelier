@@ -41,6 +41,10 @@ impl Shell {
     /// A press on the rail. Another view comes to the front with the sidebar shown; the view in front
     /// hides or shows the sidebar.
     pub(super) fn pick_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
+        // A view a module opened over the window gives way to the lens the reader picks.
+        if self.opened.take().is_some() {
+            cx.notify();
+        }
         let fit = Fit::of(atelier_ui::scale::design(window.viewport_size().width));
         if view == self.view.lens() {
             return self.flip_sidebar(fit, cx);
