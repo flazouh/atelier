@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use atelier_ui::session_status::SessionStatus;
 use futures_channel::mpsc;
 use futures_util::StreamExt;
-use crate::palette::Hue;
+use atelier_palette::Hue;
 use atelier_ui::{IconName, ReplyPreset, VoiceInputEvent, PromptInput, PromptInputEvent, SelectionReply, SelectionReplyEvent, context_usage::ContextPart};
 use gpui_kit::{
     AppContext, Context, Entity, EventEmitter, ListAlignment, ListState, SharedString,

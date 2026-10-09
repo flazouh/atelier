@@ -1,0 +1,11 @@
+[package]
+name = "atelier-palette"
+description = "The colours the app draws marks in, named once: the palette, and what colour each kind of release note has."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+gpui-kit.workspace = true
+atelier-ui.workspace = true

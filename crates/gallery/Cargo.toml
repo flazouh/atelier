@@ -12,6 +12,7 @@ atelier-ui.workspace = true
 atelier-agents.workspace = true
 atelier-editor.workspace = true
 atelier-lsp.workspace = true
+atelier-palette.workspace = true
 atelier-pr-view.workspace = true
 atelier-project.workspace = true
 atelier-settings.workspace = true

@@ -1,5 +1,5 @@
 use super::super::{NoteLine, release_notes};
-use atelier_ui::ReleaseKind::{self, Fixed, Improved, New};
+use atelier_ui::ReleaseKind::{self, Added, Changed, Design, Faster, Fixed, Improved};
 
 fn line(lead: &str, text: &str) -> NoteLine {
     NoteLine { kind: Improved, lead: lead.into(), text: text.into() }
@@ -35,7 +35,22 @@ fn words_with_no_bullet_are_one_note_and_nothing_is_none() {
 #[test]
 fn a_bullet_takes_its_kind_from_the_heading_above_it() {
     let notes = release_notes("## What is new in 1\n\n### New\n\n- **A:** a\n- **B:** b\n\n### Fixed\n\n- **C:** c\n\n### Improved\n- **D:** d");
-    assert_eq!(notes, vec![typed(New, "A", "A"), typed(New, "B", "B"), typed(Fixed, "C", "C"), typed(Improved, "D", "D")]);
+    assert_eq!(notes, vec![typed(Added, "A", "A"), typed(Added, "B", "B"), typed(Fixed, "C", "C"), typed(Improved, "D", "D")]);
     assert_eq!(release_notes("- **A:** a"), vec![typed(Improved, "A", "A")], "with no heading: improved");
     assert_eq!(release_notes("### Fixes\n- **A:** a")[0].kind, Fixed, "the word decides: fix");
+}
+
+#[test]
+fn every_heading_word_names_one_of_the_six_kinds() {
+    let kind = |heading: &str| release_notes(&format!("### {heading}\n- **A:** a"))[0].kind;
+    assert_eq!(kind("New"), Added);
+    assert_eq!(kind("Added"), Added);
+    assert_eq!(kind("Improved"), Improved);
+    assert_eq!(kind("Faster"), Faster);
+    assert_eq!(kind("Performance"), Faster);
+    assert_eq!(kind("Fixed"), Fixed);
+    assert_eq!(kind("Bug fixes"), Fixed);
+    assert_eq!(kind("Changed"), Changed);
+    assert_eq!(kind("Design"), Design);
+    assert_eq!(kind("Something else"), Improved, "an unknown heading is improved");
 }
