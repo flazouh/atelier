@@ -6,7 +6,7 @@ use atelier_ui::{
     ActiveTheme, Selection, Series, SourceKind, UsageDashboard, UsageDay, UsageModel, UsageRange, UsageSession, UsageSource,
 };
 use gpui_kit::{App, IntoElement, ParentElement, Styled, div, px};
-fn source(id: &str, name: &str, caption: &str, group: &str, series: Series, limit: Option<f32>, value: &str, note: &str) -> UsageSource {
+fn source(id: &str, name: &str, caption: &str, group: &str, series: Series, limit: Option<f32>, shown: (&str, &str)) -> UsageSource {
     UsageSource {
         id: id.to_string().into(),
         name: name.to_string().into(),
@@ -14,8 +14,8 @@ fn source(id: &str, name: &str, caption: &str, group: &str, series: Series, limi
         group: group.to_string().into(),
         series,
         limit,
-        value: value.to_string().into(),
-        note: note.to_string().into(),
+        value: shown.0.to_string().into(),
+        note: shown.1.to_string().into(),
         kind: if limit.is_some() { SourceKind::Subscription } else { SourceKind::Key },
     }
 }
@@ -64,13 +64,13 @@ pub fn usage_story(cx: &App) -> impl IntoElement {
         .selection(Selection::All)
         .summary("5.84 M", "today")
         .sources(vec![
-            source("max-p", "Max", "personal", claude, Series::new(0, 0), Some(0.45), "45%", "7d"),
-            source("max-w", "Max", "work", claude, Series::new(0, 1), Some(0.82), "82%", "7d"),
-            source("team", "Team", "seat", claude, Series::new(0, 2), Some(0.18), "18%", "7d"),
-            source("codex", "Codex", "subscription", "Codex", Series::new(1, 0), Some(0.31), "31%", "30d"),
-            source("or-w", "Work", "key", "OpenRouter · 2 keys", Series::new(2, 0), Some(0.21), "$4.20", "of $20"),
-            source("or-p", "Personal", "key", "OpenRouter · 2 keys", Series::new(2, 0), None, "$1.10", "month"),
-            source("api", "API", "key", "Anthropic API", Series::new(3, 0), Some(0.76), "$38", "month"),
+            source("max-p", "Max", "personal", claude, Series::new(0, 0), Some(0.45), ("45%", "7d")),
+            source("max-w", "Max", "work", claude, Series::new(0, 1), Some(0.82), ("82%", "7d")),
+            source("team", "Team", "seat", claude, Series::new(0, 2), Some(0.18), ("18%", "7d")),
+            source("codex", "Codex", "subscription", "Codex", Series::new(1, 0), Some(0.31), ("31%", "30d")),
+            source("or-w", "Work", "key", "OpenRouter · 2 keys", Series::new(2, 0), Some(0.21), ("$4.20", "of $20")),
+            source("or-p", "Personal", "key", "OpenRouter · 2 keys", Series::new(2, 0), None, ("$1.10", "month")),
+            source("api", "API", "key", "Anthropic API", Series::new(3, 0), Some(0.76), ("$38", "month")),
         ])
         .days(days())
         .models(vec![
