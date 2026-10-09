@@ -44,7 +44,7 @@ pub fn run(make: Make) {
     mark_read(make);
 }
 
-/// 12. A provider that lists `ReadOnly` offers no call that writes, and each write call it still lists answers
+/// Check 12: a provider that lists `ReadOnly` offers no call that writes, and each write call it still lists answers
 /// `Provider { code: "read_only" }` and changes nothing.
 pub fn read_only_changes_nothing(make: Make) {
     let Seed {
