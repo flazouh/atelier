@@ -3,6 +3,7 @@
 //!
 //! - [`Ref`]: the stable text that names a thing across capabilities, `tasks:linear:acme:ENG-123`.
 //! - [`Actor`], [`Capabilities`], [`CapError`]: who acts, what a provider can do, and how a call fails.
+//! - [`mail`]: the mail entities, the [`mail::MailProvider`] trait, the shared contract suite, and a memory provider.
 //! - [`tasks`]: the tasks entities, the [`tasks::TasksProvider`] trait, the shared contract suite, and a memory provider.
 //! - [`Registry`]: the providers the app has, by capability, provider and account.
 //! - [`card`]: the tool card schema, and the resolver that turns a card and a tool result into plain values to draw.
@@ -12,6 +13,7 @@ mod actor;
 mod capability;
 pub mod card;
 mod error;
+pub mod mail;
 mod reference;
 mod registry;
 mod subscription;

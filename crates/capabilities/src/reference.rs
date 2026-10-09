@@ -69,7 +69,11 @@ impl Ref {
             provider,
             word(provider, &['_', '-']) && !provider.chars().any(|c| c.is_ascii_uppercase()),
         )?;
-        check("account", account, word(account, &['_', '-', '.']))?;
+        check(
+            "account",
+            account,
+            word(account, &['_', '-', '.', '@', '+']),
+        )?;
         check("id", id, !id.is_empty())?;
         Ok(Self {
             capability: capability.into(),
