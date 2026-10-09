@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use gpui_kit::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, point, size};
 use atelier_ui::scale::px;
 
+mod accounts;
 mod activity;
 mod changelog;
 mod agent_models;
@@ -95,6 +96,9 @@ fn main() {
         pr_glance::install(&saved.pr_card_off, cx);
         cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));
         cx.set_global(providers::ProviderServices::system());
+        // After the hub: the connected accounts are built off the UI thread and handed to it.
+        cx.set_global(accounts::AccountServices::system());
+        accounts::refresh(saved.accounts.clone(), cx);
         cx.set_global(agent_models::ModelPrefs(saved.agent_models.clone()));
         agent_models::refresh(cx);
         let (relaunches, relaunch_requests) = futures_channel::mpsc::unbounded();

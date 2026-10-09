@@ -173,7 +173,7 @@ fn signed_out_shows_an_empty_state_with_a_button_that_asks_for_settings(cx: &mut
     let asked = Arc::new(AtomicBool::new(false));
     let seen = asked.clone();
     cx.update(|_, cx| {
-        cx.subscribe(&pane, move |_, event: &TasksEvent, _| seen.store(matches!(event, TasksEvent::OpenSettings), Ordering::SeqCst)).detach();
+        cx.subscribe(&pane, move |_, event: &TasksEvent, _| seen.store(matches!(event, TasksEvent::OpenAccounts), Ordering::SeqCst)).detach();
     });
     press("tasks-sign-in", &pane, cx);
     assert!(asked.load(Ordering::SeqCst), "the pane asked for Settings");
@@ -298,4 +298,53 @@ fn signed_out_has_no_new_task_button(cx: &mut TestAppContext) {
     provider.fail(Operation::List, CapError::NotSignedIn);
     let (_pane, cx) = open_with(source_of(&[&provider]), 900., cx);
     assert!(cx.debug_bounds("tasks-new").is_none());
+}
+
+fn choices(pane: &Entity<TasksPane>, cx: &mut VisualTestContext) -> Vec<String> {
+    pane.read_with(cx, |p, _| p.source.as_ref().map(|s| s.choices().iter().map(|c| c.words().to_string()).collect()).unwrap_or_default())
+}
+
+/// An account connected or forgotten in Settings reaches a pane that is open: the switcher follows, and the pane that was
+/// showing the account goes back to the project's own tasks.
+#[gpui_kit::test]
+fn a_connected_account_joins_an_open_pane_and_leaves_with_its_provider(cx: &mut TestAppContext) {
+    use crate::capability_hub::CapabilityHub;
+    use atelier_capabilities::tasks::MemoryTasks;
+    use gpui_kit::BorrowAppContext;
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        atelier_ui::init(cx);
+        atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
+        cx.set_reduce_motion(true);
+        cx.set_global(CapabilityHub::detached());
+    });
+    let base = tempfile::tempdir().unwrap();
+    let root = base.path().join("atelier");
+    std::fs::create_dir_all(&root).unwrap();
+    let project: Arc<dyn atelier_project::Project> = Arc::new(atelier_project::LocalProject::open(&root).unwrap().with_data_dir(&base.path().join("data")));
+    let (pane, cx) = cx.add_window_view(|window, cx| TasksPane::new("me", Vec::new(), window, cx));
+    pane.update(cx, |p, cx| p.open_from(project, cx));
+    settle(&pane, cx);
+    assert_eq!(choices(&pane, cx), ["Local · atelier"], "one provider, no switcher");
+
+    let hub = cx.update(|_, cx| cx.global::<CapabilityHub>().clone());
+    let acme = Arc::new(MemoryTasks::new("acme"));
+    let connect = |providers: Vec<Arc<dyn TasksProvider>>, cx: &mut VisualTestContext| {
+        let turn = hub.checking(&Default::default());
+        hub.install(crate::accounts::Built { rows: Default::default(), providers }, turn);
+        cx.update(|_, cx| cx.update_global::<CapabilityHub, _>(|_, _| {}));
+        settle(&pane, cx);
+    };
+
+    connect(vec![acme.clone()], cx);
+    assert_eq!(choices(&pane, cx), ["Local · atelier", "Memory · acme"], "the switcher lists the account");
+    assert!(cx.debug_bounds("tasks-provider").is_some(), "and is drawn");
+
+    pane.update(cx, |p, cx| p.choose(1, cx));
+    settle(&pane, cx);
+    assert_eq!(pane.read_with(cx, |p, _| p.provider().map(|p| p.account().to_string())), Some("acme".into()));
+
+    connect(Vec::new(), cx);
+    assert_eq!(choices(&pane, cx), ["Local · atelier"]);
+    assert_eq!(pane.read_with(cx, |p, _| p.provider().map(|p| p.account().to_string())), Some("atelier".into()), "back on the project's tasks");
 }

@@ -152,6 +152,14 @@ Every provider must pass one shared suite, including the local one:
 4. Build the Linear provider as the second implementation. It passes the contract suite or the spec changes.
 5. Only then freeze v1 and publish the schema for the iOS app and for plugin authors.
 
+### 10.1 How a person connects a provider
+Settings, Accounts. Linear takes an API key, which goes to the keychain under `linear-api-key` and never to the settings
+file. GitHub Issues takes `owner/repo` and uses the `gh` login, so it keeps no key. The settings file (`accounts`) holds
+only the facts: that Linear is connected, the repository, the name of the person. The capability hub builds the providers
+from these at start and after each change, off the UI thread, and gives the same objects to the Tasks screen and to the
+agent gateway (`tasks_list` and the others take them as `provider/account`). A provider that cannot be built (a refused
+key, no network) is left out. Its row in Settings says `Not signed in` or `Offline` in plain words.
+
 ## 11. Open questions for you
 
 1. **`in_review` as a category.** Linear has no such type. I map by the state's name. Keep six categories, or five and let

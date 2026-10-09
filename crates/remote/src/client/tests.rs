@@ -526,7 +526,15 @@ fn a_worktree_keeps_the_link_open_and_comes_back_with_it() {
     std::fs::write(tree.join("a.txt"), "again").unwrap();
     assert!(changes.recv_timeout(Duration::from_secs(3)).is_ok(), "the worktree's watch came back too");
     drop((_watch, there));
-    assert!(shared.upgrade().is_none(), "the link goes with the last of them");
+    // A thread of the link may hold it for a moment after the last handle drops: wait for its release.
+    let freed = (0..100).any(|_| {
+        let gone = shared.upgrade().is_none();
+        if !gone {
+            thread::sleep(Duration::from_millis(20));
+        }
+        gone
+    });
+    assert!(freed, "the link goes with the last of them");
 }
 
 #[test]

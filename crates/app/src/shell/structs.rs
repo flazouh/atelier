@@ -727,6 +727,20 @@ impl Shell {
             cx.notify();
             return;
         }
+        self.create_settings(window, cx);
+    }
+
+    /// The Settings pane on its Accounts section, from the Tasks screen's sign-in button: opened, or shown there when open
+    /// already (unlike ⌘, it never closes the page).
+    pub(super) fn open_accounts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let pane = match &self.settings {
+            Some((pane, _)) => pane.clone(),
+            None => self.create_settings(window, cx),
+        };
+        pane.update(cx, |pane, cx| pane.show(crate::settings_pane::Section::Accounts, cx));
+    }
+
+    fn create_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<crate::settings_pane::SettingsPane> {
         let saved = settings_path().map(|p| atelier_settings::load(&p)).unwrap_or_default();
         let agents = atelier_agents::registry::agents()
             .into_iter()
@@ -737,6 +751,9 @@ impl Shell {
             })
             .collect();
         let pane = cx.new(|cx| crate::settings_pane::SettingsPane::new(&saved, agents, cx));
+        // The repository of the project in front, for the Accounts section to offer for GitHub Issues.
+        let github_repo = self.active().and_then(|p| p.read(cx).repo.clone()).filter(|r| r.host == "github.com").map(|r| r.slug());
+        pane.update(cx, |pane, cx| pane.set_project_repo(github_repo, cx));
         let events = cx.subscribe_in(&pane, window, |this, _, event: &crate::settings_pane::SettingsEvent, window, cx| match event {
             crate::settings_pane::SettingsEvent::Close => {
                 this.settings = None;
@@ -751,8 +768,9 @@ impl Shell {
             crate::settings_pane::SettingsEvent::Zoom(zoom) => this.zoom_to(*zoom, cx),
         });
         pane.read(cx).focus_handle(cx).focus(window, cx);
-        self.settings = Some((pane, events));
+        self.settings = Some((pane.clone(), events));
         cx.notify();
+        pane
     }
 
 
@@ -1019,7 +1037,7 @@ impl Shell {
                 }
                 this.show_view(ShellView::Files, window, cx)
             }
-            ProjectEvent::OpenSettings => this.open_settings(&OpenSettings, window, cx),
+            ProjectEvent::OpenAccounts => this.open_accounts(window, cx),
             ProjectEvent::ShowTasks => {
                 if let Some(i) = this.projects.iter().position(|p| p == project) {
                     this.active = i;

@@ -74,8 +74,8 @@ pub enum ProjectEvent {
     ShowFiles,
     /// The reader ran `/tasks` in a session: the tasks come to the right pane.
     ShowTasks,
-    /// The Tasks pane asked for Settings, so the reader can sign in to a provider.
-    OpenSettings,
+    /// The Tasks pane asked for the Accounts section of Settings, so the reader can sign in to a provider.
+    OpenAccounts,
 }
 
 /// Why a project's pull requests do not open.

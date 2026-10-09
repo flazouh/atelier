@@ -138,8 +138,8 @@ pub fn banner(problem: Problem, retry: impl Fn(&mut Window, &mut App) + 'static,
     Some(row.into_any_element())
 }
 
-/// The empty state of a provider the reader is not signed in to, with a way to Settings.
-pub fn signed_out(provider: &str, open_settings: impl Fn(&mut Window, &mut App) + 'static, theme: &Theme) -> gpui_kit::AnyElement {
+/// The empty state of a provider the reader is not signed in to, with a way to the Accounts section of Settings.
+pub fn signed_out(provider: &str, open_accounts: impl Fn(&mut Window, &mut App) + 'static, theme: &Theme) -> gpui_kit::AnyElement {
     div()
         .id("tasks-signed-out")
         .debug_selector(|| "tasks-signed-out".into())
@@ -154,10 +154,10 @@ pub fn signed_out(provider: &str, open_settings: impl Fn(&mut Window, &mut App) 
         .child(
             Button::new("tasks-sign-in")
                 .debug_name("tasks-sign-in")
-                .label("Open settings")
+                .label("Open Accounts")
                 .variant(ButtonVariant::Secondary)
                 .size(ButtonSize::Sm)
-                .on_click(move |_, window, cx| open_settings(window, cx)),
+                .on_click(move |_, window, cx| open_accounts(window, cx)),
         )
         .into_any_element()
 }
