@@ -140,3 +140,18 @@ fn a_key_with_a_limit_has_a_tile_and_no_token_logs() {
     assert_eq!((tile.group.as_ref(), tile.value.as_ref(), tile.limit), ("OpenRouter", "21%", Some(0.21)));
     assert!(view.empty.unwrap().contains("no token logs"));
 }
+
+#[test]
+fn a_redraw_with_the_same_state_gets_the_same_view_and_a_press_a_new_one() {
+    let mut state = state(Selection::All);
+    let first = build(&state, &[], TODAY);
+    assert_eq!(build(&state, &[], TODAY), first, "the same state, the same view");
+    state.selection = Selection::Source("Codex:codex".into());
+    let second = build(&state, &[], TODAY);
+    assert_ne!(second, first, "a press on a tile is not answered with the old view");
+    assert_eq!(second.sessions.len(), 1);
+    state.range = UsageRange::Week;
+    assert_eq!(build(&state, &[], TODAY).days.len(), 7, "nor a change of the range");
+    let reading = claude_reading();
+    assert_ne!(build(&state, &[reading], TODAY).sources, second.sources, "nor a new reading of a limit");
+}

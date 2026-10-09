@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 use atelier_agents::usage_history::{Day, Provider, Tokens, UsageHistory};
 use atelier_ui::{ProviderGauge, Selection, UsageDay, UsageModel, UsageSession};
 use gpui_kit::SharedString;
@@ -33,8 +33,27 @@ fn sum_cost(costs: impl Iterator<Item = Option<f64>>) -> Option<f64> {
         (some, None) => some,
     })
 }
-/// What the dashboard draws, for the state it is in, at `today` (and the offset of this computer from UTC).
+/// What the dashboard draws, for the state it is in, at `today`. A redraw with the same state and readings gets the view
+/// built last time: with thousands of sessions, building it is the one costly step of a frame.
 pub fn build(state: &UsageState, readings: &[ProviderGauge], today: Day) -> UsageView {
+    let key = format!(
+        "{:?}|{:?}|{:?}|{:p}|{}|{readings:?}",
+        state.range,
+        state.selection,
+        today,
+        Arc::as_ptr(&state.history),
+        state.loading
+    );
+    if let Some((built_from, view)) = state.built.borrow().as_ref()
+        && *built_from == key
+    {
+        return view.clone();
+    }
+    let view = build_view(state, readings, today);
+    *state.built.borrow_mut() = Some((key, view.clone()));
+    view
+}
+fn build_view(state: &UsageState, readings: &[ProviderGauge], today: Day) -> UsageView {
     let history: &UsageHistory = &state.history;
     let range_days = state.range.days() as u32;
     let sources = sources(history, readings, range_days, today);

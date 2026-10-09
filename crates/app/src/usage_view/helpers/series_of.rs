@@ -11,7 +11,7 @@ pub fn series_of(provider: Provider, at: usize) -> Series {
 /// The colour of a model, by its maker.
 pub fn model_series(model: &str) -> Series {
     let model = model.to_lowercase();
-    if model.contains("gpt") || model.contains("codex") || model.starts_with('o') && model.len() < 4 {
+    if model.contains("gpt") || model.contains("codex") {
         Series::new(CODEX_HUE, 0)
     } else {
         Series::new(CLAUDE_HUE, 0)
