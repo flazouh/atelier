@@ -317,10 +317,10 @@ impl Render for MailPane {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let pane = cx.entity();
-        let open_settings = {
+        let open_accounts = {
             let pane = pane.clone();
             move |_: &mut Window, cx: &mut gpui_kit::App| {
-                pane.update(cx, |_, cx| cx.emit(MailPaneEvent::OpenSettings))
+                pane.update(cx, |_, cx| cx.emit(MailPaneEvent::OpenAccounts))
             }
         };
         let focus = self.focus.clone();
@@ -346,13 +346,13 @@ impl Render for MailPane {
             )
         };
         if self.accounts.is_empty() {
-            return alone(no_account(open_settings, &theme)).into_any_element();
+            return alone(no_account(open_accounts, &theme)).into_any_element();
         }
         if self.effective_problem() == Some(Problem::SignedOut) {
             let name = self
                 .account()
                 .map_or_else(|| "this account".to_string(), |a| a.choice.name());
-            return alone(signed_out(&name, open_settings, &theme)).into_any_element();
+            return alone(signed_out(&name, open_accounts, &theme)).into_any_element();
         }
         root()
             .child(self.list_card(cx))

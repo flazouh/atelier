@@ -52,8 +52,8 @@ pub(super) enum Menu {
 
 /// What the pane asks of the app.
 pub enum MailPaneEvent {
-    /// The reader asked for Settings, to connect or sign in to an account.
-    OpenSettings,
+    /// The reader asked for the Accounts section of Settings, to connect or sign in to an account.
+    OpenAccounts,
 }
 
 /// What a press on a control does, as the drawing code is handed it.

@@ -61,30 +61,30 @@ pub fn banner(
 /// The empty state of an account the reader is not signed in to, with a way to Settings.
 pub fn signed_out(
     account: &str,
-    open_settings: impl Fn(&mut Window, &mut App) + 'static,
+    open_accounts: impl Fn(&mut Window, &mut App) + 'static,
     theme: &Theme,
 ) -> AnyElement {
     state(
         "mail-signed-out",
         format!("Sign in to {account} to see its mail."),
         "mail-sign-in",
-        "Open settings",
-        open_settings,
+        "Open Accounts",
+        open_accounts,
         theme,
     )
 }
 
 /// The empty state of an app with no mail account.
 pub fn no_account(
-    open_settings: impl Fn(&mut Window, &mut App) + 'static,
+    open_accounts: impl Fn(&mut Window, &mut App) + 'static,
     theme: &Theme,
 ) -> AnyElement {
     state(
         "mail-empty",
         "No mail account is connected.".to_string(),
         "mail-open-settings",
-        "Open settings",
-        open_settings,
+        "Open Accounts",
+        open_accounts,
         theme,
     )
 }

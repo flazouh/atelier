@@ -15,7 +15,7 @@ use gpui_kit::{AnyElement, Context, Focusable, Window, div};
 
 use super::{
     lens::{nav_heading, nav_row},
-    structs::{OpenSettings, Shell},
+    structs::Shell,
     view::ShellView,
 };
 use crate::{
@@ -49,9 +49,7 @@ impl Shell {
                     &pane,
                     window,
                     |this: &mut Self, _, event: &MailPaneEvent, window, cx| match event {
-                        MailPaneEvent::OpenSettings => {
-                            this.open_settings(&OpenSettings, window, cx)
-                        }
+                        MailPaneEvent::OpenAccounts => this.open_accounts(window, cx),
                     },
                 );
                 self._subscriptions.push(subscription);
@@ -59,6 +57,16 @@ impl Shell {
                 pane
             }
         };
+        let providers = cx
+            .try_global::<CapabilityHub>()
+            .map(CapabilityHub::mail_providers)
+            .unwrap_or_default();
+        pane.update(cx, |pane, cx| pane.set_providers(providers, cx));
+    }
+
+    /// The hub changed: an open Mail pane takes its accounts as they are now. The same accounts change nothing.
+    pub(super) fn refresh_mail(&mut self, cx: &mut Context<Self>) {
+        let Some(pane) = self.mail.clone() else { return };
         let providers = cx
             .try_global::<CapabilityHub>()
             .map(CapabilityHub::mail_providers)

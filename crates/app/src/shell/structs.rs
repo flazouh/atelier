@@ -202,7 +202,12 @@ impl Shell {
             opening: 0,
             front: None,
             saved_open: (saved.open.clone(), saved.front.clone()),
-            _subscriptions: Vec::new(),
+            // An account connected, forgotten or rebuilt in Settings reaches the open Messages and Mail screens at once, as it
+            // reaches Tasks.
+            _subscriptions: vec![cx.observe_global::<crate::capability_hub::CapabilityHub>(|this, cx| {
+                this.refresh_messages(cx);
+                this.refresh_mail(cx);
+            })],
             panel_views: Default::default(),
             view: ShellView::from_words(saved.view.as_deref()),
             files_narrow: FilesPane::default(),

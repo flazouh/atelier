@@ -16,6 +16,7 @@ pub(crate) use helpers::{
     connect_discord, connect_github, connect_gmail, connect_linear, connect_slack, plain_words, refresh,
 };
 
+pub(crate) use cli::split_list;
 pub(crate) use structs::{AccountServices, Built, Rows, services};
 pub(crate) use types::{Kind, Row};
 
