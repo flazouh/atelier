@@ -3,7 +3,7 @@
 //! one open on its own days. It shows inline here, as the body of a `Modal` made with `flush`; the sample numbers are not
 //! real.
 use atelier_ui::{
-    ActiveTheme, Selection, Series, SourceKind, UsageDashboard, UsageDay, UsageModel, UsageRange, UsageSession, UsageSource,
+    ActiveTheme, Selection, Series, SourceKind, UsageDashboard, UsageDay, UsageModel, UsageRange, UsageSession, UsageSources, UsageStat, UsageSource,
 };
 use gpui_kit::{App, IntoElement, ParentElement, Styled, div, px};
 fn source(id: &str, name: &str, caption: &str, group: &str, series: Series, limit: Option<f32>, shown: (&str, &str)) -> UsageSource {
@@ -59,11 +59,7 @@ fn session(id: &str, title: &str, meta: &str, series: Series, tokens: &str, cost
 pub fn usage_story(cx: &App) -> impl IntoElement {
     let theme = cx.theme();
     let claude = "Claude Code · 3 accounts";
-    let dashboard = UsageDashboard::new("usage-story")
-        .range(UsageRange::Fortnight)
-        .selection(Selection::All)
-        .summary("5.84 M", "today")
-        .sources(vec![
+    let list = vec![
             source("max-p", "Max", "personal", claude, Series::new(0, 0), Some(0.45), ("45%", "7d")),
             source("max-w", "Max", "work", claude, Series::new(0, 1), Some(0.82), ("82%", "7d")),
             source("team", "Team", "seat", claude, Series::new(0, 2), Some(0.18), ("18%", "7d")),
@@ -71,7 +67,31 @@ pub fn usage_story(cx: &App) -> impl IntoElement {
             source("or-w", "Work", "key", "OpenRouter · 2 keys", Series::new(2, 0), Some(0.21), ("$4.20", "of $20")),
             source("or-p", "Personal", "key", "OpenRouter · 2 keys", Series::new(2, 0), None, ("$1.10", "month")),
             source("api", "API", "key", "Anthropic API", Series::new(3, 0), Some(0.76), ("$38", "month")),
+    ];
+    let sidebar = UsageSources::new("usage-story-sources")
+        .sources(list.clone())
+        .summary("5.84 M", "today")
+        .selection(Selection::Source("max-w".into()));
+    let stat = |label: &str, value: &str, unit: &str, note: &str, used: Option<f32>| UsageStat {
+        label: label.to_string().into(),
+        value: value.to_string().into(),
+        unit: unit.to_string().into(),
+        note: note.to_string().into(),
+        used,
+    };
+    let dashboard = UsageDashboard::new("usage-story")
+        .range(UsageRange::Fortnight)
+        .title("Max · work")
+        .subtitle("Resets in 2 d 8 h · 7-day window · last used 4 min ago")
+        .provider("Claude Code")
+        .dot(Series::new(0, 1))
+        .stats(vec![
+            stat("7-day limit", "82%", "used", "Resets in 2 d 8 h", Some(0.82)),
+            stat("Today", "2.1 M", "tokens", "Typical day 1.6 M", None),
+            stat("Last 14 days", "31.4 M", "tokens", "12 sessions", None),
+            stat("Estimated cost", "$96", "14 days", "At API prices, not billed", None),
         ])
+        .sources(list)
         .days(days())
         .models(vec![
             model("Opus 5.5", 41_200_000, "41.2 M", Series::new(0, 0)),
@@ -86,13 +106,7 @@ pub fn usage_story(cx: &App) -> impl IntoElement {
             session("s3", "Refactor the review crate", "atelier · Codex · GPT-5", Series::new(1, 0), "720,000", "$5.40", 4.),
         ])
         .expanded(Some("s1".into()));
-    div().flex().justify_center().py(px(24.)).bg(theme.background).child(
-        div()
-            .w(px(1120.))
-            .rounded(px(12.))
-            .overflow_hidden()
-            .bg(theme.popover)
-            .shadow(atelier_ui::theme::popover_shadow(theme))
-            .child(dashboard),
+    div().flex().w(px(1280.)).h(px(900.)).bg(theme.background).child(div().w(px(300.)).p(px(8.)).child(sidebar)).child(
+        div().flex_1().min_w_0().px(px(24.)).py(px(10.)).child(dashboard),
     )
 }

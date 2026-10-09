@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 use atelier_agents::usage_history::{Day, Provider, Tokens, UsageHistory};
-use atelier_ui::{ProviderGauge, Selection, UsageDay, UsageModel, UsageSession};
+use atelier_ui::{ProviderGauge, Selection, UsageDay, UsageModel, UsageSession, UsageSource, UsageStat};
 use gpui_kit::SharedString;
 use super::{counted, format_cost, format_tokens, model_series, sources::{group_of, id_of, sources}, weekday};
 use crate::usage_view::{
@@ -162,13 +162,118 @@ fn build_view(state: &UsageState, readings: &[ProviderGauge], today: Day) -> Usa
     } else {
         None
     };
+    let heading = heading(&state.selection, &sources, range_days);
+    let total_label = format_tokens(total_tokens);
+    let cost_label = format_cost(total_cost);
+    let mut stats = Vec::new();
+    stats.extend(heading.limit.clone());
+    stats.push(UsageStat {
+        label: "Today".into(),
+        value: format_tokens(today_tokens).into(),
+        unit: "tokens".into(),
+        note: "Since midnight".into(),
+        used: None,
+    });
+    stats.push(UsageStat {
+        label: format!("Last {range_days} days").into(),
+        value: total_label.clone().into(),
+        unit: "tokens".into(),
+        note: format!("{} a day", format_tokens(total_tokens / u64::from(range_days.max(1)))).into(),
+        used: None,
+    });
+    stats.push(UsageStat {
+        label: "Estimated cost".into(),
+        value: cost_label.clone().into(),
+        unit: format!("{range_days} days").into(),
+        note: "At API prices, not billed".into(),
+        used: None,
+    });
     UsageView {
         sources,
         summary: (format_tokens(today_tokens).into(), "today".into()),
+        title: heading.title,
+        subtitle: heading.subtitle,
+        provider: heading.provider,
+        dot: heading.dot,
+        stats,
         days,
         models,
         sessions,
-        total: format!("{} · {}", format_tokens(total_tokens), format_cost(total_cost)).into(),
+        total: format!("{total_label} · {cost_label}").into(),
         empty: empty.map(SharedString::from),
+    }
+}
+
+/// The words over the details and the limit tile, for what is chosen.
+struct Heading {
+    title: SharedString,
+    subtitle: SharedString,
+    provider: Option<SharedString>,
+    dot: Option<atelier_ui::Series>,
+    limit: Option<UsageStat>,
+}
+
+fn heading(selection: &Selection, sources: &[UsageSource], range_days: u32) -> Heading {
+    match selection {
+        Selection::Source(id) => match sources.iter().find(|s| s.id == *id) {
+            Some(source) => Heading {
+                title: source.name.clone(),
+                subtitle: format!(
+                    "{} · {}",
+                    source.caption,
+                    if source.limit.is_some() { format!("{} window", source.note) } else { format!("{range_days} days") }
+                )
+                .into(),
+                provider: Some(source.group.clone()),
+                dot: Some(source.series),
+                limit: source.limit.map(|used| UsageStat {
+                    label: "Limit".into(),
+                    value: source.value.clone(),
+                    unit: "used".into(),
+                    note: source.note.clone(),
+                    used: Some(used),
+                }),
+            },
+            None => Heading::all(sources),
+        },
+        Selection::Group(caption) => {
+            let own: Vec<&UsageSource> = sources.iter().filter(|s| s.group == *caption).collect();
+            Heading {
+                title: caption.clone(),
+                subtitle: format!("{} {}", own.len(), if own.len() == 1 { "account" } else { "accounts" }).into(),
+                provider: None,
+                dot: own.first().map(|s| s.series),
+                limit: None,
+            }
+        }
+        Selection::All => Heading::all(sources),
+    }
+}
+
+impl Heading {
+    fn all(sources: &[UsageSource]) -> Self {
+        let mut groups: Vec<&str> = Vec::new();
+        for source in sources {
+            if !groups.contains(&source.group.as_ref()) {
+                groups.push(source.group.as_ref());
+            }
+        }
+        let closest = sources
+            .iter()
+            .filter(|s| s.limit.is_some())
+            .max_by(|a, b| a.limit.partial_cmp(&b.limit).unwrap_or(std::cmp::Ordering::Equal));
+        Self {
+            title: "All accounts".into(),
+            subtitle: if sources.is_empty() { "No sources yet".into() } else { format!("{} sources · {}", sources.len(), groups.join(", ")).into() },
+            provider: None,
+            dot: None,
+            limit: closest.map(|s| UsageStat {
+                label: "Closest to a limit".into(),
+                value: s.value.clone(),
+                unit: "used".into(),
+                note: format!("{} · {}", s.name.clone(), s.note).into(),
+                used: s.limit,
+            }),
+        }
     }
 }

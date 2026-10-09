@@ -22,6 +22,7 @@ mod types;
 mod update_view;
 mod updates;
 mod view;
+pub(crate) use types::TITLE_BAR;
 mod views;
 
 pub use view::ShellView;
