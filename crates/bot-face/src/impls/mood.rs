@@ -2,7 +2,14 @@ use crate::enums::Mood;
 
 impl Mood {
     /// Every mood, in the order the data and the frame use.
-    pub const ALL: [Mood; 6] = [Mood::Idle, Mood::Thinking, Mood::Working, Mood::Done, Mood::Needs, Mood::Stuck];
+    pub const ALL: [Mood; 6] = [
+        Mood::Idle,
+        Mood::Thinking,
+        Mood::Working,
+        Mood::Done,
+        Mood::Needs,
+        Mood::Stuck,
+    ];
 
     /// The position of the mood in `Mood::ALL`.
     pub fn index(self) -> usize {

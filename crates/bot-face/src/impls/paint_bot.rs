@@ -8,11 +8,24 @@ use crate::structs::{Affine, BotModel, Frame, Palette, Shape};
 
 /// Draws one bot into `bounds`: the parts in order, then the cheeks, then the eyes. Call it while the window paints.
 /// Return the number of shapes drawn, so a caller can count the work.
-pub fn paint_bot(window: &mut Window, bounds: Bounds<Pixels>, bot: &BotModel, frame: &Frame, palette: &Palette) -> usize {
+pub fn paint_bot(
+    window: &mut Window,
+    bounds: Bounds<Pixels>,
+    bot: &BotModel,
+    frame: &Frame,
+    palette: &Palette,
+) -> usize {
     let (bw, bh) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
     let side = bw.min(bh);
     let scale = side / VIEW;
-    let to_px = Affine { a: scale, b: 0.0, c: 0.0, d: scale, e: f32::from(bounds.origin.x) + (bw - side) / 2.0, f: f32::from(bounds.origin.y) + (bh - side) / 2.0 };
+    let to_px = Affine {
+        a: scale,
+        b: 0.0,
+        c: 0.0,
+        d: scale,
+        e: f32::from(bounds.origin.x) + (bw - side) / 2.0,
+        f: f32::from(bounds.origin.y) + (bh - side) / 2.0,
+    };
     let base = to_px.then(&Affine::of_pose(&frame.root, (VIEW / 2.0, GROUND)));
     let mut drawn = 0;
     for (part, pose) in bot.parts.iter().zip(&frame.parts) {
@@ -33,7 +46,9 @@ pub fn paint_bot(window: &mut Window, bounds: Bounds<Pixels>, bot: &BotModel, fr
             continue;
         }
         let inner = match mood {
-            Mood::Idle | Mood::Needs => Affine::scale_about(1.0, frame.blink, VIEW / 2.0, bot.eye_y),
+            Mood::Idle | Mood::Needs => {
+                Affine::scale_about(1.0, frame.blink, VIEW / 2.0, bot.eye_y)
+            }
             Mood::Working => Affine::translate(frame.scan_x, 0.0),
             _ => Affine::IDENTITY,
         };

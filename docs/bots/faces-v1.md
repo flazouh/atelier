@@ -90,7 +90,7 @@ Check each new bot at 18 and 30 px before it ships. A bot must still read by its
 
 ## 9. Open points
 
-1. **Player.** Write a small Rust player for this data, or use a vector animation tool such as Rive? A two-hour spike decides, with frame time as the measure.
+1. **Player.** Decided: we write our own small Rust player (). The numbers and the reasons are in .
 2. **Making a bot.** The builder picks a body, a colour and a tool. How many bodies and tools do we offer at the start? The prototype has 7 and 7.
 3. **Faces for the four new roles** are part of v1, because all ten roles ship: Quill (Researcher, blue), Ink (Writer, purple), Mimi (Designer, pink) and Gus (Operator, green). Each needs its own way to move and its own tool.
 4. **Sound.** None in v1.

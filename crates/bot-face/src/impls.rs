@@ -21,3 +21,5 @@ pub use paint_bot::paint_bot;
 pub(crate) use path_data::parse_path_data as parse_path_data_for_tests;
 #[cfg(test)]
 pub(crate) use shape_parse::parse_fragment as parse_fragment_for_tests;
+#[cfg(test)]
+pub(crate) use shape_trace::trace as trace_for_tests;

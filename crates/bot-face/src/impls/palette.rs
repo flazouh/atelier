@@ -8,9 +8,24 @@ impl Palette {
     pub fn standard(body: Rgba) -> Palette {
         Palette {
             body,
-            shade: Rgba { r: 0.0, g: 0.0, b: 0.0, a: 0.3 },
-            light: Rgba { r: 1.0, g: 1.0, b: 1.0, a: 0.4 },
-            eye: Rgba { r: 0.08, g: 0.08, b: 0.075, a: 1.0 },
+            shade: Rgba {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.3,
+            },
+            light: Rgba {
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: 0.4,
+            },
+            eye: Rgba {
+                r: 0.08,
+                g: 0.08,
+                b: 0.075,
+                a: 1.0,
+            },
         }
     }
 
@@ -26,6 +41,11 @@ impl Palette {
     /// The colour moved `share` of the way toward the grey.
     pub fn mixed(colour: Rgba, grey: Rgba, share: f32) -> Rgba {
         let mix = |a: f32, b: f32| a * (1.0 - share) + b * share;
-        Rgba { r: mix(colour.r, grey.r), g: mix(colour.g, grey.g), b: mix(colour.b, grey.b), a: colour.a }
+        Rgba {
+            r: mix(colour.r, grey.r),
+            g: mix(colour.g, grey.g),
+            b: mix(colour.b, grey.b),
+            a: colour.a,
+        }
     }
 }

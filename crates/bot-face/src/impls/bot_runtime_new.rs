@@ -16,7 +16,6 @@ impl BotRuntime {
             next_blink: 1.0 + fract((phase * 12.9898).sin() * 43758.547) * 3.0,
             blink_start: None,
             react_at: None,
-            first: Mood::Idle,
         }
     }
 

@@ -12,6 +12,6 @@ mod tests;
 pub use enums::{Geometry, HabitKind, Layer, Mood, Paint, PathCmd, Token};
 pub use impls::paint_bot;
 pub use structs::{
-    Affine, BotDef, BotModel, BotRuntime, FaceData, FaceSet, Frame, HabitDef, PartDef, PartModel, Palette, Pose, Shape,
-    StateDef, StrokeSpec,
+    Affine, BotDef, BotModel, BotRuntime, FaceData, FaceSet, Frame, HabitDef, Palette, PartDef,
+    PartModel, Pose, Shape, StateDef, StrokeSpec,
 };

@@ -10,11 +10,24 @@ use crate::structs::{BotModel, BotRuntime, FaceSet, Frame, Pose};
 impl BotRuntime {
     /// Moves the bot to time `t` (seconds) and returns what to draw. `wanted` is the mood to show. `pointer` is
     /// the pointer's place relative to the bot, each way from -1 to 1, or none.
-    pub fn tick(&mut self, set: &FaceSet, bot: &BotModel, t: f32, wanted: Mood, pointer: Option<(f32, f32)>) -> Frame {
-        let dt = self.last_t.map_or(1.0 / REFERENCE_FPS, |l| (t - l).clamp(0.0, 0.1));
+    pub fn tick(
+        &mut self,
+        set: &FaceSet,
+        bot: &BotModel,
+        t: f32,
+        wanted: Mood,
+        pointer: Option<(f32, f32)>,
+    ) -> Frame {
+        let dt = self
+            .last_t
+            .map_or(1.0 / REFERENCE_FPS, |l| (t - l).clamp(0.0, 0.1));
         self.last_t = Some(t);
         let reaction = self.reaction_progress(t);
-        let mood = if reaction.is_some() { Mood::Done } else { wanted };
+        let mood = if reaction.is_some() {
+            Mood::Done
+        } else {
+            wanted
+        };
         let (pose, speed, amount) = self.blend(set, t, mood, dt);
         let mut root = pose;
         if let Some(u) = reaction {
@@ -27,7 +40,15 @@ impl BotRuntime {
         let (dx, dy) = pointer.unwrap_or((0.0, 0.0));
         let look = 1.0 - self.weights[Mood::Stuck.index()];
         root.r += dx * LEAN_DEGREES * look;
-        let parts = bot.parts.iter().map(|p| p.habit.as_ref().map_or_else(Pose::default, |h| habit_pose(h, p.pivot, t, speed, amount, self.phase))).collect();
+        let parts = bot
+            .parts
+            .iter()
+            .map(|p| {
+                p.habit.as_ref().map_or_else(Pose::default, |h| {
+                    habit_pose(h, p.pivot, t, speed, amount, self.phase)
+                })
+            })
+            .collect();
         let w = self.weights;
         Frame {
             root,
@@ -36,7 +57,9 @@ impl BotRuntime {
             blink: self.blink(t),
             scan_x: 8.0 * (t * 5.0).sin(),
             look: (dx * LOOK_X * look, dy * LOOK_Y * look),
-            cheeks: w[Mood::Idle.index()].max(w[Mood::Done.index()]).max(w[Mood::Thinking.index()]),
+            cheeks: w[Mood::Idle.index()]
+                .max(w[Mood::Done.index()])
+                .max(w[Mood::Thinking.index()]),
         }
     }
 
@@ -56,7 +79,8 @@ impl BotRuntime {
     /// Moves each mood's weight toward its target, then adds the poses, the speed and the amount by weight.
     fn blend(&mut self, set: &FaceSet, t: f32, mood: Mood, dt: f32) -> (Pose, f32, f32) {
         let k = 1.0 - (1.0 - BLEND_PER_FRAME).powf(dt * REFERENCE_FPS);
-        let (mut x, mut y, mut r, mut sx, mut sy, mut speed, mut amount) = (0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);
+        let (mut x, mut y, mut r, mut sx, mut sy, mut speed, mut amount) =
+            (0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0);
         for m in Mood::ALL {
             let i = m.index();
             self.weights[i] += ((if m == mood { 1.0 } else { 0.0 }) - self.weights[i]) * k;
@@ -82,11 +106,15 @@ impl BotRuntime {
         if self.blink_start.is_none() && t >= self.next_blink {
             self.blink_start = Some(t);
         }
-        let Some(start) = self.blink_start else { return 1.0 };
+        let Some(start) = self.blink_start else {
+            return 1.0;
+        };
         let u = (t - start) / BLINK_SECONDS;
         if u >= 1.0 {
             self.blink_start = None;
-            self.next_blink = t + BLINK_GAP_MIN + fract((t * 12.9898 + self.phase * 78.233).sin() * 43758.547) * BLINK_GAP_SPREAD;
+            self.next_blink = t
+                + BLINK_GAP_MIN
+                + fract((t * 12.9898 + self.phase * 78.233).sin() * 43758.547) * BLINK_GAP_SPREAD;
             1.0
         } else {
             1.0 - 0.92 * (PI * u).sin()

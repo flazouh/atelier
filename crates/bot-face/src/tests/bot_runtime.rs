@@ -17,7 +17,11 @@ fn run(mood: Mood, seconds: f32) -> (BotRuntime, crate::structs::Frame, FaceSet)
 #[test]
 fn a_new_mood_takes_over_the_eyes_in_about_a_second() {
     let (_, frame, _) = run(Mood::Working, 1.0);
-    assert!(frame.eye_weights[Mood::Working.index()] > 0.95, "{:?}", frame.eye_weights);
+    assert!(
+        frame.eye_weights[Mood::Working.index()] > 0.95,
+        "{:?}",
+        frame.eye_weights
+    );
     assert!(frame.eye_weights[Mood::Idle.index()] < 0.05);
 }
 
@@ -75,7 +79,10 @@ fn a_click_makes_one_jump_and_then_stops() {
         highest = highest.min(rt.tick(&set, &set.bots[0], t, Mood::Idle, None).root.y);
         t += 1.0 / 60.0;
     }
-    assert!(highest < -12.0, "the jump reaches about 18 units: {highest}");
+    assert!(
+        highest < -12.0,
+        "the jump reaches about 18 units: {highest}"
+    );
     assert!(rt.react_at.is_none(), "the reaction ends");
 }
 
@@ -83,7 +90,13 @@ fn a_click_makes_one_jump_and_then_stops() {
 fn a_bot_grows_in_after_its_delay() {
     let set = FaceSet::from_json(DATA).unwrap();
     let mut rt = BotRuntime::new(5, 0.5);
-    assert!(rt.tick(&set, &set.bots[0], 0.1, Mood::Idle, None).root.sx.abs() < 1e-3);
+    assert!(
+        rt.tick(&set, &set.bots[0], 0.1, Mood::Idle, None)
+            .root
+            .sx
+            .abs()
+            < 1e-3
+    );
     assert!((rt.tick(&set, &set.bots[0], 2.0, Mood::Idle, None).root.sx - 1.0).abs() < 0.05);
 }
 
@@ -99,6 +112,10 @@ fn the_eyes_look_toward_the_pointer_but_not_when_stuck() {
         b = Some(stuck.tick(&set, &set.bots[0], t, Mood::Stuck, Some((1.0, -1.0))));
     }
     let (a, b) = (a.unwrap(), b.unwrap());
-    assert!((a.look.0 - 3.2).abs() < 0.01 && (a.look.1 + 2.2).abs() < 0.01, "{:?}", a.look);
+    assert!(
+        (a.look.0 - 3.2).abs() < 0.01 && (a.look.1 + 2.2).abs() < 0.01,
+        "{:?}",
+        a.look
+    );
     assert!(b.look.0.abs() < 0.1, "{:?}", b.look);
 }

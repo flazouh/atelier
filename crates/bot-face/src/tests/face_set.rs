@@ -8,10 +8,27 @@ fn the_real_data_loads_with_seven_bots() {
     let set = FaceSet::from_json(DATA).expect("faces.v1.json loads");
     assert_eq!(set.bots.len(), 7);
     for bot in &set.bots {
-        assert!(bot.parts.iter().any(|p| p.layer == Layer::Body), "{} has a body", bot.id);
-        assert_eq!(bot.eyes.len(), Mood::ALL.len(), "{} has eyes for every mood", bot.id);
-        assert!(bot.eyes.iter().all(|e| !e.is_empty()), "{} has no empty eye set", bot.id);
-        assert!(bot.parts.iter().all(|p| !p.shapes.is_empty()), "{} has no empty part", bot.id);
+        assert!(
+            bot.parts.iter().any(|p| p.layer == Layer::Body),
+            "{} has a body",
+            bot.id
+        );
+        assert_eq!(
+            bot.eyes.len(),
+            Mood::ALL.len(),
+            "{} has eyes for every mood",
+            bot.id
+        );
+        assert!(
+            bot.eyes.iter().all(|e| !e.is_empty()),
+            "{} has no empty eye set",
+            bot.id
+        );
+        assert!(
+            bot.parts.iter().all(|p| !p.shapes.is_empty()),
+            "{} has no empty part",
+            bot.id
+        );
     }
 }
 

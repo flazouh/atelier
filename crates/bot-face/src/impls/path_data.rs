@@ -4,19 +4,22 @@ use crate::enums::PathCmd;
 pub(crate) fn parse_path_data(d: &str) -> Result<Vec<PathCmd>, String> {
     let mut out = Vec::new();
     let (mut x, mut y, mut sx, mut sy) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
-    let mut chars = d.chars().peekable();
     let mut cmd = ' ';
     let mut args: Vec<f32> = Vec::new();
     let mut token = String::new();
     let mut tokens: Vec<(char, Vec<f32>)> = Vec::new();
     let flush_number = |token: &mut String, args: &mut Vec<f32>| -> Result<(), String> {
         if !token.is_empty() {
-            args.push(token.parse::<f32>().map_err(|_| format!("bad number `{token}` in path"))?);
+            args.push(
+                token
+                    .parse::<f32>()
+                    .map_err(|_| format!("bad number `{token}` in path"))?,
+            );
             token.clear();
         }
         Ok(())
     };
-    while let Some(ch) = chars.next() {
+    for ch in d.chars() {
         if ch.is_ascii_alphabetic() {
             flush_number(&mut token, &mut args)?;
             if cmd != ' ' {
@@ -38,13 +41,21 @@ pub(crate) fn parse_path_data(d: &str) -> Result<Vec<PathCmd>, String> {
     }
     for (cmd, args) in tokens {
         let rel = cmd.is_ascii_lowercase();
-        let (ox, oy) = if rel { (x, y) } else { (0.0, 0.0) };
-        let need = |n: usize| if args.len() % n == 0 && !args.is_empty() { Ok(()) } else { Err(format!("path `{cmd}` needs groups of {n} numbers")) };
+        let need = |n: usize| {
+            if args.len() % n == 0 && !args.is_empty() {
+                Ok(())
+            } else {
+                Err(format!("path `{cmd}` needs groups of {n} numbers"))
+            }
+        };
+        // A relative step adds to the point the path is at when the step starts, so each pair builds on the last.
+        let base = |x: f32, y: f32| if rel { (x, y) } else { (0.0, 0.0) };
         match cmd.to_ascii_uppercase() {
             'M' => {
                 need(2)?;
                 for (i, p) in args.chunks(2).enumerate() {
-                    (x, y) = (ox_of(rel, ox, x) + p[0], ox_of(rel, oy, y) + p[1]);
+                    let (bx, by) = base(x, y);
+                    (x, y) = (bx + p[0], by + p[1]);
                     if i == 0 {
                         out.push(PathCmd::Move(x, y));
                         (sx, sy) = (x, y);
@@ -56,28 +67,29 @@ pub(crate) fn parse_path_data(d: &str) -> Result<Vec<PathCmd>, String> {
             'L' => {
                 need(2)?;
                 for p in args.chunks(2) {
-                    (x, y) = (ox_of(rel, ox, x) + p[0], ox_of(rel, oy, y) + p[1]);
+                    let (bx, by) = base(x, y);
+                    (x, y) = (bx + p[0], by + p[1]);
                     out.push(PathCmd::Line(x, y));
                 }
             }
             'H' => {
                 need(1)?;
                 for p in &args {
-                    x = ox_of(rel, ox, x) + p;
+                    x = base(x, y).0 + p;
                     out.push(PathCmd::Line(x, y));
                 }
             }
             'V' => {
                 need(1)?;
                 for p in &args {
-                    y = ox_of(rel, oy, y) + p;
+                    y = base(x, y).1 + p;
                     out.push(PathCmd::Line(x, y));
                 }
             }
             'Q' => {
                 need(4)?;
                 for p in args.chunks(4) {
-                    let (bx, by) = (ox_of(rel, ox, x), ox_of(rel, oy, y));
+                    let (bx, by) = base(x, y);
                     out.push(PathCmd::Quad(bx + p[0], by + p[1], bx + p[2], by + p[3]));
                     (x, y) = (bx + p[2], by + p[3]);
                 }
@@ -90,9 +102,4 @@ pub(crate) fn parse_path_data(d: &str) -> Result<Vec<PathCmd>, String> {
         }
     }
     Ok(out)
-}
-
-/// The base a relative step adds to: the start point of the step for a lowercase command, else nothing.
-fn ox_of(rel: bool, base: f32, _current: f32) -> f32 {
-    if rel { base } else { 0.0 }
 }

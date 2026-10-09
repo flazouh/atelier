@@ -25,4 +25,4 @@ pub const LOOK_Y: f32 = 2.2;
 /// The farthest the body leans toward the pointer, in degrees.
 pub const LEAN_DEGREES: f32 = 1.6;
 /// The control point distance that makes a cubic curve a quarter circle.
-pub const KAPPA: f32 = 0.552_284_75;
+pub const KAPPA: f32 = 0.552_284_7;

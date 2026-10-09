@@ -1,26 +1,52 @@
 use crate::structs::{Affine, Pose};
 
 impl Affine {
-    pub const IDENTITY: Affine = Affine { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 };
+    pub const IDENTITY: Affine = Affine {
+        a: 1.0,
+        b: 0.0,
+        c: 0.0,
+        d: 1.0,
+        e: 0.0,
+        f: 0.0,
+    };
 
     pub fn translate(x: f32, y: f32) -> Affine {
-        Affine { e: x, f: y, ..Affine::IDENTITY }
+        Affine {
+            e: x,
+            f: y,
+            ..Affine::IDENTITY
+        }
     }
 
     pub fn scale(sx: f32, sy: f32) -> Affine {
-        Affine { a: sx, d: sy, ..Affine::IDENTITY }
+        Affine {
+            a: sx,
+            d: sy,
+            ..Affine::IDENTITY
+        }
     }
 
     /// A turn of `degrees` around the point.
     pub fn rotate_about(degrees: f32, cx: f32, cy: f32) -> Affine {
         let (s, c) = degrees.to_radians().sin_cos();
-        let turn = Affine { a: c, b: s, c: -s, d: c, e: 0.0, f: 0.0 };
-        Affine::translate(cx, cy).then(&turn).then(&Affine::translate(-cx, -cy))
+        let turn = Affine {
+            a: c,
+            b: s,
+            c: -s,
+            d: c,
+            e: 0.0,
+            f: 0.0,
+        };
+        Affine::translate(cx, cy)
+            .then(&turn)
+            .then(&Affine::translate(-cx, -cy))
     }
 
     /// A scale around the point.
     pub fn scale_about(sx: f32, sy: f32, cx: f32, cy: f32) -> Affine {
-        Affine::translate(cx, cy).then(&Affine::scale(sx, sy)).then(&Affine::translate(-cx, -cy))
+        Affine::translate(cx, cy)
+            .then(&Affine::scale(sx, sy))
+            .then(&Affine::translate(-cx, -cy))
     }
 
     /// The transform that does `other` first and `self` after it.
@@ -36,7 +62,10 @@ impl Affine {
     }
 
     pub fn apply(&self, x: f32, y: f32) -> (f32, f32) {
-        (self.a * x + self.c * y + self.e, self.b * x + self.d * y + self.f)
+        (
+            self.a * x + self.c * y + self.e,
+            self.b * x + self.d * y + self.f,
+        )
     }
 
     /// The average size change, for a stroke width.

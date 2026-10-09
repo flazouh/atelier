@@ -25,6 +25,7 @@ mod panels_story;
 mod sidebar_story;
 mod pr_view_story;
 mod motion_story;
+mod bot_story;
 mod tasks_story;
 mod streaming_story;
 mod voice_story;
@@ -90,11 +91,12 @@ enum Story {
     Variants,
     Streaming,
     Motion,
+    Bots,
     PullRequestView,
 }
 
 impl Story {
-    const ALL: [Story; 42] = [
+    const ALL: [Story; 43] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::Worktrees,
@@ -137,6 +139,7 @@ impl Story {
         Story::Streaming,
         Story::PullRequestView,
         Story::Motion,
+        Story::Bots,
     ];
 
     fn title(self) -> &'static str {
@@ -183,6 +186,7 @@ impl Story {
             Story::Variants => "Variants",
             Story::Streaming => "Streaming",
             Story::Motion => "Motion",
+            Story::Bots => "Bots",
         }
     }
 }
@@ -266,6 +270,7 @@ struct Gallery {
     variants: Option<Entity<variants_story::VariantsStory>>,
     streaming: Option<Entity<streaming_story::StreamingStory>>,
     motion: Option<Entity<motion_story::MotionStory>>,
+    bots: Option<Entity<bot_story::BotStory>>,
     prompt: Entity<PromptInput>,
     panel_prompt: Entity<PromptInput>,
     /// Below the "Prompt input" story, as preview.tsx's `sent`/`notice` line.
@@ -381,6 +386,7 @@ impl Gallery {
             variants: None,
             streaming: None,
             motion: None,
+            bots: None,
             agent_panels: None,
             agent_replay: None,
             voice: None,
@@ -409,6 +415,9 @@ impl Gallery {
         }
         if self.story == Story::Motion && self.motion.is_none() {
             self.motion = Some(cx.new(|cx| motion_story::MotionStory::new(window, cx)));
+        }
+        if self.story == Story::Bots && self.bots.is_none() {
+            self.bots = Some(cx.new(|cx| bot_story::BotStory::new(window, cx)));
         }
         if self.story == Story::Streaming && self.streaming.is_none() {
             self.streaming = Some(cx.new(|cx| streaming_story::StreamingStory::new(window, cx)));
@@ -553,6 +562,7 @@ impl Gallery {
             Story::Variants => self.variants.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Streaming => self.streaming.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Motion => self.motion.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
+            Story::Bots => self.bots.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::PullRequestView => self.pr_view.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::Voice => self.voice.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),
             Story::AgentReplay => self.agent_replay.clone().map(|s| s.into_any_element()).unwrap_or_else(|| div().into_any_element()),

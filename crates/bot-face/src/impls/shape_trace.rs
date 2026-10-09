@@ -5,7 +5,7 @@ use crate::enums::{Geometry, PathCmd};
 use crate::structs::Affine;
 
 /// Draws a shape's outline into a path builder, every point moved by `m` into pixels.
-pub(super) fn trace(b: &mut PathBuilder, m: &Affine, g: &Geometry) {
+pub(crate) fn trace(b: &mut PathBuilder, m: &Affine, g: &Geometry) {
     let p = |x: f32, y: f32| -> Point<Pixels> {
         let (px_, py_) = m.apply(x, y);
         point(px(px_), px(py_))
@@ -14,7 +14,10 @@ pub(super) fn trace(b: &mut PathBuilder, m: &Affine, g: &Geometry) {
         Geometry::Rect { x, y, w, h, r } => {
             let r = r.min(w / 2.0).min(h / 2.0);
             if r <= 0.01 {
-                b.add_polygon(&[p(*x, *y), p(x + w, *y), p(x + w, y + h), p(*x, y + h)], true);
+                b.add_polygon(
+                    &[p(*x, *y), p(x + w, *y), p(x + w, y + h), p(*x, y + h)],
+                    true,
+                );
             } else {
                 let k = r * KAPPA;
                 let (l, t, rt, bt) = (*x, *y, x + w, y + h);
