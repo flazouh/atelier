@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "tool": "mail.search",
+  "running": { "title": "Searching mail…" },
+  "failed": { "title": "Mail search failed" },
+  "done": {
+    "title": { "template": "Searched mail, {$.count} threads" },
+    "body": {
+      "type": "list",
+      "items": "$.items",
+      "limit": 10,
+      "empty": "No mail matches.",
+      "on_item": { "type": "open", "label": "Open", "ref": { "path": "$.ref" } },
+      "item": {
+        "type": "stack",
+        "direction": "row",
+        "gap": "sm",
+        "children": [
+          { "type": "icon", "name": "star", "tone": "warning", "when": { "path": "$.starred", "equals": true } },
+          {
+            "type": "stack",
+            "direction": "column",
+            "gap": "xs",
+            "children": [
+              { "type": "text", "value": { "path": "$.subject" }, "style": "title", "max_lines": 1 },
+              { "type": "text", "value": { "path": "$.snippet" }, "style": "muted", "max_lines": 1 }
+            ]
+          },
+          { "type": "icon", "name": "attachment", "tone": "neutral", "when": { "path": "$.has_attachments", "equals": true } },
+          { "type": "metric", "label": "Unread", "value": { "path": "$.unread" } },
+          { "type": "text", "value": { "path": "$.last_at", "format": "relative_time" }, "style": "muted" }
+        ]
+      }
+    }
+  }
+}

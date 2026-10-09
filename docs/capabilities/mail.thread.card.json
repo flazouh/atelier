@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "tool": "mail.thread",
+  "running": { "title": "Reading a mail thread…" },
+  "failed": { "title": "Could not read the mail thread" },
+  "done": {
+    "title": { "template": "{$.subject}" },
+    "body": {
+      "type": "list",
+      "items": "$.messages",
+      "limit": 5,
+      "empty": "No messages.",
+      "on_item": { "type": "open", "label": "Open", "ref": { "path": "$.ref" } },
+      "item": {
+        "type": "stack",
+        "direction": "column",
+        "gap": "xs",
+        "children": [
+          {
+            "type": "stack",
+            "direction": "row",
+            "gap": "sm",
+            "children": [
+              { "type": "text", "value": { "path": "$.from.address" }, "style": "title", "max_lines": 1 },
+              { "type": "text", "value": { "path": "$.date", "format": "relative_time" }, "style": "muted" }
+            ]
+          },
+          { "type": "text", "value": { "path": "$.text" }, "max_lines": 6 }
+        ]
+      }
+    },
+    "footer": [
+      { "type": "open", "label": "Open in Atelier", "ref": { "path": "$.ref" } }
+    ]
+  }
+}
