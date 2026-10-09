@@ -485,8 +485,10 @@ name = "atelier-app"
 version = "0.1.6"
 dependencies = [
  "atelier-agents",
+ "atelier-capabilities",
  "atelier-editor",
  "atelier-forge",
+ "atelier-gateway",
  "atelier-i18n",
  "atelier-lsp",
  "atelier-palette",
@@ -572,6 +574,18 @@ dependencies = [
  "gpui-kit",
  "ignore",
  "lsp-types",
+]
+
+[[package]]
+name = "atelier-gateway"
+version = "0.1.6"
+dependencies = [
+ "atelier-capabilities",
+ "getrandom 0.3.4",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "ureq",
 ]
 
 [[package]]
