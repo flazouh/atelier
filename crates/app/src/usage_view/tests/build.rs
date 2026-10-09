@@ -2,7 +2,7 @@ use std::sync::Arc;
 use atelier_agents::usage_history::{AccountUsage, Day, DayTokens, Provider, SessionUsage, Tokens, UsageHistory};
 use atelier_agents::labs::Lab;
 use atelier_ui::{Gauge, ProviderGauge, Selection, UsageRange, menu::Lead};
-use crate::usage_view::{UsageState, build};
+use super::super::{helpers::build, structs::UsageState};
 const TODAY: Day = Day { year: 2026, month: 10, day: 9 };
 fn tokens(input: u64, output: u64) -> Tokens {
     Tokens { input, output, cache_read: 9_000_000, cache_write: 0 }

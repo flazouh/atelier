@@ -49,6 +49,7 @@ fn open_shell_with(cx: &mut TestAppContext, saved: atelier_settings::Settings) -
         gpui_kit::init(cx);
         atelier_ui::theme::set_appearance(atelier_ui::theme::Appearance::Light, cx);
         cx.set_reduce_motion(true);
+        cx.set_global(crate::slots::builtin());
     });
     let (shell, cx) = cx.add_window_view(move |_, cx| Shell::new(&saved, cx));
     cx.simulate_resize(size(px(1200.), px(800.)));
@@ -181,10 +182,32 @@ fn a_press_on_the_usage_chips_opens_the_dashboard_and_escape_closes_it(cx: &mut 
     settle(&shell, cx);
     assert!(cx.debug_bounds("usage-dashboard").is_none(), "Escape closes it");
 }
+/// The usage chips and the dashboard are what the usage module adds to the app: take its registration out and the bar has
+/// neither, a view named usage opens nothing, and the version and the machine stay.
+#[gpui_kit::test]
+fn without_the_usage_registration_the_bar_has_no_usage_chips_and_no_dashboard(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    shell.update(cx, |shell, cx| shell.sample_vitals(cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("status-usage").is_some(), "with every module the usage door is in the bar");
+    cx.update(|_, cx| {
+        let mut slots = crate::slots::Slots::default();
+        crate::changelog::register(&mut slots);
+        crate::vitals::register(&mut slots);
+        cx.set_global(slots);
+    });
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("status-usage").is_none(), "no usage module, no chips");
+    assert!(cx.debug_bounds("status-version").is_some() && cx.debug_bounds("status-cpu").is_some(), "the rest stays");
+    shell.update(cx, |shell, cx| shell.open_view("usage", cx));
+    settle(&shell, cx);
+    assert!(cx.debug_bounds("usage-dashboard").is_none(), "no usage module, no dashboard");
+}
 /// The dashboard reads folders of logs off the UI thread: with none it says there is nothing, and with three Claude
 /// accounts, one of them with a broken line, it shows all three and counts the line it skipped.
 #[gpui_kit::test]
 fn the_dashboard_reads_the_logs_and_survives_a_broken_line_and_a_folder_with_nothing(cx: &mut TestAppContext) {
+    use crate::usage_view::UsageStore;
     use atelier_agents::usage_history::{Provider, Roots};
     let (shell, cx, dir) = with_a_session(cx, 1400.);
     let home = dir.path().join("home");
@@ -201,16 +224,14 @@ fn the_dashboard_reads_the_logs_and_survives_a_broken_line_and_a_folder_with_not
     };
     // No logs at all: the empty state.
     let nothing = Roots::new().with_dir(Provider::Claude, home.join(".claude-none"));
-    shell.update(cx, |shell, cx| {
-        shell.usage_roots = nothing;
-        shell.show_usage(cx);
-    });
+    cx.update(|_, cx| cx.set_global(UsageStore { roots: nothing, ..Default::default() }));
+    shell.update(cx, |shell, cx| shell.open_view("usage", cx));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     settle(&shell, cx);
     cx.executor().run_until_parked();
     settle(&shell, cx);
     assert!(cx.debug_bounds("usage-empty").is_some(), "no logs: the dashboard says there is nothing");
-    shell.update(cx, |shell, cx| shell.close_usage(cx));
+    shell.update(cx, |shell, cx| shell.close_view(cx));
     // Three accounts, one with a broken line.
     let mut roots = Roots::new();
     for (at, name) in [".claude", ".claude-work", ".claude-team"].iter().enumerate() {
@@ -220,17 +241,15 @@ fn the_dashboard_reads_the_logs_and_survives_a_broken_line_and_a_folder_with_not
         std::fs::write(folder.join("s.jsonl"), format!("{}{broken}", line(&at.to_string()))).unwrap();
         roots = roots.with_dir(Provider::Claude, home.join(name));
     }
-    shell.update(cx, |shell, cx| {
-        shell.usage_roots = roots;
-        shell.show_usage(cx);
-    });
+    cx.update(|_, cx| cx.set_global(UsageStore { roots, ..Default::default() }));
+    shell.update(cx, |shell, cx| shell.open_view("usage", cx));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     settle(&shell, cx);
     cx.executor().run_until_parked();
     settle(&shell, cx);
     assert!(cx.debug_bounds("usage-dashboard").is_some(), "the dashboard is drawn");
     assert!(cx.debug_bounds("usage-empty").is_none(), "with logs it does not say there is nothing");
-    let (accounts, skipped) = shell.read_with(cx, |s, _| (s.usage_seen.accounts.len(), s.usage_seen.skipped));
+    let (accounts, skipped) = cx.update(|_, cx| (cx.global::<UsageStore>().seen.accounts.len(), cx.global::<UsageStore>().seen.skipped));
     assert_eq!((accounts, skipped), (3, 1), "three accounts, and the one broken line counted, not read");
 }
 /// A notice shows over the foot of the window, and goes by itself.
