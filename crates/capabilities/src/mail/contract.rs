@@ -140,8 +140,8 @@ pub fn delivered_mail_is_found_read_and_ordered(make: Make) {
     assert_eq!(thread.messages.len(), 2, "two messages in the thread");
     assert_eq!(thread.summary.message_count, 2, "the summary counts both");
     assert!(
-        thread.messages[0].date < thread.messages[1].date,
-        "oldest first"
+        thread.messages[0].date <= thread.messages[1].date,
+        "oldest first (a tie is allowed: some services show the minute only)"
     );
     assert_eq!(thread.messages[0].text, "Noon on Friday?", "the plain text");
     assert!(thread.messages[0].date > 100_000_000_000, "milliseconds");
