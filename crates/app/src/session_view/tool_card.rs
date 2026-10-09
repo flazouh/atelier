@@ -13,7 +13,17 @@ use crate::{
 /// Whose agent made the call: the person the app acts for, as "Alex's agent".
 fn origin(cx: &App) -> Option<String> {
     cx.try_global::<CapabilityHub>()
-        .map(|hub| format!("{}'s agent", hub.person().name))
+        .map(|hub| agent_of(&hub.person().name))
+}
+
+/// "Alex's agent", as the Messages screen words it: the name starts with a capital.
+fn agent_of(owner: &str) -> String {
+    let mut letters = owner.chars();
+    let name: String = letters
+        .next()
+        .map(|c| c.to_uppercase().chain(letters).collect())
+        .unwrap_or_default();
+    format!("{name}'s agent")
 }
 
 /// The card for `call`, or `None` when it keeps the plain row. A press on a row or a button asks the session to show what it
@@ -41,4 +51,15 @@ pub(super) fn card(
             })
             .into_any_element(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::agent_of;
+
+    #[test]
+    fn the_origin_names_the_owner_with_a_capital() {
+        assert_eq!(agent_of("alex"), "Alex's agent");
+        assert_eq!(agent_of("Sam"), "Sam's agent");
+    }
 }
