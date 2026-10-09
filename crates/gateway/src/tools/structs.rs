@@ -11,6 +11,8 @@ pub struct ToolDef {
     /// A JSON Schema of the arguments, an object.
     pub input_schema: Value,
     pub permission: Permission,
+    /// The tool reaches a service outside the app (Slack, Gmail). Tasks tools stay in the app's own data.
+    pub open_world: bool,
 }
 
 impl ToolDef {
@@ -24,8 +26,7 @@ impl ToolDef {
                 "title": self.title,
                 "readOnlyHint": self.permission.read_only(),
                 "destructiveHint": self.permission.destructive(),
-                // Every tool talks to the app's own data, not to the open world.
-                "openWorldHint": false,
+                "openWorldHint": self.open_world,
             },
         })
     }

@@ -4,11 +4,13 @@ use atelier_capabilities::{
     Actor, CapError, Ref, Registry,
     tasks::{NewTask, Patch, Query, TasksProvider},
 };
-use serde::de::DeserializeOwned;
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
-use super::render::{NOTICE, comment_detail, neutral, page, task_detail, task_line, untrusted};
-use crate::ToolResult;
+use super::render::{NOTICE, comment_detail, page, task_detail, task_line, untrusted};
+use crate::{
+    ToolResult,
+    shared::{account, neutral, pick, required},
+};
 
 /// How many entries of a task's activity `tasks_get` shows: the latest.
 const ACTIVITY_SHOWN: usize = 20;
@@ -155,50 +157,6 @@ pub(super) fn comment(registry: &Registry, args: &Value, by: &Actor) -> Done {
         text,
         json!({ "comment": neutral(&made), "notice": NOTICE }),
     ))
-}
-
-/// The fields of `args` that a call takes, plus `extra`, read as a `T`. A field the call does not take is left out,
-/// so a model that adds one does not fail. A field of the wrong shape names itself in the sentence.
-fn pick<T: DeserializeOwned>(
-    args: &Value,
-    keys: &[&str],
-    extra: &[(&str, Value)],
-) -> Result<T, String> {
-    let given = args
-        .as_object()
-        .ok_or("The arguments must be a JSON object.")?;
-    let mut taken = Map::new();
-    for key in keys {
-        if let Some(value) = given.get(*key) {
-            taken.insert((*key).to_string(), value.clone());
-        }
-    }
-    for (key, value) in extra {
-        taken.insert((*key).to_string(), value.clone());
-    }
-    serde_json::from_value(Value::Object(taken))
-        .map_err(|e| format!("The arguments are not valid: {e}."))
-}
-
-fn required(args: &Value, key: &str) -> Result<String, String> {
-    match args[key].as_str().map(str::trim) {
-        Some(text) if !text.is_empty() => Ok(text.to_string()),
-        _ => Err(format!("The argument {key} is required and must be text.")),
-    }
-}
-
-fn account(args: &Value) -> Result<Option<(String, String)>, String> {
-    let Some(text) = args["account"].as_str().filter(|a| !a.is_empty()) else {
-        return Ok(None);
-    };
-    match text.split_once('/') {
-        Some((provider, account)) if !provider.is_empty() && !account.is_empty() => {
-            Ok(Some((provider.to_string(), account.to_string())))
-        }
-        _ => Err(format!(
-            "The account \"{text}\" must look like provider/account, for example local/atelier."
-        )),
-    }
 }
 
 fn place(provider: &dyn TasksProvider) -> String {

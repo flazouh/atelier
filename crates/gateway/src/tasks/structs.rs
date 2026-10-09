@@ -22,6 +22,11 @@ impl TasksTools {
 
 impl ToolSet for TasksTools {
     fn tools(&self) -> Vec<ToolDef> {
+        let registry = self.registry.read().unwrap_or_else(|p| p.into_inner());
+        // With no tracker connected no task tool can work, so none is shown.
+        if registry.all_tasks().is_empty() {
+            return Vec::new();
+        }
         definitions()
     }
 

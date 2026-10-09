@@ -115,6 +115,7 @@ fn def(
             "additionalProperties": false,
         }),
         permission,
+        open_world: false,
     }
 }
 
