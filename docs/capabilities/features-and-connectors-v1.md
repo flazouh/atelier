@@ -34,7 +34,7 @@ Moving between backends uses export and import (in the tasks spec): a team that 
 
 ## 3. Clients and tool connectors
 
-**A client** has a rail icon, a wide sidebar with its own list (chats, threads), and a pane. It may reuse the shared chat view or the shared mail view when its data fits, scoped to its own provider. Telegram uses the chat view with only Telegram chats. Mail uses the mail view. It also gives agent tools. Read tools are free. A write tool (send a message, send mail) asks each time and shows the exact text. An agent never sends mail alone.
+**A client** has a rail icon, a wide sidebar with its own list (chats, threads), and a pane. It may reuse the shared chat view or the shared mail view when its data fits, scoped to its own provider. Telegram, a plugin, uses the chat view with only Telegram chats. Mail uses the mail view. It also gives agent tools. Read tools are free. A write tool (send a message, send mail) asks each time and shows the exact text. An agent never sends mail alone.
 
 **A tool connector** has no view. It is an MCP server: a URL or a command to start, and a sign-in when it needs one (OAuth, run by Atelier; the token lives in the keychain). Once added:
 - Its tools appear for every agent through the gateway, with the connector's name in front (`sentry_search_issues`).
@@ -62,13 +62,52 @@ Storage: one SQLite database per project, as tasks have today. Later a team hub 
 
 Not in v1: calls, presence dots, huddles, a search index beyond text.
 
-## 5. The rail
+## 5. Plugins
+
+A **plugin** is how a client, a backend or a tool connector gets into Atelier without being part of the app. Telegram is a plugin. So could Linear or Slack be, later.
+
+**What a plugin is:** a folder with a manifest and a program. Atelier starts the program as its own process and talks to it. The program is written in any language.
+
+```
+telegram/
+  plugin.json     the manifest
+  telegram        the program (or a command to run it)
+  logo.svg
+```
+
+**The manifest** (`plugin.json`) says:
+- `id`, `name`, `version`, `logo`.
+- `kind`: `client` (a rail icon and a view), `backend` (a backend for a feature: tasks, workspace), or `tool` (agent tools only, no view).
+- `implements`: the interface it fills: `messaging`, `tasks`, `mail`. A tool plugin lists its tools instead.
+- `run`: the command, and the operating systems it runs on.
+- `settings`: the fields it needs (for example a workspace name), as data. Atelier draws them in Settings.
+- `permissions`: what it may do: which network hosts it reaches, whether it keeps a secret in the keychain. Atelier shows the list before the person installs it.
+
+**The talk between Atelier and the plugin:** JSON-RPC 2.0 over the plugin's stdin and stdout. The calls are the calls of the interface the plugin implements, with the types of the schema we already have (`messaging.schema.json`, `tasks.schema.json`). Changes arrive as notifications (a new message). So the plugin only answers questions like "give me the history of this chat". It never draws.
+
+**What Atelier does with it:** a `PluginProvider` wraps the process and implements the same trait as a built-in provider. It goes into the same registry. So the screen, the agent tools, the cards and the contract tests all work with no change. A `client` plugin also gets its rail icon, and the shared view scoped to it.
+
+**Login in the plugin:** a plugin may ask for a login step as data: `{ "type": "qr", "data": "tg://login?token=..." }`, or `{ "type": "code", "prompt": "..." }`, or `{ "type": "fields", ... }`. Atelier draws the step (a QR code, an input) and sends the answer back. The plugin keeps its session through the host's keychain call, not in its own files.
+
+**Install:** from the plugin list in Settings, Connectors (a registry of plugins kept in a public repository; anyone adds one by a pull request), or from a folder, a URL or a git address. The person sees the name, the author, the version and the permissions first.
+
+**Safety:**
+- A plugin runs with the person's rights and no more. It reaches only the hosts it listed.
+- What a plugin returns is data: it is marked as data for the agent.
+- Reads are free for the agent; every write asks.
+- Every call is in the audit log. A kill switch stops one plugin or all.
+- Its list of calls is pinned at install. A change shows to the person before it is used.
+- Plugins are not code in the Atelier process, so a crash of one plugin is not a crash of the app.
+
+**What a plugin cannot do in v1:** draw its own screen. A plugin that needs a view that none of our shared views fits waits for the view schema (a later step; the card schema is the first part of it).
+
+## 6. The rail
 
 Today the rail is a closed list in the shell: sessions, tasks, code, messages, mail. v1 makes the rail a list of **contributions** (the slot system exists; the rail was left out). A feature or a connector registers one rail view: id, icon, label, order, the sidebar, the pane, and a condition (a connector shows only when added). The built-in views register the same way.
 
 Order: Sessions, Workspace, Tasks, Code, then the connectors in the order the person added them.
 
-## 6. Telegram, the first client
+## 7. Telegram, the first plugin
 
 - **What it is:** a full Telegram client you install and connect. Its rail icon opens the wide sidebar with your chats and the pane with the messages, written and read by you. It is a user client over MTProto, not a bot. The Rust options are `grammers-client` and `tdlib-rs`; a spike picks one.
 - **Login:** a QR code. Telegram supports QR login: you scan the code in the phone app, and no phone number is typed. A phone number and code is the fallback. The session is kept in the keychain.
@@ -76,9 +115,10 @@ Order: Sessions, Workspace, Tasks, Code, then the connectors in the order the pe
 - **The key:** every third-party Telegram client uses its own `api_id` and `api_hash`, free from `my.telegram.org`, shipped in the client; it is not a secret. We register one for Atelier.
 - **Rules of the terms we keep:** our own `api_id`, a name that says it is unofficial, no copying of their logos, show that the Telegram API is used, and no action the person did not ask for.
 - **The one risk, said once:** Telegram's terms forbid the developer to use their data to train or develop AI. They are written for the developer who holds the `api_id`. If Telegram counts an agent that reads chats as AI use, they may revoke our key, and every user's Telegram client stops until we get a new one. For a personal tool the risk is small. For a product sold per seat it is larger, so a lawyer reads the clause before we sell it. It does not stop use now.
-- **Install:** it ships as the first client crate in the repo. When the plugin host exists (a later step), it becomes an installable plugin with the same interface.
+- **Install:** it is a plugin (section 5), `kind: client`, `implements: messaging`. It is not in the Atelier repo. It lives in its own repository and is listed in the plugin registry. The person installs it from Settings, Connectors, and its rail icon appears.
+- **Login in the plugin:** the plugin asks for a `qr` login step; Atelier shows the QR code; the plugin keeps the session through the host's keychain call.
 
-## 7. What changes in the code we have
+## 8. What changes in the code we have
 
 | Today | v1 |
 |---|---|
@@ -93,17 +133,19 @@ Order: Sessions, Workspace, Tasks, Code, then the connectors in the order the pe
 
 The providers, the gateway, the agent tools, the contract suites and the screens we have are kept.
 
-## 8. Build order
+## 9. Build order
 
 1. Rail contributions, and Settings: Backends and Connectors (move Accounts under them).
-2. The native workspace backend (people, then agents as members, then links and mentions).
-3. Tool connectors (MCP): add by URL or command, sign-in, the tools reach every agent, cards in chat. The first one to try is Sentry.
-4. Telegram client (spike, then the view).
-5. Tool cards in chat for all of it (in progress).
+2. The plugin host: the manifest, the JSON-RPC talk, `PluginProvider`, install and the permission screen, the login step, the audit log. Proved first with a tiny test plugin that fakes a chat service, then with Telegram.
+3. Telegram as the first plugin (its own repository), with QR login.
+4. Tool connectors (MCP): a URL or a command, sign-in, tools to every agent, cards. The first to try is Sentry.
+5. The native workspace backend (people, then agents as members, then links and mentions).
+6. Tool cards in chat for all of it (in progress).
 
-## 9. Questions for you
+## 10. Questions for you
 
 1. **Name.** "Workspace" for the agentic space. Is that the word you want in the app?
-2. **Several backends at once?** Today a project could show Linear and native together. Do you want only one active per feature, or a union?
-3. **Native workspace and sessions.** Should every agent session also appear as a thread in a channel automatically, or only when someone sends it there?
-4. **Telegram and the agent.** Connected means the agent can read when you ask, as for Slack and Gmail. Agree?
+2. **Plugin language.** Plugins may be written in any language and speak JSON-RPC over stdio. Is that right for you, or do you want Rust only?
+3. **Several backends at once?** Today a project could show Linear and native together. Do you want only one active per feature, or a union?
+4. **Native workspace and sessions.** Should every agent session also appear as a thread in a channel automatically, or only when someone sends it there?
+5. **Telegram and the agent.** Connected means the agent can read when you ask, as for Slack and Gmail. Agree?
