@@ -263,7 +263,7 @@ fn the_first_start_of_an_updated_version_opens_the_changelog_by_itself_and_close
     assert!(cx.debug_bounds("whats-new-chip").is_none(), "there is no chip any more");
     assert!(cx.debug_bounds("release-install").is_none() && cx.debug_bounds("release-later").is_none(), "and no buttons but Close");
     assert!(cx.debug_bounds("release-earlier-0").is_none(), "the old layout is gone");
-    assert!(cx.debug_bounds("release-0").is_some() && cx.debug_bounds("release-1").is_some(), "the new version first, the older ones under it");
+    assert!(cx.debug_bounds("release-0").is_some() && cx.debug_bounds("release-1").is_none(), "the new version only, no older one");
     let close = cx.debug_bounds("release-close").expect("Close is there");
     cx.simulate_click(close.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
