@@ -34,7 +34,7 @@ fn a_press_on_bots_in_the_rail_lists_the_starters_and_shows_the_first_profile_an
     settle(&shell, cx);
     assert!(cx.debug_bounds("bot-profile-dot").is_some(), "a press on a row shows that bot");
     assert!(cx.debug_bounds("bot-profile-bolt").is_none());
-    let state = shell.read_with(cx, |s, cx| crate::control::state(s, cx));
+    let state = shell.read_with(cx, crate::control::state);
     assert_eq!(state["view"], "bots", "the control socket says which lens is in front");
     assert_eq!(state["bots"]["chosen"], "dot", "and which bot is chosen");
     assert_eq!(state["bots"]["rows"].as_array().map(Vec::len), Some(10));
@@ -69,7 +69,7 @@ fn a_bot_file_that_does_not_parse_is_said_in_the_view_and_the_app_goes_on(cx: &m
     settle(&shell, cx);
     assert!(cx.debug_bounds("bots-error").is_some(), "the view says the folder could not be read");
     assert!(cx.debug_bounds("bot-profile").is_none());
-    let state = shell.read_with(cx, |s, cx| crate::control::state(s, cx));
+    let state = shell.read_with(cx, crate::control::state);
     assert!(state["bots"]["error"].as_str().unwrap().contains("bad.json"), "the error names the file: {}", state["bots"]["error"]);
     assert!(state["bots"]["chosen"].is_null(), "nothing is chosen while nothing is read");
     let sessions = cx.debug_bounds("rail-sessions").unwrap();
