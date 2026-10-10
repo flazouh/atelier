@@ -532,6 +532,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-bots"
+version = "0.1.16"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "atelier-capabilities"
 version = "0.1.16"
 dependencies = [
