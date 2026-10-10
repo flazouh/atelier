@@ -2,7 +2,7 @@
 //! chosen on the Code lens's card. The page is one for the window (the bots are the person's, not a project's), made
 //! the first time the view is in front. What it shows is written in `bots_view`; the shell only places it.
 
-use atelier_ui::{ActiveTheme, scale::px, typography::TextSize};
+use atelier_ui::{scale::px, typography::TextSize};
 use gpui_kit::{AnyElement, Context, Window, div, prelude::*};
 
 use super::{lens::nav_row_marked, structs::Shell, view::ShellView};
@@ -32,8 +32,7 @@ impl Shell {
     /// The Bots view's sidebar: its title, then one row per bot with its face, its name and its role.
     pub(super) fn bots_sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
         let Some(page) = self.bots.clone() else { return div().into_any_element() };
-        let theme = cx.theme().clone();
-        let mut column = div()
+        let column = div()
             .id("bots-sidebar")
             .debug_selector(|| "bots-sidebar".into())
             .flex()
@@ -68,14 +67,8 @@ impl Shell {
                 })
                 .collect()
         });
-        let empty = rows.is_empty();
-        column = column.children(rows);
-        if empty && let Some(error) = page.read(cx).error() {
-            column = column.child(
-                div().px(px(8.)).pt(px(10.)).text_size(TextSize::Xs.font_size()).text_color(theme.danger).child(error.to_string()),
-            );
-        }
-        column.into_any_element()
+        // A folder that could not be read leaves the list empty; the main area says why.
+        column.children(rows).into_any_element()
     }
 
     /// The Bots page, once the view was in front.

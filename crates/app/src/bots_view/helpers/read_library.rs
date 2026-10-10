@@ -8,10 +8,8 @@ use super::super::structs::{Entry, Library};
 /// in words, with the path of the file it names, and the view shows it. Call it off the UI thread.
 pub fn read_library(root: &Path) -> Library {
     let store = DiskBotStore::new(root);
-    if let Err(e) = seed_starters(&store) {
-        return Library { entries: Vec::new(), error: Some(format!("The starter bots could not be written: {e}")) };
-    }
-    match store.bots() {
+    // Seeding reads the folder first, so a broken file is told here, by its path.
+    match seed_starters(&store).and_then(|_| store.bots()) {
         Ok(bots) => Library {
             entries: bots
                 .into_iter()

@@ -59,9 +59,13 @@ impl BotsPage {
             drop(this.update(cx, |page, cx| {
                 page.library = library;
                 page.loading = false;
+                // The choice follows the folder: a bot that is gone is no longer chosen, and the first one is when none is.
                 let kept = page.selected.as_ref().is_some_and(|id| page.library.entries.iter().any(|e| e.bot.id == *id));
-                if !kept && let Some(first) = page.library.entries.first().map(|e| e.bot.id.clone()) {
-                    page.select(first, cx);
+                if !kept {
+                    page.selected = None;
+                    if let Some(first) = page.library.entries.first().map(|e| e.bot.id.clone()) {
+                        page.select(first, cx);
+                    }
                 }
                 cx.notify();
             }));

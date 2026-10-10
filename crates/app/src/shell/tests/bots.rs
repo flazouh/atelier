@@ -69,6 +69,9 @@ fn a_bot_file_that_does_not_parse_is_said_in_the_view_and_the_app_goes_on(cx: &m
     settle(&shell, cx);
     assert!(cx.debug_bounds("bots-error").is_some(), "the view says the folder could not be read");
     assert!(cx.debug_bounds("bot-profile").is_none());
+    let state = shell.read_with(cx, |s, cx| crate::control::state(s, cx));
+    assert!(state["bots"]["error"].as_str().unwrap().contains("bad.json"), "the error names the file: {}", state["bots"]["error"]);
+    assert!(state["bots"]["chosen"].is_null(), "nothing is chosen while nothing is read");
     let sessions = cx.debug_bounds("rail-sessions").unwrap();
     cx.simulate_click(sessions.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
