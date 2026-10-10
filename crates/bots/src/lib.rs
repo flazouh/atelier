@@ -1,7 +1,9 @@
 //! The bots of `docs/bots/bots-v1.md`. A `Bot` is a persona on top of an agent harness: a face, a role, skills,
 //! tools, a voice and a version. Its memory is kept as notes in three layers. A `Playbook` is an ordered list of
-//! bots. `BotStore` keeps all of it, and `DiskBotStore` keeps it in a folder. `starter_crew` is the ten bots that
-//! ship. Nothing here draws: the face is a choice, and `atelier-bot-face` draws it.
+//! bots, and a `Run` is one playbook at work on a brief: its moves are pure, and each one returns the new run and the
+//! `RunEvent`s the app acts on. `BotStore` keeps all of it, and `DiskBotStore` keeps it in a folder. `starter_crew`
+//! is the ten bots that ship. Nothing here draws or starts an agent: the face is a choice, and `atelier-bot-face`
+//! draws it.
 
 mod consts;
 mod enums;
@@ -11,9 +13,14 @@ mod structs;
 mod tests;
 mod traits;
 
-pub use enums::{Access, Body, BotsError, Colour, Harness, MemoryScope, Tool, Voice};
+pub use consts::ASKS_FIRST_QUESTION;
+pub use enums::{
+    Access, Body, BotsError, Colour, Harness, MemoryScope, RunEvent, RunState, StepState, Tool,
+    Voice,
+};
 pub use impls::{seed_starters, starter_crew, starter_playbooks};
 pub use structs::{
-    Bot, BotId, DiskBotStore, FaceChoice, MemoryNote, Playbook, PlaybookStep, Provider, ToolGrant,
+    Bot, BotId, DiskBotStore, FaceChoice, HandOver, MemoryNote, Playbook, PlaybookStep, Provider,
+    Run, RunStep, StepReading, ToolGrant,
 };
 pub use traits::BotStore;

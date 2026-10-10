@@ -12,6 +12,27 @@ fn deliver_names_five_bots_that_exist() {
 }
 
 #[test]
+fn design_is_the_second_starter_and_goes_from_research_to_the_check() {
+    let playbooks = starter_playbooks();
+    assert_eq!(
+        playbooks.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+        ["deliver", "design"]
+    );
+    let design = &playbooks[1];
+    assert_eq!(design.name, "Design");
+    assert_eq!(
+        design
+            .steps
+            .iter()
+            .map(|s| s.bot.as_str())
+            .collect::<Vec<_>>(),
+        ["quill", "mimi", "bolt", "pip"]
+    );
+    assert!(design.problems(&starter_crew()).is_empty());
+    assert!(design.steps.iter().all(|s| !s.asks_first));
+}
+
+#[test]
 fn a_step_that_names_a_missing_bot_is_listed_with_its_place() {
     let playbook = Playbook {
         id: "p".parse().unwrap(),
