@@ -42,6 +42,15 @@ pub(crate) fn trace(b: &mut PathBuilder, m: &Affine, g: &Geometry) {
             b.cubic_bezier_to(p(cx + r, *cy), p(cx + k, cy - r), p(cx + r, cy - k));
             b.close();
         }
+        Geometry::Ellipse { cx, cy, rx, ry } => {
+            let (kx, ky) = (rx * KAPPA, ry * KAPPA);
+            b.move_to(p(cx + rx, *cy));
+            b.cubic_bezier_to(p(*cx, cy + ry), p(cx + rx, cy + ky), p(cx + kx, cy + ry));
+            b.cubic_bezier_to(p(cx - rx, *cy), p(cx - kx, cy + ry), p(cx - rx, cy + ky));
+            b.cubic_bezier_to(p(*cx, cy - ry), p(cx - rx, cy - ky), p(cx - kx, cy - ry));
+            b.cubic_bezier_to(p(cx + rx, *cy), p(cx + kx, cy - ry), p(cx + rx, cy - ky));
+            b.close();
+        }
         Geometry::Polygon(points) => {
             let pts: Vec<_> = points.iter().map(|(x, y)| p(*x, *y)).collect();
             b.add_polygon(&pts, true);
@@ -52,6 +61,9 @@ pub(crate) fn trace(b: &mut PathBuilder, m: &Affine, g: &Geometry) {
                     PathCmd::Move(x, y) => b.move_to(p(x, y)),
                     PathCmd::Line(x, y) => b.line_to(p(x, y)),
                     PathCmd::Quad(cx, cy, x, y) => b.curve_to(p(x, y), p(cx, cy)),
+                    PathCmd::Cubic(ax, ay, bx, by, x, y) => {
+                        b.cubic_bezier_to(p(x, y), p(ax, ay), p(bx, by))
+                    }
                     PathCmd::Close => b.close(),
                 }
             }

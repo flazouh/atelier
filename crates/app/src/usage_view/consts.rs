@@ -13,7 +13,5 @@ pub const SHADES: usize = 3;
 pub const NOTHING: &str = "No usage found yet. Atelier reads the session logs of Claude Code and Codex on this computer.";
 pub const READING: &str = "Reading the session logs…";
 pub const NO_LOGS: &str = "This source keeps no token logs here. Its limit is in its tile.";
-/// The width of the sources list at the left of the usage view, in design pixels.
-pub const SIDE_WIDTH: f32 = 300.;
 /// The room the detail leaves round its content, in design pixels.
 pub const DETAIL_PAD: f32 = 24.;

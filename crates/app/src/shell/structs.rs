@@ -112,6 +112,10 @@ pub struct Shell {
     pub(super) messages: Option<Entity<crate::messages::pane::MessagesPane>>,
     /// The Mail view's pane, made the first time the view is in front.
     pub(super) mail: Option<Entity<crate::mail::pane::MailPane>>,
+    /// The Usage view's page, made the first time the view is in front.
+    pub(super) usage: Option<Entity<crate::usage_view::UsagePage>>,
+    /// A module asked for the Usage view: the next frame, which has a window, shows it.
+    pub(super) usage_asked: bool,
     /// In Sessions, the project the list and the panels are narrowed to; all of them with `None`.
     pub(super) session_filter: Option<SharedString>,
     /// The project switcher's menu is open.
@@ -222,6 +226,8 @@ impl Shell {
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
             messages: None,
             mail: None,
+            usage: None,
+            usage_asked: false,
             session_filter: None,
             switcher_open: false,
             add_open: false,
@@ -1013,6 +1019,7 @@ impl Shell {
                 this.focus_front(project, window, cx);
                 cx.notify();
             }
+            ProjectEvent::PullPage => this.show_code(ShellView::Pulls, window, cx),
             ProjectEvent::PullsShown => {
                 this.right = true;
                 this.widen_right(window, cx);
@@ -1803,7 +1810,7 @@ impl Shell {
         let switcher = self.project_switcher(cx);
         // The Sessions sidebar has a row of its own at the top, with the ⋯ at its right: the switcher stands on that row,
         // left of the ⋯, so the head is one row. The other lenses have no such row and give the switcher one.
-        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Messages | ShellView::Mail) {
+        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Messages | ShellView::Mail | ShellView::Usage) {
             let row = switcher.map(|switcher| {
                 div().absolute().top(px(5.)).left(px(8.)).right(px(44.)).h(px(36.)).flex().items_center().min_w_0().child(switcher)
             });
@@ -1830,6 +1837,9 @@ impl Shell {
         }
         if self.view == ShellView::Mail {
             return div().size_full().child(self.mail_sidebar(cx));
+        }
+        if self.view == ShellView::Usage {
+            return div().size_full().child(self.usage_sidebar(cx));
         }
         div()
             .flex()
@@ -1945,8 +1955,15 @@ impl Shell {
         if self.view == ShellView::Messages {
             self.ensure_messages(window, cx);
         }
+        if self.usage_asked {
+            self.usage_asked = false;
+            self.show_usage(window, cx);
+        }
         if self.view == ShellView::Mail {
             self.ensure_mail(window, cx);
+        }
+        if self.view == ShellView::Usage {
+            self.ensure_usage(cx);
         }
         let total = atelier_ui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
@@ -2109,6 +2126,7 @@ impl Shell {
             ShellView::Tasks => self.tasks_main(project, window, cx),
             ShellView::Messages => self.messages_main(),
             ShellView::Mail => self.mail_main(),
+            ShellView::Usage => self.usage_main(cx),
             ShellView::Git => self.changes_main(project, cx),
             ShellView::Files => self.files_editor(project, false, cx),
             ShellView::Pulls => self.pulls_main(project, cx),

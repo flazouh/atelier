@@ -163,9 +163,27 @@ fn a_press_on_the_version_opens_the_changelog(cx: &mut TestAppContext) {
     settle(&shell, cx);
     assert!(shell.read_with(cx, |s, _| s.changelog_open), "the changelog is open");
 }
-/// A press on the usage chips in the status bar opens the usage dashboard, and Escape closes it.
+/// A press on a pull request chip opens the pull requests page of the Code view, not the right pane of the Sessions view.
 #[gpui_kit::test]
-fn a_press_on_the_usage_chips_opens_the_dashboard_and_escape_closes_it(cx: &mut TestAppContext) {
+fn a_pull_request_chip_opens_the_pull_requests_page_not_the_right_pane(cx: &mut TestAppContext) {
+    let (shell, cx, _dir) = with_a_session(cx, 1400.);
+    let repo = atelier_forge::RepoRef { host: "github.com".into(), owner: "flazouh".into(), name: "atelier".into() };
+    let project = shell.read_with(cx, |s, _| s.active().cloned().expect("a project is open"));
+    cx.update(|_, cx| project.update(cx, |p, cx| p.set_repo(Some(repo.clone()), cx)));
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Sessions);
+    let reference = atelier_forge::PullRef { repo, number: 7 };
+    cx.update(|window, cx| project.update(cx, |p, cx| p.show_pull(reference, window, cx)));
+    settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Pulls, "the page of pull requests is in front");
+    assert_ne!(
+        project.read_with(cx, |p, _| p.front()),
+        crate::open_project::front::Front::Pulls,
+        "the right pane did not take it"
+    );
+}
+/// A press on the usage chips in the status bar opens the Usage view, and a press on another lens of the rail leaves it.
+#[gpui_kit::test]
+fn a_press_on_the_usage_chips_opens_the_usage_view_and_another_lens_leaves_it(cx: &mut TestAppContext) {
     use atelier_agents::usage::{Reading, Window};
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
     shell.update(cx, |shell, cx| {
@@ -181,9 +199,12 @@ fn a_press_on_the_usage_chips_opens_the_dashboard_and_escape_closes_it(cx: &mut 
     cx.simulate_click(chips.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("usage-dashboard").is_some(), "a press opens the dashboard");
-    cx.simulate_keystrokes("escape");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Usage, "the view is a lens of the shell");
+    assert!(cx.debug_bounds("usage-sidebar").is_some(), "its sources are in the sidebar");
+    let rail = cx.debug_bounds("rail-sessions").expect("the rail has Sessions");
+    cx.simulate_click(rail.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    assert!(cx.debug_bounds("usage-dashboard").is_none(), "Escape closes it");
+    assert!(cx.debug_bounds("usage-dashboard").is_none(), "another lens leaves it");
 }
 /// The usage chips and the dashboard are what the usage module adds to the app: take its registration out and the bar has
 /// neither, a view named usage opens nothing, and the version and the machine stay.
@@ -234,7 +255,8 @@ fn the_dashboard_reads_the_logs_and_survives_a_broken_line_and_a_folder_with_not
     cx.executor().run_until_parked();
     settle(&shell, cx);
     assert!(cx.debug_bounds("usage-empty").is_some(), "no logs: the dashboard says there is nothing");
-    shell.update(cx, |shell, cx| shell.close_view(cx));
+    cx.update(|window, cx| shell.update(cx, |shell, cx| shell.show_view(ShellView::Sessions, window, cx)));
+    settle(&shell, cx);
     // Three accounts, one with a broken line.
     let mut roots = Roots::new();
     for (at, name) in [".claude", ".claude-work", ".claude-team"].iter().enumerate() {

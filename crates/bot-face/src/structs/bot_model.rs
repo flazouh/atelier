@@ -10,6 +10,8 @@ pub struct BotModel {
     pub role: String,
     pub colour: Rgba,
     pub eye_y: f32,
+    /// The part of the drawing that is shown: x, y, width and height, in view units.
+    pub view: [f32; 4],
     pub parts: Vec<PartModel>,
     /// One set of shapes for each mood, in the order of `Mood::ALL`.
     pub eyes: Vec<Vec<Shape>>,

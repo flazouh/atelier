@@ -40,6 +40,12 @@ fn shape_of(node: &roxmltree::Node) -> Result<Shape, String> {
             cy: num("cy", 0.0)?,
             r: num("r", 0.0)?,
         },
+        "ellipse" => Geometry::Ellipse {
+            cx: num("cx", 0.0)?,
+            cy: num("cy", 0.0)?,
+            rx: num("rx", 0.0)?,
+            ry: num("ry", 0.0)?,
+        },
         "polygon" => Geometry::Polygon(parse_points(node.attribute("points").unwrap_or(""))?),
         "path" => Geometry::Path(parse_path_data(node.attribute("d").unwrap_or(""))?),
         other => return Err(format!("the shape `{other}` is not supported")),

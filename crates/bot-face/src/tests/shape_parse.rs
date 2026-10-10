@@ -48,3 +48,18 @@ fn a_literal_colour_is_kept() {
     let shapes = parse(r##"<rect x="0" y="0" width="1" height="1" fill="#FFE9B0"/>"##).unwrap();
     assert!(matches!(shapes[0].fill, Some(Paint::Literal(_))));
 }
+
+#[test]
+fn an_ellipse_reads_its_two_radii() {
+    let shapes = parse(r##"<ellipse cx="60" cy="62" rx="37" ry="33" fill="{body}" stroke="#141413" stroke-width="3.2"/>"##).unwrap();
+    assert_eq!(
+        shapes[0].geometry,
+        Geometry::Ellipse {
+            cx: 60.0,
+            cy: 62.0,
+            rx: 37.0,
+            ry: 33.0
+        }
+    );
+    assert!(shapes[0].stroke.is_some());
+}
