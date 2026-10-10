@@ -148,10 +148,6 @@ impl Host {
         drop(self.shell.update(cx, |shell, cx| shell.open_view(id, cx)));
     }
 
-    /// Closes the view that is open.
-    pub fn close_view(&self, cx: &mut App) {
-        drop(self.shell.update(cx, |shell, cx| shell.close_view(cx)));
-    }
 
     /// Opens the changelog.
     pub fn show_changelog(&self, cx: &mut App) {

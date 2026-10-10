@@ -11,14 +11,16 @@ impl Shell {
         let Some(view) = cx.global::<Slots>().view(id).cloned() else {
             return;
         };
+        // The Usage view is a lens of the shell, not a layer over it: the next frame shows it.
+        if id == "usage" {
+            self.usage_asked = true;
+            cx.notify();
+            return;
+        }
         let host = Host::new(cx.weak_entity(), self.vitals.clone());
         let page = (view.open)(&host, cx);
         self.opened = Some((view.id, page));
         cx.notify();
     }
 
-    pub fn close_view(&mut self, cx: &mut Context<Self>) {
-        self.opened = None;
-        cx.notify();
-    }
 }

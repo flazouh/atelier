@@ -21,8 +21,8 @@ mod tree_menu;
 mod types;
 mod update_view;
 mod updates;
+mod usage;
 mod view;
-pub(crate) use types::TITLE_BAR;
 mod views;
 
 pub use view::ShellView;
