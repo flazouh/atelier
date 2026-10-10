@@ -12,4 +12,8 @@ pub enum HabitKind {
     Bob,
     Scuttle,
     Wave,
+    /// Turns edge on and off, like blades: the part shrinks across and grows back.
+    Rotor,
+    /// Grows and shrinks all round, like a heart beat.
+    Pulse,
 }

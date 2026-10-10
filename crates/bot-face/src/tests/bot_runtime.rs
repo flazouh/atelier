@@ -125,8 +125,8 @@ fn a_still_frame_shows_the_mood_at_once_and_does_not_move() {
     let set = FaceSet::from_json(DATA).unwrap();
     let mut rt = BotRuntime::new(7, 3.0);
     rt.react(0.5);
-    let a = rt.still(&set, &set.bots[3], Mood::Needs);
-    let b = rt.still(&set, &set.bots[3], Mood::Needs);
+    let a = rt.still(&set, set.bot("skip").unwrap(), Mood::Needs);
+    let b = rt.still(&set, set.bot("skip").unwrap(), Mood::Needs);
     assert_eq!(a, b, "two still frames are the same");
     assert_eq!(a.eye_weights[Mood::Needs.index()], 1.0);
     assert_eq!(a.blink, 1.0);

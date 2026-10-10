@@ -1,27 +1,31 @@
 # Bot faces and motion, v1 (draft for review)
 
-Status: draft. Docs only. The look was chosen by looking at the live prototype in `prototype/crew-live.html`. This file turns that look into data and rules, so a Rust player can run it.
+Status: draft. The look was chosen from the storybook mockups in `prototype/crew-storybook.html`. This file turns that look into data and rules, and `crates/bot-face` runs them.
 
 ## 1. The look
 
-- **Flat colour.** Each bot is one colour. Shade and light are the same colour with black or white laid over it at fixed opacity. No gradients, no glow, no outline.
-- **Soft body.** Big head, small body, large corner radius. No circles as the body shape.
+A storybook robot with hardware. Round, friendly, and a little futuristic.
+
+- **Outline.** Every body and every part has a dark outline, 3.2 units wide, with round corners.
+- **A face.** Two round dark eyes with two white highlights, a small smile, and two soft cheeks (idle, thinking and done). Each mood has its own eyes and mouth (section 3).
+- **Depth, not detail.** A soft shine on each body. Dark grey and steel for hardware. A glow is a few circles that fade out.
+- **The reactor.** Each bot has one, on its chest, in a dark housing. It is a glowing core, a glowing ring, or a white spark. The glow colour is a part of the bot's identity.
+- **One of each.** A body, one reactor, one way to move (tracks, one wheel, a spring, jets, legs, hover pads, lander legs, casters, cogs, a propeller) and one tool (a hard hat, a lens, goggles, a plane, antennae, a dish, a telescope, a feather, a brush, a wrench, a keyhole). This is a rule, not a taste. No rivets, bolts, extra lights, trails or loose objects.
 - **Nothing around the bot.** No ring, badge or halo. State shows on the bot itself, by its eyes and its motion.
-- **Eyes are the face.** Two dark pills on the body. Idle, done and thinking also show two faint cheeks.
-- **Colour.** The seven brand colours, each mixed 10% toward a warm grey (`#74716A`) so they sit calm on a dark and on a light page. The eye colour is `#141413` on both.
-- **A way to move and a tool.** Every bot has one way to move (tracks, wheels, one spring, jets, legs, feet, a diamond base) and one tool. These make the shapes differ, so colour is not the only clue.
+- **Colour.** The seven brand colours. Quill, Ink, Mimi and Gus share a colour with an older bot, and their shape tells them apart.
 
 ## 2. The data
 
-`faces.v1.json` holds the 7 starter bots. A player needs nothing else.
+`faces.v1.json` holds 11 bots: the ten starters and Keyla, the company example. A player needs nothing else.
 
-- `view_box`: always `[0, 0, 120, 120]`. `ground_y`: 104, the line where bots stand.
-- `tokens`: `{body}`, `{shade}`, `{light}`, `{eye}`. The player replaces them with colours.
-- Each bot has `parts` in draw order. A part has a `layer` (`back`, `body` or `front`), `svg` (basic shapes: rect, path, polygon, circle), a `pivot` and an optional `habit`.
-- Each bot has `eyes`: one drawing for each mood, centred on `eye_y`.
+**Do not edit the file by hand.** Run `node docs/bots/faces.gen.js > docs/bots/faces.v1.json`. The generator holds the drawing in code, so a change to the look is a change to one script.
+
+- `view_box`: `[-4, -2, 128, 128]`. `ground_y`: 104, the line where bots stand.
+- Each bot has `parts` in draw order. A part has a `layer` (`back`, `body` or `front`), `svg`, a `pivot` and an optional `habit`.
+- `svg` holds flat shapes: `rect`, `circle`, `ellipse`, `polygon` and `path`. A path may use M L H V Q C and Z, in both cases. A shape may use `fill`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `opacity` and `transform="rotate(a cx cy)"`.
+- Colours are `{body}` (the bot's colour), `{eye}` (the ink of the face), `none`, or a plain hex colour. There are no gradients, no filters and no groups, so any renderer can draw them.
+- Each bot has `eyes`: one drawing for each mood, with the mouth. `cheeks` lists the blush shapes. `eye_y` is the height of the eyes.
 - `states`: for each mood, `speed` and `amount`. They scale every habit.
-
-Only basic shapes are allowed, so any renderer can draw them. A bot with a new body adds a `parts` list. It does not need new code.
 
 ## 3. The moods
 
@@ -40,19 +44,34 @@ The moods map to session states: `Idle` (waiting), `Thinking` (planning), `Worki
 
 A habit moves one part around its pivot. `speed` and `amount` from the mood scale it. Rates are the number inside `sin()` at speed 1, in radians per second.
 
-| Bot | Part | Habit |
-|---|---|---|
-| Bolt | hammer arm | swings 30° and taps three times every 3.2 s |
-| Pip | lens | slides 5 px and tilts 6° at 1.6 rad/s |
-| Pip | wheels | spin 130°/s, only when `speed` is above 1.2 |
-| Olive | periscope | turns ±14° at 1.2 rad/s |
-| Olive | spring | squashes 7% at 3 rad/s |
-| Skip | jets | flames flicker (scale 1 ± 0.35) |
-| Skip | parcel | bobs 1.4 px and tilts 2° |
-| Dot | legs | scuttle: tilt 2° and lift 1.4 px at 7 rad/s, full strength only when busy |
-| Dot | antennae | swing ±10° at 2.2 rad/s, out of step |
-| Nimbus | flag | waves ±6° and stretches 5% |
-| Keyla | key | swings ±10° at 2.4 rad/s |
+| Kind | What it does |
+|---|---|
+| `swing` | Turns back and forth by `amp_deg`. With `every_s` it taps three times, then rests. |
+| `spin` | Turns round at `deg_per_s`, only when `speed` is above 1.2. |
+| `sweep` | Slides by `dx` and tilts by `rot_deg`. |
+| `spring` | Squashes by `squash` and stretches the other way. |
+| `flicker` | A flame: the part grows and shrinks in height, out of step with its twin. |
+| `bob` | Moves up and down by `dy` and tilts by `rot_deg`. |
+| `scuttle` | Legs: a small tilt and lift, at full strength only when busy. |
+| `wave` | Turns by `amp_deg` and stretches by `stretch`. |
+| `rotor` | Blades: the part gets narrower across and wide again, fast. |
+| `pulse` | A reactor: the part grows and shrinks all round. |
+
+| Bot | Habits |
+|---|---|
+| Bolt | hat bobs; the chain wheels spin; the reactor pulses |
+| Pip | lens sweeps; the wheel spins |
+| Olive | the spring squashes |
+| Skip | both flames flicker; the plane bobs |
+| Dot | the legs scuttle; the two antennae swing out of step |
+| Nimbus | the dish swings; the hover pads bob |
+| Keyla | the hover pads bob; the keyhole reactor pulses |
+| Quill | the telescope swings; the lander jet flickers |
+| Ink | the casters spin; the feather waves |
+| Mimi | the propeller beats as a rotor; the brush swings; the thruster flickers |
+| Gus | the cogs spin in turn; the wrench swings |
+
+Every bot also pulses its reactor.
 
 ## 5. Motion rules
 
@@ -86,11 +105,13 @@ Check each new bot at 18 and 30 px before it ships. A bot must still read by its
 
 ## 8. The prototype
 
-`prototype/crew-live.html` is the reference. Open it in a browser. It shows every rule above and the three real sizes. If the prototype and this file differ, the prototype was approved first. Fix this file.
+`prototype/crew-storybook.html` is the design reference: the ten bots, light and dark, with a before and after of the clutter cut. It is a still page, not the player. The player is `crates/bot-face`, and the gallery story named Bots shows it.
+
+If the page and this file differ, the page was approved first. Fix this file.
 
 ## 9. Open points
 
 1. **Player.** Decided: we write our own small Rust player (`crates/bot-face`). The numbers and the reasons are in `player-spike-v1.md`.
-2. **Making a bot.** The builder picks a body, a colour and a tool. How many bodies and tools do we offer at the start? The prototype has 7 and 7.
-3. **Faces for the four new roles** are part of v1, because all ten roles ship: Quill (Researcher, blue), Ink (Writer, purple), Mimi (Designer, pink) and Gus (Operator, green). Each needs its own way to move and its own tool.
+2. **Dark theme.** The outline is near black, so it disappears on a dark page, and the bots lose their storybook edge. Options: a light outline in the dark theme (a `{ink}` colour that the theme sets), or keep it as it is. This needs a decision.
+3. **Making a bot.** The builder will pick from a parts kit: reactors, ways to move and tools (the mockup frame "parts kit"). The data now holds ten complete bots, not parts that mix. Splitting them into a kit is the builder step.
 4. **Sound.** None in v1.

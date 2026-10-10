@@ -16,15 +16,19 @@ pub fn paint_bot(
     palette: &Palette,
 ) -> usize {
     let (bw, bh) = (f32::from(bounds.size.width), f32::from(bounds.size.height));
-    let side = bw.min(bh);
-    let scale = side / VIEW;
+    let [vx, vy, vw, vh] = bot.view;
+    let scale = (bw / vw).min(bh / vh);
+    let (ox, oy) = (
+        f32::from(bounds.origin.x) + (bw - vw * scale) / 2.0,
+        f32::from(bounds.origin.y) + (bh - vh * scale) / 2.0,
+    );
     let to_px = Affine {
         a: scale,
         b: 0.0,
         c: 0.0,
         d: scale,
-        e: f32::from(bounds.origin.x) + (bw - side) / 2.0,
-        f: f32::from(bounds.origin.y) + (bh - side) / 2.0,
+        e: ox - vx * scale,
+        f: oy - vy * scale,
     };
     let base = to_px.then(&Affine::of_pose(&frame.root, (VIEW / 2.0, GROUND)));
     let mut drawn = 0;

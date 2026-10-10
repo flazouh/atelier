@@ -4,7 +4,7 @@ use crate::enums::HabitKind;
 use crate::structs::{HabitDef, Pose};
 
 /// The pose of one habit at time `t`. `speed` and `amount` come from the moods, mixed by weight.
-pub(super) fn habit_pose(
+pub(crate) fn habit_pose(
     h: &HabitDef,
     pivot: (f32, f32),
     t: f32,
@@ -83,6 +83,17 @@ pub(super) fn habit_pose(
                 0.0,
                 0.0,
             )
+        }
+        HabitKind::Rotor => Pose::delta(
+            0.0,
+            0.0,
+            0.0,
+            -amount * h.amp.unwrap_or(0.0) * (t * speed * hz).sin().abs(),
+            0.0,
+        ),
+        HabitKind::Pulse => {
+            let grow = amount * h.amp.unwrap_or(0.0) * (t * speed * hz + ph).sin();
+            Pose::delta(0.0, 0.0, 0.0, grow, grow)
         }
         HabitKind::Wave => Pose::delta(
             0.0,

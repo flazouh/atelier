@@ -1,0 +1,207 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Crew, storybook with hardware</title>
+<style>
+:root{--bg:#F0EEE6;--card:#EAE7DC;--strong:#E1DDCF;--ink:#141413;--muted:#63605A}
+:root[data-theme=dark]{--bg:#141413;--card:#1C1C1A;--strong:#2A2926;--ink:#F0EEE6;--muted:#8A867C}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Geist,system-ui,sans-serif}
+.frame{width:1290px;height:724px;padding:28px 32px;overflow:hidden}
+.frame h2{margin:0 0 2px;font-size:19px;font-weight:600}
+.sub{color:var(--muted);margin:0 0 10px}
+body.solo .frame{display:none}body.solo .frame.show{display:block}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.cc{background:var(--card);border-radius:18px;padding:8px 10px 10px;text-align:center;height:286px}
+.cc svg{display:block;margin:0 auto;overflow:visible}
+.nm{font-weight:600;font-size:17px;margin-top:2px}
+.rl{color:var(--muted);font-size:12.5px;min-height:36px;padding:0 8px;line-height:1.35}
+.say{display:inline-block;background:var(--strong);border-radius:12px;padding:6px 12px;font-size:13px;margin-top:8px;position:relative}
+.say:after{content:"";position:absolute;left:50%;top:-5px;margin-left:-5px;width:10px;height:10px;background:var(--strong);transform:rotate(45deg)}
+.grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.tc{background:var(--card);border-radius:16px;padding:8px 6px 10px;text-align:center;height:232px}.tc svg{display:block;margin:0 auto}.tc.new{outline:2px solid var(--strong)}.newb{background:var(--ink);color:var(--bg);border-radius:6px;padding:0 6px;font-size:10.5px;font-weight:600;vertical-align:middle}.cmp{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.cm{background:var(--card);border-radius:16px;padding:12px 4px;text-align:center}.cmh{display:flex;align-items:center;justify-content:center}.cmh svg{width:104px;height:104px}.arr{color:var(--muted);font-size:18px}.parts{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+.pc{background:var(--card);border-radius:14px;padding:8px 4px 8px;text-align:center}
+.pc svg{display:block;margin:0 auto}
+.pc .nm{font-size:12.5px;margin-top:2px}
+.sec{font-weight:600;margin:10px 0 6px;color:var(--muted);font-size:12.5px;letter-spacing:.04em;text-transform:uppercase}
+.app{display:grid;grid-template-columns:250px 1fr;background:var(--card);border-radius:18px;overflow:hidden;height:560px}
+.side{background:var(--bg);padding:14px;border-right:1px solid var(--strong)}
+.row{display:flex;align-items:center;gap:10px;padding:5px 6px;border-radius:8px}
+.row small{color:var(--muted);margin-left:auto;font-size:12px}
+.lab{color:var(--muted);font-size:12px;margin:10px 0 6px}
+.chat{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:12px}
+.pill{background:var(--strong);border-radius:6px;padding:1px 7px;font-size:12px;color:var(--muted);margin-left:6px}
+small.t{color:var(--muted);margin-left:6px}
+.sizes{display:flex;gap:26px;align-items:flex-end;margin-top:14px;background:var(--card);border-radius:18px;padding:16px 22px}
+.sizes div{text-align:center;color:var(--muted);font-size:12px}
+</style></head><body>
+<div id="root"></div>
+<script>
+const K='#141413', O=`stroke="${K}" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"`;
+const GREY='#3d3d42', STEEL='#a9a7b0';
+let U=0;
+const defs=(id,glow)=>`<defs><radialGradient id="${id}"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="${glow}"/><stop offset="1" stop-color="${glow}" stop-opacity=".55"/></radialGradient><filter id="${id}f" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.2"/></filter></defs>`;
+// the reactor: a housing, a ring, a glowing core
+function reactor(cx,cy,r,glow,id,kind='core'){
+  let s=`<circle cx="${cx}" cy="${cy}" r="${r+3.2}" fill="${K}"/><circle cx="${cx}" cy="${cy}" r="${r+1}" fill="${GREY}"/>`;
+  if(kind==='core'||kind==='twin'){
+    s+=`<circle cx="${cx}" cy="${cy}" r="${r-1.5}" fill="none" stroke="${glow}" stroke-width="1.8" stroke-dasharray="${(r*2.1).toFixed(1)} ${(r*0.9).toFixed(1)}" stroke-linecap="round"/>`;
+    s+=`<circle cx="${cx}" cy="${cy}" r="${r-3.6}" fill="${glow}" filter="url(#${id}f)" opacity=".8"/><circle cx="${cx}" cy="${cy}" r="${r-3.6}" fill="url(#${id})"/>`;
+    s+=`<circle cx="${cx-1}" cy="${cy-1}" r="${Math.max(1,(r-3.6)*.3)}" fill="#fff"/>`;
+    if(kind==='twin') s+=`<path d="M${cx-r+2} ${cy}H${cx+r-2}" stroke="${K}" stroke-width="1.4" opacity=".55"/>`;
+  } else if(kind==='ring'){
+    s+=`<circle cx="${cx}" cy="${cy}" r="${r-1.6}" fill="none" stroke="${glow}" stroke-width="3" filter="url(#${id}f)" opacity=".9"/><circle cx="${cx}" cy="${cy}" r="${r-1.6}" fill="none" stroke="#fff" stroke-width="1.6" opacity=".95"/><circle cx="${cx}" cy="${cy}" r="${r*.25}" fill="${glow}"/>`;
+  } else if(kind==='spark'){
+    s+=`<path d="M${cx} ${cy-r+2.2}L${cx+r*.28} ${cy-r*.28}L${cx+r-2.2} ${cy}L${cx+r*.28} ${cy+r*.28}L${cx} ${cy+r-2.2}L${cx-r*.28} ${cy+r*.28}L${cx-r+2.2} ${cy}L${cx-r*.28} ${cy-r*.28}Z" fill="${glow}" filter="url(#${id}f)"/><path d="M${cx} ${cy-r+2.2}L${cx+r*.28} ${cy-r*.28}L${cx+r-2.2} ${cy}L${cx+r*.28} ${cy+r*.28}L${cx} ${cy+r-2.2}L${cx-r*.28} ${cy+r*.28}L${cx-r+2.2} ${cy}L${cx-r*.28} ${cy-r*.28}Z" fill="#fff"/>`;
+  }
+  return s;
+}
+const eyes=(a,b,cy)=>[a,b].map(x=>`<circle cx="${x}" cy="${cy}" r="6.4" fill="${K}"/><circle cx="${x+2.3}" cy="${cy-2.4}" r="2.2" fill="#fff"/><circle cx="${x-2}" cy="${cy+2.2}" r="1" fill="#fff" opacity=".8"/>`).join('');
+const smile=(cx,cy)=>`<path d="M${cx-6} ${cy}Q${cx} ${cy+6.5} ${cx+6} ${cy}" fill="none" stroke="${K}" stroke-width="2.6" stroke-linecap="round"/>`;
+const cheeks=(a,b,cy)=>[a,b].map(x=>`<ellipse cx="${x}" cy="${cy}" rx="6.5" ry="4.4" fill="#fff" opacity=".38"/>`).join('');
+const shine=(x,y,rx,ry,r=-25)=>`<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#fff" opacity=".32" transform="rotate(${r} ${x} ${y})"/>`;
+const rivet=(x,y)=>`<circle cx="${x}" cy="${y}" r="1.9" fill="${STEEL}" stroke="${K}" stroke-width="1"/>`;
+// movers
+function tracks(x,y,w,h=20){
+  let s=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h/2}" fill="${GREY}" stroke="${K}" stroke-width="3.2"/>`;
+  for(let i=0;i<Math.floor((w-2*h/2)/9);i++){const px=x+h/2+3+i*9;s+=`<path d="M${px} ${y+3}v4M${px} ${y+h-7}v4" stroke="#8d8b95" stroke-width="2" stroke-linecap="round"/>`}
+  [x+h/2,x+w-h/2].forEach(cx=>s+=`<circle cx="${cx}" cy="${y+h/2}" r="${h/2-4}" fill="${STEEL}" stroke="${K}" stroke-width="2"/><circle cx="${cx}" cy="${y+h/2}" r="2" fill="${K}"/>`);
+  s+=`<circle cx="${x+w/2}" cy="${y+h/2}" r="${h/2-5}" fill="${STEEL}" stroke="${K}" stroke-width="2"/><circle cx="${x+w/2}" cy="${y+h/2}" r="1.8" fill="${K}"/>`;
+  return s;
+}
+function wheel(cx,cy,r){return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${GREY}" stroke="${K}" stroke-width="3.2"/><circle cx="${cx}" cy="${cy}" r="${r*.5}" fill="${STEEL}" stroke="${K}" stroke-width="2"/><path d="M${cx} ${cy-r*.5}V${cy+r*.5}M${cx-r*.5} ${cy}H${cx+r*.5}" stroke="${K}" stroke-width="1.4"/>`}
+function spring(x,y0,y1){let d=`M${x} ${y0}`;const n=4,h=(y1-y0)/n;for(let i=0;i<n;i++)d+=`L${x+(i%2?-9:9)} ${y0+h*(i+.5)}L${x} ${y0+h*(i+1)}`;return `<path d="${d}" fill="none" stroke="${K}" stroke-width="6.5" stroke-linejoin="round" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${STEEL}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/><rect x="${x-10}" y="${y1-1}" width="20" height="6" rx="3" fill="${GREY}" stroke="${K}" stroke-width="2.4"/>`}
+function jets(x1,x2,y,id){return [x1,x2].map(x=>`<ellipse cx="${x}" cy="${y+16}" rx="5" ry="9" fill="#FFB347" filter="url(#${id}f)" opacity=".9"/><path d="M${x-4.5} ${y+6}Q${x} ${y+27} ${x+4.5} ${y+6}Z" fill="#FFE08A" stroke="${K}" stroke-width="1.6"/><rect x="${x-7}" y="${y}" width="14" height="9" rx="3" fill="${GREY}" stroke="${K}" stroke-width="2.6"/>`).join('')}
+function legs(side,color){
+  const L=[[[34,82],[18,92],[16,106]],[[42,86],[32,98],[30,110]],[[52,88],[46,100],[46,112]]];
+  const mk=(pts,mirror)=>{const p=pts.map(([x,y])=>[mirror?120-x:x,y]);const d=`M${p[0][0]} ${p[0][1]}L${p[1][0]} ${p[1][1]}L${p[2][0]} ${p[2][1]}`;return `<path d="${d}" fill="none" stroke="${K}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${STEEL}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${p[1][0]}" cy="${p[1][1]}" r="3.2" fill="${GREY}" stroke="${K}" stroke-width="1.8"/>`};
+  return L.map(p=>mk(p,false)).join('')+L.map(p=>mk(p,true)).join('');
+}
+function hover(cx,y,id,glow='#4ACFFF'){return [cx-16,cx+16].map(x=>`<ellipse cx="${x}" cy="${y+4}" rx="11" ry="4.5" fill="${glow}" filter="url(#${id}f)" opacity=".9"/><rect x="${x-9}" y="${y-5}" width="18" height="8" rx="4" fill="${GREY}" stroke="${K}" stroke-width="2.6"/><ellipse cx="${x}" cy="${y+3}" rx="6" ry="2.2" fill="#fff" opacity=".85"/>`).join('')}
+function antenna(x1,y1,x2,y2,glow,id){return `<path d="M${x1} ${y1}L${x2} ${y2}" stroke="${K}" stroke-width="5.5" stroke-linecap="round"/><path d="M${x1} ${y1}L${x2} ${y2}" stroke="${STEEL}" stroke-width="2.2" stroke-linecap="round"/><circle cx="${x2}" cy="${y2}" r="5.5" fill="${glow}" filter="url(#${id}f)" opacity=".85"/><circle cx="${x2}" cy="${y2}" r="4.4" fill="${glow}" stroke="${K}" stroke-width="2"/><circle cx="${x2-1.2}" cy="${y2-1.2}" r="1.3" fill="#fff"/>`}
+// the bots
+const BOTS_OLD={
+ bolt:(id)=>{const c='#6CCBFA';return defs(id,'#7DF3FF')+tracks(18,88,84,20)+`<ellipse cx="60" cy="62" rx="37" ry="33" fill="${c}" ${O}/>`+shine(44,44,11,6)+
+  `<rect x="31" y="40" width="58" height="9" rx="4.5" fill="#F5C842" ${O}/><path d="M35 41Q35 21 60 21Q85 21 85 41Z" fill="#FBD73C" ${O}/><rect x="52" y="12" width="16" height="10" rx="4" fill="#FF5C59" ${O}/><circle cx="60" cy="14" r="9" fill="#FF5C59" filter="url(#${id}f)" opacity=".55"/>`+
+  `<rect x="92" y="62" width="14" height="10" rx="5" fill="${c}" ${O}/><path d="M104 56h9v6h-4v10h4v6h-9z" fill="${STEEL}" ${O}/>`+
+  eyes(48,60,60)+smile(60,68)+cheeks(40,80,70)+reactor(60,86,6.5,'#7DF3FF',id)},
+ pip:(id)=>{const c='#66D9A0';return defs(id,'#9DFFF0')+wheel(60,98,13)+`<path d="M60 12C70 34 94 46 94 70C94 90 79 100 60 100C41 100 26 90 26 70C26 46 50 34 60 12Z" fill="${c}" ${O}/>`+shine(46,58,8,15,20)+
+  rivet(36,76)+rivet(84,76)+antenna(60,16,72,6,'#9DFFF0',id)+
+  `<path d="M95 104L108 117" stroke="${K}" stroke-width="7" stroke-linecap="round"/><path d="M95 104L108 117" stroke="${STEEL}" stroke-width="3" stroke-linecap="round"/><circle cx="88" cy="94" r="14" fill="#CFF7FF" opacity=".92" ${O}/><circle cx="88" cy="94" r="9" fill="#9DFFF0" filter="url(#${id}f)" opacity=".7"/><path d="M80 90Q84 84 91 85" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>`+
+  eyes(50,66,64)+smile(60,72)+cheeks(41,79,74)+reactor(60,88,5.4,'#9DFFF0',id,'ring')},
+ olive:(id)=>{const c='#8F5CF2';return defs(id,'#4ACFFF')+spring(60,92,112)+`<rect x="34" y="14" width="52" height="82" rx="26" fill="${c}" ${O}/>`+shine(48,34,8,14,10)+
+  [[34,56],[86,56]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="5" fill="${GREY}" ${O}/><circle cx="${x}" cy="${y}" r="1.8" fill="${STEEL}"/>`).join('')+
+  [49,71].map(x=>`<circle cx="${x}" cy="44" r="12.5" fill="#EDE8FF" ${O}/><circle cx="${x}" cy="44" r="10" fill="none" stroke="#4ACFFF" stroke-width="1.6" opacity=".9"/><circle cx="${x}" cy="45" r="5.2" fill="${K}"/><circle cx="${x+1.8}" cy="43" r="1.8" fill="#fff"/>`).join('')+`<path d="M61.5 44h-3" stroke="${K}" stroke-width="3"/>`+
+  smile(60,66)+cheeks(42,78,64)+reactor(60,82,7,'#4ACFFF',id,'ring')+`<rect x="56" y="6" width="8" height="10" rx="3" fill="${GREY}" ${O}/>`+antenna(60,8,60,2,'#4ACFFF',id).replace('stroke-width="5.5"','stroke-width="0"')},
+ skip:(id)=>{const c='#F29A4B';return defs(id,'#FFE08A')+`<path d="M28 74L10 90L28 94Z" fill="#E4672E" ${O}/><path d="M92 74L110 90L92 94Z" fill="#E4672E" ${O}/>`+jets(42,78,96,id)+`<circle cx="60" cy="66" r="35" fill="${c}" ${O}/>`+shine(44,48,10,6)+
+  `<path d="M60 14L84 8L74 30L66 26Z" fill="#F6F4EF" ${O}/><path d="M66 26L84 8" stroke="${K}" stroke-width="1.8"/><circle cx="52" cy="22" r="2" fill="#fff" opacity=".8"/><circle cx="46" cy="26" r="1.4" fill="#fff" opacity=".6"/>`+
+  eyes(48,72,62)+smile(60,70)+cheeks(38,82,72)+reactor(60,87,6.5,'#FFE08A',id,'spark')},
+ dot:(id)=>{const c='#EE82EE';return defs(id,'#FBD73C')+legs()+antenna(46,38,38,18,'#FBD73C',id)+antenna(74,38,82,18,'#7DF3FF',id)+`<path d="M26 88V62A34 34 0 0 1 94 62V88Z" fill="${c}" ${O}/>`+shine(44,44,10,6)+
+  `<circle cx="40" cy="40" r="4.5" fill="#FBD73C" ${O.replace('3.2','1.8')}/><circle cx="74" cy="34" r="3.6" fill="#7DF3FF" stroke="${K}" stroke-width="1.6"/><circle cx="84" cy="52" r="3.4" fill="#9DFFB0" stroke="${K}" stroke-width="1.6"/>`+
+  eyes(49,71,62)+smile(60,70)+cheeks(40,80,72)+reactor(60,81,7.2,'#FBD73C',id,'twin')},
+ nimbus:(id)=>{const c='#F6D95C';const sh=`<circle cx="38" cy="72" r="19"/><circle cx="82" cy="72" r="19"/><circle cx="60" cy="58" r="25"/><rect x="26" y="70" width="68" height="26" rx="13"/>`;
+  return defs(id,'#7DF3FF')+`<ellipse cx="60" cy="52" rx="56" ry="13" transform="rotate(-14 60 52)" fill="none" stroke="${K}" stroke-width="2.6" stroke-dasharray="1 0"/><circle cx="108" cy="36" r="4.8" fill="#fff" ${O.replace('3.2','2')}/>`+hover(60,102,id)+
+  `<g fill="${K}" stroke="${K}" stroke-width="6.4" stroke-linejoin="round">${sh}</g><g fill="${c}">${sh}</g>`+shine(46,48,10,6)+
+  `<rect x="58" y="26" width="4" height="12" fill="${STEEL}" stroke="${K}" stroke-width="1.6"/><path d="M48 22Q60 8 72 22Z" fill="${STEEL}" ${O.replace('3.2','2.4')}/><circle cx="60" cy="19" r="2.2" fill="#7DF3FF"/>`+
+  eyes(50,70,62)+smile(60,70)+cheeks(40,80,72)+reactor(60,86,5.5,'#7DF3FF',id,'core')},
+ keyla:(id)=>{const c='#EF6B64';return defs(id,'#FBD73C')+hover(60,110,id,'#7DF3FF').replace(/<ellipse[^>]*opacity="\.9"\/>/,'')+`<path d="M30 22H90V60Q90 88 60 102Q30 88 30 60Z" fill="${c}" ${O}/>`+shine(44,38,8,14,10)+
+  `<path d="M36 28H84V58Q84 82 60 94Q36 82 36 58Z" fill="none" stroke="${K}" stroke-width="1.6" opacity=".4"/>`+rivet(36,28)+rivet(84,28)+
+  `<circle cx="60" cy="82" r="11" fill="${K}"/><circle cx="60" cy="82" r="9.4" fill="${GREY}"/><circle cx="60" cy="82" r="7.8" fill="#FBD73C" filter="url(#${id}f)" opacity=".9"/><circle cx="60" cy="82" r="7" fill="url(#${id})"/><circle cx="60" cy="80" r="2.6" fill="${K}"/><path d="M58.4 81.5h3.2l1 5h-5.2z" fill="${K}"/>`+
+  eyes(48,72,48)+smile(60,56)+cheeks(40,80,58)},
+ you:(id)=>{return defs(id,'#7DF3FF')+`<circle cx="60" cy="68" r="35" fill="#E6E2D3" ${O}/>`+shine(44,50,10,6)+antenna(60,34,60,14,'#FBD73C',id)+`<path d="M60 4l3 6.5 7 .8-5.2 4.8 1.5 7-6.3-3.6-6.3 3.6 1.5-7L50 11.3l7-.8z" fill="#FBD73C" ${O.replace('3.2','2')}/>`+
+  eyes(48,72,64)+smile(60,72)+cheeks(38,82,74)+`<circle cx="60" cy="90" r="8.6" fill="none" stroke="${K}" stroke-width="2.4" stroke-dasharray="3 3.4"/><path d="M60 85v10M55 90h10" stroke="${K}" stroke-width="2.4" stroke-linecap="round"/>`}
+ ,quill:(id)=>{const c='#58B4F4';return defs(id,'#7DF3FF')+
+  [[40,84,24,106],[80,84,96,106]].map(([x1,y1,x2,y2])=>`<path d="M${x1} ${y1}L${x2} ${y2}" stroke="${K}" stroke-width="8" stroke-linecap="round"/><path d="M${x1} ${y1}L${x2} ${y2}" stroke="${STEEL}" stroke-width="3.4" stroke-linecap="round"/><rect x="${x2-8}" y="${y2-1}" width="16" height="6" rx="3" fill="${GREY}" ${O.replace('3.2','2.4')}/>`).join('')+`<rect x="53" y="88" width="14" height="11" rx="4" fill="${GREY}" ${O.replace('3.2','2.6')}/><ellipse cx="60" cy="102" rx="6" ry="4" fill="#7DF3FF" filter="url(#${id}f)" opacity=".85"/>`+
+  `<g transform="rotate(-24 50 34)"><rect x="44" y="26" width="8" height="12" rx="2" fill="${GREY}" ${O.replace('3.2','2.4')}/><rect x="22" y="12" width="34" height="15" rx="5" fill="${GREY}" ${O}/><rect x="14" y="9" width="12" height="21" rx="4" fill="#CFF7FF" ${O}/><rect x="16" y="13" width="3" height="13" rx="1.5" fill="#fff" opacity=".9"/><rect x="54" y="15" width="9" height="9" rx="3" fill="${STEEL}" ${O.replace('3.2','2.2')}/></g>`+
+  `<rect x="32" y="34" width="56" height="56" rx="24" fill="${c}" ${O}/>`+shine(46,46,9,6)+rivet(38,70)+rivet(82,70)+
+  eyes(48,72,56)+smile(60,64)+cheeks(39,81,66)+reactor(60,80,6.6,'#7DF3FF',id,'ring')},
+ ink:(id)=>{const c='#A074F5';return defs(id,'#FFE08A')+wheel(40,102,9)+wheel(80,102,9)+
+  `<g transform="rotate(18 93 70)"><rect x="87" y="46" width="11" height="42" rx="5.5" fill="#FBD73C" ${O}/><rect x="87" y="54" width="11" height="6" fill="#E4672E" stroke="${K}" stroke-width="1.6"/><path d="M87 88H98L92.5 102Z" fill="${STEEL}" ${O}/><circle cx="92.5" cy="104" r="4" fill="#C9A7FF" filter="url(#${id}f)" opacity=".9"/><circle cx="92.5" cy="104" r="2.6" fill="#E9DBFF" stroke="${K}" stroke-width="1.2"/></g>`+
+  `<rect x="82" y="62" width="14" height="10" rx="5" fill="${c}" ${O}/>`+
+  `<rect x="30" y="30" width="60" height="68" rx="26" fill="${c}" ${O}/>`+shine(46,46,9,6)+
+  `<path d="M60 30Q44 20 52 6Q64 8 66 18Q68 26 60 30Z" fill="#F6F4EF" ${O}/><path d="M60 30Q56 20 54 9" fill="none" stroke="${K}" stroke-width="1.6"/><path d="M58 22Q62 18 64 14" fill="none" stroke="${K}" stroke-width="1.2" opacity=".6"/>`+
+  eyes(48,72,56)+smile(60,64)+cheeks(39,81,66)+reactor(60,82,6.8,'#FFE08A',id,'spark')},
+ mimi:(id)=>{const c='#F27BEF';return defs(id,'#FFE08A')+
+  `<ellipse cx="60" cy="104" rx="15" ry="5" fill="#7DF3FF" filter="url(#${id}f)" opacity=".9"/><rect x="50" y="97" width="20" height="8" rx="3" fill="${GREY}" ${O.replace('3.2','2.6')}/>`+
+  `<rect x="58" y="26" width="4" height="12" fill="${STEEL}" stroke="${K}" stroke-width="1.6"/><ellipse cx="60" cy="24" rx="38" ry="4.5" fill="#fff" opacity=".28"/><ellipse cx="60" cy="24" rx="27" ry="4.2" fill="${STEEL}" ${O.replace('3.2','2.4')}/><circle cx="60" cy="24" r="3.6" fill="${GREY}" stroke="${K}" stroke-width="1.8"/>`+
+  `<rect x="26" y="64" width="14" height="9" rx="4.5" fill="${c}" ${O}/><path d="M6 66Q6 54 22 54Q34 54 34 64Q34 70 28 70Q24 70 24 74Q24 80 16 80Q6 80 6 66Z" fill="#F6F4EF" ${O}/><circle cx="14" cy="62" r="3" fill="#FF5C59" stroke="${K}" stroke-width="1.2"/><circle cx="22" cy="60" r="3" fill="#FBD73C" stroke="${K}" stroke-width="1.2"/><circle cx="14" cy="71" r="3" fill="#4ACFFF" stroke="${K}" stroke-width="1.2"/>`+
+  `<rect x="82" y="64" width="14" height="9" rx="4.5" fill="${c}" ${O}/><g transform="rotate(32 100 66)"><rect x="96" y="40" width="7" height="28" rx="3.5" fill="#FBD73C" ${O}/><rect x="95" y="36" width="9" height="6" fill="${STEEL}" stroke="${K}" stroke-width="1.8"/><path d="M95 36Q99.5 24 104 36Z" fill="#7DF3FF" ${O.replace('3.2','2')}/><circle cx="99.5" cy="26" r="5" fill="#7DF3FF" filter="url(#${id}f)" opacity=".8"/></g>`+
+  `<circle cx="60" cy="66" r="33" fill="${c}" ${O}/>`+shine(44,50,10,6)+
+  eyes(49,71,62)+smile(60,70)+cheeks(40,80,72)+reactor(60,86,5.8,'#FFE08A',id,'core')},
+ gus:(id)=>{const c='#3FC38B';const cog=(cx,cy,r)=>`<g>${[0,45,90,135].map(a=>`<rect x="${cx-3.2}" y="${cy-r-3.2}" width="6.4" height="${2*r+6.4}" rx="1.6" fill="${GREY}" ${O.replace('3.2','2.2')} transform="rotate(${a} ${cx} ${cy})"/>`).join('')}<circle cx="${cx}" cy="${cy}" r="${r}" fill="${GREY}" ${O.replace('3.2','2.6')}/><circle cx="${cx}" cy="${cy}" r="${r*.45}" fill="${STEEL}" stroke="${K}" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="1.8" fill="${K}"/></g>`;
+  return defs(id,'#9DFFB0')+`<rect x="57" y="20" width="6" height="24" rx="2" fill="${STEEL}" ${O.replace('3.2','2.4')}/><path d="M51 22V14Q51 6 60 6Q69 6 69 14V22" fill="none" stroke="${K}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M51 22V14Q51 6 60 6Q69 6 69 14V22" fill="none" stroke="${STEEL}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`+
+  cog(34,98,11)+cog(86,98,11)+
+  `<rect x="24" y="40" width="72" height="56" rx="18" fill="${c}" ${O}/>`+shine(40,52,10,6)+rivet(32,48)+rivet(88,48)+rivet(32,86)+rivet(88,86)+
+  
+  eyes(48,72,60)+smile(60,68)+cheeks(39,81,70)+reactor(60,84,6.8,'#9DFFB0',id,'twin')}
+
+};
+const BOTS={
+ bolt:(id)=>{const c='#6CCBFA';return defs(id,'#7DF3FF')+tracks(18,88,84,20)+`<ellipse cx="60" cy="62" rx="37" ry="33" fill="${c}" ${O}/>`+shine(44,44,11,6)+
+  `<rect x="31" y="40" width="58" height="9" rx="4.5" fill="#F5C842" ${O}/><path d="M35 41Q35 21 60 21Q85 21 85 41Z" fill="#FBD73C" ${O}/>`+
+  eyes(48,60,60)+smile(60,68)+cheeks(40,80,70)+reactor(60,86,6.5,'#7DF3FF',id)},
+ pip:(id)=>{const c='#66D9A0';return defs(id,'#9DFFF0')+wheel(60,98,13)+`<path d="M60 12C70 34 94 46 94 70C94 90 79 100 60 100C41 100 26 90 26 70C26 46 50 34 60 12Z" fill="${c}" ${O}/>`+shine(46,58,8,15,20)+
+  `<path d="M95 104L108 117" stroke="${K}" stroke-width="7" stroke-linecap="round"/><path d="M95 104L108 117" stroke="${STEEL}" stroke-width="3" stroke-linecap="round"/><circle cx="88" cy="94" r="14" fill="#CFF7FF" opacity=".92" ${O}/><circle cx="88" cy="94" r="9" fill="#9DFFF0" filter="url(#${id}f)" opacity=".7"/><path d="M80 90Q84 84 91 85" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>`+
+  eyes(50,66,64)+smile(60,72)+cheeks(41,79,74)+reactor(60,88,5.4,'#9DFFF0',id,'ring')},
+ olive:(id)=>{const c='#8F5CF2';return defs(id,'#4ACFFF')+spring(60,92,112)+`<rect x="34" y="14" width="52" height="82" rx="26" fill="${c}" ${O}/>`+shine(48,34,8,14,10)+
+  [49,71].map(x=>`<circle cx="${x}" cy="44" r="12.5" fill="#EDE8FF" ${O}/><circle cx="${x}" cy="44" r="10" fill="none" stroke="#4ACFFF" stroke-width="1.6" opacity=".9"/><circle cx="${x}" cy="45" r="5.2" fill="${K}"/><circle cx="${x+1.8}" cy="43" r="1.8" fill="#fff"/>`).join('')+`<path d="M61.5 44h-3" stroke="${K}" stroke-width="3"/>`+
+  smile(60,66)+cheeks(42,78,64)+reactor(60,82,7,'#4ACFFF',id,'ring')},
+ skip:(id)=>{const c='#F29A4B';return defs(id,'#FFE08A')+`<path d="M28 74L10 90L28 94Z" fill="#E4672E" ${O}/><path d="M92 74L110 90L92 94Z" fill="#E4672E" ${O}/>`+jets(42,78,96,id)+`<circle cx="60" cy="66" r="35" fill="${c}" ${O}/>`+shine(44,48,10,6)+
+  `<path d="M60 14L84 8L74 30L66 26Z" fill="#F6F4EF" ${O}/><path d="M66 26L84 8" stroke="${K}" stroke-width="1.8"/>`+
+  eyes(48,72,62)+smile(60,70)+cheeks(38,82,72)+reactor(60,87,6.5,'#FFE08A',id,'spark')},
+ dot:(id)=>{const c='#EE82EE';return defs(id,'#FBD73C')+legs()+antenna(46,38,38,18,'#FBD73C',id)+antenna(74,38,82,18,'#7DF3FF',id)+`<path d="M26 88V62A34 34 0 0 1 94 62V88Z" fill="${c}" ${O}/>`+shine(44,44,10,6)+
+  eyes(49,71,62)+smile(60,70)+cheeks(40,80,72)+reactor(60,81,7.2,'#FBD73C',id,'twin')},
+ nimbus:(id)=>{const c='#F6D95C';const sh=`<circle cx="38" cy="72" r="19"/><circle cx="82" cy="72" r="19"/><circle cx="60" cy="58" r="25"/><rect x="26" y="70" width="68" height="26" rx="13"/>`;
+  return defs(id,'#7DF3FF')+hover(60,102,id)+
+  `<g fill="${K}" stroke="${K}" stroke-width="6.4" stroke-linejoin="round">${sh}</g><g fill="${c}">${sh}</g>`+shine(46,48,10,6)+
+  `<rect x="58" y="26" width="4" height="12" fill="${STEEL}" stroke="${K}" stroke-width="1.6"/><path d="M48 22Q60 8 72 22Z" fill="${STEEL}" ${O.replace('3.2','2.4')}/><circle cx="60" cy="19" r="2.2" fill="#7DF3FF"/>`+
+  eyes(50,70,62)+smile(60,70)+cheeks(40,80,72)+reactor(60,86,5.5,'#7DF3FF',id,'core')},
+ keyla:(id)=>{const c='#EF6B64';return defs(id,'#FBD73C')+hover(60,110,id,'#7DF3FF').replace(/<ellipse[^>]*opacity="\.9"\/>/,'')+`<path d="M30 22H90V60Q90 88 60 102Q30 88 30 60Z" fill="${c}" ${O}/>`+shine(44,38,8,14,10)+
+  `<circle cx="60" cy="82" r="11" fill="${K}"/><circle cx="60" cy="82" r="9.4" fill="${GREY}"/><circle cx="60" cy="82" r="7.8" fill="#FBD73C" filter="url(#${id}f)" opacity=".9"/><circle cx="60" cy="82" r="7" fill="url(#${id})"/><circle cx="60" cy="80" r="2.6" fill="${K}"/><path d="M58.4 81.5h3.2l1 5h-5.2z" fill="${K}"/>`+
+  eyes(48,72,48)+smile(60,56)+cheeks(40,80,58)},
+ you:(id)=>{return defs(id,'#7DF3FF')+`<circle cx="60" cy="68" r="35" fill="#E6E2D3" ${O}/>`+shine(44,50,10,6)+antenna(60,34,60,14,'#FBD73C',id)+`<path d="M60 4l3 6.5 7 .8-5.2 4.8 1.5 7-6.3-3.6-6.3 3.6 1.5-7L50 11.3l7-.8z" fill="#FBD73C" ${O.replace('3.2','2')}/>`+
+  eyes(48,72,64)+smile(60,72)+cheeks(38,82,74)+`<circle cx="60" cy="90" r="8.6" fill="none" stroke="${K}" stroke-width="2.4" stroke-dasharray="3 3.4"/><path d="M60 85v10M55 90h10" stroke="${K}" stroke-width="2.4" stroke-linecap="round"/>`}
+ ,quill:(id)=>{const c='#58B4F4';return defs(id,'#7DF3FF')+
+  [[40,84,24,106],[80,84,96,106]].map(([x1,y1,x2,y2])=>`<path d="M${x1} ${y1}L${x2} ${y2}" stroke="${K}" stroke-width="8" stroke-linecap="round"/><path d="M${x1} ${y1}L${x2} ${y2}" stroke="${STEEL}" stroke-width="3.4" stroke-linecap="round"/><rect x="${x2-8}" y="${y2-1}" width="16" height="6" rx="3" fill="${GREY}" ${O.replace('3.2','2.4')}/>`).join('')+`<rect x="53" y="88" width="14" height="11" rx="4" fill="${GREY}" ${O.replace('3.2','2.6')}/><ellipse cx="60" cy="102" rx="6" ry="4" fill="#7DF3FF" filter="url(#${id}f)" opacity=".85"/>`+
+  `<g transform="rotate(-24 50 34)"><rect x="22" y="12" width="34" height="15" rx="5" fill="${GREY}" ${O}/><rect x="14" y="9" width="12" height="21" rx="4" fill="#CFF7FF" ${O}/><rect x="16" y="13" width="3" height="13" rx="1.5" fill="#fff" opacity=".9"/></g>`+
+  `<rect x="32" y="34" width="56" height="56" rx="24" fill="${c}" ${O}/>`+shine(46,46,9,6)+
+  eyes(48,72,56)+smile(60,64)+cheeks(39,81,66)+reactor(60,80,6.6,'#7DF3FF',id,'ring')},
+ ink:(id)=>{const c='#A074F5';return defs(id,'#FFE08A')+wheel(40,102,9)+wheel(80,102,9)+
+  `<rect x="30" y="30" width="60" height="68" rx="26" fill="${c}" ${O}/>`+shine(46,46,9,6)+
+  `<path d="M60 30Q44 20 52 6Q64 8 66 18Q68 26 60 30Z" fill="#F6F4EF" ${O}/><path d="M60 30Q56 20 54 9" fill="none" stroke="${K}" stroke-width="1.6"/><path d="M58 22Q62 18 64 14" fill="none" stroke="${K}" stroke-width="1.2" opacity=".6"/>`+
+  eyes(48,72,56)+smile(60,64)+cheeks(39,81,66)+reactor(60,82,6.8,'#FFE08A',id,'spark')},
+ mimi:(id)=>{const c='#F27BEF';return defs(id,'#FFE08A')+
+  `<ellipse cx="60" cy="104" rx="15" ry="5" fill="#7DF3FF" filter="url(#${id}f)" opacity=".9"/><rect x="50" y="97" width="20" height="8" rx="3" fill="${GREY}" ${O.replace('3.2','2.6')}/>`+
+  `<rect x="58" y="26" width="4" height="12" fill="${STEEL}" stroke="${K}" stroke-width="1.6"/><ellipse cx="60" cy="24" rx="38" ry="4.5" fill="#fff" opacity=".28"/><ellipse cx="60" cy="24" rx="27" ry="4.2" fill="${STEEL}" ${O.replace('3.2','2.4')}/><circle cx="60" cy="24" r="3.6" fill="${GREY}" stroke="${K}" stroke-width="1.8"/>`+
+  `<rect x="82" y="64" width="14" height="9" rx="4.5" fill="${c}" ${O}/><g transform="rotate(32 100 66)"><rect x="96" y="40" width="7" height="28" rx="3.5" fill="#FBD73C" ${O}/><rect x="95" y="36" width="9" height="6" fill="${STEEL}" stroke="${K}" stroke-width="1.8"/><path d="M95 36Q99.5 24 104 36Z" fill="#7DF3FF" ${O.replace('3.2','2')}/><circle cx="99.5" cy="26" r="5" fill="#7DF3FF" filter="url(#${id}f)" opacity=".8"/></g>`+
+  `<circle cx="60" cy="66" r="33" fill="${c}" ${O}/>`+shine(44,50,10,6)+
+  eyes(49,71,62)+smile(60,70)+cheeks(40,80,72)+reactor(60,86,5.8,'#FFE08A',id,'core')},
+ gus:(id)=>{const c='#3FC38B';const cog=(cx,cy,r)=>`<g>${[0,45,90,135].map(a=>`<rect x="${cx-3.2}" y="${cy-r-3.2}" width="6.4" height="${2*r+6.4}" rx="1.6" fill="${GREY}" ${O.replace('3.2','2.2')} transform="rotate(${a} ${cx} ${cy})"/>`).join('')}<circle cx="${cx}" cy="${cy}" r="${r}" fill="${GREY}" ${O.replace('3.2','2.6')}/><circle cx="${cx}" cy="${cy}" r="${r*.45}" fill="${STEEL}" stroke="${K}" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="1.8" fill="${K}"/></g>`;
+  return defs(id,'#9DFFB0')+`<rect x="57" y="20" width="6" height="24" rx="2" fill="${STEEL}" ${O.replace('3.2','2.4')}/><path d="M51 22V14Q51 6 60 6Q69 6 69 14V22" fill="none" stroke="${K}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><path d="M51 22V14Q51 6 60 6Q69 6 69 14V22" fill="none" stroke="${STEEL}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`+
+  cog(34,98,11)+cog(86,98,11)+
+  `<rect x="24" y="40" width="72" height="56" rx="18" fill="${c}" ${O}/>`+shine(40,52,10,6)+
+  
+  eyes(48,72,60)+smile(60,68)+cheeks(39,81,70)+reactor(60,84,6.8,'#9DFFB0',id,'twin')}
+
+};
+function bot(name,size,i=0,set=BOTS){return `<svg width="${size}" height="${size}" viewBox="-4 -2 128 128" xmlns="http://www.w3.org/2000/svg">${set[name]('r'+(U++))}</svg>`}
+const CREW=[['bolt','Bolt','Builder · Writes the code, test first.','Tests first, always.'],['pip','Pip','Prover · Checks the real build, never the Builder.','I ran it. Here is the proof.'],['olive','Olive','Reviewer · Reads the whole change for real defects.','Found two things. Look at line 40.'],['skip','Skip','Shipper · Lands, releases and tells people.','Merged. Everyone knows.'],['dot','Dot','Debugger · Finds the real cause before any fix.','I can reproduce it. One minute.'],['nimbus','Nimbus','Planner · Turns an idea into a spec and a QA matrix.','Let us write it down first.'],['keyla','Keyla','SSO Auditor · Checks single sign-on settings every week.','All admins accounted for.'],['you','You?','A new friend · Make one in a minute.','Hi! What are we doing?']];
+const crew=()=>`<div class="grid">${CREW.map(([k,n,r,s])=>`<div class="cc">${bot(k,146)}<div class="nm">${n}</div><div class="rl">${r}</div><div class="say">${s}</div></div>`).join('')}</div>`;
+// parts kit: small drawings of each part on a plain body
+function kit(inner,id,glow){return `<svg width="110" height="86" viewBox="0 0 120 94" xmlns="http://www.w3.org/2000/svg">${defs(id,glow||'#7DF3FF')}${inner}</svg>`}
+const KIT={
+ reactors:[['Core',(id)=>reactor(60,46,17,'#7DF3FF',id,'core')],['Twin',(id)=>reactor(60,46,17,'#FBD73C',id,'twin')],['Ring',(id)=>reactor(60,46,17,'#4ACFFF',id,'ring')],['Spark',(id)=>reactor(60,46,17,'#FFE08A',id,'spark')],['Core, green',(id)=>reactor(60,46,17,'#9DFFB0',id,'core')],['Core, pink',(id)=>reactor(60,46,17,'#FF9DF3',id,'core')]],
+ movers:[['Tracks',(id)=>tracks(12,40,96,26)],['Wheels',(id)=>wheel(36,50,16)+wheel(84,50,16)],['One wheel',(id)=>wheel(60,48,22)],['Spring',(id)=>spring(60,12,74)],['Jets',(id)=>jets(40,80,26,id)],['Hover pads',(id)=>hover(60,52,id)]],
+ more:[['Legs',(id)=>`<g transform="translate(0 -42)">${legs()}</g>`],['Feet',(id)=>`<rect x="40" y="16" width="12" height="40" rx="6" fill="${GREY}" ${O}/><rect x="68" y="16" width="12" height="40" rx="6" fill="${GREY}" ${O}/><rect x="32" y="52" width="26" height="12" rx="6" fill="#F6D95C" ${O}/><rect x="62" y="52" width="26" height="12" rx="6" fill="#F6D95C" ${O}/>`],['Antennae',(id)=>antenna(40,60,30,24,'#FBD73C',id)+antenna(80,60,90,24,'#7DF3FF',id)],['Dish',(id)=>`<rect x="58" y="30" width="4" height="34" fill="${STEEL}" stroke="${K}" stroke-width="1.8"/><path d="M36 28Q60 2 84 28Z" fill="${STEEL}" ${O}/><circle cx="60" cy="16" r="3.4" fill="#7DF3FF"/>`],['Arm and claw',(id)=>`<rect x="14" y="40" width="46" height="14" rx="7" fill="#6CCBFA" ${O}/><path d="M56 30h26v8H66v18h16v8H56z" fill="${STEEL}" ${O}/>`],['Lens',(id)=>`<path d="M40 70L22 88" stroke="${K}" stroke-width="7" stroke-linecap="round"/><path d="M40 70L22 88" stroke="${STEEL}" stroke-width="3" stroke-linecap="round"/><circle cx="62" cy="42" r="26" fill="#CFF7FF" opacity=".92" ${O}/><circle cx="62" cy="42" r="17" fill="#9DFFF0" filter="url(#${id}f)" opacity=".7"/><path d="M48 36Q54 26 66 28" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>`]]
+};
+const partsFrame=()=>{let n=0;const row=(title,list)=>`<div class="sec">${title}</div><div class="parts">${list.map(([name,fn])=>`<div class="pc">${kit(fn('k'+(n++)),'k'+n)}<div class="nm">${name}</div></div>`).join('')}</div>`;
+  return row('Reactors, the glowing heart',KIT.reactors)+row('Ways to move',KIT.movers)+row('Tools and hardware',KIT.more)};
+const smallFrame=()=>{const names=['bolt','pip','olive','skip','dot','nimbus','keyla'];const nm={bolt:'Bolt',pip:'Pip',olive:'Olive',skip:'Skip',dot:'Dot',nimbus:'Nimbus',keyla:'Keyla'};
+  return `<div class="app"><div class="side"><div class="row" style="font-weight:600">Fluentai</div><div class="lab">Working now</div>${[['bolt','#general · 14 s'],['dot','#design · 2 min'],['olive','needs Alex'],['skip','merged'],['pip','proving'],['nimbus','planning']].map(([k,t])=>`<div class="row">${bot(k,30)}<span>${nm[k]}</span><small>${t}</small></div>`).join('')}</div>
+  <div class="chat">${[['dot','Dot','Alex’s bot','10:05','On it. Looking at how the server binds its port.'],['bolt','Bolt','Workspace bot','10:06','Tests first. I will start when you say go.'],['skip','Skip','Workspace bot','10:08','ENG-370 is merged and released. I told Ana.']].map(([k,n,b,t,x])=>`<div class="msg">${bot(k,48)}<div><b>${n}</b><span class="pill">${b}</span><small class="t">${t}</small><div>${x}</div></div></div>`).join('')}
+  <div class="sizes">${[150,96,64,44,30,22].map(s=>`<div>${bot('bolt',s)}<br>${s}px</div>`).join('')}${[96,44,22].map(s=>`<div>${bot('keyla',s)}<br>${s}px</div>`).join('')}</div></div></div>`};
+const TEN=[['nimbus','Nimbus','Planner',0],['bolt','Bolt','Builder',0],['pip','Pip','Prover',0],['olive','Olive','Reviewer',0],['skip','Skip','Shipper',0],['dot','Dot','Debugger',0],['quill','Quill','Researcher',1],['ink','Ink','Writer',1],['mimi','Mimi','Designer',1],['gus','Gus','Operator',1]];
+const ten=()=>`<div class="grid5">${TEN.map(([k,n,r,nw])=>`<div class="tc${nw?' new':''}">${bot(k,140)}<div class="nm">${n}${nw?' <span class="newb">new</span>':''}</div><div class="rl">${r}</div></div>`).join('')}</div>`;
+const cmp=()=>`<div class="cmp">${[['bolt','Bolt'],['skip','Skip'],['dot','Dot'],['nimbus','Nimbus'],['mimi','Mimi']].map(([k,n])=>`<div class="cm"><div class="cmh">${bot(k,150,0,BOTS_OLD)}<span class="arr">→</span>${bot(k,150)}</div><div class="nm">${n}</div></div>`).join('')}</div>`;
+const FR=[['f1','1. Same depth, fewer loose parts: the ten starter bots','TEN','Shine, shading and glow stay. Each bot keeps one reactor, one way to move and one tool.'],['f2','2. The same, in the dark theme','TEN',''],['f3','3. Before and after (left: the first pass)','CMP','Only the extra objects are gone: beacon, plane trail, sensor lights, orbit ring, palette, rivets.']];
+document.getElementById('root').innerHTML=FR.map(([id,t,w,sub])=>`<section class="frame" id="${id}"><h2>${t}</h2><p class="sub">${sub}</p>${w==='TEN'?ten():cmp()}</section>`).join('');
+const q=location.search;if(q.includes('dark'))document.documentElement.dataset.theme='dark';
+const h=location.hash.slice(1);if(h){document.body.classList.add('solo');const f=document.getElementById(h);if(f)f.classList.add('show')}
+</script></body></html>

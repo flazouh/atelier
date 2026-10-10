@@ -18,6 +18,8 @@ mod shape_trace;
 pub use paint_bot::paint_bot;
 
 #[cfg(test)]
+pub(crate) use habit_pose::habit_pose as habit_pose_for_tests;
+#[cfg(test)]
 pub(crate) use path_data::parse_path_data as parse_path_data_for_tests;
 #[cfg(test)]
 pub(crate) use shape_parse::parse_fragment as parse_fragment_for_tests;

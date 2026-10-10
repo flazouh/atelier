@@ -10,7 +10,7 @@ Status: result of ENG-402. It answers open point 1 of `faces-v1.md`: write our o
 - The "Bots" story in the gallery: many bots at once, six mood buttons, a click reaction, eyes that follow the pointer, and a line that shows the cost of a frame.
 - A benchmark with no window: `cargo test --release -p atelier-bot-face frame_cost -- --ignored --nocapture`.
 
-The first run looked like the prototype. Same shapes, same colours, same habits.
+The first run looked like the prototype of that day (a round, flat style). The look has since changed to the storybook style, and the data and the player changed with it.
 
 ## What it costs
 

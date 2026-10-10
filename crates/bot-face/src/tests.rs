@@ -3,5 +3,6 @@
 mod bot_runtime;
 mod face_set;
 mod frame_cost;
+mod habit_pose;
 mod path_data;
 mod shape_parse;

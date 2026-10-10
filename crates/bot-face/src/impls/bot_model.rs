@@ -6,7 +6,7 @@ use crate::structs::{BotDef, BotModel, PartModel, Shape};
 
 impl BotModel {
     /// Parses every part and every eye drawing of a bot.
-    pub fn from_def(def: &BotDef) -> Result<BotModel, String> {
+    pub fn from_def(def: &BotDef, view: [f32; 4]) -> Result<BotModel, String> {
         let colour = Rgba::try_from(def.colour.as_str())
             .map_err(|e| format!("{}: bad colour: {e}", def.id))?;
         let parts = def
@@ -41,6 +41,7 @@ impl BotModel {
             role: def.role.clone(),
             colour,
             eye_y: def.eye_y,
+            view,
             parts,
             eyes,
             cheeks,
