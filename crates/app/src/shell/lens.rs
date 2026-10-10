@@ -28,6 +28,11 @@ use crate::tasks::pane::Scope;
 
 /// A row of a lens's sidebar: a mark, the words, and a count at the end. `id` names it for the control socket.
 pub(super) fn nav_row(id: String, on: bool, mark: AnyElement, label: SharedString, count: Option<usize>, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
+    nav_row_marked(id, on, mark, 15., label, count, cx)
+}
+
+/// A row whose mark takes `mark_side` pixels: a face, where an icon's 15 would be too small to read.
+pub(super) fn nav_row_marked(id: String, on: bool, mark: AnyElement, mark_side: f32, label: SharedString, count: Option<usize>, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
     let theme = cx.theme();
     let name = id.clone();
     div()
@@ -43,7 +48,7 @@ pub(super) fn nav_row(id: String, on: bool, mark: AnyElement, label: SharedStrin
         .text_size(TextSize::Sm.font_size())
         .when(on, |d| d.bg(theme.card_strong))
         .when(!on, |d| d.hover(|s| s.bg(theme.card_strong.opacity(0.6))))
-        .child(div().flex_none().flex().items_center().justify_center().size(px(15.)).text_color(theme.muted_foreground).child(mark))
+        .child(div().flex_none().flex().items_center().justify_center().size(px(mark_side)).text_color(theme.muted_foreground).child(mark))
         .child(div().flex_1().min_w_0().truncate().child(label))
         .children(count.map(|n| div().text_size(TextSize::Xs.font_size()).text_color(theme.muted_foreground).child(n.to_string())))
 }
@@ -406,6 +411,8 @@ impl Shell {
             ShellView::Tasks => self.show_tasks(window, cx),
             ShellView::Messages => self.show_messages(window, cx),
             ShellView::Mail => self.show_mail(window, cx),
+            ShellView::Usage => self.show_usage(window, cx),
+            ShellView::Bots => self.show_bots(window, cx),
             v if v.in_code() => self.show_code(v, window, cx),
             v => self.show_view(v, window, cx),
         }

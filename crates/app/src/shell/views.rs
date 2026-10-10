@@ -2,6 +2,7 @@
 use gpui_kit::Context;
 
 use super::structs::Shell;
+use super::view::ShellView;
 use crate::slots::{Host, Slots};
 
 impl Shell {
@@ -11,9 +12,14 @@ impl Shell {
         let Some(view) = cx.global::<Slots>().view(id).cloned() else {
             return;
         };
-        // The Usage view is a lens of the shell, not a layer over it: the next frame shows it.
-        if id == "usage" {
-            self.usage_asked = true;
+        // Usage and Bots are lenses of the shell, not layers over it: the next frame, which has a window, shows them.
+        let lens = match id {
+            "usage" => Some(ShellView::Usage),
+            "bots" => Some(ShellView::Bots),
+            _ => None,
+        };
+        if let Some(lens) = lens {
+            self.lens_asked = Some(lens);
             cx.notify();
             return;
         }

@@ -17,6 +17,7 @@ mod capability_hub;
 mod project_icons;
 mod providers;
 mod usage_view;
+mod bots_view;
 mod vitals;
 mod agents_view;
 mod file_glyphs;

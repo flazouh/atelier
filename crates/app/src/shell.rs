@@ -9,6 +9,7 @@ mod fit;
 mod footer;
 mod helpers;
 mod impls;
+mod bots;
 mod changes;
 mod history;
 mod lens;
