@@ -27,6 +27,7 @@ atelier-discord.workspace = true
 atelier-linear.workspace = true
 atelier-lsp.workspace = true
 atelier-palette.workspace = true
+atelier-plugin.workspace = true
 atelier-pr-view.workspace = true
 atelier-project.workspace = true
 atelier-remote.workspace = true

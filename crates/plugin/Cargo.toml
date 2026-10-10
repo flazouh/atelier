@@ -1,0 +1,14 @@
+[package]
+name = "atelier-plugin"
+description = "What a plugin needs to add a view to atelier: the plugin, its view, the page of the view, and the host."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+gpui-kit.workspace = true
+atelier-ui.workspace = true
+
+[dev-dependencies]
+gpui-kit = { workspace = true, features = ["test-support"] }

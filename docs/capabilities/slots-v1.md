@@ -1,5 +1,5 @@
 # Slots, v1 (draft for review)
-Status: draft. The first two slots exist in code (`crates/app/src/slots`). The others are planned and have no code yet.
+Status: draft. The first two slots exist in code (`crates/app/src/slots`, and `crates/plugin` for the view). The others are planned and have no code yet.
 ## 1. Why slots
 The base app is raw: a window, a sidebar, a session, a bar at the foot. What else the reader sees is **contributed**.
 A capability (`tasks`, `mail`, `messaging`) or a plugin adds its pieces to **named slots**, and the base app draws
@@ -34,20 +34,20 @@ Built-in cards:
 | `work` | Middle | 10 | `vitals` | an agent session waits on the reader. |
 | `usage` | Middle | 20 | `usage_view` | always. The chips of the 5 hour and weekly limits. A press opens the `usage` view. |
 | `system` | Right | 0 | `vitals` | the machine was sampled. CPU and memory. |
-### 2.2 Rail view
-A view a module opens, and the door to it.
+### 2.2 Plugin view
+A view a plugin adds: an entry on the left rail, and the page it opens. `docs/plugins.md` is the guide.
 A contribution gives:
 | Field | Meaning |
 |---|---|
 | `id` | Names the view. A view added with the id of another replaces it. |
-| `icon` | The icon of the door on the left rail. `None`: the view has its door elsewhere. |
-| `label` | The name of the door. |
-| `order` | The place of the door on the rail, lowest first. The same number goes by `id`. |
-| `open` | Builds the view. It gets the host and returns a GPUI view. The shell shows it over the window until it asks to close. |
-A view closes with `Host::close_view`. Anything may open a registered view by id with `Host::open_view`.
-Built-in views: `usage` (module `usage_view`, no icon). Its door is the usage chips in the status bar.
-Not done yet: the left rail still draws its three own views (Sessions, Tasks, Code) and does not read the registry.
-Moving them onto it needs `ShellView` to stop being a closed list. A view registered with an icon is not on the rail yet.
+| `icon` | The icon of the entry on the left rail. |
+| `label` | The name of the entry. |
+| `order` | The place of the entry on the rail, lowest first, after the app's own three. The same number goes by `id`. |
+| the page | Makes the page of the view. It gets the host. The shell keeps one page per view, and draws its sidebar and its main area. |
+Anything may open a registered view by id with `Host::open_view`.
+Built-in views: `bots` (module `bots_view`, order 90) and `usage` (module `usage_view`, order 100). The usage chips in
+the status bar also open `usage`.
+The rail draws its three own views (Sessions, Tasks, Code) and then every registered view.
 ## 3. Planned slots
 Each row says what a contribution gives. None has code yet.
 | Slot | Where | A contribution gives |
@@ -60,20 +60,20 @@ Each row says what a contribution gives. None has code yet.
 | Menu entries | The ⋯ menus of a project and a session, and the main menu. | The `menu` they go in, `id`, `order`, `label`, an optional icon and shortcut, `visible`, and what a press does. |
 All of them follow the rules of section 4: an `id`, replace by `id`, `order`, and `visible`.
 ## 4. How a capability or a plugin registers
-1. The module has one function, `register(slots: &mut Slots)`. It calls `add_card` or `add_view` once per contribution.
-   Its render and open functions use only the host they are given: the numbers, and the few calls of `Host`
-   (`open_view`, `close_view`, `show_changelog`). A contribution never takes a handle to the shell.
-2. `slots::builtin()` calls `register` of each module. That is the only list. It runs once, at startup, before the
-   window opens, and its result is set as a global.
+1. A module that adds a card has one function, `register(slots: &mut Slots)`, which calls `add_card` once per card.
+   A plugin implements `atelier_plugin::Plugin` and adds its views there. Render functions and pages use only the
+   host they are given: the numbers, and the few calls of `Host` (`open_view`, `show_changelog`). A contribution
+   never takes a handle to the shell.
+2. `slots::builtin()` calls `register` of each module and `plug` for each plugin. That is the only list. It runs once,
+   at startup, before the window opens, and its result is set as a global.
 3. A second contribution with an existing `id` replaces the first. A later module can therefore replace a built-in one.
 4. A module that is not in the list adds nothing, and the opening of a view it would have registered does nothing.
    The tests hold this for the usage module: without its registration the bar has no chips and `open_view("usage")`
    opens nothing.
-A plugin is a module of the same shape. Plugins that load at run time are not part of v1, so a plugin is a Rust
-module that `builtin()` lists. When they load at run time, they will fill the same structs and call the same two
-functions, and nothing in this document changes for them.
+Plugins that load at run time are not part of v1, so a plugin is a Rust crate that `builtin()` lists
+(`docs/plugins.md`).
 ## 5. Open questions
 - Should `visible` take more than the bar's numbers? A session badge needs the session. Each slot will pass its own
   state, as the bar passes `Vitals`.
-- Should the rail's three views move onto the registry in the next step, with `ShellView` becoming an id?
+- Should the rail's three own views move onto the registry in a later step?
 - Where does a plugin declare the capabilities it needs, so a card for a capability that is not there is not drawn?

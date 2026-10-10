@@ -27,6 +27,7 @@ atelier-gmail = { path = "crates/gmail" }
 atelier-i18n = { path = "crates/i18n" }
 atelier-lsp = { path = "crates/lsp" }
 atelier-palette = { path = "crates/palette" }
+atelier-plugin = { path = "crates/plugin" }
 atelier-pr-view = { path = "crates/pr-view" }
 atelier-project = { path = "crates/project" }
 atelier-remote = { path = "crates/remote" }

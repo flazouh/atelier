@@ -1,14 +1,13 @@
 use std::rc::Rc;
 
 use atelier_ui::status_bar::{Press, usage_part};
-use gpui_kit::AppContext;
 
-use crate::slots::{Column, RailView, Slots, StatusBarCard};
+use crate::slots::{Column, Slots, StatusBarCard};
 
-use super::super::structs::UsagePage;
+use super::super::structs::UsagePlugin;
 
-/// What this module adds to the app: the chips of the limits in the middle of the status bar, and the dashboard they open.
-/// With these two registrations gone the bar has no usage chips and the app has no dashboard.
+/// What this module adds to the app: the chips of the limits in the middle of the status bar, and its plugin, whose view
+/// (the dashboard) the chips and the rail open. With this line gone the bar has no usage chips and the app has no dashboard.
 pub fn register(slots: &mut Slots) {
     slots.add_card(StatusBarCard::new(
         "usage",
@@ -22,8 +21,5 @@ pub fn register(slots: &mut Slots) {
                 .collect()
         },
     ));
-    slots.add_view(RailView::new("usage", None, "Usage", 100, |host, cx| {
-        let host = host.clone();
-        cx.new(|cx| UsagePage::new(host, cx)).into()
-    }));
+    slots.plug(&UsagePlugin);
 }

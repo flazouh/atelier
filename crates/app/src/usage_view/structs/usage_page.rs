@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use atelier_agents::usage_history::read_cached;
+use atelier_plugin::{Host, PluginPage};
 use atelier_ui::{Selection, UsageDashboard, UsageRange, UsageSources, scale::px, typography::TextSize};
 use gpui_kit::{
-    AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
-    StatefulInteractiveElement, Styled, Window, div,
+    AnyElement, Context, InteractiveElement, IntoElement, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, div,
 };
 
 use super::super::{
@@ -12,9 +13,8 @@ use super::super::{
     helpers::{build, today},
 };
 use super::{UsageState, UsageStore};
-use crate::slots::Host;
 
-/// The usage dashboard as a panel over the window, with what the reader chose in it. The logs are read off the UI thread,
+/// The usage dashboard as the page of the Usage view, with what the reader chose in it. The logs are read off the UI thread,
 /// and what was read stays in the [`UsageStore`] for the next opening, so the dashboard shows at once and then refreshes.
 pub struct UsagePage {
     state: UsageState,
@@ -81,20 +81,22 @@ impl UsagePage {
 }
 
 impl UsagePage {
-    /// The view came in front again: reads the logs once more, and keeps what it shows until they are read.
-    pub fn refresh(&self, cx: &mut Context<Self>) {
-        self.read(cx);
-    }
-
     /// What the view shows now, built again only when the state or the readings changed.
     fn built(&self, cx: &mut Context<Self>) -> crate::usage_view::structs::UsageView {
-        let readings = self.host.vitals.read(cx).providers().to_vec();
+        let readings = self.host.vitals(cx).providers;
         let (today, _) = today();
         build(&self.state, &readings, today)
     }
+}
+
+impl PluginPage for UsagePage {
+    /// The view came in front again: reads the logs once more, and keeps what it shows until they are read.
+    fn in_front_again(&mut self, cx: &mut Context<Self>) {
+        self.read(cx);
+    }
 
     /// The sidebar of the Usage view: its title and the list of sources, as the other views' sidebars are filled.
-    pub fn sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let view = self.built(cx);
         let select = cx.weak_entity();
         let sources = UsageSources::new("usage-sources")
@@ -123,7 +125,7 @@ impl UsagePage {
     }
 
     /// The detail of what is chosen, scrolling inside the card the shell puts it on.
-    pub fn main(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn main(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let view = self.built(cx);
         let (range, expand) = (cx.weak_entity(), cx.weak_entity());
         let dashboard = UsageDashboard::new("usage-dashboard")
@@ -154,12 +156,5 @@ impl UsagePage {
             .p(px(DETAIL_PAD))
             .child(dashboard)
             .into_any_element()
-    }
-}
-
-/// Shown on its own (the slot's view), the page is its detail.
-impl Render for UsagePage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.main(cx)
     }
 }
