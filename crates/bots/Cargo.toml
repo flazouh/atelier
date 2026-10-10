@@ -1,0 +1,12 @@
+[package]
+name = "atelier-bots"
+description = "The bots: a named worker with a face, a role, skills, a voice and a memory, and where they are kept."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+[dev-dependencies]
+tempfile = "3"

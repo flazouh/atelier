@@ -522,13 +522,22 @@ dependencies = [
 
 [[package]]
 name = "atelier-bot-face"
-version = "0.1.12"
+version = "0.1.14"
 dependencies = [
  "gpui-kit",
  "lyon",
  "roxmltree 0.20.0",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "atelier-bots"
+version = "0.1.14"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]
