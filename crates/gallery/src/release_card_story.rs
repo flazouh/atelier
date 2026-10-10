@@ -4,12 +4,11 @@
 //! made with `flush` gives it; the app opens it by itself the first time a new version starts, and from the version
 //! in the status bar.
 use atelier_ui::{ActiveTheme, ReleaseCard, ReleaseNote};
-use gpui_kit::{App, IntoElement, ParentElement, SharedString, Styled, div, px};
+use gpui_kit::{App, IntoElement, ParentElement, Styled, div, px};
 
 fn card() -> ReleaseCard {
     ReleaseCard::new("release-card-story", "atelier", "0.1.16")
         .title("What\u{2019}s new in atelier")
-        .date(Some(SharedString::from("Version 0.1.16 \u{b7} 10 October 2026")))
         .notes([
             ReleaseNote::new("Usage is a full view.", "The same sidebar and main pane as the rest of the app, with charts per session."),
             ReleaseNote::new("SSH folders open again.", "A folder on another computer opens with no helper error."),
