@@ -2,7 +2,7 @@
 //! reader presses its button, and the settings keep that they did, so it shows once.
 
 use atelier_ui::WelcomePage;
-use gpui_kit::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Styled, WindowControlArea, div};
+use gpui_kit::{AnyElement, AppContext, Context, InteractiveElement, IntoElement, ParentElement, Styled, WindowControlArea, div};
 
 use super::{Shell, helpers::settings_path, types::TITLE_BAR};
 use atelier_ui::scale::px;
