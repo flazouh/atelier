@@ -56,6 +56,8 @@ pub enum ProjectEvent {
     Open(String),
     /// The pull requests came on screen: the shell shows the right pane.
     PullsShown,
+    /// A pull request was asked for by name (a chip): the shell shows the pull requests page of the Code view.
+    PullPage,
     /// A session the project opened for a task: the shell puts it in front.
     ShowSession(Entity<AgentSession>),
     /// The tasks came on screen: the shell shows the right pane.
