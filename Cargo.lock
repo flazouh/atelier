@@ -521,6 +521,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "atelier-bot-face"
+version = "0.1.12"
+dependencies = [
+ "gpui-kit",
+ "lyon",
+ "roxmltree 0.20.0",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "atelier-capabilities"
 version = "0.1.14"
 dependencies = [
@@ -568,6 +579,7 @@ name = "atelier-gallery"
 version = "0.1.14"
 dependencies = [
  "atelier-agents",
+ "atelier-bot-face",
  "atelier-editor",
  "atelier-lsp",
  "atelier-pr-view",

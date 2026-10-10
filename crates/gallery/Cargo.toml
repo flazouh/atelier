@@ -10,6 +10,7 @@ license.workspace = true
 gpui-kit.workspace = true
 atelier-ui.workspace = true
 atelier-agents.workspace = true
+atelier-bot-face.workspace = true
 atelier-editor.workspace = true
 atelier-lsp.workspace = true
 atelier-pr-view.workspace = true

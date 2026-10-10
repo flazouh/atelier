@@ -14,6 +14,7 @@ license = "AGPL-3.0-only"
 gpui-kit = "0.6.6"
 atelier-ui = { git = "https://github.com/flazouh/atelier-ui" }
 atelier-agents = { path = "crates/agents" }
+atelier-bot-face = { path = "crates/bot-face" }
 atelier-capabilities = { path = "crates/capabilities" }
 atelier-discord = { path = "crates/discord" }
 atelier-linear = { path = "crates/linear" }

@@ -236,7 +236,7 @@
    "parts": [
     {
      "layer": "back",
-     "svg": "<path d=\"M60 80L50 86L70 92L50 98L60 104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"5.5\"/>",
+     "svg": "<path d=\"M60 80L50 86L70 92L50 98L60 104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
      "pivot": [
       60,
       80
@@ -411,7 +411,7 @@
    "parts": [
     {
      "layer": "back",
-     "svg": "<path d=\"M36 76L22 86V100M44 82L36 94V104M52 86L50 98V104M84 76L98 86V100M76 82L84 94V104M68 86L70 98V104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"4.5\"/>",
+     "svg": "<path d=\"M36 76L22 86V100M44 82L36 94V104M52 86L50 98V104M84 76L98 86V100M76 82L84 94V104M68 86L70 98V104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
      "pivot": [
       60,
       86

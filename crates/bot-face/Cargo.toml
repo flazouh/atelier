@@ -1,0 +1,13 @@
+[package]
+name = "atelier-bot-face"
+description = "Draws and moves the bot faces of docs/bots/faces.v1.json: parts, six moods, habits."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+[dependencies]
+gpui-kit.workspace = true
+lyon = "1"
+roxmltree = "0.20"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
