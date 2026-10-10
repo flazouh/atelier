@@ -356,9 +356,9 @@ impl SettingsPane {
             })
             .child(group("Tasks", "Where your tasks live besides this project. A connected account shows in the Tasks screen and reaches your agents.", &theme))
             .child(div().flex().flex_col().gap(px(12.)).child(linear).child(github))
-            .child(group("Chat", "Where your conversations live. A connected account shows in the Messages screen and reaches your agents. Each one uses the login of its own command line tool.", &theme))
+            .child(group("Chat", "Where your conversations live. A connected account reaches your agents. Each one uses the login of its own command line tool.", &theme))
             .child(div().flex().flex_col().gap(px(12.)).child(slack).child(discord))
-            .child(group("Mail", "Your mailbox, for the Mail screen and your agents.", &theme))
+            .child(group("Mail", "Your mailbox, for your agents.", &theme))
             .child(div().flex().flex_col().gap(px(12.)).child(gmail))
             .into_any_element()
     }
