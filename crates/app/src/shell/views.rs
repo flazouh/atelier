@@ -23,8 +23,4 @@ impl Shell {
         cx.notify();
     }
 
-    pub fn close_view(&mut self, cx: &mut Context<Self>) {
-        self.opened = None;
-        cx.notify();
-    }
 }
