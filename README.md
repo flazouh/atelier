@@ -42,6 +42,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[Apache-2.0](LICENSE). The copies in `vendor` keep their own Apache-2.0 license. atelier-ui has its own license
-(GPL-3.0 or commercial), so a build of atelier as a whole is under the GPL-3.0. Agent and lab logos in
-`crates/agents/assets` belong to their owners and show which agent or model is in use.
+[AGPL-3.0](LICENSE). If you run a modified atelier for other people, including as a hosted service, you must
+offer them the source. atelier-ui is GPL-3.0 or commercial, and GPL-3.0 code may join an AGPL-3.0 work. The copies
+in `vendor` keep their own Apache-2.0 license. Agent and lab logos in `crates/agents/assets` belong to their owners
+and show which agent or model is in use.
