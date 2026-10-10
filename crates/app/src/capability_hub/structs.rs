@@ -78,15 +78,9 @@ impl CapabilityHub {
         Self::new(person_actor(), run_dir(), enabled)
     }
 
-    /// Adds a messaging account to the registry that the agent gateway and the Messages screen both read, so what the
-    /// agent can reach is what the person sees. A second one for the same provider and account replaces the first.
-    #[cfg_attr(
-        not(debug_assertions),
-        allow(
-            dead_code,
-            reason = "connected accounts go in through `install`; only the debug demo adds one by hand"
-        )
-    )]
+    /// Adds a messaging account to the registry the agent gateway reads. Connected accounts go in through `install`; a
+    /// test adds one by hand. A second one for the same provider and account replaces the first.
+    #[cfg(test)]
     pub(crate) fn add_messaging(&self, provider: Arc<dyn MessagingProvider>) {
         self.inner
             .registry
@@ -95,8 +89,8 @@ impl CapabilityHub {
             .add_messaging(provider);
     }
 
-    /// Every messaging account the app has, in the registry's order. The screen asks again each time it opens, so an
-    /// account added later shows.
+    /// Every messaging account the app has, in the registry's order.
+    #[cfg(test)]
     pub(crate) fn messaging_providers(&self) -> Vec<Arc<dyn MessagingProvider>> {
         self.inner
             .registry
@@ -105,15 +99,9 @@ impl CapabilityHub {
             .all_messaging()
     }
 
-    /// Adds a mail account to the registry that the agent gateway and the Mail screen both read, so what the agent can reach is
-    /// what the person sees. A second one for the same provider and account replaces the first.
-    #[cfg_attr(
-        not(debug_assertions),
-        allow(
-            dead_code,
-            reason = "connected accounts go in through `install`; only the debug demo adds one by hand"
-        )
-    )]
+    /// Adds a mail account to the registry the agent gateway reads. Connected accounts go in through `install`; a test adds
+    /// one by hand. A second one for the same provider and account replaces the first.
+    #[cfg(test)]
     pub(crate) fn add_mail(&self, provider: Arc<dyn MailProvider>) {
         self.inner
             .registry
@@ -122,19 +110,14 @@ impl CapabilityHub {
             .add_mail(provider);
     }
 
-    /// Every mail account the app has, in the registry's order. The screen asks again each time it opens, so an account added
-    /// later shows.
+    /// Every mail account the app has, in the registry's order.
+    #[cfg(test)]
     pub(crate) fn mail_providers(&self) -> Vec<Arc<dyn MailProvider>> {
         self.inner
             .registry
             .read()
             .unwrap_or_else(|p| p.into_inner())
             .all_mail()
-    }
-
-    /// The person the app acts for: every change they make in a screen is theirs.
-    pub(crate) fn person(&self) -> Actor {
-        self.inner.me.clone()
     }
 
     /// A hub with no gateway, for a screen that runs without the app's own (a test, the gallery).

@@ -13,8 +13,6 @@ mod bots;
 mod changes;
 mod history;
 mod lens;
-mod mail;
-mod messages;
 mod rail;
 mod restore;
 mod structs;

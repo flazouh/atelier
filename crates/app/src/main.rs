@@ -61,8 +61,6 @@ mod tabs;
 mod test_dirs;
 mod timings;
 mod tool_density;
-mod mail;
-mod messages;
 mod tasks;
 mod tree;
 mod tree_view;
@@ -89,12 +87,6 @@ fn main() {
         file_glyphs::install(cx);
         cx.set_global(agent_session::RunPickedSkills(saved.run_picked_skills.unwrap_or(false)));
         let hub = capability_hub::CapabilityHub::for_this_app(saved.capabilities.agent_tools.unwrap_or(true));
-        // A debug build with ATELIER_DEMO_MESSAGING=1 has one seeded chat account, to look at the Messages view with.
-        #[cfg(debug_assertions)]
-        let _ = messages::demo::register_from_env(&hub);
-        // The same for the Mail view, with ATELIER_DEMO_MAIL.
-        #[cfg(debug_assertions)]
-        let _ = mail::demo::register_from_env(&hub);
         cx.set_global(hub);
         cx.set_global(slots::builtin());
         cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));

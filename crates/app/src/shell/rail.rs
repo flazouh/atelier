@@ -1,5 +1,5 @@
 //! The left rail and what its views draw: Tasks shows the board, Sessions the session list and the
-//! panels, Git the focused session's changed files and their review, Messages the chat accounts, Mail the mail accounts.
+//! panels, Git the focused session's changed files and their review, Bots the bot library, Usage the dashboard.
 
 use atelier_ui::view_rail::{RailView, ViewRail};
 use atelier_ui::scale::px;
@@ -18,8 +18,6 @@ fn rail_view(view: ShellView, needs_you: usize) -> RailView {
     match view {
         ShellView::Tasks => RailView { icon: IconName::Checklist, label: "Tasks".into(), debug: "rail-tasks", count: 0 },
         ShellView::Git => RailView { icon: IconName::Code, label: "Code".into(), debug: "rail-git", count: 0 },
-        ShellView::Messages => RailView { icon: IconName::ChatBubble, label: "Messages".into(), debug: "rail-messages", count: 0 },
-        ShellView::Mail => RailView { icon: IconName::Mail, label: "Mail".into(), debug: "rail-mail", count: 0 },
         ShellView::Usage => RailView { icon: IconName::BarChart, label: "Usage".into(), debug: "rail-usage", count: 0 },
         ShellView::Bots => RailView { icon: IconName::Bot, label: "Bots".into(), debug: "rail-bots", count: 0 },
         _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions", count: needs_you },
