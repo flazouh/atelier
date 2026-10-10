@@ -1,33 +1,24 @@
 use std::sync::Arc;
 
 use atelier_agents::usage_history::read_cached;
-use atelier_ui::{
-    Selection, UsageDashboard, UsageRange, UsageSources,
-    scale::px,
-    theme::{ActiveTheme, radius},
-    typography::TextSize,
-};
+use atelier_ui::{Selection, UsageDashboard, UsageRange, UsageSources, scale::px, typography::TextSize};
 use gpui_kit::{
-    Context, FocusHandle, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
+    AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Render, SharedString,
     StatefulInteractiveElement, Styled, Window, div,
 };
 
 use super::super::{
-    consts::{DETAIL_PAD, LONGEST, SIDE_WIDTH},
+    consts::{DETAIL_PAD, LONGEST},
     helpers::{build, today},
 };
 use super::{UsageState, UsageStore};
-use crate::shell::TITLE_BAR;
 use crate::slots::Host;
 
 /// The usage dashboard as a panel over the window, with what the reader chose in it. The logs are read off the UI thread,
 /// and what was read stays in the [`UsageStore`] for the next opening, so the dashboard shows at once and then refreshes.
 pub struct UsagePage {
     state: UsageState,
-    focus: FocusHandle,
     host: Host,
-    /// Whether the page took the focus yet, so Escape reaches it.
-    focused: bool,
 }
 
 impl UsagePage {
@@ -36,9 +27,7 @@ impl UsagePage {
         let seen = cx.default_global::<UsageStore>().seen.clone();
         let page = Self {
             state: UsageState::new(seen),
-            focus: cx.focus_handle(),
             host,
-            focused: false,
         };
         page.read(cx);
         page
@@ -91,23 +80,52 @@ impl UsagePage {
     }
 }
 
-impl Render for UsagePage {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if !self.focused {
-            self.focused = true;
-            window.focus(&self.focus, cx);
-        }
-        let host = self.host.clone();
+impl UsagePage {
+    /// The view came in front again: reads the logs once more, and keeps what it shows until they are read.
+    pub fn refresh(&self, cx: &mut Context<Self>) {
+        self.read(cx);
+    }
+
+    /// What the view shows now, built again only when the state or the readings changed.
+    fn built(&self, cx: &mut Context<Self>) -> crate::usage_view::structs::UsageView {
         let readings = self.host.vitals.read(cx).providers().to_vec();
         let (today, _) = today();
-        let view = build(&self.state, &readings, today);
-        let theme = cx.theme().clone();
-        let (range, select, expand) = (cx.weak_entity(), cx.weak_entity(), cx.weak_entity());
+        build(&self.state, &readings, today)
+    }
+
+    /// The sidebar of the Usage view: its title and the list of sources, as the other views' sidebars are filled.
+    pub fn sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let view = self.built(cx);
+        let select = cx.weak_entity();
         let sources = UsageSources::new("usage-sources")
-            .sources(view.sources.clone())
-            .summary(view.summary.0.clone(), view.summary.1.clone())
+            .sources(view.sources)
+            .summary(view.summary.0, view.summary.1)
             .selection(self.state.selection.clone())
             .on_select(move |s, _, cx| drop(select.update(cx, |page, cx| page.select(s, cx))));
+        div()
+            .id("usage-side")
+            .debug_selector(|| "usage-sidebar".into())
+            .size_full()
+            .overflow_y_scroll()
+            .px(px(4.))
+            .pb(px(8.))
+            .child(
+                div()
+                    .px(px(10.))
+                    .pt(px(10.))
+                    .pb(px(8.))
+                    .text_size(TextSize::Lg.font_size())
+                    .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+                    .child("Usage"),
+            )
+            .child(sources)
+            .into_any_element()
+    }
+
+    /// The detail of what is chosen, scrolling inside the card the shell puts it on.
+    pub fn main(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let view = self.built(cx);
+        let (range, expand) = (cx.weak_entity(), cx.weak_entity());
         let dashboard = UsageDashboard::new("usage-dashboard")
             .range(self.state.range)
             .title(view.title)
@@ -128,61 +146,20 @@ impl Render for UsagePage {
             (None, Some(provider)) => dashboard.provider(provider),
             (None, None) => dashboard,
         };
-        // The view fills the window right of the rail and between the title bar and the status bar: a list of the
-        // sources at the left, the detail of the one chosen at the right, as the other views of the shell are laid out.
         div()
-            .id("usage-view")
+            .id("usage-scroll")
             .debug_selector(|| "usage-view".into())
-            .absolute()
-            .top(px(TITLE_BAR))
-            .left(px(atelier_ui::view_rail::WIDTH))
-            .right_0()
-            .bottom(px(atelier_ui::status_bar::HEIGHT))
-            .flex()
-            .gap(px(atelier_ui::panel_layout::GAP))
-            .pr(px(8.))
-            .pb(px(10.))
-            .bg(theme.background)
-            .track_focus(&self.focus)
-            .on_key_down(move |event, _, cx| {
-                if event.keystroke.key == "escape" {
-                    host.close_view(cx);
-                }
-            })
-            .child(
-                div()
-                    .id("usage-side")
-                    .flex_none()
-                    .w(px(SIDE_WIDTH))
-                    .h_full()
-                    .overflow_y_scroll()
-                    .pl(px(8.))
-                    .pr(px(4.))
-                    .pb(px(8.))
-                    .child(
-                        div()
-                            .px(px(10.))
-                            .pt(px(10.))
-                            .pb(px(8.))
-                            .text_size(TextSize::Lg.font_size())
-                            .font_weight(gpui_kit::FontWeight::SEMIBOLD)
-                            .child("Usage"),
-                    )
-                    .child(sources),
-            )
-            .child(
-                div()
-                    .id("usage-scroll")
-                    .flex_1()
-                    .min_w_0()
-                    .h_full()
-                    .overflow_y_scroll()
-                    .px(px(DETAIL_PAD))
-                    .pt(px(DETAIL_PAD))
-                    .pb(px(DETAIL_PAD))
-                    .rounded(radius::lg())
-                    .bg(theme.card)
-                    .child(dashboard),
-            )
+            .size_full()
+            .overflow_y_scroll()
+            .p(px(DETAIL_PAD))
+            .child(dashboard)
+            .into_any_element()
+    }
+}
+
+/// Shown on its own (the slot's view), the page is its detail.
+impl Render for UsagePage {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.main(cx)
     }
 }

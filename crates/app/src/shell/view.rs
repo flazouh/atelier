@@ -44,6 +44,7 @@ impl ShellView {
             Some("history") => Self::History,
             Some("messages") => Self::Messages,
             Some("mail") => Self::Mail,
+            Some("usage") => Self::Usage,
             _ => Self::Sessions,
         }
     }

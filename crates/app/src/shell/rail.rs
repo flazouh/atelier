@@ -30,8 +30,7 @@ impl Shell {
     pub(super) fn view_rail(&self, open: bool, cx: &mut Context<Self>) -> AnyElement {
         let needs_you = self.needs_you(cx);
         let views = ShellView::ON_RAIL.into_iter().map(|v| rail_view(v, needs_you)).collect();
-        let lens = if self.opened.is_some() { ShellView::Usage } else { self.view.lens() };
-        let selected = ShellView::ON_RAIL.iter().position(|v| *v == lens).unwrap_or(usize::MAX);
+        let selected = ShellView::ON_RAIL.iter().position(|v| *v == self.view.lens()).unwrap_or(usize::MAX);
         let this = cx.entity().downgrade();
         ViewRail::new("view-rail", views, selected, open)
             .on_select(move |i, window, cx| {
@@ -43,10 +42,7 @@ impl Shell {
     /// A press on the rail. Another view comes to the front with the sidebar shown; the view in front
     /// hides or shows the sidebar.
     pub(super) fn pick_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
-        // The Usage door opens (or closes) the view a module draws over the window; any other lens closes it.
-        if view == ShellView::Usage {
-            return if self.opened.is_some() { self.close_view(cx) } else { self.open_view("usage", cx) };
-        }
+        // A view a module opened over the window gives way to the lens the reader picks.
         if self.opened.take().is_some() {
             cx.notify();
         }
@@ -62,6 +58,7 @@ impl Shell {
             ShellView::Git => self.show_code(self.code_view, window, cx),
             ShellView::Messages => self.show_messages(window, cx),
             ShellView::Mail => self.show_mail(window, cx),
+            ShellView::Usage => self.show_usage(window, cx),
             _ => self.show_view(view, window, cx),
         }
     }

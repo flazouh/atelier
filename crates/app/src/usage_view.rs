@@ -6,6 +6,7 @@ mod consts;
 mod helpers;
 mod structs;
 pub use helpers::register;
+pub use structs::UsagePage;
 #[cfg(test)]
 pub use structs::UsageStore;
 #[cfg(test)]
