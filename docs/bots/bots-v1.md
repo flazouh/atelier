@@ -121,3 +121,24 @@ Answered by Alex:
 5. **Names.** Keep Nimbus, Bolt, Pip, Olive, Skip, Dot and Keyla. Add Quill, Ink, Mimi and Gus.
 
 No open questions remain in this file.
+
+## 10. In code
+
+The crate `atelier-bots` (`crates/bots`) holds this model. It has no screen and no dependency on the UI.
+
+- `Bot`, `FaceChoice`, `Provider`, `ToolGrant`, `Playbook`, `PlaybookStep` and `MemoryNote` are the data. `BotId` is a short name of lower case letters, digits and hyphens, and it is the name of the file.
+- `BotStore` is the trait the app talks to. `DiskBotStore` keeps one JSON file for each bot and each playbook, and one file of notes for each layer:
+
+```
+<folder>/bots/<id>.json
+<folder>/playbooks/<id>.json
+<folder>/memory/bot/<id>.json
+<folder>/memory/workspace/<id>.json
+<folder>/memory/project/<path, made safe>.json
+```
+
+- An edit that changes a bot makes the next `version`. A save that changes nothing keeps the version.
+- A playbook can only name bots that are kept, and a bot that a playbook names cannot be removed.
+- `starter_crew()` is the ten bots and `starter_playbooks()` is Deliver. `seed_starters` adds the ones a folder does not hold. It never touches a bot that is kept, even after you edit it.
+- The faces of Quill, Ink, Mimi and Gus are provisional until the faces step.
+
