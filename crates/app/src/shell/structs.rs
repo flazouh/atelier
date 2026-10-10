@@ -108,10 +108,6 @@ pub struct Shell {
     pub(super) view: ShellView,
     /// The view of the Code lens the rail goes back to.
     pub(super) code_view: ShellView,
-    /// The Messages view's pane, made the first time the view is in front.
-    pub(super) messages: Option<Entity<crate::messages::pane::MessagesPane>>,
-    /// The Mail view's pane, made the first time the view is in front.
-    pub(super) mail: Option<Entity<crate::mail::pane::MailPane>>,
     /// The Usage view's page, made the first time the view is in front.
     pub(super) usage: Option<Entity<crate::usage_view::UsagePage>>,
     /// A module asked for a lens (Usage, Bots): the next frame, which has a window, shows it.
@@ -211,12 +207,7 @@ impl Shell {
             opening: 0,
             front: None,
             saved_open: (saved.open.clone(), saved.front.clone()),
-            // An account connected, forgotten or rebuilt in Settings reaches the open Messages and Mail screens at once, as it
-            // reaches Tasks.
-            _subscriptions: vec![cx.observe_global::<crate::capability_hub::CapabilityHub>(|this, cx| {
-                this.refresh_messages(cx);
-                this.refresh_mail(cx);
-            })],
+            _subscriptions: Vec::new(),
             panel_views: Default::default(),
             view: ShellView::from_words(saved.view.as_deref()),
             files_narrow: FilesPane::default(),
@@ -228,8 +219,6 @@ impl Shell {
             update_focus: cx.focus_handle(),
             opened: None,
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
-            messages: None,
-            mail: None,
             usage: None,
             lens_asked: None,
             bots: None,
@@ -1816,7 +1805,7 @@ impl Shell {
         let switcher = self.project_switcher(cx);
         // The Sessions sidebar has a row of its own at the top, with the ⋯ at its right: the switcher stands on that row,
         // left of the ⋯, so the head is one row. The other lenses have no such row and give the switcher one.
-        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Messages | ShellView::Mail | ShellView::Usage | ShellView::Bots) {
+        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Usage | ShellView::Bots) {
             let row = switcher.map(|switcher| {
                 div().absolute().top(px(5.)).left(px(8.)).right(px(44.)).h(px(36.)).flex().items_center().min_w_0().child(switcher)
             });
@@ -1837,12 +1826,6 @@ impl Shell {
             && let Some(project) = self.active().cloned()
         {
             return div().size_full().child(self.issues_sidebar(&project, cx));
-        }
-        if self.view == ShellView::Messages {
-            return div().size_full().child(self.messages_sidebar(cx));
-        }
-        if self.view == ShellView::Mail {
-            return div().size_full().child(self.mail_sidebar(cx));
         }
         if self.view == ShellView::Usage {
             return div().size_full().child(self.usage_sidebar(cx));
@@ -1960,15 +1943,8 @@ impl Shell {
     /// The panes for the window's width: the three side by side, the two without the sidebar, or one at
     /// a time with tabs (docs/app.md, "Window widths").
     pub(super) fn panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        // A window that closed on Messages opens on it with no press, so the pane is made here and not only by the rail.
-        if self.view == ShellView::Messages {
-            self.ensure_messages(window, cx);
-        }
         if let Some(lens) = self.lens_asked.take() {
             self.go_to(lens, window, cx);
-        }
-        if self.view == ShellView::Mail {
-            self.ensure_mail(window, cx);
         }
         if self.view == ShellView::Usage {
             self.ensure_usage(cx);
@@ -2135,8 +2111,6 @@ impl Shell {
     fn center(&self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         match self.view {
             ShellView::Tasks => self.tasks_main(project, window, cx),
-            ShellView::Messages => self.messages_main(),
-            ShellView::Mail => self.mail_main(),
             ShellView::Usage => self.usage_main(cx),
             ShellView::Bots => self.bots_main(cx),
             ShellView::Git => self.changes_main(project, cx),

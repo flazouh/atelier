@@ -131,7 +131,7 @@ fn a_slack_workspace_is_saved_with_its_channels_and_its_provider_built_and_forge
     assert_eq!(
         accounts,
         ["acme"],
-        "the Messages screen and the gateway read it from the hub"
+        "the gateway reads it from the hub"
     );
 
     pane.update(cx, |p, cx| p.show(super::Section::Accounts, cx));

@@ -414,8 +414,6 @@ impl Shell {
     pub(crate) fn go_to(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         match view {
             ShellView::Tasks => self.show_tasks(window, cx),
-            ShellView::Messages => self.show_messages(window, cx),
-            ShellView::Mail => self.show_mail(window, cx),
             ShellView::Usage => self.show_usage(window, cx),
             ShellView::Bots => self.show_bots(window, cx),
             v if v.in_code() => self.show_code(v, window, cx),
