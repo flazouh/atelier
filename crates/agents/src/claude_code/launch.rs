@@ -49,6 +49,10 @@ pub(super) fn command(program: &str, request: &OpenRequest) -> Command {
     if let Some(config) = &request.mcp_config {
         args.extend([MCP_CONFIG_FLAG.into(), config.to_string_lossy().into_owned()]);
     }
+    // The prompt is not kept with the session, so a resume says it again. A blank one is none.
+    if let Some(persona) = request.append_system_prompt.as_deref().filter(|persona| !persona.trim().is_empty()) {
+        args.extend([APPEND_SYSTEM_PROMPT_FLAG.into(), persona.to_string()]);
+    }
     // `Ask` is what `claude` does with no flag.
     if let Some(mode) = request.mode.filter(|mode| *mode != PermissionMode::Ask) {
         args.extend(["--permission-mode".into(), mode_name(mode).into()]);
@@ -79,6 +83,8 @@ const SHELL: &str = "sh";
 const FORK_FLAG: &str = "--fork-session";
 /// Adds the servers of a JSON file to the ones `claude` has already, so the reader keeps their own.
 const MCP_CONFIG_FLAG: &str = "--mcp-config";
+/// Adds text after `claude`'s own system prompt, which stays as it is.
+const APPEND_SYSTEM_PROMPT_FLAG: &str = "--append-system-prompt";
 /// Carries the account's name into the script, so the script never holds it.
 const ACCOUNT_ENV: &str = "ATELIER_CLAUDE_ACCOUNT";
 /// Carries the id of the session to resume into the script, so the script never holds it.

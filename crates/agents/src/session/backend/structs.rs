@@ -41,6 +41,9 @@ pub struct OpenRequest {
     /// A file of MCP servers to give the agent, for the tools of the app itself. Only an agent that takes MCP servers
     /// from a file reads it; the others leave it. It is a path on this machine, so a project on another host gets none.
     pub mcp_config: Option<std::path::PathBuf>,
+    /// Text to add to the agent's own system prompt, at every start of the session: who the agent is in it. Only an agent
+    /// that takes such text at launch reads it; the others leave it, and nothing of it goes to them another way.
+    pub append_system_prompt: Option<String>,
 }
 
 /// One of the agent's sign-ins on a host, which a [`super::types::Provider::Account`] names.
