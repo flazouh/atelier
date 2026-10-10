@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Starts, shows and stops a throwaway atelier to check a change by driving it, not by guessing clicks.
 #   tools/dev-qa.sh start [folder]   build, start on a scratch folder (a fresh git repo) with its own settings
+#                                    (QA_WELCOME=1: as a new reader, on the welcome page)
 #   tools/dev-qa.sh shot out.png     screenshot of the window
 #   tools/dev-qa.sh stop
 # Then drive it with tools/atelier-ctl.sh (state, new_session, send). With no display (the HP) it runs under
@@ -28,6 +29,13 @@ start)
     sleep 1
   fi
   echo "$DISPLAY" >"$RUN/display"
+  # A throwaway app is past the welcome page, so a script reaches the window. QA_WELCOME=1 starts it as a new reader
+  # has it, with no settings.
+  if [ "${QA_WELCOME:-}" = 1 ]; then
+    rm -f "$RUN/settings.json"
+  else
+    python3 -c 'import json,os,sys; p=sys.argv[1]; s=json.load(open(p)) if os.path.exists(p) else {}; s["welcomed"]=True; json.dump(s,open(p,"w"))' "$RUN/settings.json"
+  fi
   rm -f "$RUN"/atelier-*.sock
   ATELIER_SETTINGS="$RUN/settings.json" ATELIER_CONTROL="$RUN/atelier.sock" WAYLAND_DISPLAY= \
     "$TARGET/debug/atelier" "$FOLDER" >"$RUN/app.log" 2>&1 &

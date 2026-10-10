@@ -81,6 +81,8 @@ pub struct Settings {
     pub agent_models: std::collections::BTreeMap<String, AgentModels>,
     /// The changelog of the update the app downloaded last, kept so that the first start of that version can show it once.
     pub whats_new: Option<WhatsNew>,
+    /// The reader pressed the welcome page's button. Unset: the page shows at the next start, once.
+    pub welcomed: Option<bool>,
     /// Keys a newer or older atelier wrote, kept as they are.
     #[serde(flatten)]
     pub other: serde_json::Map<String, serde_json::Value>,
