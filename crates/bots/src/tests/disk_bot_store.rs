@@ -14,11 +14,19 @@ fn id(text: &str) -> BotId {
 }
 
 #[test]
-fn seeding_keeps_ten_bots_and_one_playbook_and_a_second_seeding_adds_nothing() {
+fn seeding_keeps_ten_bots_and_two_playbooks_and_a_second_seeding_adds_nothing() {
     let (_dir, store) = store();
-    assert_eq!(seed_starters(&store).unwrap(), 11);
+    assert_eq!(seed_starters(&store).unwrap(), 12);
     assert_eq!(store.bots().unwrap().len(), 10);
-    assert_eq!(store.playbooks().unwrap().len(), 1);
+    assert_eq!(
+        store
+            .playbooks()
+            .unwrap()
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        ["deliver", "design"]
+    );
     assert_eq!(seed_starters(&store).unwrap(), 0);
 }
 

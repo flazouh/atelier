@@ -1,9 +1,11 @@
-/// Why a bot, a playbook or a note could not be read, kept or made.
+/// Why a bot, a playbook, a run or a note could not be read, kept, made or moved.
 #[derive(Debug)]
 pub enum BotsError {
     /// The data breaks a rule. Every problem is listed.
     Invalid(Vec<String>),
-    /// No bot or playbook has this id.
+    /// The rules of a run do not allow this move. It says why.
+    Refused(String),
+    /// No bot, playbook or run has this id.
     NotFound(String),
     /// A file could not be read or written.
     Io { path: String, reason: String },
