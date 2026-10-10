@@ -15,6 +15,12 @@ pub enum Geometry {
         cy: f32,
         r: f32,
     },
+    Ellipse {
+        cx: f32,
+        cy: f32,
+        rx: f32,
+        ry: f32,
+    },
     Polygon(Vec<(f32, f32)>),
     Path(Vec<PathCmd>),
 }

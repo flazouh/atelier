@@ -1,6 +1,6 @@
 use crate::enums::PathCmd;
 
-/// Reads the `d` attribute of a path. It knows M L H V Q Z, in both cases, which is all the data uses.
+/// Reads the `d` attribute of a path. It knows M L H V Q C Z, in both cases, which is all the data uses.
 pub(crate) fn parse_path_data(d: &str) -> Result<Vec<PathCmd>, String> {
     let mut out = Vec::new();
     let (mut x, mut y, mut sx, mut sy) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
@@ -92,6 +92,21 @@ pub(crate) fn parse_path_data(d: &str) -> Result<Vec<PathCmd>, String> {
                     let (bx, by) = base(x, y);
                     out.push(PathCmd::Quad(bx + p[0], by + p[1], bx + p[2], by + p[3]));
                     (x, y) = (bx + p[2], by + p[3]);
+                }
+            }
+            'C' => {
+                need(6)?;
+                for p in args.chunks(6) {
+                    let (bx, by) = base(x, y);
+                    out.push(PathCmd::Cubic(
+                        bx + p[0],
+                        by + p[1],
+                        bx + p[2],
+                        by + p[3],
+                        bx + p[4],
+                        by + p[5],
+                    ));
+                    (x, y) = (bx + p[4], by + p[5]);
                 }
             }
             'Z' => {

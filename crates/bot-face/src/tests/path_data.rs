@@ -54,3 +54,16 @@ fn a_close_returns_to_the_start_of_the_sub_path() {
     let cmds = parse("M2 2L6 2Zh3").unwrap();
     assert_eq!(cmds.last(), Some(&PathCmd::Line(5.0, 2.0)));
 }
+
+#[test]
+fn a_cubic_keeps_both_control_points_and_moves_the_pen_to_its_end() {
+    let cmds = parse("M26 62C26 43 41 28 60 28L70 28").unwrap();
+    assert_eq!(cmds[1], PathCmd::Cubic(26.0, 43.0, 41.0, 28.0, 60.0, 28.0));
+    assert_eq!(cmds[2], PathCmd::Line(70.0, 28.0));
+}
+
+#[test]
+fn a_relative_cubic_adds_to_the_point_where_it_starts() {
+    let cmds = parse("M10 10c0 5 5 10 10 10").unwrap();
+    assert_eq!(cmds[1], PathCmd::Cubic(10.0, 15.0, 15.0, 20.0, 20.0, 20.0));
+}

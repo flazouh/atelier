@@ -25,7 +25,7 @@ impl FaceSet {
         let bots = data
             .bots
             .iter()
-            .map(BotModel::from_def)
+            .map(|b| BotModel::from_def(b, data.view_box))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(FaceSet {
             bots,

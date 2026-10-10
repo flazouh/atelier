@@ -1,19 +1,17 @@
 {
  "version": 1,
  "view_box": [
-  0,
-  0,
-  120,
-  120
+  -4,
+  -2,
+  128,
+  128
  ],
  "ground_y": 104,
- "colour_mix_with_grey": 0.1,
  "grey": "#74716A",
+ "colour_mix_with_grey": 0,
  "tokens": {
-  "body": "the bot colour mixed 10% toward the grey",
-  "shade": "black at 30% opacity, drawn over the body colour",
-  "light": "white at 40% opacity",
-  "eye": "#141413 in both themes"
+  "body": "the bot colour",
+  "eye": "the ink colour of the eyes and the mouth"
  },
  "states": {
   "idle": {
@@ -43,30 +41,83 @@
  },
  "bots": [
   {
-   "id": "blob",
+   "id": "bolt",
    "name": "Bolt",
    "role": "Builder",
-   "colour": "#4ACFFF",
-   "habit_text": "Taps the hammer when it builds.",
-   "eye_y": 58,
+   "colour": "#6CCBFA",
+   "eye_y": 60,
    "cheeks": [
     [
-     40,
-     66,
-     8,
-     5
+     33.5,
+     65.6,
+     13,
+     8.8
     ],
     [
-     72,
-     66,
-     8,
-     5
+     73.5,
+     65.6,
+     13,
+     8.8
     ]
    ],
    "parts": [
     {
      "layer": "back",
-     "svg": "<rect x=\"20\" y=\"82\" width=\"80\" height=\"20\" rx=\"10\" fill=\"{body}\"/><rect x=\"20\" y=\"82\" width=\"80\" height=\"20\" rx=\"10\" fill=\"{shade}\"/><rect x=\"30\" y=\"90\" width=\"10\" height=\"4\" rx=\"2\" fill=\"{light}\"/><rect x=\"55\" y=\"90\" width=\"10\" height=\"4\" rx=\"2\" fill=\"{light}\"/><rect x=\"80\" y=\"90\" width=\"10\" height=\"4\" rx=\"2\" fill=\"{light}\"/>",
+     "svg": "<rect x=\"18\" y=\"88\" width=\"84\" height=\"20\" rx=\"10\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<path d=\"M29 91v4M29 101v4M38 91v4M38 101v4M47 91v4M47 101v4M56 91v4M56 101v4M65 91v4M65 101v4M74 91v4M74 101v4M83 91v4M83 101v4M92 91v4M92 101v4\" fill=\"none\" stroke=\"#8d8b95\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<circle cx=\"28\" cy=\"98\" r=\"5.5\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"28\" cy=\"98\" r=\"1.8\" fill=\"#141413\"/>",
+     "pivot": [
+      28,
+      98
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": 150
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<circle cx=\"60\" cy=\"98\" r=\"5\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"60\" cy=\"98\" r=\"1.8\" fill=\"#141413\"/>",
+     "pivot": [
+      60,
+      98
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": 150
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<circle cx=\"92\" cy=\"98\" r=\"5.5\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"92\" cy=\"98\" r=\"1.8\" fill=\"#141413\"/>",
+     "pivot": [
+      92,
+      98
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": 150
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<ellipse cx=\"60\" cy=\"62\" rx=\"37\" ry=\"33\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"44\" cy=\"44\" rx=\"11\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 44 44)\"/>",
      "pivot": [
       60,
       100
@@ -75,185 +126,157 @@
     },
     {
      "layer": "body",
-     "svg": "<rect x=\"30\" y=\"38\" width=\"60\" height=\"50\" rx=\"22\" fill=\"{body}\"/>",
+     "svg": "<circle cx=\"60\" cy=\"86\" r=\"9.5\" fill=\"#141413\"/><circle cx=\"60\" cy=\"86\" r=\"7.3\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"86\" r=\"7.41\" fill=\"#7DF3FF\" opacity=\"0.16\"/><circle cx=\"60\" cy=\"86\" r=\"5.46\" fill=\"#7DF3FF\" opacity=\"0.3\"/><circle cx=\"60\" cy=\"86\" r=\"4.3\" fill=\"#7DF3FF\"/><circle cx=\"59.2\" cy=\"85.2\" r=\"1.38\" fill=\"#ffffff\"/>",
      "pivot": [
       60,
-      100
+      86
      ],
-     "habit": null
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
     },
     {
      "layer": "front",
-     "svg": "<rect x=\"84\" y=\"57\" width=\"18\" height=\"10\" rx=\"5\" fill=\"{body}\"/><rect x=\"98\" y=\"48\" width=\"12\" height=\"28\" rx=\"5\" fill=\"{body}\"/><rect x=\"98\" y=\"48\" width=\"12\" height=\"28\" rx=\"5\" fill=\"{shade}\"/>",
-     "pivot": [
-      88,
-      62
-     ],
-     "habit": {
-      "kind": "swing",
-      "pivot": [
-       88,
-       62
-      ],
-      "amp_deg": 30,
-      "every_s": 3.2,
-      "note": "taps 3 times, then rests"
-     }
-    }
-   ],
-   "eyes": {
-    "idle": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
-    "thinking": "<circle cx=\"48\" cy=\"58\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
-    "working": "<rect x=\"42\" y=\"56\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
-    "done": "<path d=\"M42 61Q48 52 54 61M66 61Q72 52 78 61\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
-    "needs": "<rect x=\"44\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
-    "stuck": "<path d=\"M44 54L52 62M52 54L44 62M68 54L76 62M76 54L68 62\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
-   }
-  },
-  {
-   "id": "drop",
-   "name": "Pip",
-   "role": "Prover",
-   "colour": "#15DB95",
-   "habit_text": "Sweeps the lens over the proof.",
-   "eye_y": 58,
-   "cheeks": [
-    [
-     36,
-     66,
-     8,
-     5
-    ],
-    [
-     76,
-     66,
-     8,
-     5
-    ]
-   ],
-   "parts": [
-    {
-     "layer": "back",
-     "svg": "<rect x=\"28\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{body}\"/><rect x=\"28\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{shade}\"/><rect x=\"68\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{body}\"/><rect x=\"68\" y=\"80\" width=\"24\" height=\"24\" rx=\"9\" fill=\"{shade}\"/>",
+     "svg": "<rect x=\"31\" y=\"40\" width=\"58\" height=\"9\" rx=\"4.5\" fill=\"#F5C842\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M35 41Q35 21 60 21Q85 21 85 41Z\" fill=\"#FBD73C\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
      "pivot": [
       60,
-      100
-     ],
-     "habit": null
-    },
-    {
-     "layer": "back",
-     "svg": "<rect x=\"36\" y=\"88\" width=\"8\" height=\"8\" rx=\"3\" fill=\"{light}\"/>",
-     "pivot": [
-      40,
-      92
+      42
      ],
      "habit": {
-      "kind": "spin",
-      "pivot": [
-       40,
-       92
-      ],
-      "deg_per_s": 130,
-      "only_when": "speed>1.2"
-     }
-    },
-    {
-     "layer": "back",
-     "svg": "<rect x=\"76\" y=\"88\" width=\"8\" height=\"8\" rx=\"3\" fill=\"{light}\"/>",
-     "pivot": [
-      80,
-      92
-     ],
-     "habit": {
-      "kind": "spin",
-      "pivot": [
-       80,
-       92
-      ],
-      "deg_per_s": 130,
-      "only_when": "speed>1.2"
-     }
-    },
-    {
-     "layer": "body",
-     "svg": "<rect x=\"26\" y=\"32\" width=\"68\" height=\"56\" rx=\"24\" fill=\"{body}\"/>",
-     "pivot": [
-      60,
-      100
-     ],
-     "habit": null
-    },
-    {
-     "layer": "front",
-     "svg": "<rect x=\"58\" y=\"18\" width=\"4\" height=\"16\" rx=\"2\" fill=\"{body}\"/><rect x=\"50\" y=\"2\" width=\"20\" height=\"18\" rx=\"8\" fill=\"none\" stroke=\"{body}\" stroke-width=\"4\"/><rect x=\"56\" y=\"7\" width=\"8\" height=\"8\" rx=\"3\" fill=\"{light}\"/>",
-     "pivot": [
-      60,
-      32
-     ],
-     "habit": {
-      "kind": "sweep",
-      "pivot": [
-       60,
-       32
-      ],
-      "dx": 5,
-      "rot_deg": 6,
+      "kind": "bob",
+      "dy": 1.2,
+      "rot_deg": 2,
       "hz": 1.6
      }
     }
    ],
    "eyes": {
-    "idle": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
-    "thinking": "<circle cx=\"48\" cy=\"58\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
-    "working": "<rect x=\"42\" y=\"56\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
-    "done": "<path d=\"M42 61Q48 52 54 61M66 61Q72 52 78 61\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
-    "needs": "<rect x=\"44\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
-    "stuck": "<path d=\"M44 54L52 62M52 54L44 62M68 54L76 62M76 54L68 62\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+    "idle": "<circle cx=\"48\" cy=\"60\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"50.3\" cy=\"57.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"46.02\" cy=\"62.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"72\" cy=\"60\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"74.3\" cy=\"57.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"70.02\" cy=\"62.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 68Q60 74.5 66 68\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"46\" cy=\"60\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"60\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"74\" cy=\"60\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 68H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"58\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 63Q48 54 54 63\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 63Q72 54 78 63\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 68Q60 76.5 67 68\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"50\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"50\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"70\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 56L52 64M52 56L44 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 56L76 64M76 56L68 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 69Q57 66 60 69Q63 72 66 69\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
    }
   },
   {
-   "id": "bean",
-   "name": "Olive",
-   "role": "Reviewer",
-   "colour": "#9758FF",
-   "habit_text": "Turns the periscope to read every line.",
-   "eye_y": 48,
+   "id": "pip",
+   "name": "Pip",
+   "role": "Prover",
+   "colour": "#66D9A0",
+   "eye_y": 64,
    "cheeks": [
     [
-     44,
-     56,
-     8,
-     5
+     34.5,
+     69.6,
+     13,
+     8.8
     ],
     [
-     68,
-     56,
-     8,
-     5
+     72.5,
+     69.6,
+     13,
+     8.8
     ]
    ],
    "parts": [
     {
      "layer": "back",
-     "svg": "<path d=\"M60 80L50 86L70 92L50 98L60 104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "svg": "<circle cx=\"60\" cy=\"98\" r=\"13\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"60\" cy=\"98\" r=\"6.5\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M60 91.5V104.5M53.5 98H66.5\" fill=\"none\" stroke=\"#141413\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
      "pivot": [
       60,
-      80
+      98
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": 130
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<path d=\"M60 12C70 34 94 46 94 70C94 90 79 100 60 100C41 100 26 90 26 70C26 46 50 34 60 12Z\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"46\" cy=\"58\" rx=\"8\" ry=\"15\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(20 46 58)\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"88\" r=\"8.6\" fill=\"#141413\"/><circle cx=\"60\" cy=\"88\" r=\"6.4\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"88\" r=\"5.7\" fill=\"#9DFFF0\" opacity=\"0.16\"/><circle cx=\"60\" cy=\"88\" r=\"4.2\" fill=\"#9DFFF0\" opacity=\"0.3\"/><circle cx=\"60\" cy=\"88\" r=\"3.4\" fill=\"#9DFFF0\"/><circle cx=\"59.2\" cy=\"87.2\" r=\"1.09\" fill=\"#ffffff\"/>",
+     "pivot": [
+      60,
+      88
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<path d=\"M95 104L108 117\" fill=\"none\" stroke=\"#141413\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M95 104L108 117\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"88\" cy=\"94\" r=\"14\" fill=\"#CFF7FF\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"88\" cy=\"94\" r=\"8.5\" fill=\"#9DFFF0\" opacity=\"0.55\"/><path d=\"M80 90Q84 84 91 85\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      95,
+      100
+     ],
+     "habit": {
+      "kind": "sweep",
+      "dx": 3,
+      "rot_deg": 8,
+      "hz": 1.6
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<circle cx=\"50\" cy=\"64\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"52.3\" cy=\"61.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"48.02\" cy=\"66.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"70\" cy=\"64\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"72.3\" cy=\"61.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"68.02\" cy=\"66.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 72Q60 78.5 66 72\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"64\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"64\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"72\" cy=\"64\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 72H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"62\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M44 67Q50 58 56 67\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M64 67Q70 58 76 67\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 72Q60 80.5 67 72\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"46\" y=\"54\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"66\" y=\"54\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"74\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M46 60L54 68M54 60L46 68\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 60L74 68M74 60L66 68\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 73Q57 70 60 73Q63 76 66 73\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+   }
+  },
+  {
+   "id": "olive",
+   "name": "Olive",
+   "role": "Reviewer",
+   "colour": "#8F5CF2",
+   "eye_y": 45,
+   "cheeks": [
+    [
+     35.5,
+     59.6,
+     13,
+     8.8
+    ],
+    [
+     71.5,
+     59.6,
+     13,
+     8.8
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<path d=\"M60 92L68 94.5L52 99.5L68 104.5L52 109.5L60 112\" fill=\"none\" stroke=\"#141413\" stroke-width=\"6.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M60 92L68 94.5L52 99.5L68 104.5L52 109.5L60 112\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"50\" y=\"111\" width=\"20\" height=\"6\" rx=\"3\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      92
      ],
      "habit": {
       "kind": "spring",
-      "pivot": [
-       60,
-       80
-      ],
-      "squash": 0.07,
+      "squash": 0.08,
       "hz": 3
      }
     },
     {
      "layer": "body",
-     "svg": "<rect x=\"34\" y=\"24\" width=\"52\" height=\"60\" rx=\"24\" fill=\"{body}\"/>",
+     "svg": "<rect x=\"34\" y=\"14\" width=\"52\" height=\"82\" rx=\"26\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"48\" cy=\"34\" rx=\"8\" ry=\"14\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(10 48 34)\"/>",
      "pivot": [
       60,
       100
@@ -261,57 +284,61 @@
      "habit": null
     },
     {
-     "layer": "front",
-     "svg": "<rect x=\"57\" y=\"10\" width=\"6\" height=\"16\" rx=\"3\" fill=\"{body}\"/><rect x=\"57\" y=\"1\" width=\"20\" height=\"11\" rx=\"5\" fill=\"{body}\"/><rect x=\"68\" y=\"4\" width=\"5\" height=\"5\" rx=\"2.5\" fill=\"{eye}\"/>",
+     "layer": "body",
+     "svg": "<circle cx=\"49\" cy=\"44\" r=\"12.5\" fill=\"#EDE8FF\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"49\" cy=\"44\" r=\"10\" fill=\"none\" stroke=\"#4ACFFF\" stroke-width=\"1.6\" opacity=\"0.9\"/><circle cx=\"71\" cy=\"44\" r=\"12.5\" fill=\"#EDE8FF\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"71\" cy=\"44\" r=\"10\" fill=\"none\" stroke=\"#4ACFFF\" stroke-width=\"1.6\" opacity=\"0.9\"/><path d=\"M61.5 44h-3\" fill=\"none\" stroke=\"#141413\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
      "pivot": [
       60,
-      24
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"82\" r=\"9.5\" fill=\"#141413\"/><circle cx=\"60\" cy=\"82\" r=\"7.3\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"82\" r=\"4.9\" fill=\"none\" stroke=\"#4ACFFF\" stroke-width=\"3\" stroke-linejoin=\"round\" stroke-linecap=\"round\" opacity=\"0.45\"/><circle cx=\"60\" cy=\"82\" r=\"4.9\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.6\"/><circle cx=\"60\" cy=\"82\" r=\"1.95\" fill=\"#4ACFFF\"/>",
+     "pivot": [
+      60,
+      82
      ],
      "habit": {
-      "kind": "swing",
-      "pivot": [
-       60,
-       24
-      ],
-      "amp_deg": 14,
-      "hz": 1.2
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
      }
     }
    ],
    "eyes": {
-    "idle": "<rect x=\"44\" y=\"42\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"42\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
-    "thinking": "<circle cx=\"48\" cy=\"48\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"48\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"48\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
-    "working": "<rect x=\"42\" y=\"46\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
-    "done": "<path d=\"M42 51Q48 42 54 51M66 51Q72 42 78 51\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
-    "needs": "<rect x=\"44\" y=\"38\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"38\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
-    "stuck": "<path d=\"M44 44L52 52M52 44L44 52M68 44L76 52M76 44L68 52\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+    "idle": "<circle cx=\"49\" cy=\"45\" r=\"5.2\" fill=\"{eye}\"/><circle cx=\"50.87\" cy=\"43.05\" r=\"1.77\" fill=\"#ffffff\"/><circle cx=\"47.39\" cy=\"46.77\" r=\"0.83\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"71\" cy=\"45\" r=\"5.2\" fill=\"{eye}\"/><circle cx=\"72.87\" cy=\"43.05\" r=\"1.77\" fill=\"#ffffff\"/><circle cx=\"69.39\" cy=\"46.77\" r=\"0.83\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 66Q60 72.5 66 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"47\" cy=\"45\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"45\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"73\" cy=\"45\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 66H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"43\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M43 48Q49 39 55 48\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M65 48Q71 39 77 48\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 66Q60 74.5 67 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"45\" y=\"35\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"67\" y=\"35\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"68\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M45 41L53 49M53 41L45 49\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M67 41L75 49M75 41L67 49\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 67Q57 64 60 67Q63 70 66 67\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
    }
   },
   {
-   "id": "bun",
+   "id": "skip",
    "name": "Skip",
    "role": "Shipper",
-   "colour": "#FF8D22",
-   "habit_text": "Flickers the jets before it ships.",
-   "eye_y": 58,
+   "colour": "#F29A4B",
+   "eye_y": 62,
    "cheeks": [
     [
-     32,
-     66,
-     8,
-     5
+     31.5,
+     67.6,
+     13,
+     8.8
     ],
     [
-     80,
-     66,
-     8,
-     5
+     75.5,
+     67.6,
+     13,
+     8.8
     ]
    ],
    "parts": [
     {
      "layer": "back",
-     "svg": "<rect x=\"32\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{body}\"/><rect x=\"32\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{shade}\"/><rect x=\"70\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{body}\"/><rect x=\"70\" y=\"76\" width=\"18\" height=\"12\" rx=\"5\" fill=\"{shade}\"/>",
+     "svg": "<path d=\"M28 74L10 90L28 94Z\" fill=\"#E4672E\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
      "pivot": [
       60,
       100
@@ -320,39 +347,58 @@
     },
     {
      "layer": "back",
-     "svg": "<rect x=\"37\" y=\"90\" width=\"8\" height=\"10\" rx=\"4\" fill=\"#FFE9B0\"/>",
+     "svg": "<path d=\"M92 74L110 90L92 94Z\" fill=\"#E4672E\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
      "pivot": [
-      41,
-      90
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"35\" y=\"96\" width=\"14\" height=\"9\" rx=\"3\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<ellipse cx=\"42\" cy=\"112\" rx=\"5.5\" ry=\"9\" fill=\"#FFB347\" opacity=\"0.45\"/><path d=\"M37.5 105Q42 126 46.5 105Z\" fill=\"#FFE08A\" stroke=\"#141413\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      42,
+      105
      ],
      "habit": {
       "kind": "flicker",
-      "pivot": [
-       41,
-       90
-      ],
       "amp": 0.35
      }
     },
     {
      "layer": "back",
-     "svg": "<rect x=\"75\" y=\"90\" width=\"8\" height=\"10\" rx=\"4\" fill=\"#FFE9B0\"/>",
+     "svg": "<rect x=\"71\" y=\"96\" width=\"14\" height=\"9\" rx=\"3\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
      "pivot": [
-      79,
-      90
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<ellipse cx=\"78\" cy=\"112\" rx=\"5.5\" ry=\"9\" fill=\"#FFB347\" opacity=\"0.45\"/><path d=\"M73.5 105Q78 126 82.5 105Z\" fill=\"#FFE08A\" stroke=\"#141413\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      78,
+      105
      ],
      "habit": {
       "kind": "flicker",
-      "pivot": [
-       79,
-       90
-      ],
       "amp": 0.35
      }
     },
     {
      "layer": "body",
-     "svg": "<rect x=\"22\" y=\"36\" width=\"76\" height=\"44\" rx=\"22\" fill=\"{body}\"/>",
+     "svg": "<circle cx=\"60\" cy=\"66\" r=\"35\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"44\" cy=\"48\" rx=\"10\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 44 48)\"/>",
      "pivot": [
       60,
       100
@@ -360,153 +406,107 @@
      "habit": null
     },
     {
-     "layer": "front",
-     "svg": "<rect x=\"44\" y=\"20\" width=\"32\" height=\"20\" rx=\"5\" fill=\"{body}\"/><rect x=\"44\" y=\"20\" width=\"32\" height=\"20\" rx=\"5\" fill=\"{shade}\"/><rect x=\"58\" y=\"20\" width=\"4\" height=\"20\" rx=\"0\" fill=\"{light}\"/>",
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"87\" r=\"9.5\" fill=\"#141413\"/><circle cx=\"60\" cy=\"87\" r=\"7.3\" fill=\"#3d3d42\"/><path d=\"M60 81.93L61.521 85.479L65.07 87L61.521 88.521L60 92.07L58.479 88.521L54.93 87L58.479 85.479Z\" fill=\"#ffffff\"/>",
      "pivot": [
       60,
-      40
+      87
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<path d=\"M60 14L84 8L74 30L66 26Z\" fill=\"#F6F4EF\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M66 26L84 8\" fill=\"none\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      68,
+      28
      ],
      "habit": {
       "kind": "bob",
-      "pivot": [
-       60,
-       40
-      ],
       "dy": 1.4,
-      "rot_deg": 2,
+      "rot_deg": 3,
       "hz": 2
      }
     }
    ],
    "eyes": {
-    "idle": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
-    "thinking": "<circle cx=\"48\" cy=\"58\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"58\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
-    "working": "<rect x=\"42\" y=\"56\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
-    "done": "<path d=\"M42 61Q48 52 54 61M66 61Q72 52 78 61\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
-    "needs": "<rect x=\"44\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"48\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
-    "stuck": "<path d=\"M44 54L52 62M52 54L44 62M68 54L76 62M76 54L68 62\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+    "idle": "<circle cx=\"48\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"50.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"46.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"72\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"74.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"70.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 70Q60 76.5 66 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"46\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"74\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 70H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"60\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 65Q48 56 54 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 65Q72 56 78 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 70Q60 78.5 67 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"72\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 58L52 66M52 58L44 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 58L76 66M76 58L68 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 71Q57 68 60 71Q63 74 66 71\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
    }
   },
   {
-   "id": "dome",
+   "id": "dot",
    "name": "Dot",
    "role": "Debugger",
-   "colour": "#FF78F7",
-   "habit_text": "Scuttles when it hunts a bug.",
+   "colour": "#EE82EE",
    "eye_y": 62,
    "cheeks": [
     [
-     36,
-     70,
-     8,
-     5
+     33.5,
+     67.6,
+     13,
+     8.8
     ],
     [
-     76,
-     70,
-     8,
-     5
+     73.5,
+     67.6,
+     13,
+     8.8
     ]
    ],
    "parts": [
     {
      "layer": "back",
-     "svg": "<path d=\"M36 76L22 86V100M44 82L36 94V104M52 86L50 98V104M84 76L98 86V100M76 82L84 94V104M68 86L70 98V104\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "svg": "<path d=\"M34,82L18,92L16,106\" fill=\"none\" stroke=\"#141413\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34,82L18,92L16,106\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"18\" cy=\"92\" r=\"3.2\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M42,86L32,98L30,110\" fill=\"none\" stroke=\"#141413\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M42,86L32,98L30,110\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"32\" cy=\"98\" r=\"3.2\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M52,88L46,100L46,112\" fill=\"none\" stroke=\"#141413\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M52,88L46,100L46,112\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"46\" cy=\"100\" r=\"3.2\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M86,82L102,92L104,106\" fill=\"none\" stroke=\"#141413\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M86,82L102,92L104,106\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"102\" cy=\"92\" r=\"3.2\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M78,86L88,98L90,110\" fill=\"none\" stroke=\"#141413\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M78,86L88,98L90,110\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"88\" cy=\"98\" r=\"3.2\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M68,88L74,100L74,112\" fill=\"none\" stroke=\"#141413\" stroke-width=\"7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68,88L74,100L74,112\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"74\" cy=\"100\" r=\"3.2\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
      "pivot": [
       60,
       86
      ],
      "habit": {
       "kind": "scuttle",
-      "pivot": [
-       60,
-       86
-      ],
       "rot_deg": 2,
       "dy": 1.4,
-      "hz": 7,
-      "intensity": "by speed"
+      "hz": 7
      }
     },
     {
-     "layer": "body",
-     "svg": "<rect x=\"26\" y=\"40\" width=\"68\" height=\"46\" rx=\"22\" fill=\"{body}\"/>",
-     "pivot": [
-      60,
-      100
-     ],
-     "habit": null
-    },
-    {
-     "layer": "front",
-     "svg": "<path d=\"M46 46L40 30\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"35\" y=\"20\" width=\"10\" height=\"10\" rx=\"5\" fill=\"{body}\"/>",
+     "layer": "back",
+     "svg": "<path d=\"M46 38L38 18\" fill=\"none\" stroke=\"#141413\" stroke-width=\"5.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M46 38L38 18\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"38\" cy=\"18\" r=\"4.6\" fill=\"#FBD73C\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"37\" cy=\"17\" r=\"1.2\" fill=\"#ffffff\"/>",
      "pivot": [
       46,
-      46
+      38
      ],
      "habit": {
       "kind": "swing",
-      "pivot": [
-       46,
-       46
-      ],
       "amp_deg": 10,
       "hz": 2.2
      }
     },
     {
-     "layer": "front",
-     "svg": "<path d=\"M74 46L80 30\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"75\" y=\"20\" width=\"10\" height=\"10\" rx=\"5\" fill=\"{body}\"/>",
+     "layer": "back",
+     "svg": "<path d=\"M74 38L82 18\" fill=\"none\" stroke=\"#141413\" stroke-width=\"5.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M74 38L82 18\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"82\" cy=\"18\" r=\"4.6\" fill=\"#7DF3FF\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"81\" cy=\"17\" r=\"1.2\" fill=\"#ffffff\"/>",
      "pivot": [
       74,
-      46
+      38
      ],
      "habit": {
       "kind": "swing",
-      "pivot": [
-       74,
-       46
-      ],
       "amp_deg": 10,
       "hz": 2.2,
       "phase": 1.6
      }
-    }
-   ],
-   "eyes": {
-    "idle": "<rect x=\"44\" y=\"56\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"56\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
-    "thinking": "<circle cx=\"48\" cy=\"62\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
-    "working": "<rect x=\"42\" y=\"60\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
-    "done": "<path d=\"M42 65Q48 56 54 65M66 65Q72 56 78 65\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
-    "needs": "<rect x=\"44\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
-    "stuck": "<path d=\"M44 58L52 66M52 58L44 66M68 58L76 66M76 58L68 66\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
-   }
-  },
-  {
-   "id": "cloud",
-   "name": "Nimbus",
-   "role": "Planner",
-   "colour": "#FBD73C",
-   "habit_text": "Waves the flag over the plan.",
-   "eye_y": 52,
-   "cheeks": [
-    [
-     38,
-     60,
-     8,
-     5
-    ],
-    [
-     74,
-     60,
-     8,
-     5
-    ]
-   ],
-   "parts": [
+    },
     {
-     "layer": "back",
-     "svg": "<rect x=\"40\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{body}\"/><rect x=\"40\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{shade}\"/><rect x=\"68\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{body}\"/><rect x=\"68\" y=\"82\" width=\"12\" height=\"16\" rx=\"6\" fill=\"{shade}\"/><rect x=\"34\" y=\"94\" width=\"24\" height=\"10\" rx=\"5\" fill=\"{body}\"/><rect x=\"62\" y=\"94\" width=\"24\" height=\"10\" rx=\"5\" fill=\"{body}\"/>",
+     "layer": "body",
+     "svg": "<path d=\"M26 88V62C26 43.2 41.2 28 60 28C78.8 28 94 43.2 94 62V88Z\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"44\" cy=\"44\" rx=\"10\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 44 44)\"/>",
      "pivot": [
       60,
       100
@@ -515,7 +515,65 @@
     },
     {
      "layer": "body",
-     "svg": "<rect x=\"28\" y=\"28\" width=\"64\" height=\"60\" rx=\"26\" fill=\"{body}\"/>",
+     "svg": "<circle cx=\"60\" cy=\"81\" r=\"9.5\" fill=\"#141413\"/><circle cx=\"60\" cy=\"81\" r=\"7.3\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"81\" r=\"7.41\" fill=\"#FBD73C\" opacity=\"0.16\"/><circle cx=\"60\" cy=\"81\" r=\"5.46\" fill=\"#FBD73C\" opacity=\"0.3\"/><circle cx=\"60\" cy=\"81\" r=\"4.3\" fill=\"#FBD73C\"/><circle cx=\"59.2\" cy=\"80.2\" r=\"1.38\" fill=\"#ffffff\"/>",
+     "pivot": [
+      60,
+      81
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<circle cx=\"49\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"51.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"47.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"71\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"73.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"69.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 70Q60 76.5 66 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"47\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"73\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 70H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"60\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M43 65Q49 56 55 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M65 65Q71 56 77 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 70Q60 78.5 67 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"45\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"67\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"72\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M45 58L53 66M53 58L45 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M67 58L75 66M75 58L67 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 71Q57 68 60 71Q63 74 66 71\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+   }
+  },
+  {
+   "id": "nimbus",
+   "name": "Nimbus",
+   "role": "Planner",
+   "colour": "#F6D95C",
+   "eye_y": 62,
+   "cheeks": [
+    [
+     33.5,
+     67.6,
+     13,
+     8.8
+    ],
+    [
+     73.5,
+     67.6,
+     13,
+     8.8
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<ellipse cx=\"43\" cy=\"108\" rx=\"10\" ry=\"3.6\" fill=\"#7DF3FF\" opacity=\"0.5\"/><rect x=\"34\" y=\"98\" width=\"18\" height=\"8\" rx=\"4\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"77\" cy=\"108\" rx=\"10\" ry=\"3.6\" fill=\"#7DF3FF\" opacity=\"0.5\"/><rect x=\"68\" y=\"98\" width=\"18\" height=\"8\" rx=\"4\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      103
+     ],
+     "habit": {
+      "kind": "bob",
+      "dy": 1.2,
+      "rot_deg": 0,
+      "hz": 1.4
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"38\" cy=\"72\" r=\"19\" fill=\"#141413\" stroke=\"#141413\" stroke-width=\"6.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"82\" cy=\"72\" r=\"19\" fill=\"#141413\" stroke=\"#141413\" stroke-width=\"6.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"60\" cy=\"58\" r=\"25\" fill=\"#141413\" stroke=\"#141413\" stroke-width=\"6.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><rect x=\"26\" y=\"70\" width=\"68\" height=\"26\" rx=\"13\" fill=\"#141413\" stroke=\"#141413\" stroke-width=\"6.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"38\" cy=\"72\" r=\"19\" fill=\"{body}\"/><circle cx=\"82\" cy=\"72\" r=\"19\" fill=\"{body}\"/><circle cx=\"60\" cy=\"58\" r=\"25\" fill=\"{body}\"/><rect x=\"26\" y=\"70\" width=\"68\" height=\"26\" rx=\"13\" fill=\"{body}\"/><ellipse cx=\"46\" cy=\"48\" rx=\"10\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 46 48)\"/>",
      "pivot": [
       60,
       100
@@ -523,45 +581,322 @@
      "habit": null
     },
     {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"86\" r=\"8.8\" fill=\"#141413\"/><circle cx=\"60\" cy=\"86\" r=\"6.6\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"86\" r=\"6.08\" fill=\"#7DF3FF\" opacity=\"0.16\"/><circle cx=\"60\" cy=\"86\" r=\"4.48\" fill=\"#7DF3FF\" opacity=\"0.3\"/><circle cx=\"60\" cy=\"86\" r=\"3.6\" fill=\"#7DF3FF\"/><circle cx=\"59.2\" cy=\"85.2\" r=\"1.15\" fill=\"#ffffff\"/>",
+     "pivot": [
+      60,
+      86
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    },
+    {
      "layer": "front",
-     "svg": "<rect x=\"58\" y=\"4\" width=\"4\" height=\"26\" rx=\"2\" fill=\"{body}\"/><path d=\"M62 4Q82 6 80 12Q82 18 62 20Z\" fill=\"{body}\"/>",
+     "svg": "<rect x=\"58\" y=\"26\" width=\"4\" height=\"12\" rx=\"0\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M46 24Q60 6 74 24Z\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"60\" cy=\"19\" r=\"2.2\" fill=\"#7DF3FF\"/>",
+     "pivot": [
+      60,
+      38
+     ],
+     "habit": {
+      "kind": "swing",
+      "amp_deg": 8,
+      "hz": 1.4
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<circle cx=\"50\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"52.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"48.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"70\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"72.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"68.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 70Q60 76.5 66 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"48\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"72\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 70H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"60\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M44 65Q50 56 56 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M64 65Q70 56 76 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 70Q60 78.5 67 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"46\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"66\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"72\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M46 58L54 66M54 58L46 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 58L74 66M74 58L66 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 71Q57 68 60 71Q63 74 66 71\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+   }
+  },
+  {
+   "id": "keyla",
+   "name": "Keyla",
+   "role": "SSO Auditor",
+   "colour": "#EF6B64",
+   "eye_y": 48,
+   "cheeks": [
+    [
+     33.5,
+     53.6,
+     13,
+     8.8
+    ],
+    [
+     73.5,
+     53.6,
+     13,
+     8.8
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<ellipse cx=\"43\" cy=\"115\" rx=\"10\" ry=\"3.6\" fill=\"#7DF3FF\" opacity=\"0.5\"/><rect x=\"34\" y=\"105\" width=\"18\" height=\"8\" rx=\"4\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"77\" cy=\"115\" rx=\"10\" ry=\"3.6\" fill=\"#7DF3FF\" opacity=\"0.5\"/><rect x=\"68\" y=\"105\" width=\"18\" height=\"8\" rx=\"4\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      110
+     ],
+     "habit": {
+      "kind": "bob",
+      "dy": 1.2,
+      "rot_deg": 0,
+      "hz": 1.4
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<path d=\"M30 22H90V60Q90 88 60 102Q30 88 30 60Z\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"44\" cy=\"38\" rx=\"8\" ry=\"14\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(10 44 38)\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"82\" r=\"11\" fill=\"#141413\"/><circle cx=\"60\" cy=\"82\" r=\"9.4\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"82\" r=\"11.4\" fill=\"#FBD73C\" opacity=\"0.16\"/><circle cx=\"60\" cy=\"82\" r=\"8.4\" fill=\"#FBD73C\" opacity=\"0.3\"/><circle cx=\"60\" cy=\"82\" r=\"7.4\" fill=\"#FBD73C\"/><circle cx=\"60\" cy=\"80\" r=\"2.6\" fill=\"#141413\"/><path d=\"M58.4 81.5h3.2l1 5h-5.2z\" fill=\"#141413\"/>",
+     "pivot": [
+      60,
+      82
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.08,
+      "hz": 2.2
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<circle cx=\"48\" cy=\"48\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"50.3\" cy=\"45.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"46.02\" cy=\"50.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"72\" cy=\"48\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"74.3\" cy=\"45.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"70.02\" cy=\"50.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 56Q60 62.5 66 56\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"46\" cy=\"48\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"48\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"74\" cy=\"48\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 56H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"46\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 51Q48 42 54 51\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 51Q72 42 78 51\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 56Q60 64.5 67 56\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"38\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"38\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"58\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 44L52 52M52 44L44 52\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 44L76 52M76 44L68 52\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 57Q57 54 60 57Q63 60 66 57\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+   }
+  },
+  {
+   "id": "quill",
+   "name": "Quill",
+   "role": "Researcher",
+   "colour": "#58B4F4",
+   "eye_y": 56,
+   "cheeks": [
+    [
+     32.5,
+     61.6,
+     13,
+     8.8
+    ],
+    [
+     74.5,
+     61.6,
+     13,
+     8.8
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<path d=\"M40 84L24 106\" fill=\"none\" stroke=\"#141413\" stroke-width=\"8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M40 84L24 106\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"16\" y=\"105\" width=\"16\" height=\"6\" rx=\"3\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M80 84L96 106\" fill=\"none\" stroke=\"#141413\" stroke-width=\"8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M80 84L96 106\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"3.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"88\" y=\"105\" width=\"16\" height=\"6\" rx=\"3\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "back",
+     "svg": "<ellipse cx=\"60\" cy=\"103\" rx=\"6\" ry=\"4\" fill=\"#7DF3FF\" opacity=\"0.55\"/><rect x=\"53\" y=\"88\" width=\"14\" height=\"11\" rx=\"4\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": {
+      "kind": "flicker",
+      "amp": 0.25
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"32\" y=\"34\" width=\"56\" height=\"56\" rx=\"24\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"46\" cy=\"46\" rx=\"9\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 46 46)\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"80\" r=\"9.6\" fill=\"#141413\"/><circle cx=\"60\" cy=\"80\" r=\"7.4\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"80\" r=\"5\" fill=\"none\" stroke=\"#7DF3FF\" stroke-width=\"3\" stroke-linejoin=\"round\" stroke-linecap=\"round\" opacity=\"0.45\"/><circle cx=\"60\" cy=\"80\" r=\"5\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.6\"/><circle cx=\"60\" cy=\"80\" r=\"1.98\" fill=\"#7DF3FF\"/>",
+     "pivot": [
+      60,
+      80
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"22\" y=\"12\" width=\"34\" height=\"15\" rx=\"5\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(-24 50 34)\"/><rect x=\"14\" y=\"9\" width=\"12\" height=\"21\" rx=\"4\" fill=\"#CFF7FF\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(-24 50 34)\"/><rect x=\"16\" y=\"13\" width=\"3\" height=\"13\" rx=\"1.5\" fill=\"#ffffff\" opacity=\"0.9\" transform=\"rotate(-24 50 34)\"/>",
+     "pivot": [
+      50,
+      34
+     ],
+     "habit": {
+      "kind": "swing",
+      "amp_deg": 10,
+      "hz": 1.1
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<circle cx=\"48\" cy=\"56\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"50.3\" cy=\"53.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"46.02\" cy=\"58.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"72\" cy=\"56\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"74.3\" cy=\"53.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"70.02\" cy=\"58.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 64Q60 70.5 66 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"46\" cy=\"56\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"56\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"74\" cy=\"56\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 64H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"54\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 59Q48 50 54 59\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 59Q72 50 78 59\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 64Q60 72.5 67 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"46\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"46\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"66\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 52L52 60M52 52L44 60\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 52L76 60M76 52L68 60\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 65Q57 62 60 65Q63 68 66 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+   }
+  },
+  {
+   "id": "ink",
+   "name": "Ink",
+   "role": "Writer",
+   "colour": "#A074F5",
+   "eye_y": 56,
+   "cheeks": [
+    [
+     32.5,
+     61.6,
+     13,
+     8.8
+    ],
+    [
+     74.5,
+     61.6,
+     13,
+     8.8
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<circle cx=\"40\" cy=\"102\" r=\"9\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"40\" cy=\"102\" r=\"4.5\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M40 97.5V106.5M35.5 102H44.5\" fill=\"none\" stroke=\"#141413\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      40,
+      102
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": 130
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<circle cx=\"80\" cy=\"102\" r=\"9\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"80\" cy=\"102\" r=\"4.5\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M80 97.5V106.5M75.5 102H84.5\" fill=\"none\" stroke=\"#141413\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      80,
+      102
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": 130
+     }
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"30\" y=\"30\" width=\"60\" height=\"68\" rx=\"26\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"46\" cy=\"46\" rx=\"9\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 46 46)\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"82\" r=\"9.8\" fill=\"#141413\"/><circle cx=\"60\" cy=\"82\" r=\"7.6\" fill=\"#3d3d42\"/><path d=\"M60 76.696L61.5912 80.4088L65.304 82L61.5912 83.5912L60 87.304L58.4088 83.5912L54.696 82L58.4088 80.4088Z\" fill=\"#ffffff\"/>",
+     "pivot": [
+      60,
+      82
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<path d=\"M60 30Q44 20 52 6Q64 8 66 18Q68 26 60 30Z\" fill=\"#F6F4EF\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><path d=\"M60 30Q56 20 54 9\" fill=\"none\" stroke=\"#141413\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M58 22Q62 18 64 14\" fill=\"none\" stroke=\"#141413\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"/>",
      "pivot": [
       60,
       30
      ],
      "habit": {
       "kind": "wave",
-      "pivot": [
-       60,
-       30
-      ],
-      "amp_deg": 6,
-      "stretch": 0.05,
-      "hz": 3
+      "amp_deg": 7,
+      "stretch": 0.03,
+      "hz": 1.8
      }
     }
    ],
    "eyes": {
-    "idle": "<rect x=\"44\" y=\"46\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"46\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
-    "thinking": "<circle cx=\"48\" cy=\"52\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"52\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"52\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
-    "working": "<rect x=\"42\" y=\"50\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
-    "done": "<path d=\"M42 55Q48 46 54 55M66 55Q72 46 78 55\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
-    "needs": "<rect x=\"44\" y=\"42\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"42\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
-    "stuck": "<path d=\"M44 48L52 56M52 48L44 56M68 48L76 56M76 48L68 56\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+    "idle": "<circle cx=\"48\" cy=\"56\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"50.3\" cy=\"53.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"46.02\" cy=\"58.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"72\" cy=\"56\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"74.3\" cy=\"53.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"70.02\" cy=\"58.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 64Q60 70.5 66 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"46\" cy=\"56\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"56\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"74\" cy=\"56\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 64H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"54\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 59Q48 50 54 59\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 59Q72 50 78 59\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 64Q60 72.5 67 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"46\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"46\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"66\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 52L52 60M52 52L44 60\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 52L76 60M76 52L68 60\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 65Q57 62 60 65Q63 68 66 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
    }
   },
   {
-   "id": "shield",
-   "name": "Keyla",
-   "role": "SSO Auditor",
-   "colour": "#FF5C59",
-   "habit_text": "Swings the key it guards.",
-   "eye_y": 44,
-   "cheeks": null,
+   "id": "mimi",
+   "name": "Mimi",
+   "role": "Designer",
+   "colour": "#F27BEF",
+   "eye_y": 62,
+   "cheeks": [
+    [
+     33.5,
+     67.6,
+     13,
+     8.8
+    ],
+    [
+     73.5,
+     67.6,
+     13,
+     8.8
+    ]
+   ],
    "parts": [
     {
      "layer": "back",
-     "svg": "<rect x=\"48\" y=\"82\" width=\"24\" height=\"24\" rx=\"7\" transform=\"rotate(45 60 94)\" fill=\"{body}\"/><rect x=\"48\" y=\"82\" width=\"24\" height=\"24\" rx=\"7\" transform=\"rotate(45 60 94)\" fill=\"{shade}\"/>",
+     "svg": "<ellipse cx=\"60\" cy=\"104\" rx=\"14\" ry=\"4.5\" fill=\"#7DF3FF\" opacity=\"0.5\"/><rect x=\"50\" y=\"97\" width=\"20\" height=\"8\" rx=\"3\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      104
+     ],
+     "habit": {
+      "kind": "flicker",
+      "amp": 0.2
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"58\" y=\"26\" width=\"4\" height=\"12\" rx=\"0\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
      "pivot": [
       60,
       100
@@ -570,7 +905,42 @@
     },
     {
      "layer": "body",
-     "svg": "<path d=\"M38 30H82V50Q82 62 60 80Q38 62 38 50Z\" fill=\"{body}\" stroke=\"{body}\" stroke-width=\"12\" stroke-linejoin=\"round\"/>",
+     "svg": "<circle cx=\"60\" cy=\"66\" r=\"33\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"44\" cy=\"50\" rx=\"10\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 44 50)\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"86\" r=\"8.8\" fill=\"#141413\"/><circle cx=\"60\" cy=\"86\" r=\"6.6\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"86\" r=\"6.08\" fill=\"#FFE08A\" opacity=\"0.16\"/><circle cx=\"60\" cy=\"86\" r=\"4.48\" fill=\"#FFE08A\" opacity=\"0.3\"/><circle cx=\"60\" cy=\"86\" r=\"3.6\" fill=\"#FFE08A\"/><circle cx=\"59.2\" cy=\"85.2\" r=\"1.15\" fill=\"#ffffff\"/>",
+     "pivot": [
+      60,
+      86
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<ellipse cx=\"60\" cy=\"24\" rx=\"38\" ry=\"4.5\" fill=\"#ffffff\" opacity=\"0.28\"/><ellipse cx=\"60\" cy=\"24\" rx=\"27\" ry=\"4.2\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"60\" cy=\"24\" r=\"3.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      24
+     ],
+     "habit": {
+      "kind": "rotor",
+      "amp": 0.7,
+      "hz": 7
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<rect x=\"82\" y=\"64\" width=\"14\" height=\"9\" rx=\"4.5\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
      "pivot": [
       60,
       100
@@ -579,29 +949,124 @@
     },
     {
      "layer": "front",
-     "svg": "<rect x=\"10\" y=\"38\" width=\"16\" height=\"16\" rx=\"6\" fill=\"none\" stroke=\"{body}\" stroke-width=\"4\"/><path d=\"M18 54V74M18 66h8M18 74h8\" stroke=\"{body}\" stroke-width=\"4\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "svg": "<rect x=\"96\" y=\"40\" width=\"7\" height=\"28\" rx=\"3.5\" fill=\"#FBD73C\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(32 100 66)\"/><rect x=\"95\" y=\"36\" width=\"9\" height=\"6\" rx=\"0\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(32 100 66)\"/><path d=\"M95 36Q99.5 24 104 36Z\" fill=\"#7DF3FF\" stroke=\"#141413\" stroke-width=\"2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(32 100 66)\"/><circle cx=\"99.5\" cy=\"26\" r=\"5\" fill=\"#7DF3FF\" opacity=\"0.5\" transform=\"rotate(32 100 66)\"/>",
      "pivot": [
-      18,
-      38
+      97,
+      68
      ],
      "habit": {
       "kind": "swing",
-      "pivot": [
-       18,
-       38
-      ],
       "amp_deg": 10,
-      "hz": 2.4
+      "hz": 2.2
      }
     }
    ],
    "eyes": {
-    "idle": "<rect x=\"44\" y=\"38\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"38\" width=\"8\" height=\"12\" rx=\"4\" fill=\"{eye}\"/>",
-    "thinking": "<circle cx=\"48\" cy=\"44\" r=\"3.4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"44\" r=\"3.4\" fill=\"{eye}\" opacity=\".6\"/><circle cx=\"72\" cy=\"44\" r=\"3.4\" fill=\"{eye}\" opacity=\".3\"/>",
-    "working": "<rect x=\"42\" y=\"42\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
-    "done": "<path d=\"M42 47Q48 38 54 47M66 47Q72 38 78 47\" stroke=\"{eye}\" stroke-width=\"3.6\" fill=\"none\" stroke-linecap=\"round\"/>",
-    "needs": "<rect x=\"44\" y=\"34\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"34\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/>",
-    "stuck": "<path d=\"M44 40L52 48M52 40L44 48M68 40L76 48M76 40L68 48\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+    "idle": "<circle cx=\"49\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"51.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"47.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"71\" cy=\"62\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"73.3\" cy=\"59.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"69.02\" cy=\"64.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 70Q60 76.5 66 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"47\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"73\" cy=\"62\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 70H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"60\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M43 65Q49 56 55 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M65 65Q71 56 77 65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 70Q60 78.5 67 70\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"45\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"67\" y=\"52\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"72\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M45 58L53 66M53 58L45 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M67 58L75 66M75 58L67 66\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 71Q57 68 60 71Q63 74 66 71\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+   }
+  },
+  {
+   "id": "gus",
+   "name": "Gus",
+   "role": "Operator",
+   "colour": "#3FC38B",
+   "eye_y": 60,
+   "cheeks": [
+    [
+     32.5,
+     65.6,
+     13,
+     8.8
+    ],
+    [
+     74.5,
+     65.6,
+     13,
+     8.8
+    ]
+   ],
+   "parts": [
+    {
+     "layer": "back",
+     "svg": "<rect x=\"30.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(0 34 98)\"/><rect x=\"30.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(45 34 98)\"/><rect x=\"30.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(90 34 98)\"/><rect x=\"30.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(135 34 98)\"/><circle cx=\"34\" cy=\"98\" r=\"11\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"34\" cy=\"98\" r=\"4.4\" fill=\"#a9a7b0\"/>",
+     "pivot": [
+      34,
+      98
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": 80
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"82.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(0 86 98)\"/><rect x=\"82.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(45 86 98)\"/><rect x=\"82.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(90 86 98)\"/><rect x=\"82.8\" y=\"83.8\" width=\"6.4\" height=\"28.4\" rx=\"1.6\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" transform=\"rotate(135 86 98)\"/><circle cx=\"86\" cy=\"98\" r=\"11\" fill=\"#3d3d42\" stroke=\"#141413\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><circle cx=\"86\" cy=\"98\" r=\"4.4\" fill=\"#a9a7b0\"/>",
+     "pivot": [
+      86,
+      98
+     ],
+     "habit": {
+      "kind": "spin",
+      "deg_per_s": -80
+     }
+    },
+    {
+     "layer": "back",
+     "svg": "<rect x=\"57\" y=\"20\" width=\"6\" height=\"24\" rx=\"2\" fill=\"#a9a7b0\" stroke=\"#141413\" stroke-width=\"2.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<rect x=\"24\" y=\"40\" width=\"72\" height=\"56\" rx=\"18\" fill=\"{body}\" stroke=\"#141413\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/><ellipse cx=\"40\" cy=\"52\" rx=\"10\" ry=\"6\" fill=\"#ffffff\" opacity=\"0.32\" transform=\"rotate(-25 40 52)\"/>",
+     "pivot": [
+      60,
+      100
+     ],
+     "habit": null
+    },
+    {
+     "layer": "body",
+     "svg": "<circle cx=\"60\" cy=\"84\" r=\"9.8\" fill=\"#141413\"/><circle cx=\"60\" cy=\"84\" r=\"7.6\" fill=\"#3d3d42\"/><circle cx=\"60\" cy=\"84\" r=\"7.98\" fill=\"#9DFFB0\" opacity=\"0.16\"/><circle cx=\"60\" cy=\"84\" r=\"5.88\" fill=\"#9DFFB0\" opacity=\"0.3\"/><circle cx=\"60\" cy=\"84\" r=\"4.6\" fill=\"#9DFFB0\"/><circle cx=\"59.2\" cy=\"83.2\" r=\"1.47\" fill=\"#ffffff\"/>",
+     "pivot": [
+      60,
+      84
+     ],
+     "habit": {
+      "kind": "pulse",
+      "amp": 0.1,
+      "hz": 2.2
+     }
+    },
+    {
+     "layer": "front",
+     "svg": "<path d=\"M51 22V14Q51 6 60 6Q69 6 69 14V22\" fill=\"none\" stroke=\"#141413\" stroke-width=\"10\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M51 22V14Q51 6 60 6Q69 6 69 14V22\" fill=\"none\" stroke=\"#a9a7b0\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+     "pivot": [
+      60,
+      44
+     ],
+     "habit": {
+      "kind": "swing",
+      "amp_deg": 6,
+      "hz": 1.2
+     }
+    }
+   ],
+   "eyes": {
+    "idle": "<circle cx=\"48\" cy=\"60\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"50.3\" cy=\"57.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"46.02\" cy=\"62.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><circle cx=\"72\" cy=\"60\" r=\"6.4\" fill=\"{eye}\"/><circle cx=\"74.3\" cy=\"57.6\" r=\"2.18\" fill=\"#ffffff\"/><circle cx=\"70.02\" cy=\"62.18\" r=\"1.02\" fill=\"#ffffff\" opacity=\"0.8\"/><path d=\"M54 68Q60 74.5 66 68\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "thinking": "<circle cx=\"46\" cy=\"60\" r=\"3.4\" fill=\"{eye}\" opacity=\"1\"/><circle cx=\"60\" cy=\"60\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.6\"/><circle cx=\"74\" cy=\"60\" r=\"3.4\" fill=\"{eye}\" opacity=\"0.3\"/><path d=\"M55 68H65\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "working": "<rect x=\"42\" y=\"58\" width=\"36\" height=\"4\" rx=\"2\" fill=\"{eye}\"/>",
+    "done": "<path d=\"M42 63Q48 54 54 63\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M66 63Q72 54 78 63\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M53 68Q60 76.5 67 68\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>",
+    "needs": "<rect x=\"44\" y=\"50\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><rect x=\"68\" y=\"50\" width=\"8\" height=\"20\" rx=\"4\" fill=\"{eye}\"/><circle cx=\"60\" cy=\"70\" r=\"2.6\" fill=\"{eye}\"/>",
+    "stuck": "<path d=\"M44 56L52 64M52 56L44 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M68 56L76 64M76 56L68 64\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M54 69Q57 66 60 69Q63 72 66 69\" fill=\"none\" stroke=\"{eye}\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
    }
   }
  ]
