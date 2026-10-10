@@ -405,6 +405,11 @@ impl Shell {
             .into_any_element()
     }
 
+    /// The lens in front.
+    pub(crate) fn view(&self) -> ShellView {
+        self.view
+    }
+
     /// Brings `view` to the front as the rail or the Code sidebar would.
     pub(crate) fn go_to(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         match view {

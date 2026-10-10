@@ -147,6 +147,7 @@ impl BotsPage {
         let theme = cx.theme().clone();
         let bot = &entry.bot;
         let id = bot.id.to_string();
+        let selector_id = id.clone();
         let ink = Rgba::from(theme.foreground);
         let portrait = face_of(&self.faces, bot).map(|model| {
             let motion = Some((self.runtime.clone(), self.started));
@@ -167,13 +168,14 @@ impl BotsPage {
                     .flex_1()
                     .min_w_0()
                     .pt(px(8.))
-                    .child(
+                    .child(crate::control::marked_named(
+                        format!("bot-profile-{id}"),
                         div()
-                            .debug_selector(move || format!("bot-profile-{id}"))
+                            .debug_selector(move || format!("bot-profile-{selector_id}"))
                             .text_size(TextSize::Xl.font_size())
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(SharedString::from(bot.name.clone())),
-                    )
+                    ))
                     .child(div().text_size(TextSize::Base.font_size()).text_color(theme.muted_foreground).child(SharedString::from(bot.role.clone())))
                     .child(div().mt(px(10.)).text_size(TextSize::Sm.font_size()).child(SharedString::from(bot.job.clone()))),
             );

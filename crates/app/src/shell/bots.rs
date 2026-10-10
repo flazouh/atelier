@@ -61,9 +61,10 @@ impl Shell {
                     let mark = page.row_face(entry, cx).unwrap_or_else(|| div().into_any_element());
                     let label = format!("{} · {}", entry.bot.name, entry.bot.role);
                     let pick = cx.weak_entity();
-                    nav_row_marked(format!("bot-row-{id}"), on, mark, ROW_FACE, label.into(), None, cx)
-                        .on_click(move |_, _, cx| drop(pick.update(cx, |page, cx| page.select(id.clone(), cx))))
-                        .into_any_element()
+                    let name = format!("bot-row-{id}");
+                    let row = nav_row_marked(name.clone(), on, mark, ROW_FACE, label.into(), None, cx)
+                        .on_click(move |_, _, cx| drop(pick.update(cx, |page, cx| page.select(id.clone(), cx))));
+                    crate::control::marked_named(name, row)
                 })
                 .collect()
         });
@@ -75,6 +76,11 @@ impl Shell {
             );
         }
         column.into_any_element()
+    }
+
+    /// The Bots page, once the view was in front.
+    pub(crate) fn bots_page(&self) -> Option<&gpui_kit::Entity<BotsPage>> {
+        self.bots.as_ref()
     }
 
     /// The Bots view's main area: the profile on the card the Code lens uses.

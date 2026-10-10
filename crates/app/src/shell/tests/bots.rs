@@ -34,6 +34,13 @@ fn a_press_on_bots_in_the_rail_lists_the_starters_and_shows_the_first_profile_an
     settle(&shell, cx);
     assert!(cx.debug_bounds("bot-profile-dot").is_some(), "a press on a row shows that bot");
     assert!(cx.debug_bounds("bot-profile-bolt").is_none());
+    let state = shell.read_with(cx, |s, cx| crate::control::state(s, cx));
+    assert_eq!(state["view"], "bots", "the control socket says which lens is in front");
+    assert_eq!(state["bots"]["chosen"], "dot", "and which bot is chosen");
+    assert_eq!(state["bots"]["rows"].as_array().map(Vec::len), Some(10));
+    assert!(state["bots"]["error"].is_null());
+    let marked = shell.read_with(cx, |_, cx| crate::control::find("bot-row-dot", cx).is_some());
+    assert!(marked, "a script presses a row by its name");
     let sessions = cx.debug_bounds("rail-sessions").expect("the rail has Sessions");
     cx.simulate_click(sessions.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);

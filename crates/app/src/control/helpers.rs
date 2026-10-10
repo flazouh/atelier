@@ -189,8 +189,8 @@ fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Con
     }
 }
 
-/// The projects and sessions open, as a person would list them.
-fn state(shell: &Shell, cx: &App) -> Value {
+/// The projects and sessions open, as a person would list them, the lens in front, and the bots when their view was made.
+pub(crate) fn state(shell: &Shell, cx: &App) -> Value {
     let front = shell.front_session(cx).map(|s| s.read(cx).key.to_string());
     let projects: Vec<Value> = shell
         .projects()
@@ -211,7 +211,12 @@ fn state(shell: &Shell, cx: &App) -> Value {
         .collect();
     let theme = atelier_ui::theme::ActiveTheme::theme(cx);
     let updates = cx.try_global::<crate::updater::Updater>().is_some_and(crate::updater::Updater::available);
-    json!({ "settings": shell.settings_section(cx), "unsaved": shell.unsaved(cx), "updates": { "available": updates, "state": shell.update_state_word(), "changelog_open": shell.changelog_shown() }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) } })
+    let bots = shell.bots_page().map(|page| {
+        let page = page.read(cx);
+        let rows: Vec<&str> = page.entries().iter().map(|e| e.bot.id.as_str()).collect();
+        json!({ "rows": rows, "chosen": page.selected().map(ToString::to_string), "error": page.error() })
+    });
+    json!({ "settings": shell.settings_section(cx), "unsaved": shell.unsaved(cx), "updates": { "available": updates, "state": shell.update_state_word(), "changelog_open": shell.changelog_shown() }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) }, "view": shell.view().words(), "bots": bots })
 }
 
 /// One session: who the agent is, how it stands, and the rows its list shows.

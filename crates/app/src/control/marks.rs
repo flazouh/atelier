@@ -2,7 +2,10 @@
 //! last drawn, so a script finds and presses it by name instead of by a guessed pixel. A debug build always marks;
 //! a release build marks once the control socket listens, and draws the element as it is before that.
 
-use std::{collections::HashMap, sync::atomic::{AtomicBool, Ordering}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Mutex, atomic::{AtomicBool, Ordering}},
+};
 
 use gpui_kit::{AnyElement, App, Bounds, Global, IntoElement, ParentElement, Pixels, Styled, canvas, div};
 
@@ -28,6 +31,23 @@ pub fn marked(name: &'static str, element: impl IntoElement) -> AnyElement {
         .child(element)
         .child(canvas(move |bounds, _, cx| cx.default_global::<Marks>().0.insert(name, bounds), |_, _, _, _| {}).absolute().inset_0())
         .into_any_element()
+}
+
+/// `element` marked by a name made at run time, such as a row named by its record. Each distinct name is kept once
+/// for the life of the process, so the names stay as few as the records they stand for.
+pub fn marked_named(name: String, element: impl IntoElement) -> AnyElement {
+    static NAMES: Mutex<Option<HashSet<&'static str>>> = Mutex::new(None);
+    let mut names = NAMES.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let names = names.get_or_insert_with(HashSet::new);
+    let name = match names.get(name.as_str()) {
+        Some(kept) => *kept,
+        None => {
+            let kept: &'static str = Box::leak(name.into_boxed_str());
+            names.insert(kept);
+            kept
+        }
+    };
+    marked(name, element)
 }
 
 /// Where `name` was last drawn, in the window's own points.
