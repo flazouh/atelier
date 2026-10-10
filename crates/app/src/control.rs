@@ -19,9 +19,11 @@ mod marks;
 mod types;
 
 pub use helpers::{serve, socket_path};
-pub use marks::marked;
+pub use marks::{marked, marked_named};
 #[cfg(test)]
 pub(crate) use {helpers::press_in_steps, marks::find};
+#[cfg(test)]
+pub(crate) use helpers::state;
 
 #[cfg(test)]
 mod tests;

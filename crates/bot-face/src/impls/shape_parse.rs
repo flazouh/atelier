@@ -96,6 +96,7 @@ fn parse_paint(value: &str) -> Result<Option<Paint>, String> {
         "{shade}" => Ok(Some(Paint::Token(Token::Shade))),
         "{light}" => Ok(Some(Paint::Token(Token::Light))),
         "{eye}" => Ok(Some(Paint::Token(Token::Eye))),
+        "{ink}" => Ok(Some(Paint::Token(Token::Ink))),
         other => Rgba::try_from(other)
             .map(|c| Some(Paint::Literal(c)))
             .map_err(|e| format!("the colour `{other}` is not known: {e}")),

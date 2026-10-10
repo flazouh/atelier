@@ -7,5 +7,6 @@ pub fn builtin() -> Slots {
     crate::changelog::register(&mut slots);
     crate::vitals::register(&mut slots);
     crate::usage_view::register(&mut slots);
+    crate::bots_view::register(&mut slots);
     slots
 }

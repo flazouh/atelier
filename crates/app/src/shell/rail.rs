@@ -21,6 +21,7 @@ fn rail_view(view: ShellView, needs_you: usize) -> RailView {
         ShellView::Messages => RailView { icon: IconName::ChatBubble, label: "Messages".into(), debug: "rail-messages", count: 0 },
         ShellView::Mail => RailView { icon: IconName::Mail, label: "Mail".into(), debug: "rail-mail", count: 0 },
         ShellView::Usage => RailView { icon: IconName::BarChart, label: "Usage".into(), debug: "rail-usage", count: 0 },
+        ShellView::Bots => RailView { icon: IconName::Bot, label: "Bots".into(), debug: "rail-bots", count: 0 },
         _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions", count: needs_you },
     }
 }
@@ -53,14 +54,9 @@ impl Shell {
         if !self.sidebar_shown(fit) {
             self.flip_sidebar(fit, cx);
         }
-        match view {
-            ShellView::Tasks => self.show_tasks(window, cx),
-            ShellView::Git => self.show_code(self.code_view, window, cx),
-            ShellView::Messages => self.show_messages(window, cx),
-            ShellView::Mail => self.show_mail(window, cx),
-            ShellView::Usage => self.show_usage(window, cx),
-            _ => self.show_view(view, window, cx),
-        }
+        // The Code lens comes back on the view it was left on.
+        let view = if view == ShellView::Git { self.code_view } else { view };
+        self.go_to(view, window, cx);
     }
 
     /// The focused panel's session, and its project.
