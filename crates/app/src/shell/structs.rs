@@ -1013,6 +1013,7 @@ impl Shell {
                 this.focus_front(project, window, cx);
                 cx.notify();
             }
+            ProjectEvent::PullPage => this.show_code(ShellView::Pulls, window, cx),
             ProjectEvent::PullsShown => {
                 this.right = true;
                 this.widen_right(window, cx);

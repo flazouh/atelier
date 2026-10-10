@@ -748,7 +748,7 @@ impl OpenProject {
         .detach();
     }
 
-    /// Opens the pull request a chip names, in the pull request pane, which mounts if it never showed. A chip
+    /// Opens the pull request a chip names, on the pull requests page, which reads them if it never did. A chip
     /// the list does not hold opens when it names this project's repository.
     pub(super) fn open_pull(&mut self, chip: &atelier_ui::PrChipData, window: &mut Window, cx: &mut Context<Self>) {
         let listed = self.pulls.as_ref().and_then(|pulls| pulls.hub.read(cx).list().read(cx).model().reference_of(chip));
@@ -930,17 +930,22 @@ impl OpenProject {
 
     /// Shows `reference` in the pull request view, mounting the view first when it is not yet there.
     pub fn show_pull(&mut self, reference: atelier_forge::PullRef, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(pulls) = &mut self.pulls {
-            pulls.shown = true;
-            self.right_asked = super::front::Front::Pulls;
+        // The pull request opens on the pull requests page of the Code view, not in the right pane. A project that has
+        // not read its pull requests yet reads them now, behind the page, and opens the one named when they are there.
+        if let Some(pulls) = &self.pulls {
             let hub = pulls.hub.clone();
             hub.update(cx, |hub, cx| hub.open(reference, window, cx));
-            cx.emit(ProjectEvent::PullsShown);
-            return cx.notify();
+        } else {
+            let Some(repo) = self.repo.clone() else {
+                return cx.emit(ProjectEvent::Said(NO_FORGE_REMOTE.into()));
+            };
+            self.pending_pull = Some(reference);
+            if !self.pulls_loading {
+                self.read_pulls(repo, false, window, cx);
+            }
         }
-        self.pending_pull = Some(reference);
-        self.right_asked = super::front::Front::Pulls;
-        self.toggle_pulls(window, cx);
+        cx.emit(ProjectEvent::PullPage);
+        cx.notify();
     }
 
     fn mount_pulls(&mut self, services: std::sync::Arc<atelier_pr_view::services::Services>, front: bool, window: &mut Window, cx: &mut Context<Self>) {
