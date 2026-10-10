@@ -1,10 +1,12 @@
 use gpui_kit::Rgba;
 
+use crate::consts::DARK_INK;
 use crate::enums::Token;
 use crate::structs::Palette;
 
 impl Palette {
-    /// The usual palette for a bot colour: black at 30% for the shade, white at 40% for the light, and a dark eye.
+    /// The usual palette for a bot colour: black at 30% for the shade, white at 40% for the light, a dark eye and the
+    /// dark ink for the outline. Give the theme's ink for a dark page.
     pub fn standard(body: Rgba) -> Palette {
         Palette {
             body,
@@ -26,6 +28,7 @@ impl Palette {
                 b: 0.075,
                 a: 1.0,
             },
+            ink: DARK_INK,
         }
     }
 
@@ -35,6 +38,7 @@ impl Palette {
             Token::Shade => self.shade,
             Token::Light => self.light,
             Token::Eye => self.eye,
+            Token::Ink => self.ink,
         }
     }
 

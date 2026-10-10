@@ -28,3 +28,10 @@ pub const LEAN_DEGREES: f32 = 1.6;
 pub const KAPPA: f32 = 0.552_284_7;
 /// The moment, in seconds, a still frame shows. No bot blinks or grows in at this moment.
 pub const STILL_T: f32 = 2.0;
+/// The outline of the storybook look on a light page: atelier's dark ink.
+pub const DARK_INK: gpui_kit::Rgba = gpui_kit::Rgba {
+    r: 0x14 as f32 / 255.0,
+    g: 0x14 as f32 / 255.0,
+    b: 0x13 as f32 / 255.0,
+    a: 1.0,
+};

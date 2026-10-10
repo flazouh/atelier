@@ -23,7 +23,7 @@ A storybook robot with hardware. Round, friendly, and a little futuristic.
 - `view_box`: `[-4, -2, 128, 128]`. `ground_y`: 104, the line where bots stand.
 - Each bot has `parts` in draw order. A part has a `layer` (`back`, `body` or `front`), `svg`, a `pivot` and an optional `habit`.
 - `svg` holds flat shapes: `rect`, `circle`, `ellipse`, `polygon` and `path`. A path may use M L H V Q C and Z, in both cases. A shape may use `fill`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `opacity` and `transform="rotate(a cx cy)"`.
-- Colours are `{body}` (the bot's colour), `{eye}` (the ink of the face), `none`, or a plain hex colour. There are no gradients, no filters and no groups, so any renderer can draw them.
+- Colours are `{body}` (the bot's colour), `{eye}` (the ink of the face), `{ink}` (the outline, which the theme sets: dark on a light page, light on a dark one), `none`, or a plain hex colour. There are no gradients, no filters and no groups, so any renderer can draw them.
 - Each bot has `eyes`: one drawing for each mood, with the mouth. `cheeks` lists the blush shapes. `eye_y` is the height of the eyes.
 - `states`: for each mood, `speed` and `amount`. They scale every habit.
 
@@ -112,6 +112,6 @@ If the page and this file differ, the page was approved first. Fix this file.
 ## 9. Open points
 
 1. **Player.** Decided: we write our own small Rust player (`crates/bot-face`). The numbers and the reasons are in `player-spike-v1.md`.
-2. **Dark theme.** The outline is near black, so it disappears on a dark page, and the bots lose their storybook edge. Options: a light outline in the dark theme (a `{ink}` colour that the theme sets), or keep it as it is. This needs a decision.
+2. **Dark theme.** Decided: the outline is `{ink}`, a colour the theme sets. It is dark on a light page and light on a dark one, so the bots keep their storybook edge. The eyes and the mouth stay `{eye}`, dark on the coloured body.
 3. **Making a bot.** The builder will pick from a parts kit: reactors, ways to move and tools (the mockup frame "parts kit"). The data now holds ten complete bots, not parts that mix. Splitting them into a kit is the builder step.
 4. **Sound.** None in v1.

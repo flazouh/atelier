@@ -63,3 +63,9 @@ fn an_ellipse_reads_its_two_radii() {
     );
     assert!(shapes[0].stroke.is_some());
 }
+
+#[test]
+fn the_ink_token_names_the_outline_colour_the_theme_sets() {
+    let shapes = parse(r##"<rect x="0" y="0" width="1" height="1" fill="{body}" stroke="{ink}" stroke-width="3.2"/>"##).unwrap();
+    assert_eq!(shapes[0].stroke.map(|s| s.paint), Some(Paint::Token(Token::Ink)));
+}

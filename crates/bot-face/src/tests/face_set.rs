@@ -1,5 +1,5 @@
-use crate::enums::{Layer, Mood};
-use crate::structs::FaceSet;
+use crate::enums::{Layer, Mood, Paint, Token};
+use crate::structs::{FaceSet, Palette};
 
 pub(super) const DATA: &str = include_str!("../../../../docs/bots/faces.v1.json");
 
@@ -99,4 +99,28 @@ fn every_bot_has_a_body_part_a_reactor_and_cheeks_or_a_reason() {
         );
         assert!(!bot.cheeks.is_empty(), "{} has cheeks", bot.id);
     }
+}
+
+/// The storybook outline is the theme's ink, light on a dark page: no outline in the data names the dark ink itself.
+#[test]
+fn every_outline_in_the_data_takes_the_ink_token() {
+    let set = FaceSet::from_json(DATA).expect("faces.v1.json loads");
+    let dark = gpui_kit::Rgba::try_from("#141413").unwrap();
+    let mut ink = 0;
+    for bot in &set.bots {
+        for shape in bot.parts.iter().flat_map(|p| &p.shapes) {
+            match shape.stroke.map(|s| s.paint) {
+                Some(Paint::Token(Token::Ink)) => ink += 1,
+                Some(Paint::Literal(c)) => assert_ne!(c, dark, "{}: an outline names the dark ink instead of {{ink}}", bot.id),
+                _ => {}
+            }
+        }
+    }
+    assert!(ink > 0, "the outlines take the ink token");
+}
+
+#[test]
+fn the_standard_palette_draws_the_outline_in_the_dark_ink() {
+    let palette = Palette::standard(gpui_kit::Rgba::try_from("#6CCBFA").unwrap());
+    assert_eq!(palette.colour(Token::Ink), gpui_kit::rgb(0x141413));
 }
