@@ -1,23 +1,25 @@
 //! The Bots view of the shell: its place on the rail, the bots in its sidebar, and the profile of the one chosen.
-use gpui_kit::{Entity, TestAppContext, VisualTestContext};
+use gpui_kit::{TestAppContext, VisualTestContext};
 
-use super::super::{Shell, ShellView};
+use super::super::ShellView;
 use super::{settle, with_a_session};
+use crate::bots_view::BotsPlugin;
+use crate::slots::Slots;
 
-/// An app whose bots live in `root`, as a reader's live next to the settings file.
-fn keeping_bots_in(shell: &Entity<Shell>, root: std::path::PathBuf, cx: &mut VisualTestContext) {
-    shell.update(cx, |s, _| s.bots_root = Some(root));
+/// An app whose bots live in `root`, as a reader's live next to the settings file; with none, an app with no folder.
+fn keeping_bots_in(root: Option<std::path::PathBuf>, cx: &mut VisualTestContext) {
+    cx.update(|_, cx| cx.global_mut::<Slots>().plug(&BotsPlugin::at(root)));
 }
 
 #[gpui_kit::test]
 fn a_press_on_bots_in_the_rail_lists_the_starters_and_shows_the_first_profile_and_a_row_switches_it(cx: &mut TestAppContext) {
     let (shell, cx, dir) = with_a_session(cx, 1400.);
-    keeping_bots_in(&shell, dir.path().join("bots"), cx);
+    keeping_bots_in(Some(dir.path().join("bots")), cx);
     assert!(cx.debug_bounds("bots-sidebar").is_none());
     let rail = cx.debug_bounds("rail-bots").expect("the rail has Bots");
     cx.simulate_click(rail.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
-    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Bots, "the view is a lens of the shell");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Plugin("bots"), "the view is in front in the shell");
     assert!(cx.debug_bounds("bots-sidebar").is_some(), "the bots are in the sidebar");
     for row in [
         "bot-row-bolt", "bot-row-dot", "bot-row-gus", "bot-row-ink", "bot-row-mimi",
@@ -45,16 +47,17 @@ fn a_press_on_bots_in_the_rail_lists_the_starters_and_shows_the_first_profile_an
     cx.simulate_click(sessions.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("bot-profile").is_none(), "another lens leaves it");
-    assert_eq!(ShellView::from_words(Some("bots")), ShellView::Bots, "the settings keep it by name");
+    let slots = cx.update(|_, cx| cx.global::<Slots>().clone());
+    assert_eq!(ShellView::saved(Some("bots"), Some(&slots)), ShellView::Plugin("bots"), "the settings keep it by name");
 }
 
 #[gpui_kit::test]
 fn a_module_opens_the_bots_lens_by_name(cx: &mut TestAppContext) {
     let (shell, cx, dir) = with_a_session(cx, 1400.);
-    keeping_bots_in(&shell, dir.path().join("bots"), cx);
+    keeping_bots_in(Some(dir.path().join("bots")), cx);
     shell.update(cx, |shell, cx| shell.open_view("bots", cx));
     settle(&shell, cx);
-    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Bots);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Plugin("bots"));
     assert!(cx.debug_bounds("bot-profile").is_some());
 }
 
@@ -64,7 +67,7 @@ fn a_bot_file_that_does_not_parse_is_said_in_the_view_and_the_app_goes_on(cx: &m
     let root = dir.path().join("bots");
     std::fs::create_dir_all(root.join("bots")).unwrap();
     std::fs::write(root.join("bots/bad.json"), "{").unwrap();
-    keeping_bots_in(&shell, root, cx);
+    keeping_bots_in(Some(root), cx);
     shell.update(cx, |shell, cx| shell.open_view("bots", cx));
     settle(&shell, cx);
     assert!(cx.debug_bounds("bots-error").is_some(), "the view says the folder could not be read");
@@ -81,7 +84,7 @@ fn a_bot_file_that_does_not_parse_is_said_in_the_view_and_the_app_goes_on(cx: &m
 #[gpui_kit::test]
 fn without_a_folder_the_view_says_so_and_writes_nothing(cx: &mut TestAppContext) {
     let (shell, cx, _dir) = with_a_session(cx, 1400.);
-    shell.update(cx, |s, _| s.bots_root = None);
+    keeping_bots_in(None, cx);
     shell.update(cx, |shell, cx| shell.open_view("bots", cx));
     settle(&shell, cx);
     assert!(cx.debug_bounds("bots-empty").is_some());

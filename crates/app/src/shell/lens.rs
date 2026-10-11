@@ -32,7 +32,7 @@ pub(super) fn nav_row(id: String, on: bool, mark: AnyElement, label: SharedStrin
 }
 
 /// A row whose mark takes `mark_side` pixels: a face, where an icon's 15 would be too small to read.
-pub(super) fn nav_row_marked(id: String, on: bool, mark: AnyElement, mark_side: f32, label: SharedString, count: Option<usize>, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
+pub(crate) fn nav_row_marked(id: String, on: bool, mark: AnyElement, mark_side: f32, label: SharedString, count: Option<usize>, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
     let theme = cx.theme();
     let name = id.clone();
     div()
@@ -414,8 +414,7 @@ impl Shell {
     pub(crate) fn go_to(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
         match view {
             ShellView::Tasks => self.show_tasks(window, cx),
-            ShellView::Usage => self.show_usage(window, cx),
-            ShellView::Bots => self.show_bots(window, cx),
+            ShellView::Plugin(id) => self.show_plugin(id, window, cx),
             v if v.in_code() => self.show_code(v, window, cx),
             v => self.show_view(v, window, cx),
         }

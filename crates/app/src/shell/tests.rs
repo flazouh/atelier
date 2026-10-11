@@ -4,6 +4,7 @@ use gpui_kit::{TestAppContext, px, size};
 use super::*;
 
 mod bots;
+mod plugins;
 
 #[gpui_kit::test]
 fn the_first_launch_shows_the_mark_and_one_line_about_what_atelier_is_above_the_buttons(cx: &mut TestAppContext) {
@@ -198,7 +199,7 @@ fn a_press_on_the_usage_chips_opens_the_usage_view_and_another_lens_leaves_it(cx
     cx.simulate_click(chips.center(), gpui_kit::Modifiers::default());
     settle(&shell, cx);
     assert!(cx.debug_bounds("usage-dashboard").is_some(), "a press opens the dashboard");
-    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Usage, "the view is a lens of the shell");
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Plugin("usage"), "the view is in front in the shell");
     assert!(cx.debug_bounds("usage-sidebar").is_some(), "its sources are in the sidebar");
     let rail = cx.debug_bounds("rail-sessions").expect("the rail has Sessions");
     cx.simulate_click(rail.center(), gpui_kit::Modifiers::default());

@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
-use gpui_kit::{AnyElement, AnyView, App, Window};
+use gpui_kit::{AnyElement, App, Window};
 
-use super::structs::{BarEnv, Host};
+use super::structs::BarEnv;
 use crate::vitals::Vitals;
 
 /// The id of the status bar: its parts take their own ids from it.
@@ -24,6 +24,3 @@ pub type Visible = Rc<dyn Fn(&Vitals) -> bool>;
 
 /// What a card draws: the parts it puts in its column, left to right.
 pub type RenderCard = Rc<dyn Fn(&BarEnv<'_>, &mut Window, &mut App) -> Vec<AnyElement>>;
-
-/// Builds the view a [`RailView`] opens.
-pub type OpenView = Rc<dyn Fn(&Host, &mut App) -> AnyView>;

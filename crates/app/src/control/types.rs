@@ -17,7 +17,8 @@ pub enum Request {
     Press { name: String },
     /// The names of the elements that can be found and pressed, as they were last drawn.
     Marks,
-    /// Brings a view to the front by the name the settings keep it by: sessions, tasks, pulls, files or git.
+    /// Brings a view to the front by the name the settings keep it by: sessions, tasks, pulls, files or git, or the id
+    /// of a view a plugin registered (bots, usage).
     View { name: String },
     /// Opens the folder at `path`, on `host` over SSH when one is named, as the add menu does.
     Open { path: String, host: Option<String> },
