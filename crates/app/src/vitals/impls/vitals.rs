@@ -18,7 +18,6 @@ impl Vitals {
         Self { probe, load: None, providers: Vec::new(), work: Work::default(), columns: (None, None), shell: WeakEntity::new_invalid() }
     }
 
-    #[cfg(test)]
     pub fn load(&self) -> Option<&SystemLoad> {
         self.load.as_ref()
     }

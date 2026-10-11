@@ -4,6 +4,15 @@ use gpui_kit::{Entity, TestAppContext, VisualTestContext};
 
 use super::super::{Shell, ShellView};
 use super::{settle, with_a_session};
+use crate::{bots_view::BotsPlugin, session_bot::BotsFolder, slots::Slots};
+
+/// An app whose bots live in `root`: the Bots view reads them there, and so does a session that belongs to one.
+fn keeping_bots_in(root: Option<std::path::PathBuf>, cx: &mut VisualTestContext) {
+    cx.update(|_, cx| {
+        cx.global_mut::<Slots>().plug(&BotsPlugin::at(root.clone()));
+        cx.set_global(BotsFolder(root));
+    });
+}
 
 /// The bot of each session of the project in front, in order.
 fn bots_of_sessions(shell: &Entity<Shell>, cx: &mut VisualTestContext) -> Vec<Option<String>> {
@@ -15,7 +24,7 @@ fn bots_of_sessions(shell: &Entity<Shell>, cx: &mut VisualTestContext) -> Vec<Op
 
 /// A session started by a bot's id, as the control socket starts one: the bots live in a folder of the test.
 fn start_as(shell: &Entity<Shell>, id: &str, root: &std::path::Path, cx: &mut VisualTestContext) -> Result<(), String> {
-    shell.update(cx, |s, _| s.bots_root = Some(root.to_path_buf()));
+    keeping_bots_in(Some(root.to_path_buf()), cx);
     let started = shell.update_in(cx, |s, window, cx| s.new_session_of_bot(id, window, cx).map(|_| ()));
     settle(shell, cx);
     started
@@ -28,8 +37,10 @@ fn a_session_started_as_a_bot_records_it_shows_its_face_and_comes_in_front_in_se
     assert!(cx.debug_bounds("session-mark").is_none(), "and its row keeps the agent's mark");
     assert!(cx.debug_bounds("panel-bot").is_none(), "as its header does");
     // From another lens, as the profile's button starts one.
-    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Bots, window, cx));
+    keeping_bots_in(Some(dir.path().join("bots")), cx);
+    shell.update(cx, |s, cx| s.open_view("bots", cx));
     settle(&shell, cx);
+    assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Plugin("bots"));
     start_as(&shell, "dot", &dir.path().join("bots"), cx).expect("Dot starts");
     assert_eq!(bots_of_sessions(&shell, cx), [None, Some("dot".to_string())]);
     assert_eq!(shell.read_with(cx, |s, _| s.view), ShellView::Sessions, "the Sessions view is in front");
@@ -50,7 +61,7 @@ fn a_bot_nobody_keeps_starts_no_session_and_says_why(cx: &mut TestAppContext) {
     let why = start_as(&shell, "nobody", &dir.path().join("bots"), cx).unwrap_err();
     assert!(why.contains("nobody"), "{why}");
     assert_eq!(bots_of_sessions(&shell, cx), [None], "no session opened");
-    shell.update(cx, |s, _| s.bots_root = None);
+    keeping_bots_in(None, cx);
     let no_folder = shell.update_in(cx, |s, window, cx| s.new_session_of_bot("dot", window, cx).map(|_| ())).unwrap_err();
     assert!(no_folder.contains("no folder"), "{no_folder}");
 }
@@ -69,8 +80,8 @@ fn a_bot_on_a_harness_the_app_cannot_start_opens_no_session_and_says_so(cx: &mut
 #[gpui_kit::test]
 fn a_press_on_start_a_session_in_a_profile_opens_a_session_of_that_bot_in_sessions(cx: &mut TestAppContext) {
     let (shell, cx, dir) = with_a_session(cx, 1400.);
-    shell.update(cx, |s, _| s.bots_root = Some(dir.path().join("bots")));
-    shell.update_in(cx, |s, window, cx| s.go_to(ShellView::Bots, window, cx));
+    keeping_bots_in(Some(dir.path().join("bots")), cx);
+    shell.update(cx, |s, cx| s.open_view("bots", cx));
     settle(&shell, cx);
     let dot = cx.debug_bounds("bot-row-dot").expect("the bots are listed");
     cx.simulate_click(dot.center(), gpui_kit::Modifiers::default());
@@ -106,7 +117,6 @@ fn a_session_of_a_bot_is_still_the_bots_after_a_save_and_a_load_of_the_settings(
     // The next launch: a window that knows only what the file holds.
     let (next, cx) = cx.add_window_view(|_, cx| Shell::new(&atelier_settings::Settings::default(), cx));
     cx.simulate_resize(gpui_kit::size(gpui_kit::px(1400.), gpui_kit::px(900.)));
-    next.update(cx, |s, _| s.bots_root = Some(bots));
     next.update_in(cx, |s, window, cx| s.restore(loaded.open, loaded.front, true, window, cx));
     settle(&next, cx);
     assert_eq!(bots_of_sessions(&next, cx), [Some("dot".to_string()), None], "the next launch still knows whose session it is");

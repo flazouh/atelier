@@ -193,23 +193,36 @@ pub fn starter_crew() -> Vec<Bot> {
         .collect()
 }
 
-/// The playbooks that ship. Deliver: plan, build, prove, review, ship. The Prover and the Shipper stop to ask first.
+/// The playbooks that ship. Deliver: plan, build, prove, review, ship, and the Shipper stops to ask first. Design:
+/// research, design, build, check.
 pub fn starter_playbooks() -> Vec<Playbook> {
     let step = |bot: &str, asks_first: bool| PlaybookStep {
         bot: id(bot),
         asks_first,
     };
-    vec![Playbook {
-        id: id("deliver"),
-        name: "Deliver".to_string(),
-        steps: vec![
-            step("nimbus", false),
-            step("bolt", false),
-            step("pip", false),
-            step("olive", false),
-            step("skip", true),
-        ],
-    }]
+    vec![
+        Playbook {
+            id: id("deliver"),
+            name: "Deliver".to_string(),
+            steps: vec![
+                step("nimbus", false),
+                step("bolt", false),
+                step("pip", false),
+                step("olive", false),
+                step("skip", true),
+            ],
+        },
+        Playbook {
+            id: id("design"),
+            name: "Design".to_string(),
+            steps: vec![
+                step("quill", false),
+                step("mimi", false),
+                step("bolt", false),
+                step("pip", false),
+            ],
+        },
+    ]
 }
 
 /// Keeps the starter bots and playbooks that the store does not hold yet. A bot or a playbook that is kept, even

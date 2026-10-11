@@ -5,6 +5,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::enums::{BotsError, MemoryScope};
+use crate::structs::BotId;
 
 pub(super) fn io(path: &Path, e: std::io::Error) -> BotsError {
     BotsError::Io {
@@ -40,6 +41,17 @@ pub(super) fn write<T: Serialize>(path: &Path, value: &T) -> Result<(), BotsErro
     let temp = path.with_extension("json.tmp");
     fs::write(&temp, text).map_err(|e| io(&temp, e))?;
     fs::rename(&temp, path).map_err(|e| io(path, e))
+}
+
+/// Removes the file kept under an id. A file that does not exist is not found.
+pub(super) fn remove(path: &Path, id: &BotId) -> Result<(), BotsError> {
+    fs::remove_file(path).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            BotsError::NotFound(id.to_string())
+        } else {
+            io(path, e)
+        }
+    })
 }
 
 /// The files in a folder that end in `.json`, by name. An absent folder holds none.

@@ -9,7 +9,6 @@ mod fit;
 mod footer;
 mod helpers;
 mod impls;
-mod bots;
 mod changes;
 mod history;
 mod lens;
@@ -21,13 +20,13 @@ mod tree_menu;
 mod types;
 mod update_view;
 mod updates;
-mod usage;
 mod view;
 mod views;
 
 pub use view::ShellView;
 
 pub use helpers::bind_keys;
+pub(crate) use lens::nav_row_marked;
 pub use structs::{CheckForUpdates, Quit, Shell};
 #[cfg(test)]
 pub use structs::{NewSession, OpenSettings};

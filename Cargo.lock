@@ -498,6 +498,7 @@ dependencies = [
  "atelier-linear",
  "atelier-lsp",
  "atelier-palette",
+ "atelier-plugin",
  "atelier-pr-view",
  "atelier-project",
  "atelier-remote",
@@ -667,6 +668,14 @@ dependencies = [
 
 [[package]]
 name = "atelier-palette"
+version = "0.1.16"
+dependencies = [
+ "atelier-ui",
+ "gpui-kit",
+]
+
+[[package]]
+name = "atelier-plugin"
 version = "0.1.16"
 dependencies = [
  "atelier-ui",

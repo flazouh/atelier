@@ -108,14 +108,10 @@ pub struct Shell {
     pub(super) view: ShellView,
     /// The view of the Code lens the rail goes back to.
     pub(super) code_view: ShellView,
-    /// The Usage view's page, made the first time the view is in front.
-    pub(super) usage: Option<Entity<crate::usage_view::UsagePage>>,
-    /// A module asked for a lens (Usage, Bots): the next frame, which has a window, shows it.
-    pub(super) lens_asked: Option<ShellView>,
-    /// The Bots view's page, made the first time the view is in front.
-    pub(super) bots: Option<Entity<crate::bots_view::BotsPage>>,
-    /// The folder the bots are kept in; none in a test that names no settings file.
-    pub(super) bots_root: Option<std::path::PathBuf>,
+    /// The page of each plugin's view, by the id of the view, made the first time the view is in front.
+    pub(super) pages: std::collections::HashMap<&'static str, atelier_plugin::Page>,
+    /// The plugin's view someone asked for by its id, with no window at hand: the next frame, which has one, shows it.
+    pub(super) asked: Option<&'static str>,
     /// In Sessions, the project the list and the panels are narrowed to; all of them with `None`.
     pub(super) session_filter: Option<SharedString>,
     /// The project switcher's menu is open.
@@ -141,8 +137,6 @@ pub struct Shell {
     pub(super) changelog_open: bool,
     /// What the changelog panel holds focus with, so Escape reaches it.
     pub(super) update_focus: FocusHandle,
-    /// The view a module opened over the window, by the id of its slot, until it closes itself.
-    pub(super) opened: Option<(gpui_kit::SharedString, gpui_kit::AnyView)>,
     /// The sessions the reader archived, by the agent's id.
     pub(super) archived: std::collections::BTreeSet<String>,
     /// Where the session column ends, for the ⋯ at its top right; `None` in a narrow window.
@@ -210,7 +204,7 @@ impl Shell {
             saved_open: (saved.open.clone(), saved.front.clone()),
             _subscriptions: Vec::new(),
             panel_views: Default::default(),
-            view: ShellView::from_words(saved.view.as_deref()),
+            view: ShellView::saved(saved.view.as_deref(), cx.try_global::<crate::slots::Slots>()),
             files_narrow: FilesPane::default(),
             layout_menu: false,
             update: crate::updater::UpdateState::default(),
@@ -218,12 +212,9 @@ impl Shell {
             whats_new,
             changelog_open: false,
             update_focus: cx.focus_handle(),
-            opened: None,
             code_view: Some(ShellView::from_words(saved.view.as_deref())).filter(|v| v.in_code()).unwrap_or(ShellView::Files),
-            usage: None,
-            lens_asked: None,
-            bots: None,
-            bots_root: crate::bots_view::library_root(super::helpers::settings_path().as_deref()),
+            pages: Default::default(),
+            asked: None,
             session_filter: None,
             switcher_open: false,
             add_open: false,
@@ -389,7 +380,7 @@ impl Shell {
             let id = atelier_agents::session::SessionId::new(saved.id.clone());
             let title = self.names.get(&saved.id).cloned().unwrap_or(saved.title.clone());
             let agent = saved.agent.as_deref().and_then(atelier_agents::registry::by_backend);
-            let bot = saved.bot.as_deref().and_then(|bot| self.kept_bot(bot));
+            let bot = saved.bot.as_deref().and_then(|bot| self.kept_bot(bot, cx));
             let session = project.update(cx, |p, cx| p.open_session_as(Some((id, title.into())), agent, saved.provider.as_deref().and_then(crate::providers::Choice::from_key), bot, window, cx));
             // A session from the last run keeps its place; only one opened now stands first.
             self.order.push(session.read(cx).key.clone());
@@ -1808,7 +1799,7 @@ impl Shell {
         let switcher = self.project_switcher(cx);
         // The Sessions sidebar has a row of its own at the top, with the ⋯ at its right: the switcher stands on that row,
         // left of the ⋯, so the head is one row. The other lenses have no such row and give the switcher one.
-        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Usage | ShellView::Bots) {
+        if !self.view.in_code() && !matches!(self.view, ShellView::Tasks | ShellView::Plugin(_)) {
             let row = switcher.map(|switcher| {
                 div().absolute().top(px(5.)).left(px(8.)).right(px(44.)).h(px(36.)).flex().items_center().min_w_0().child(switcher)
             });
@@ -1830,11 +1821,8 @@ impl Shell {
         {
             return div().size_full().child(self.issues_sidebar(&project, cx));
         }
-        if self.view == ShellView::Usage {
-            return div().size_full().child(self.usage_sidebar(cx));
-        }
-        if self.view == ShellView::Bots {
-            return div().size_full().child(self.bots_sidebar(cx));
+        if let ShellView::Plugin(id) = self.view {
+            return div().size_full().child(self.plugin_sidebar(id, cx));
         }
         div()
             .flex()
@@ -1946,15 +1934,7 @@ impl Shell {
     /// The panes for the window's width: the three side by side, the two without the sidebar, or one at
     /// a time with tabs (docs/app.md, "Window widths").
     pub(super) fn panes(&mut self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        if let Some(lens) = self.lens_asked.take() {
-            self.go_to(lens, window, cx);
-        }
-        if self.view == ShellView::Usage {
-            self.ensure_usage(cx);
-        }
-        if self.view == ShellView::Bots {
-            self.ensure_bots(window, cx);
-        }
+        self.settle_plugin_view(window, cx);
         let total = atelier_ui::scale::design(window.viewport_size().width);
         let fit = Fit::of(total);
         if fit == Fit::Narrow {
@@ -2114,8 +2094,7 @@ impl Shell {
     fn center(&self, project: &Entity<OpenProject>, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         match self.view {
             ShellView::Tasks => self.tasks_main(project, window, cx),
-            ShellView::Usage => self.usage_main(cx),
-            ShellView::Bots => self.bots_main(cx),
+            ShellView::Plugin(id) => self.plugin_main(id, cx),
             ShellView::Git => self.changes_main(project, cx),
             ShellView::Files => self.files_editor(project, false, cx),
             ShellView::Pulls => self.pulls_main(project, cx),
@@ -2242,7 +2221,6 @@ impl Shell {
             }))
             .children(self.tree_menu(cx))
             .children(self.update_panel(window, cx))
-            .children(self.opened.as_ref().map(|(_, page)| page.clone()))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().occlude().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
             .children(self.ssh.as_ref().map(|(form, _)| {

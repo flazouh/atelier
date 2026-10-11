@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use atelier_ui::IconName;
+use atelier_plugin::{AppHost, Plugin, PluginView, Registry};
 use gpui_kit::{
-    AnyElement, AnyView, App, ElementId, Entity, Global, SharedString, WeakEntity, Window,
+    AnyElement, App, ElementId, Entity, Global, SharedString, WeakEntity, Window,
 };
 
-use super::types::{Column, OpenView, RenderCard, Visible};
+use super::types::{Column, RenderCard, Visible};
 use crate::{shell::Shell, vitals::Vitals};
 
 /// What a module puts in one column of the status bar. The bar has one panel under each column; a card is a piece of one.
@@ -44,45 +44,12 @@ impl StatusBarCard {
     }
 }
 
-/// A view a module opens, and the door to it. The door is an icon and a label on the left rail; a view with no icon has its
-/// door elsewhere (the usage view opens from the chips in the status bar). The rail itself still draws its three built-in views.
-#[derive(Clone)]
-#[expect(
-    dead_code,
-    reason = "the rail still draws its three built-in views and not these"
-)]
-pub struct RailView {
-    pub id: SharedString,
-    pub icon: Option<IconName>,
-    pub label: SharedString,
-    /// Doors stand from the lowest order to the highest; the same order goes by id.
-    pub order: i32,
-    pub open: OpenView,
-}
-
-impl RailView {
-    pub fn new(
-        id: impl Into<SharedString>,
-        icon: Option<IconName>,
-        label: impl Into<SharedString>,
-        order: i32,
-        open: impl Fn(&Host, &mut App) -> AnyView + 'static,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            icon,
-            label: label.into(),
-            order,
-            open: Rc::new(open),
-        }
-    }
-}
-
 /// What the modules of the app have added, by slot. A global: the shell and the bar read it each time they draw.
 #[derive(Clone, Default)]
 pub struct Slots {
     cards: Vec<StatusBarCard>,
-    views: Vec<RailView>,
+    /// What the plugins added: their views.
+    plugins: Registry,
 }
 
 impl Global for Slots {}
@@ -94,10 +61,9 @@ impl Slots {
         self.cards.push(card);
     }
 
-    /// Adds a view; one already there with the same id is replaced.
-    pub fn add_view(&mut self, view: RailView) {
-        self.views.retain(|have| have.id != view.id);
-        self.views.push(view);
+    /// Adds what `plugin` registers. This is the one line a plugin has in the app.
+    pub fn plug(&mut self, plugin: &dyn Plugin) {
+        self.plugins.add(plugin);
     }
 
     /// The cards to draw in `column` now, in order.
@@ -111,22 +77,14 @@ impl Slots {
         cards
     }
 
-    pub fn view(&self, id: &str) -> Option<&RailView> {
-        self.views.iter().find(|view| view.id.as_ref() == id)
+    /// The view a plugin registered as `id`.
+    pub fn view(&self, id: &str) -> Option<&PluginView> {
+        self.plugins.view(id)
     }
 
-    /// Every view, in order.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "for the rail, which still draws its three built-in views"
-        )
-    )]
-    pub fn views(&self) -> Vec<&RailView> {
-        let mut views: Vec<&RailView> = self.views.iter().collect();
-        views.sort_by(|a, b| a.order.cmp(&b.order).then_with(|| a.id.cmp(&b.id)));
-        views
+    /// Every view the plugins registered, in the order of the rail.
+    pub fn views(&self) -> Vec<&PluginView> {
+        self.plugins.views()
     }
 }
 
@@ -143,7 +101,7 @@ impl Host {
         Self { shell, vitals }
     }
 
-    /// Opens the view of the registered [`RailView`] named `id`, over the window. Nothing happens for an id nobody registered.
+    /// Brings the view a plugin registered as `id` in front. Nothing happens for an id nobody registered.
     pub fn open_view(&self, id: &str, cx: &mut App) {
         drop(self.shell.update(cx, |shell, cx| shell.open_view(id, cx)));
     }
@@ -160,4 +118,24 @@ pub struct BarEnv<'a> {
     pub id: &'a ElementId,
     pub vitals: &'a Vitals,
     pub host: &'a Host,
+}
+
+/// The app's side of the handle a plugin gets (`atelier_plugin::Host`).
+impl AppHost for Host {
+    /// At the next turn of the app, not now: a page may ask while the shell draws it, and the shell cannot be changed then.
+    fn open_view(&self, id: &str, cx: &mut App) {
+        let (host, id) = (self.clone(), id.to_string());
+        cx.defer(move |cx| Host::open_view(&host, &id, cx));
+    }
+
+    fn vitals(&self, cx: &App) -> atelier_plugin::Vitals {
+        let vitals = self.vitals.read(cx);
+        atelier_plugin::Vitals { load: vitals.load().cloned(), providers: vitals.providers().to_vec() }
+    }
+
+    /// Once the handler that asked has returned, so the shell can be changed.
+    fn start_session_as(&self, bot: &str, window: &mut Window, cx: &mut App) {
+        let (shell, bot) = (self.shell.clone(), bot.to_string());
+        window.defer(cx, move |window, cx| drop(shell.update(cx, |shell, cx| shell.start_session_of_bot(&bot, window, cx))));
+    }
 }

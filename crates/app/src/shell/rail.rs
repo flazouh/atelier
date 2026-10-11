@@ -1,6 +1,11 @@
 //! The left rail and what its views draw: Tasks shows the board, Sessions the session list and the
-//! panels, Git the focused session's changed files and their review, Bots the bot library, Usage the dashboard.
+//! panels, Git the focused session's changed files and their review. After the app's own three, the rail has one
+//! entry for each view a plugin registered.
 
+use std::collections::BTreeMap;
+use std::sync::Mutex;
+
+use atelier_plugin::PluginView;
 use atelier_ui::view_rail::{RailView, ViewRail};
 use atelier_ui::scale::px;
 use atelier_ui::IconName;
@@ -13,27 +18,48 @@ use super::structs::Shell;
 use crate::agent_session::AgentSession;
 use crate::open_project::OpenProject;
 use crate::review_pane::Scope;
+use crate::slots::Slots;
 
+/// The entry of one of the app's own views.
 fn rail_view(view: ShellView, needs_you: usize) -> RailView {
     match view {
         ShellView::Tasks => RailView { icon: IconName::Checklist, label: "Tasks".into(), debug: "rail-tasks", count: 0 },
         ShellView::Git => RailView { icon: IconName::Code, label: "Code".into(), debug: "rail-git", count: 0 },
-        ShellView::Usage => RailView { icon: IconName::BarChart, label: "Usage".into(), debug: "rail-usage", count: 0 },
-        ShellView::Bots => RailView { icon: IconName::Bot, label: "Bots".into(), debug: "rail-bots", count: 0 },
         _ => RailView { icon: IconName::Forum, label: "Sessions".into(), debug: "rail-sessions", count: needs_you },
     }
 }
 
+/// The debug name of the entry of a plugin's view: `rail-<id>`. The rail takes a name that lasts as long as the app,
+/// so the name of each id is made once and kept.
+fn plugin_rail_name(id: &'static str) -> &'static str {
+    static NAMES: Mutex<BTreeMap<&'static str, &'static str>> = Mutex::new(BTreeMap::new());
+    let mut names = NAMES.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    names.entry(id).or_insert_with(|| Box::leak(format!("rail-{id}").into_boxed_str()))
+}
+
+/// The entry of a view a plugin registered.
+fn plugin_rail_view(view: &PluginView) -> RailView {
+    RailView { icon: view.icon, label: view.label.clone(), debug: plugin_rail_name(view.id), count: 0 }
+}
+
 impl Shell {
+    /// What the rail lists, top to bottom: the app's own three, then each view a plugin registered, by its order.
+    fn rail_entries(&self, cx: &App) -> Vec<(ShellView, RailView)> {
+        let needs_you = self.needs_you(cx);
+        let own = ShellView::ON_RAIL.into_iter().map(|view| (view, rail_view(view, needs_you)));
+        let registered = cx.global::<Slots>().views().into_iter().map(|view| (ShellView::Plugin(view.id), plugin_rail_view(view)));
+        own.chain(registered).collect()
+    }
+
     /// The rail, with the view in front marked, folded while the sidebar is hidden.
     pub(super) fn view_rail(&self, open: bool, cx: &mut Context<Self>) -> AnyElement {
-        let needs_you = self.needs_you(cx);
-        let views = ShellView::ON_RAIL.into_iter().map(|v| rail_view(v, needs_you)).collect();
-        let selected = ShellView::ON_RAIL.iter().position(|v| *v == self.view.lens()).unwrap_or(usize::MAX);
+        let (on_rail, views): (Vec<ShellView>, Vec<RailView>) = self.rail_entries(cx).into_iter().unzip();
+        let selected = on_rail.iter().position(|v| *v == self.view.lens()).unwrap_or(usize::MAX);
         let this = cx.entity().downgrade();
         ViewRail::new("view-rail", views, selected, open)
             .on_select(move |i, window, cx| {
-                this.update(cx, |this, cx| this.pick_view(ShellView::ON_RAIL[i], window, cx)).ok();
+                let Some(view) = on_rail.get(i).copied() else { return };
+                this.update(cx, |this, cx| this.pick_view(view, window, cx)).ok();
             })
             .into_any_element()
     }
@@ -41,10 +67,6 @@ impl Shell {
     /// A press on the rail. Another view comes to the front with the sidebar shown; the view in front
     /// hides or shows the sidebar.
     pub(super) fn pick_view(&mut self, view: ShellView, window: &mut Window, cx: &mut Context<Self>) {
-        // A view a module opened over the window gives way to the lens the reader picks.
-        if self.opened.take().is_some() {
-            cx.notify();
-        }
         let fit = Fit::of(atelier_ui::scale::design(window.viewport_size().width));
         if view == self.view.lens() {
             return self.flip_sidebar(fit, cx);

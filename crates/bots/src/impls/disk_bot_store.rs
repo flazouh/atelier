@@ -1,10 +1,9 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::disk_bot_store_files::{io, json_files, memory_file, read, write};
+use super::disk_bot_store_files::{json_files, memory_file, read, remove, write};
 use crate::consts::NOTE_MAX;
 use crate::enums::{BotsError, MemoryScope};
-use crate::structs::{Bot, BotId, DiskBotStore, MemoryNote, Playbook};
+use crate::structs::{Bot, BotId, DiskBotStore, MemoryNote, Playbook, Run};
 use crate::traits::BotStore;
 
 impl DiskBotStore {
@@ -24,6 +23,10 @@ impl DiskBotStore {
 
     fn playbook_file(&self, id: &BotId) -> PathBuf {
         self.root.join("playbooks").join(format!("{id}.json"))
+    }
+
+    fn run_file(&self, id: &BotId) -> PathBuf {
+        self.root.join("runs").join(format!("{id}.json"))
     }
 }
 
@@ -57,26 +60,31 @@ impl BotStore for DiskBotStore {
     }
 
     fn remove_bot(&self, id: &BotId) -> Result<(), BotsError> {
-        let using: Vec<String> = self
+        let playbooks: Vec<String> = self
             .playbooks()?
             .into_iter()
             .filter(|p| p.steps.iter().any(|s| s.bot == *id))
             .map(|p| p.id.to_string())
             .collect();
-        if !using.is_empty() {
+        if !playbooks.is_empty() {
             return Err(BotsError::Invalid(vec![format!(
                 "{id} is a step of the playbook {}: take it out there first",
-                using.join(", ")
+                playbooks.join(", ")
             )]));
         }
-        let path = self.bot_file(id);
-        fs::remove_file(&path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                BotsError::NotFound(id.to_string())
-            } else {
-                io(&path, e)
-            }
-        })
+        let runs: Vec<String> = self
+            .runs()?
+            .into_iter()
+            .filter(|r| r.bots_needed().contains(id))
+            .map(|r| r.id.to_string())
+            .collect();
+        if !runs.is_empty() {
+            return Err(BotsError::Invalid(vec![format!(
+                "{id} still has work in the run {}: stop the run or let it end first",
+                runs.join(", ")
+            )]));
+        }
+        remove(&self.bot_file(id), id)
     }
 
     fn playbooks(&self) -> Result<Vec<Playbook>, BotsError> {
@@ -97,14 +105,41 @@ impl BotStore for DiskBotStore {
     }
 
     fn remove_playbook(&self, id: &BotId) -> Result<(), BotsError> {
-        let path = self.playbook_file(id);
-        fs::remove_file(&path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                BotsError::NotFound(id.to_string())
-            } else {
-                io(&path, e)
+        remove(&self.playbook_file(id), id)
+    }
+
+    fn runs(&self) -> Result<Vec<Run>, BotsError> {
+        let mut out = Vec::new();
+        for file in json_files(&self.root.join("runs"))? {
+            out.extend(read::<Run>(&file)?);
+        }
+        out.sort_by(|a, b| b.started_ms.cmp(&a.started_ms).then(a.id.cmp(&b.id)));
+        Ok(out)
+    }
+
+    fn run(&self, id: &BotId) -> Result<Run, BotsError> {
+        read::<Run>(&self.run_file(id))?.ok_or_else(|| BotsError::NotFound(id.to_string()))
+    }
+
+    fn save_run(&self, run: &Run) -> Result<(), BotsError> {
+        let mut problems = run.problems();
+        let bots = self.bots()?;
+        for bot in run.bots_needed() {
+            if !bots.iter().any(|kept| kept.id == bot) {
+                problems.push(format!(
+                    "{}: the run still needs `{bot}`, and no such bot is kept",
+                    run.id
+                ));
             }
-        })
+        }
+        if !problems.is_empty() {
+            return Err(BotsError::Invalid(problems));
+        }
+        write(&self.run_file(&run.id), run)
+    }
+
+    fn remove_run(&self, id: &BotId) -> Result<(), BotsError> {
+        remove(&self.run_file(id), id)
     }
 
     fn notes(&self, scope: &MemoryScope) -> Result<Vec<MemoryNote>, BotsError> {

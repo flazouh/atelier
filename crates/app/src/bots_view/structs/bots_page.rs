@@ -2,9 +2,10 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
 use atelier_bot_face::{BotRuntime, FaceSet, Mood};
 use atelier_bots::BotId;
+use atelier_plugin::Host;
 use atelier_ui::{ActiveTheme, Badge, Button, ButtonSize, Segment, Segmented, scale::px, typography::TextSize};
 use gpui_kit::{
-    AnyElement, Context, EventEmitter, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, Rgba, SharedString,
+    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, Rgba, SharedString,
     StatefulInteractiveElement, Styled, Window, div,
 };
 
@@ -12,12 +13,13 @@ use super::super::{
     consts::{DETAIL_PAD, FACE_DATA, NO_FOLDER, NO_NOTES, NOTHING, PROFILE_FACE, READING, ROW_FACE},
     helpers::{access_words, face, face_of, harness_words, mood_words, provider_words, read_library, voice_words},
 };
-use super::super::types::BotsEvent;
 use super::{Entry, Library};
 
 /// The bot library: the bots of the folder and the one chosen, with the mood its face shows. The folder is read off
 /// the UI thread each time the view comes in front, so an edit on disk shows at the next opening.
 pub struct BotsPage {
+    /// The app, as a plugin's page reaches it: the profile asks it for a session of its bot.
+    host: Host,
     faces: Rc<FaceSet>,
     root: Option<PathBuf>,
     library: Library,
@@ -30,13 +32,12 @@ pub struct BotsPage {
     started: Instant,
 }
 
-impl EventEmitter<BotsEvent> for BotsPage {}
-
 impl BotsPage {
     /// Opens the library on `root` and reads it. With no folder the page says so and reads nothing.
-    pub fn new(root: Option<PathBuf>, cx: &mut Context<Self>) -> Self {
+    pub fn new(root: Option<PathBuf>, host: Host, cx: &mut Context<Self>) -> Self {
         let faces = Rc::new(FaceSet::from_json(FACE_DATA).expect("the face data built into the app loads"));
         let page = Self {
+            host,
             faces,
             loading: root.is_some(),
             root,
@@ -165,12 +166,12 @@ impl BotsPage {
         let switch = cx.weak_entity();
         let mood = Segmented::new("bot-mood", moods, selected)
             .on_change(move |i, _, cx| drop(switch.update(cx, |page, cx| page.set_mood(Mood::ALL[i], cx))));
-        let (asking, started) = (cx.weak_entity(), bot.clone());
+        let (host, started) = (self.host.clone(), id.clone());
         let start = Button::new("bot-start-session")
             .debug_name("bot-start-session")
             .label("Start a session")
             .size(ButtonSize::Md)
-            .on_click(move |_, _, cx| drop(asking.update(cx, |_, cx| cx.emit(BotsEvent::StartSession(started.clone())))));
+            .on_click(move |_, window, cx| host.start_session_as(&started, window, cx));
         let head = div()
             .flex()
             .items_start()

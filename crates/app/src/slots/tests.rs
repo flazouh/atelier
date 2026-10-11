@@ -1,6 +1,8 @@
+use atelier_plugin::{Plugin, PluginPage, PluginView, Registry};
 use atelier_ui::{IconName, Work};
+use gpui_kit::{AnyElement, Context};
 
-use super::{Column, RailView, Slots, StatusBarCard, builtin};
+use super::{Column, Slots, StatusBarCard, builtin};
 use crate::vitals::{SysinfoProbe, Vitals};
 
 fn card(id: &'static str, column: Column, order: i32) -> StatusBarCard {
@@ -19,10 +21,30 @@ fn ids(slots: &Slots, column: Column, vitals: &Vitals) -> Vec<String> {
         .collect()
 }
 
-fn view(id: &'static str, order: i32) -> RailView {
-    RailView::new(id, Some(IconName::Code), id, order, |_, _| {
+/// The page of a view no test opens.
+struct NotOpened;
+
+impl PluginPage for NotOpened {
+    fn sidebar(&mut self, _cx: &mut Context<Self>) -> AnyElement {
         unreachable!("not opened")
-    })
+    }
+
+    fn main(&mut self, _cx: &mut Context<Self>) -> AnyElement {
+        unreachable!("not opened")
+    }
+}
+
+/// A plugin that adds one view.
+struct One(PluginView);
+
+impl Plugin for One {
+    fn register(&self, registry: &mut Registry) {
+        registry.add_view(self.0.clone());
+    }
+}
+
+fn view(id: &'static str, order: i32) -> One {
+    One(PluginView::new(id, IconName::Code, id, order, |_, _| -> NotOpened { unreachable!("not opened") }))
 }
 
 #[test]
@@ -73,9 +95,9 @@ fn a_card_added_with_the_id_of_another_replaces_it() {
 #[test]
 fn a_view_added_with_the_id_of_another_replaces_it_and_views_stand_by_order() {
     let mut slots = Slots::default();
-    slots.add_view(view("b", 2));
-    slots.add_view(view("a", 3));
-    slots.add_view(view("b", 5));
+    slots.plug(&view("b", 2));
+    slots.plug(&view("a", 3));
+    slots.plug(&view("b", 5));
     let order: Vec<_> = slots
         .views()
         .iter()

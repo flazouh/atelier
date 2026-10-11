@@ -90,6 +90,8 @@ fn main() {
         let hub = capability_hub::CapabilityHub::for_this_app(saved.capabilities.agent_tools.unwrap_or(true));
         cx.set_global(hub);
         cx.set_global(slots::builtin());
+        // A session that belongs to a bot reads the bot where the Bots view keeps it.
+        cx.set_global(session_bot::BotsFolder(bots_view::helpers::reader_root()));
         cx.set_global(tool_density::ToolDensity::from_key(saved.tool_density.as_deref()));
         pr_glance::install(&saved.pr_card_off, cx);
         cx.set_global(providers::DefaultProvider(providers::Choice::saved(saved.default_provider.as_deref())));

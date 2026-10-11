@@ -126,12 +126,13 @@ No open questions remain in this file.
 
 The crate `atelier-bots` (`crates/bots`) holds this model. It has no screen and no dependency on the UI.
 
-- `Bot`, `FaceChoice`, `Provider`, `ToolGrant`, `Playbook`, `PlaybookStep` and `MemoryNote` are the data. `BotId` is a short name of lower case letters, digits and hyphens, and it is the name of the file.
-- `BotStore` is the trait the app talks to. `DiskBotStore` keeps one JSON file for each bot and each playbook, and one file of notes for each layer:
+- `Bot`, `FaceChoice`, `Provider`, `ToolGrant`, `Playbook`, `PlaybookStep`, `Run`, `RunStep` and `MemoryNote` are the data. `BotId` is a short name of lower case letters, digits and hyphens, and it is the name of the file.
+- `BotStore` is the trait the app talks to. `DiskBotStore` keeps one JSON file for each bot, each playbook and each run, and one file of notes for each layer:
 
 ```
 <folder>/bots/<id>.json
 <folder>/playbooks/<id>.json
+<folder>/runs/<id>.json
 <folder>/memory/bot/<id>.json
 <folder>/memory/workspace/<id>.json
 <folder>/memory/project/<path, made safe>.json
@@ -139,8 +140,94 @@ The crate `atelier-bots` (`crates/bots`) holds this model. It has no screen and 
 
 - An edit that changes a bot makes the next `version`. A save that changes nothing keeps the version.
 - A playbook can only name bots that are kept, and a bot that a playbook names cannot be removed.
-- `starter_crew()` is the ten bots and `starter_playbooks()` is Deliver. `seed_starters` adds the ones a folder does not hold. It never touches a bot that is kept, even after you edit it.
+- `starter_crew()` is the ten bots. `starter_playbooks()` is Deliver, then Design: Quill, Mimi, Bolt, Pip. `seed_starters` adds the ones a folder does not hold. It never touches a bot that is kept, even after you edit it.
 - The faces of Quill, Ink, Mimi and Gus are provisional until the faces step.
+
+### Runs
+
+A **run** is one playbook at work on a brief. The crate holds the run and its rules. It starts no session and calls no agent: the app does that, from the events.
+
+A `Run` has an id, the id of its playbook, the brief (the text a person gave), the time it started, and its steps in order. The app picks the id. A run keeps its own copy of the steps, so you can edit or remove a playbook while a run of it goes on.
+
+A `RunStep` has the id of its bot, its state, and three texts that may be absent:
+
+| Field | Meaning |
+|---|---|
+| `session` | The session the app started for the step. The crate does not read it. |
+| `hand_over` | What the bot wrote for the steps after it. |
+| `answer` | What a person last told the step. |
+
+A step is in one of six states (`StepState`): waiting, working, needs a person, done, failed, skipped. A step that fails keeps the reason. A step that needs a person keeps the question.
+
+The **turn** belongs to the first step that is not done and not skipped. A step that waits and has the turn is **ready**: the app can start it.
+
+The state of a run (`RunState`) is not kept in the file. `Run::state()` reads it from the step that has the turn, so the two cannot disagree:
+
+| The step that has the turn | The run |
+|---|---|
+| waits, or works | working |
+| needs a person | needs a person |
+| failed | failed |
+| no step is left | done |
+
+Only a stop is kept, as `stopped`, because no step can say it. A stopped run is stopped, whatever its steps say. Its steps stay as they were, to show where it stopped.
+
+#### The moves
+
+Each move is a function on a `Run`. It does not change the run it is called on. It returns the new run and a list of `RunEvent`, or a `BotsError::Refused` that says in words why not. The app keeps the new run with `save_run`, then acts on the events.
+
+| Move | Who | What it does |
+|---|---|---|
+| `Run::start` | a person | Makes a run from a playbook and a brief. The first step gets the turn. The rest wait. |
+| `Run::start_alone` | a person | Makes a run of one step. Every other step is skipped. The step does not ask first. |
+| `step_starts` | the app | The ready step is at work. The app gives the id of the session. |
+| `step_asks` | the bot | A step at work needs a person, with a question. |
+| `person_answers` | a person | A step at work goes on. A step that asked before it started is ready. |
+| `step_ends` | the bot | A step at work is done, with its hand-over. The next step gets the turn. |
+| `step_fails` | the app | The step that has the turn fails, with a reason. It may be ready, at work or waiting for a person. |
+| `skip_step` | a person | A step that is not over is skipped. It may be a later step. |
+| `retry_step` | a person | A failed step is ready again, for a new session. |
+| `stop` | a person | The run is stopped. |
+
+When a step gets the turn, one of two things happens. A step that asks first (`asks_first` in the playbook) needs a person, and it is ready after the answer. Any other step is ready at once. With no step left, the run is done.
+
+The bot of a ready step reads a `StepReading`: the brief, the hand-over of each step done before it, in order, and the answer of a person, if there is one. `Run::reading` gives it again at any time.
+
+These moves are refused:
+
+1. Any move on a stopped run.
+2. Any move on a run that breaks a rule of the data (`Run::problems`).
+3. A step that starts before its turn, starts twice, or starts with no session id.
+4. A step that ends or asks when it is not at work. A step that never started cannot end.
+5. An answer for a step that asked nothing.
+6. A failure with no reason, before the turn of the step, or after the step is over.
+7. A skip of a step that is done or skipped.
+8. A retry of a step that did not fail.
+9. A stop of a run that is done.
+
+#### The events
+
+| Event | What the app does |
+|---|---|
+| `StepReady` | Starts a session of the bot and gives it the reading. |
+| `StepStarted` | Shows that the bot is at work. |
+| `StepNeedsPerson` | Shows the question as "needs you". |
+| `StepAnswered` | Gives the answer to the session. |
+| `StepDone` | Shows the hand-over. |
+| `StepSkipped` | Ends the session of the step, if it has one. |
+| `RunDone` | Shows that the run is done. |
+| `RunFailed` | Shows the step and the reason. A person can retry the step, skip it or stop the run. |
+| `RunStopped` | Ends the session of the step that had the turn, if it has one. |
+
+#### Runs and the store
+
+- `runs()` lists the runs, the newest first. `run`, `save_run` and `remove_run` read, keep and remove one.
+- `save_run` checks the rules of the data. It refuses a run that still needs a bot that is not kept.
+- A run **still needs** the bots of its steps that are not done and not skipped. A run that is stopped needs none.
+- A bot that a run still needs cannot be removed. Stop the run, or let it end, first.
+- A run that is done or stopped holds no bot. It stays as a record, and it shows the id of a bot that is gone.
+
+### Sessions of a bot
 
 A session may belong to a bot (`crates/app/src/session_bot`). A session started the old way has no bot.
 
