@@ -822,6 +822,10 @@ fn buttons() -> impl IntoElement {
                 .child(Button::new("chip-xl").label("Get started").chip(IconName::ArrowForward).size(ButtonSize::Xl)),
         ))
         .child(section(
+            "A chip that wears the mark's tile: faint at rest, whole on hover. For the one button that stands for the app",
+            row().child(Button::new("chip-tile").label("Start crafting").chip(IconName::ArrowForward).chip_tile(atelier_ui::atelier_mark::Tile::of(None)).size(ButtonSize::Xl)),
+        ))
+        .child(section(
             "Icon buttons: Icon (28) and IconSm (24), beside Small and Medium text buttons",
             row()
                 .child(Button::new("i-send").icon(IconName::ArrowUp).size(ButtonSize::Icon))
