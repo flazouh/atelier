@@ -3,6 +3,7 @@
 //! that says which file it edits, and git, which finds what a shell command changed.
 
 mod helpers;
+mod shell;
 mod structs;
 mod types;
 

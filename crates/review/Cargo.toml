@@ -11,7 +11,7 @@ atelier-ui.workspace = true
 imara-diff = "0.2"
 atelier-agents.workspace = true
 atelier-project.workspace = true
+serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"
-serde_json = "1"

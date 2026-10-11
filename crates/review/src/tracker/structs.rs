@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use atelier_agents::session::{Event, ToolId, ToolKind};
 use atelier_project::Project;
+use serde_json::Value;
 
 use crate::{
     file_review::{Change, FileReview},
@@ -10,6 +11,7 @@ use crate::{
 };
 use super::types::{Baseline, Heads, Now};
 use super::helpers::{changed_since, pair_renames, read};
+use super::shell::write_targets;
 
 /// Records one turn. `begin` at its start, `observe` for each event of the session while it runs, and
 /// `finish` at its end. Every method that takes a project reads from it and may be slow: call them off
@@ -18,6 +20,10 @@ pub struct TurnTracker {
     pub(super) root: String,
     pub(super) start: Option<State>,
     baselines: BTreeMap<String, Baseline>,
+    /// The files whose baseline a shell command's text gave, with the call. The command may have run before the text was
+    /// whole, so such a baseline can already hold the command's own work: a file that then looks unchanged is listed, not
+    /// dropped. Unless the call failed (a denied command, a crash): then the file is as it was.
+    named_by_shell: BTreeMap<String, ToolId>,
     kinds: HashMap<ToolId, ToolKind>,
 }
 
@@ -27,6 +33,7 @@ impl TurnTracker {
             root: project.root().to_string_lossy().trim_end_matches('/').to_string(),
             start: git_state::snapshot(project),
             baselines: BTreeMap::new(),
+            named_by_shell: BTreeMap::new(),
             kinds: HashMap::new(),
         }
     }
@@ -40,6 +47,12 @@ impl TurnTracker {
                 if let Some(file) = &call.file {
                     self.touch(project, call.kind, file);
                 }
+                self.touch_shell(project, &call.id, call.kind, &call.input);
+            }
+            Event::ToolInput { id, input, file: None } => {
+                if let Some(kind) = self.kinds.get(id).copied() {
+                    self.touch_shell(project, id, kind, input);
+                }
             }
             Event::ToolTarget { id, file } | Event::ToolInput { id, file: Some(file), .. } => {
                 if let Some(kind) = self.kinds.get(id).copied() {
@@ -50,7 +63,9 @@ impl TurnTracker {
                 if let Some(file) = &request.call.file {
                     self.touch(project, request.call.kind, file);
                 }
+                self.touch_shell(project, &request.call.id, request.call.kind, &request.call.input);
             }
+            Event::ToolFinished { id, output } if output.is_error => self.named_by_shell.retain(|_, call| call != id),
             _ => {}
         }
     }
@@ -60,16 +75,37 @@ impl TurnTracker {
             return;
         }
         let Some(path) = self.place_of(file) else { return };
-        if self.baselines.contains_key(&path) {
+        self.take_baseline(project, path);
+    }
+
+    /// Takes the baseline of each file beyond the project that a shell command's redirects and `tee` name. A file inside the
+    /// project needs none: git finds what the command did there. A script that opens its own files is not seen.
+    fn touch_shell(&mut self, project: &dyn Project, id: &ToolId, kind: ToolKind, input: &Value) {
+        if kind != ToolKind::Shell {
             return;
+        }
+        let Some(command) = input.get("command").and_then(Value::as_str) else { return };
+        for file in write_targets(command) {
+            let Some(path) = self.place_of(&file).filter(|path| crate::place::is_outside(path)) else { continue };
+            if self.take_baseline(project, path.clone()) {
+                self.named_by_shell.insert(path, id.clone());
+            }
+        }
+    }
+
+    /// Records the file's text now, unless the turn already holds one. Whether this call recorded it.
+    fn take_baseline(&mut self, project: &dyn Project, path: String) -> bool {
+        if self.baselines.contains_key(&path) {
+            return false;
         }
         let baseline = match read(project, &path) {
             Some(Now::Text(text)) => Baseline::Text(text),
             Some(Now::Absent) => Baseline::Absent,
             Some(Now::Binary(hash)) => Baseline::Binary(hash),
-            None => return,
+            None => return false,
         };
         self.baselines.insert(path, baseline);
+        true
     }
 
     /// The path a review keeps for a file the agent named: relative to the project when it is inside the folder, else
@@ -128,6 +164,9 @@ impl TurnTracker {
             (baseline, now) => {
                 let before = if let Baseline::Text(text) = baseline { Some(text) } else { None };
                 let after = if let Now::Text(text) = now { Some(text) } else { None };
+                if before == after && after.is_some() && self.named_by_shell.contains_key(path) {
+                    return Some(FileReview::unknown(path, after));
+                }
                 (before != after).then(|| FileReview::from_texts(path, before, after, exact))
             }
         }
