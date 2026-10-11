@@ -447,8 +447,17 @@ fn the_files_come_sorted_by_path() {
 
 /// The events of a captured `claude` run, with the run's folder replaced by this repository's.
 fn captured(name: &str, root: &Path) -> Vec<Event> {
+    captured_replacing(name, root, "", "")
+}
+
+/// A captured run, with the text `from` in it swapped for `to` (an empty `from` swaps nothing).
+fn captured_replacing(name: &str, root: &Path, from: &str, to: &str) -> Vec<Event> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../agents/tests/fixtures/claude_code").join(format!("{name}.jsonl"));
-    let text = fs::read_to_string(path).unwrap();
+    let mut text = fs::read_to_string(path).unwrap();
+    if !from.is_empty() {
+        assert!(text.contains(from), "the run holds {from:?}");
+        text = text.replace(from, to);
+    }
     let mut mapper = ClaudeLineMapper::new();
     let now = std::time::Instant::now();
     let root = root.to_string_lossy().to_string();
@@ -663,4 +672,30 @@ fn a_shell_command_that_failed_after_it_wrote_still_lists_the_file() {
     tracker.observe(repo.project.as_ref(), &errored("t1"));
     let files = repo.files(tracker);
     assert_eq!((files.len(), &files[0].change), (1, &Change::Added));
+}
+
+#[test]
+fn a_captured_shell_run_takes_the_text_of_a_redirect_target_before_the_command_would_run() {
+    // A real Claude Code run of one Bash call, its command swapped for a redirect beyond the project. The command reaches
+    // the tracker in pieces, then whole; the file is written only once it is whole, as the tool would run it.
+    let repo = Repo::with(&[("note.txt", "n\n")]);
+    let (_outside, out) = outside_folder();
+    let mut tracker = repo.begin();
+    let mut written = false;
+    for event in captured_replacing("tool_read", repo.root(), "cat note.txt", &format!("echo hello > {out}")) {
+        tracker.observe(repo.project.as_ref(), &event);
+        let whole = match &event {
+            Event::ToolInput { input, .. } => input.get("command"),
+            Event::ToolStarted(call) => call.input.get("command"),
+            _ => None,
+        };
+        if !written && whole.and_then(|command| command.as_str()).is_some_and(|command| command.ends_with(&out)) {
+            fs::write(&out, "hello\n").unwrap();
+            written = true;
+        }
+    }
+    assert!(written, "the whole command reached the tracker");
+    let files = repo.files(tracker);
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert_eq!((files[0].path.as_str(), &files[0].change, files[0].before.as_deref(), files[0].exact), (out.as_str(), &Change::Added, None, true));
 }
