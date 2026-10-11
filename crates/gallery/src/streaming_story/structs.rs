@@ -45,7 +45,6 @@ impl Render for StreamingStory {
                 AgentText::new("stream", answer(self.tokens))
                     .status(if done { AgentTextStatus::Complete } else { AgentTextStatus::Streaming })
                     .fade_tail(self.fade)
-                    .fade_into(theme.background),
             ),
         )
     }
