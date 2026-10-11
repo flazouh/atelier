@@ -765,7 +765,7 @@ dependencies = [
 [[package]]
 name = "atelier-ui"
 version = "0.1.0"
-source = "git+https://github.com/flazouh/atelier-ui#e5b88b97e106e8039d1244d24477a0798005db21"
+source = "git+https://github.com/flazouh/atelier-ui#7b84522800942182ef33fdce9b002c292bef6163"
 dependencies = [
  "core-foundation 0.9.4",
  "core-foundation-sys",
