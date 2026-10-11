@@ -46,18 +46,19 @@ fn a_first_start_covers_the_whole_window_with_the_welcome_page(cx: &mut TestAppC
 #[gpui_kit::test]
 fn pressing_the_button_takes_the_page_away_and_the_start_screen_answers_again(cx: &mut TestAppContext) {
     let (shell, cx) = start(cx, atelier_settings::Settings::default());
-    let folder = cx.debug_bounds("open-folder").expect("the start screen is drawn under the page");
-    cx.simulate_click(folder.center(), Modifiers::default());
+    // Open over SSH opens the app's own dialog at once; Open Folder asks the system's first.
+    let remote = cx.debug_bounds("open-remote").expect("the start screen is drawn under the page");
+    cx.simulate_click(remote.center(), Modifiers::default());
     settle(&shell, cx);
-    assert!(cx.debug_bounds("open-folder-picker").is_none(), "a press does not go through the page");
+    assert!(cx.debug_bounds("open-over-ssh").is_none(), "a press does not go through the page");
     let button = cx.debug_bounds("welcome-continue").expect("the button is drawn");
     cx.simulate_click(button.center(), Modifiers::default());
     settle(&shell, cx);
     assert!(!shell.read_with(cx, |s, _| s.welcome_shown()));
     assert!(cx.debug_bounds("welcome").is_none(), "the page is gone");
-    cx.simulate_click(folder.center(), Modifiers::default());
+    cx.simulate_click(remote.center(), Modifiers::default());
     settle(&shell, cx);
-    assert!(cx.debug_bounds("open-folder-picker").is_some(), "the start screen answers again");
+    assert!(cx.debug_bounds("open-over-ssh").is_some(), "the start screen answers again");
     shell.update(cx, |s, cx| s.dismiss_welcome(cx));
     settle(&shell, cx);
     assert!(!shell.read_with(cx, |s, _| s.welcome_shown()), "a second dismissal changes nothing");

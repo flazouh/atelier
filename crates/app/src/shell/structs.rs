@@ -1778,6 +1778,7 @@ impl Shell {
                             )
                             .child(
                                 Button::new("open-remote")
+                                    .debug_name("open-remote")
                                     .label("Open over SSH…")
                                     .size(ButtonSize::Md)
                                     .variant(ButtonVariant::Secondary)
@@ -2252,6 +2253,7 @@ impl Shell {
                 let this = cx.entity().downgrade();
                 let focus = form.read(cx).focus_handle(cx);
                 Modal::new("open-over-ssh")
+                    .debug_name("open-over-ssh")
                     .view(form.read(cx).view_key())
                     .width(440.)
                     .focus(&focus)
@@ -2262,7 +2264,6 @@ impl Shell {
                 let this = cx.entity().downgrade();
                 let focus = picker.read(cx).focus_handle(cx);
                 Modal::new("open-folder-picker")
-                    .debug_name("open-folder-picker")
                     .width(520.)
                     .focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_folder_picker(window, cx))))
