@@ -23,6 +23,7 @@ mod updates;
 mod usage;
 mod view;
 mod views;
+mod welcome;
 
 pub use view::ShellView;
 

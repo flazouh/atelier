@@ -39,6 +39,7 @@ mod providers_story;
 mod sign_in_story;
 mod changelog_story;
 mod groups;
+mod welcome_story;
 mod usage_story;
 
 use gpui_kit::base::input::InputEvent;
@@ -58,6 +59,7 @@ enum Story {
     ProviderSettings,
     SignInNotice,
     ChangelogSheet,
+    WelcomePage,
     UsageDashboard,
     SubagentCard,
     SubagentStrip,
@@ -97,7 +99,7 @@ enum Story {
 }
 
 impl Story {
-    const ALL: [Story; 43] = [
+    const ALL: [Story; 44] = [
         Story::AgentPanel,
         Story::ChangedFiles,
         Story::Worktrees,
@@ -105,6 +107,7 @@ impl Story {
         Story::ProviderSettings,
         Story::SignInNotice,
         Story::ChangelogSheet,
+        Story::WelcomePage,
         Story::UsageDashboard,
         Story::SubagentCard,
         Story::SubagentStrip,
@@ -152,6 +155,7 @@ impl Story {
             Story::ProviderSettings => "Provider settings",
             Story::SignInNotice => "Sign-in notice",
             Story::ChangelogSheet => "Changelog sheet",
+            Story::WelcomePage => "Welcome page",
             Story::UsageDashboard => "Usage dashboard",
             Story::SubagentCard => "Subagent card",
             Story::SubagentStrip => "Subagent strip",
@@ -591,6 +595,7 @@ impl Gallery {
             Story::ProviderSettings => providers_story::settings_story(cx).into_any_element(),
             Story::SignInNotice => sign_in_story::sign_in_story(cx).into_any_element(),
             Story::ChangelogSheet => changelog_story::changelog_story(cx).into_any_element(),
+            Story::WelcomePage => welcome_story::welcome_story().into_any_element(),
             Story::UsageDashboard => usage_story::usage_story(cx).into_any_element(),
             Story::SubagentCard => agent_parts::subagent_card_story(self.tick, self.is_live(), cx).into_any_element(),
             Story::SubagentStrip => agent_parts::subagent_strip_story(self.tick, self.is_live(), cx).into_any_element(),

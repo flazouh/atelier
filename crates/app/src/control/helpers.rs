@@ -216,7 +216,7 @@ pub(crate) fn state(shell: &Shell, cx: &App) -> Value {
         let rows: Vec<&str> = page.entries().iter().map(|e| e.bot.id.as_str()).collect();
         json!({ "rows": rows, "chosen": page.selected().map(ToString::to_string), "error": page.error() })
     });
-    json!({ "settings": shell.settings_section(cx), "unsaved": shell.unsaved(cx), "updates": { "available": updates, "state": shell.update_state_word(), "changelog_open": shell.changelog_shown() }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) }, "view": shell.view().words(), "bots": bots })
+    json!({ "settings": shell.settings_section(cx), "welcome": shell.welcome_shown(), "unsaved": shell.unsaved(cx), "updates": { "available": updates, "state": shell.update_state_word(), "changelog_open": shell.changelog_shown() }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) }, "view": shell.view().words(), "bots": bots })
 }
 
 /// One session: who the agent is, how it stands, and the rows its list shows.

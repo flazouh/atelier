@@ -134,6 +134,7 @@ fn main() {
             window.observe_window_appearance(|window, cx| settings_pane::Mode::system_changed(window.appearance(), cx)).detach();
             let shell = cx.new(|cx| shell::Shell::new(&saved, cx));
             shell.update(cx, |s, cx| s.listen(window, cx));
+            shell.update(cx, |s, cx| s.welcome_at_start(&saved, cx));
             shell.update(cx, |s, cx| {
                 s.serve_relaunches(relaunch_requests, window, cx);
                 s.serve_updates(update_events, window, cx);

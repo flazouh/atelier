@@ -56,7 +56,7 @@ impl Story {
             | Story::Bots => Group::Agent,
             Story::Editor | Story::Diffs | Story::Inline | Story::Review | Story::ChangedFiles | Story::Load | Story::Worktrees => Group::Code,
             Story::PullRequest | Story::PullRequests | Story::PullRequestView | Story::PrCard | Story::PrChip | Story::PrChipCards | Story::Merge => Group::PullRequests,
-            Story::ChangelogSheet | Story::UsageDashboard | Story::Providers | Story::ProviderSettings | Story::SignInNotice | Story::Tasks => Group::App,
+            Story::WelcomePage | Story::ChangelogSheet | Story::UsageDashboard | Story::Providers | Story::ProviderSettings | Story::SignInNotice | Story::Tasks => Group::App,
         }
     }
 

@@ -137,6 +137,8 @@ pub struct Shell {
     /// The changelog of the update this version came from, kept until the reader closes its sheet, and whether the sheet is open.
     pub(super) whats_new: Option<atelier_settings::WhatsNew>,
     pub(super) whats_new_open: bool,
+    /// The welcome page covers the window: a reader's first start, until they press its button.
+    pub(super) welcome: bool,
     /// The changelog the version in the title bar opens.
     pub(super) changelog_open: bool,
     /// What the changelog panel holds focus with, so Escape reaches it.
@@ -215,6 +217,7 @@ impl Shell {
             update: crate::updater::UpdateState::default(),
             whats_new_open: whats_new.is_some(),
             whats_new,
+            welcome: false,
             changelog_open: false,
             update_focus: cx.focus_handle(),
             opened: None,
@@ -1766,6 +1769,7 @@ impl Shell {
                             .gap(px(8.))
                             .child(
                                 Button::new("open-folder")
+                                    .debug_name("open-folder")
                                     .label("Open Folder…")
                                     .size(ButtonSize::Md)
                                     .variant(ButtonVariant::Primary)
@@ -2238,7 +2242,9 @@ impl Shell {
                     )
             }))
             .children(self.tree_menu(cx))
-            .children(self.update_panel(window, cx))
+            // The welcome page stands alone: a changelog waits under it until the reader has pressed its button.
+            .children((!self.welcome).then(|| self.update_panel(window, cx)).flatten())
+            .children(self.welcome_page(cx))
             .children(self.opened.as_ref().map(|(_, page)| page.clone()))
             .children(self.settings.as_ref().map(|(pane, _)| div().absolute().top(px(TITLE_BAR)).left_0().right_0().bottom_0().occlude().child(pane.clone())))
             // The dialogs share the Modal: a scrim, Escape and a press on the scrim close it, and focus goes back.
@@ -2256,6 +2262,7 @@ impl Shell {
                 let this = cx.entity().downgrade();
                 let focus = picker.read(cx).focus_handle(cx);
                 Modal::new("open-folder-picker")
+                    .debug_name("open-folder-picker")
                     .width(520.)
                     .focus(&focus)
                     .on_close(move |window, cx| drop(this.update(cx, |shell, cx| shell.close_folder_picker(window, cx))))
