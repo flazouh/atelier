@@ -8,8 +8,9 @@ use crate::fake_agent::start;
 #[test]
 fn a_line_names_its_command() {
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"state"}"#).unwrap(), Request::State);
-    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"new_session"}"#).unwrap(), Request::NewSession { agent: None });
-    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"new_session","agent":"Cursor"}"#).unwrap(), Request::NewSession { agent: Some("Cursor".into()) });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"new_session"}"#).unwrap(), Request::NewSession { agent: None, bot: None });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"new_session","agent":"Cursor"}"#).unwrap(), Request::NewSession { agent: Some("Cursor".into()), bot: None });
+    assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"new_session","bot":"dot"}"#).unwrap(), Request::NewSession { agent: None, bot: Some("dot".into()) });
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"send","text":"hi"}"#).unwrap(), Request::Send { text: "hi".into() });
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"limit"}"#).unwrap(), Request::Limit);
     assert_eq!(serde_json::from_str::<Request>(r#"{"cmd":"find","name":"a"}"#).unwrap(), Request::Find { name: "a".into() });
@@ -47,6 +48,25 @@ fn the_state_of_a_session_that_waits_lists_the_message_and_the_waiting_line(cx: 
     assert_eq!(rows[0]["text"], "hello");
     assert_eq!(rows[1]["kind"], "waiting");
     assert!(!rows[1]["label"].as_str().unwrap().is_empty());
+}
+
+/// A script reads whose session it is: the bot's id and the mood its face shows, and neither for a session with no bot.
+#[gpui_kit::test]
+fn the_state_of_a_session_says_its_bot_and_the_mood_of_its_face(cx: &mut TestAppContext) {
+    let dot = atelier_bots::starter_crew().into_iter().find(|b| b.id.as_str() == "dot").unwrap();
+    let (session, _fake, cx) = crate::fake_agent::start_as(cx, dot, None, vec![]);
+    let json = cx.update(|_, cx| session_json(session.read(cx), true));
+    assert_eq!((json["bot"].as_str(), json["mood"].as_str()), (Some("dot"), Some("idle")));
+    cx.update(|_, cx| session.update(cx, |s, cx| s.send("hello".into(), cx)));
+    let json = cx.update(|_, cx| session_json(session.read(cx), true));
+    assert_eq!(json["mood"], "thinking", "the agent works and runs no tool");
+}
+
+#[gpui_kit::test]
+fn the_state_of_a_session_with_no_bot_names_none(cx: &mut TestAppContext) {
+    let (session, _fake, cx) = start(cx, vec![], false);
+    let json = cx.update(|_, cx| session_json(session.read(cx), true));
+    assert!(json["bot"].is_null() && json["mood"].is_null(), "{json}");
 }
 
 /// A debug build listens without being asked, a release build only when asked, and "off" wins.

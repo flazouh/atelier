@@ -4,6 +4,7 @@
 # atelier-<pid>.sock in $XDG_RUNTIME_DIR (or /tmp).
 #   tools/atelier-ctl.sh state
 #   tools/atelier-ctl.sh new_session [agent]     e.g. Cursor, "Claude Code"
+#   tools/atelier-ctl.sh new_session --bot ID    a session that belongs to a bot, e.g. --bot dot
 #   tools/atelier-ctl.sh send "a message"
 #   tools/atelier-ctl.sh limit                  pretend the front session hit its weekly limit
 #   tools/atelier-ctl.sh open PATH [HOST]       open a folder, over SSH on HOST when named
@@ -14,13 +15,16 @@
 #                                               section-providers, add-key, keep-key, test-key, forget-key
 # Each prints the app's JSON answer, one line.
 set -euo pipefail
-[ $# -ge 1 ] || { sed -n 2,13p "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n 2,14p "$0"; exit 2; }
 exec python3 - "$@" <<'PY'
 import glob, json, os, socket, sys
 cmd, rest = sys.argv[1], sys.argv[2:]
 request = {"cmd": cmd}
 if cmd == "new_session" and rest:
-    request["agent"] = rest[0]
+    if rest[0] == "--bot":
+        request["bot"] = rest[1]
+    else:
+        request["agent"] = rest[0]
 if cmd == "press":
     request["name"] = rest[0]
 if cmd == "find" or cmd == "click":

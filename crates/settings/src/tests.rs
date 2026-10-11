@@ -92,8 +92,8 @@ fn the_open_sessions_come_back() {
     let here = Location::Local { path: "/work/atelier".into() };
     update(&path, |s| {
         s.open = vec![
-            OpenSession { location: here.clone(), id: "s1".into(), title: "Fix the lease".into(), agent: None, provider: None },
-            OpenSession { location: here.clone(), id: "s2".into(), title: "Add a test".into(), agent: None, provider: None },
+            OpenSession { location: here.clone(), id: "s1".into(), title: "Fix the lease".into(), agent: None, provider: None, bot: None },
+            OpenSession { location: here.clone(), id: "s2".into(), title: "Add a test".into(), agent: None, provider: None, bot: None },
         ];
         s.front = Some("s2".into());
     })
@@ -108,7 +108,7 @@ fn the_open_sessions_come_back() {
 #[test]
 fn an_open_session_keeps_its_agent_and_an_old_file_has_none() {
     let here = Location::Local { path: "/work/atelier".into() };
-    let kept = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: Some("cursor".into()), provider: Some("openrouter".into()) };
+    let kept = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: Some("cursor".into()), provider: Some("openrouter".into()), bot: None };
     let round: OpenSession = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
     assert_eq!(round, kept);
     let old: OpenSession = serde_json::from_str(r#"{"location":{"kind":"local","path":"/w"},"id":"s1","title":"hi"}"#).unwrap();
@@ -206,10 +206,26 @@ fn the_language_is_kept_by_its_tag() {
 #[test]
 fn an_open_session_with_no_provider_writes_none_and_reads_back() {
     let here = Location::Local { path: "/p".into() };
-    let saved = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: None, provider: None };
+    let saved = OpenSession { location: here, id: "s1".into(), title: "hi".into(), agent: None, provider: None, bot: None };
     let text = serde_json::to_string(&saved).unwrap();
     assert!(!text.contains("provider"), "{text}");
     assert_eq!(serde_json::from_str::<OpenSession>(&text).unwrap(), saved);
+}
+
+/// A session that belongs to a bot keeps the bot's id, so the next launch still knows whose it is. A session with no bot
+/// writes none, so a file from before bots reads the same way.
+#[test]
+fn an_open_session_keeps_its_bot_through_a_save_and_a_load_and_one_with_no_bot_writes_none() {
+    let path = scratch("open-bot");
+    let here = Location::Local { path: "/work/atelier".into() };
+    let of_dot = OpenSession { location: here.clone(), id: "s1".into(), title: "Find the leak".into(), agent: Some("claude-code".into()), provider: None, bot: Some("dot".into()) };
+    let plain = OpenSession { location: here, id: "s2".into(), title: "hi".into(), agent: None, provider: None, bot: None };
+    update(&path, |s| s.open = vec![of_dot.clone(), plain.clone()]).unwrap();
+    assert_eq!(load(&path).open, vec![of_dot, plain.clone()]);
+    let text = serde_json::to_string(&plain).unwrap();
+    assert!(!text.contains("bot"), "{text}");
+    let old: OpenSession = serde_json::from_str(r#"{"location":{"kind":"local","path":"/w"},"id":"s1","title":"hi"}"#).unwrap();
+    assert_eq!(old.bot, None);
 }
 
 fn pairs(of: &[(&str, &str)]) -> Vec<(String, String)> {

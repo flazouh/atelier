@@ -2,9 +2,9 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Instant};
 
 use atelier_bot_face::{BotRuntime, FaceSet, Mood};
 use atelier_bots::BotId;
-use atelier_ui::{ActiveTheme, Badge, Segment, Segmented, scale::px, typography::TextSize};
+use atelier_ui::{ActiveTheme, Badge, Button, ButtonSize, Segment, Segmented, scale::px, typography::TextSize};
 use gpui_kit::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, Rgba, SharedString,
+    AnyElement, Context, EventEmitter, FontWeight, InteractiveElement, IntoElement, ParentElement, Render, Rgba, SharedString,
     StatefulInteractiveElement, Styled, Window, div,
 };
 
@@ -12,6 +12,7 @@ use super::super::{
     consts::{DETAIL_PAD, FACE_DATA, NO_FOLDER, NO_NOTES, NOTHING, PROFILE_FACE, READING, ROW_FACE},
     helpers::{access_words, face, face_of, harness_words, mood_words, provider_words, read_library, voice_words},
 };
+use super::super::types::BotsEvent;
 use super::{Entry, Library};
 
 /// The bot library: the bots of the folder and the one chosen, with the mood its face shows. The folder is read off
@@ -28,6 +29,8 @@ pub struct BotsPage {
     runtime: Rc<RefCell<BotRuntime>>,
     started: Instant,
 }
+
+impl EventEmitter<BotsEvent> for BotsPage {}
 
 impl BotsPage {
     /// Opens the library on `root` and reads it. With no folder the page says so and reads nothing.
@@ -162,6 +165,12 @@ impl BotsPage {
         let switch = cx.weak_entity();
         let mood = Segmented::new("bot-mood", moods, selected)
             .on_change(move |i, _, cx| drop(switch.update(cx, |page, cx| page.set_mood(Mood::ALL[i], cx))));
+        let (asking, started) = (cx.weak_entity(), bot.clone());
+        let start = Button::new("bot-start-session")
+            .debug_name("bot-start-session")
+            .label("Start a session")
+            .size(ButtonSize::Md)
+            .on_click(move |_, _, cx| drop(asking.update(cx, |_, cx| cx.emit(BotsEvent::StartSession(started.clone())))));
         let head = div()
             .flex()
             .items_start()
@@ -181,7 +190,8 @@ impl BotsPage {
                             .child(SharedString::from(bot.name.clone())),
                     ))
                     .child(div().text_size(TextSize::Base.font_size()).text_color(theme.muted_foreground).child(SharedString::from(bot.role.clone())))
-                    .child(div().mt(px(10.)).text_size(TextSize::Sm.font_size()).child(SharedString::from(bot.job.clone()))),
+                    .child(div().mt(px(10.)).text_size(TextSize::Sm.font_size()).child(SharedString::from(bot.job.clone())))
+                    .child(div().mt(px(14.)).flex().child(crate::control::marked("bot-start-session", start))),
             );
         let skills: Vec<AnyElement> = bot.skills.iter().map(|s| Badge::new(SharedString::from(s.clone())).into_any_element()).collect();
         let tools: Vec<SharedString> =

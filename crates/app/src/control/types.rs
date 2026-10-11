@@ -5,7 +5,9 @@ use serde::Deserialize;
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum Request {
     State,
-    NewSession { agent: Option<String> },
+    /// A new session in the active project: of `agent` by its name, or one that belongs to the bot kept under the id `bot`
+    /// (on the bot's own harness), or the project's own agent with neither.
+    NewSession { agent: Option<String>, bot: Option<String> },
     Send { text: String },
     /// Pretends the front session's account reached its weekly limit, resetting in 30 h 39 min.
     Limit,

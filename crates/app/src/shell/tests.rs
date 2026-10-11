@@ -4,6 +4,7 @@ use gpui_kit::{TestAppContext, px, size};
 use super::*;
 
 mod bots;
+mod session_bot;
 
 #[gpui_kit::test]
 fn the_first_launch_shows_the_mark_and_one_line_about_what_atelier_is_above_the_buttons(cx: &mut TestAppContext) {

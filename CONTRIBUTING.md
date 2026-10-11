@@ -9,7 +9,8 @@ errors, the gallery build, and the tests of the patched copies in `vendor`.
 
 A debug build listens on a Unix socket (`ATELIER_CONTROL=off` turns it off), so a change can be checked without a pointer:
 `tools/dev-qa.sh start` runs a throwaway app on a scratch folder, `tools/atelier-ctl.sh state` lists the sessions and
-the rows they show, `new_session [agent]` and `send "text"` act, and `tools/dev-qa.sh stop` ends it.
+the rows they show, `new_session [agent]` (or `new_session --bot ID` for a session that belongs to a bot) and
+`send "text"` act, and `tools/dev-qa.sh stop` ends it.
 
 ## Design
 

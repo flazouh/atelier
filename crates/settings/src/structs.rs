@@ -184,8 +184,8 @@ pub struct Panels {
     pub widths: Vec<(String, f32)>,
 }
 
-/// A session open at quit: its project, the agent's id for it, its title as the panel showed it, and the
-/// backend of the agent that runs it (`None` in a file from before, for the default agent).
+/// A session open at quit: its project, the agent's id for it, its title as the panel showed it, the
+/// backend of the agent that runs it (`None` in a file from before, for the default agent), and its bot when it has one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OpenSession {
     pub location: Location,
@@ -196,6 +196,9 @@ pub struct OpenSession {
     /// The provider the session ran on, as the settings keep a provider choice; none for a session saved before this was kept.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    /// The id of the bot the session belongs to; none for a session that has no bot, and for one saved before bots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bot: Option<String>,
 }
 
 impl Settings {

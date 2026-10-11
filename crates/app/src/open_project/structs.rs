@@ -258,6 +258,11 @@ impl OpenProject {
     /// Starts a new session, or resumes the past one `resume`, on `provider` when one is named. A resumed session with none
     /// runs on the account it was saved under.
     pub fn open_session_on(&mut self, resume: Option<(SessionId, SharedString)>, agent: Option<Agent>, provider: Option<crate::providers::Choice>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+        self.open_session_as(resume, agent, provider, None, window, cx)
+    }
+    /// As `open_session_on`, for a session that belongs to `bot` when one is named: `agent` is the bot's harness, the agent is
+    /// told the bot's persona, and the session's rows show the bot's face.
+    pub fn open_session_as(&mut self, resume: Option<(SessionId, SharedString)>, agent: Option<Agent>, provider: Option<crate::providers::Choice>, bot: Option<atelier_bots::Bot>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let key: SharedString = format!("session-{}", NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)).into();
         let when = resume.as_ref().and_then(|(id, _)| super::past::last_activity(&self.past, id));
@@ -266,7 +271,7 @@ impl OpenProject {
         if let Some((id, _)) = &resume {
             self.past.retain(|p| p.id != *id);
         }
-        let session = self.start_session(key, agent.unwrap_or_else(|| self.agent.clone()), resume, provider, window, cx);
+        let session = self.start_session(key, agent.unwrap_or_else(|| self.agent.clone()), resume, provider, bot, window, cx);
         // An opened past session keeps its place: its stamp is its last activity, not now.
         if let Some(when) = when {
             session.update(cx, |s, _| {
@@ -281,14 +286,15 @@ impl OpenProject {
     }
 
     /// A new session keyed `key` of `agent`, and the project listening to it.
-    fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, provider: Option<crate::providers::Choice>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
+    #[allow(clippy::too_many_arguments)]
+    fn start_session(&mut self, key: SharedString, agent: Agent, resume: Option<(SessionId, SharedString)>, provider: Option<crate::providers::Choice>, bot: Option<atelier_bots::Bot>, window: &mut Window, cx: &mut Context<Self>) -> Entity<AgentSession> {
         let project = self.project.clone();
         let chips = self.pr_chips.clone();
         #[cfg(test)]
         let agent = if super::TEST_THREAD_ONLY.get() { Agent { backend: crate::fake_agent::fake_agent("fake").backend, ..agent } } else { agent };
         let branches = self.handoff_targets.branches();
         let session = cx.new(|cx| {
-            let mut session = AgentSession::start_on(key, agent, project, resume, provider, window, cx);
+            let mut session = AgentSession::start_as(key, agent, project, resume, provider, bot, window, cx);
             session.pr_chips = chips;
             session.handoff_branches = branches;
             session
@@ -337,14 +343,15 @@ impl OpenProject {
     }
 
     /// The new session keyed `key` starts again with `agent`, in its place and under its key, so its
-    /// panel stays where it was. A session that has a conversation keeps its agent.
+    /// panel stays where it was. A session that has a conversation keeps its agent. A bot is a persona on its own harness, so
+    /// a session of a bot that takes another agent is a session with no bot.
     pub fn choose_agent(&mut self, key: &str, agent: Agent, window: &mut Window, cx: &mut Context<Self>) {
         let Some(at) = self.sessions.iter().position(|s| s.read(cx).key.as_ref() == key) else { return };
         if !self.sessions[at].read(cx).can_choose_agent() {
             return;
         }
         let continues = self.sessions[at].read(cx).continues().cloned();
-        self.sessions[at] = self.start_session(key.to_string().into(), agent, None, None, window, cx);
+        self.sessions[at] = self.start_session(key.to_string().into(), agent, None, None, None, window, cx);
         if let Some(source) = continues {
             self.sessions[at].update(cx, |s, cx| s.continue_from(source, None, cx));
         }

@@ -12,7 +12,7 @@ impl Shell {
     /// Shows the Bots view.
     pub(super) fn show_bots(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let before = self.bots.is_some();
-        self.ensure_bots(cx);
+        self.ensure_bots(window, cx);
         // A page made earlier shows what it read then: the folder is read again each time the view comes in front.
         if let Some(page) = self.bots.clone().filter(|_| before && self.view != ShellView::Bots) {
             page.update(cx, |page, cx| page.refresh(cx));
@@ -21,11 +21,13 @@ impl Shell {
         cx.notify();
     }
 
-    /// Makes the page when there is none.
-    pub(super) fn ensure_bots(&mut self, cx: &mut Context<Self>) {
+    /// Makes the page when there is none, and hears what it asks of the window.
+    pub(super) fn ensure_bots(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.bots.is_none() {
             let root = self.bots_root.clone();
-            self.bots = Some(cx.new(|cx| BotsPage::new(root, cx)));
+            let page = cx.new(|cx| BotsPage::new(root, cx));
+            self._subscriptions.push(cx.subscribe_in(&page, window, Self::bots_event));
+            self.bots = Some(page);
         }
     }
 
