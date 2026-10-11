@@ -100,7 +100,7 @@ pub struct Shell {
     /// The session in front at the last quit, by the agent's id.
     pub(super) front: Option<String>,
     /// The open sessions and the one in front as the settings file has them, to write only a change.
-    saved_open: (Vec<atelier_settings::OpenSession>, Option<String>),
+    pub(super) saved_open: (Vec<atelier_settings::OpenSession>, Option<String>),
     pub(super) _subscriptions: Vec<Subscription>,
     /// Each open session's panel view, by the session's entity.
     panel_views: std::collections::HashMap<gpui_kit::EntityId, Entity<crate::session_panel::SessionPanel>>,
@@ -164,6 +164,7 @@ impl Shell {
             sidebar
         });
         agents_sidebar.update(cx, |s, cx| s.set_layout(crate::sidebar_layout::from_settings(saved), cx));
+        super::session_bot::show_bot_faces(&agents_sidebar, cx.weak_entity(), cx);
         let panels = cx.new(|cx| {
             let mut panels = AgentPanels::new(cx);
             let layout = if saved.panels.single { Layout::Single } else { Layout::SideBySide };
@@ -319,6 +320,7 @@ impl Shell {
                         title: s.shown_title().to_string(),
                         agent: Some(s.agent.backend.name().to_string()),
                         provider: s.provider.as_ref().map(crate::providers::Choice::key),
+                        bot: s.bot.as_ref().map(|bot| bot.id.to_string()),
                     }));
                 }
             }
@@ -378,7 +380,8 @@ impl Shell {
             let id = atelier_agents::session::SessionId::new(saved.id.clone());
             let title = self.names.get(&saved.id).cloned().unwrap_or(saved.title.clone());
             let agent = saved.agent.as_deref().and_then(atelier_agents::registry::by_backend);
-            let session = project.update(cx, |p, cx| p.open_session_on(Some((id, title.into())), agent, saved.provider.as_deref().and_then(crate::providers::Choice::from_key), window, cx));
+            let bot = saved.bot.as_deref().and_then(|bot| self.kept_bot(bot, cx));
+            let session = project.update(cx, |p, cx| p.open_session_as(Some((id, title.into())), agent, saved.provider.as_deref().and_then(crate::providers::Choice::from_key), bot, window, cx));
             // A session from the last run keeps its place; only one opened now stands first.
             self.order.push(session.read(cx).key.clone());
             if let Some(name) = self.names.get(&saved.id) {

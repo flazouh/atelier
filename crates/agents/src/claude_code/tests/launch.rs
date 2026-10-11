@@ -211,6 +211,20 @@ fn the_permission_flow_is_the_same_with_an_mcp_config() {
     let with = OpenRequest { mcp_config: Some("/run/atelier/mcp-1.json".into()), ..OpenRequest::default() };
     assert!(has_pair(&args(&with), "--permission-prompt-tool", "stdio"));
 }
+/// A persona is text added to `claude`'s own system prompt at launch, at a new session and at a resume alike: the prompt is
+/// not kept with the session, so a resume must say it again. It is one argument, whatever it holds.
+#[test]
+fn a_persona_goes_to_claude_as_an_appended_system_prompt_and_none_adds_no_flag() {
+    let persona = "You are Dot.\nRole: Debugger. It's \"thorough\".";
+    let with = OpenRequest { append_system_prompt: Some(persona.into()), ..OpenRequest::default() };
+    assert!(has_pair(&args(&with), "--append-system-prompt", persona));
+    let resumed = OpenRequest { append_system_prompt: Some(persona.into()), ..resuming(SAVED_SESSION) };
+    assert!(has_pair(&args(&resumed), "--append-system-prompt", persona));
+    assert!(!args(&OpenRequest::default()).iter().any(|arg| arg == "--append-system-prompt"));
+    let blank = OpenRequest { append_system_prompt: Some("  ".into()), ..OpenRequest::default() };
+    assert!(!args(&blank).iter().any(|arg| arg == "--append-system-prompt"), "a blank persona is none");
+}
+
 fn on(provider: Provider) -> OpenRequest {
     OpenRequest { provider: Some(provider), ..OpenRequest::default() }
 }

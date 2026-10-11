@@ -3,8 +3,10 @@
 //! `atelier-<pid>.sock` in `$XDG_RUNTIME_DIR`; `ATELIER_CONTROL=<path>` picks the place (and turns it on in a
 //! release build), and `ATELIER_CONTROL=off` turns it off.
 //!
-//! - `{"cmd":"state"}`: the open projects and sessions, each with its agent, status and the rows the list shows.
+//! - `{"cmd":"state"}`: the open projects and sessions, each with its agent, its bot and the mood of the bot's face when it
+//!   belongs to one, its status and the rows the list shows.
 //! - `{"cmd":"new_session"}` or `{"cmd":"new_session","agent":"Cursor"}`: opens a session in the active project.
+//!   `{"cmd":"new_session","bot":"dot"}` opens one that belongs to the bot kept under that id, on the bot's harness.
 //! - `{"cmd":"send","text":"hello"}`: sends a message in the session in front, as the composer does.
 //! - `{"cmd":"find","name":"limit-continue"}` and `{"cmd":"click","name":"limit-continue"}`: where an element marked with
 //!   [`marked`] was last drawn, and a press on it. `{"cmd":"click","x":10,"y":20}` presses a point of the window; `"button":"right"` presses it with the other button.

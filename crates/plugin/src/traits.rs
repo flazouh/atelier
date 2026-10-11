@@ -1,4 +1,4 @@
-use gpui_kit::{AnyElement, AnyEntity, App, Context, Entity};
+use gpui_kit::{AnyElement, AnyEntity, App, Context, Entity, Window};
 
 use super::structs::{Registry, Vitals};
 
@@ -29,6 +29,10 @@ pub trait AppHost {
 
     /// The numbers of the status bar, as the app last read them.
     fn vitals(&self, cx: &App) -> Vitals;
+
+    /// Starts a session that belongs to the bot kept under the id `bot`, in the project in front, and brings the
+    /// Sessions view in front with it open. The app says why when none starts.
+    fn start_session_as(&self, bot: &str, window: &mut Window, cx: &mut App);
 }
 
 /// A page of any type, as the app calls it: [`Page`](super::Page) holds one.

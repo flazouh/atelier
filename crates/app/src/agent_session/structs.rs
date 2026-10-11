@@ -71,6 +71,9 @@ pub struct AgentSession {
     /// What its agent runs on, for an agent with a choice; `None` leaves the agent as the host has it, and a resume
     /// finds the account that holds the session.
     pub provider: Option<crate::providers::Choice>,
+    /// The bot the session belongs to, when it has one: its agent is told the bot's persona, and its rows show the
+    /// bot's face. A session started the old way has none.
+    pub bot: Option<crate::session_bot::SessionBot>,
     /// The session this one continues, until its first message goes.
     pub(super) handoff: Option<super::handoff::Handoff>,
     /// The task the session began from, for the header's chip and the first signal.
@@ -198,6 +201,12 @@ impl AgentSession {
         });
     }
 
+    /// The mood its bot's face shows for what the session does now; none for a session with no bot.
+    pub fn mood(&self) -> Option<atelier_bot_face::Mood> {
+        self.bot.as_ref()?;
+        Some(crate::session_bot::mood_of(&self.status, crate::session_bot::tool_runs(self.conversation.items())))
+    }
+
     /// Gives the session its project's badge, which its panel's head shows. The shell sets it whenever it syncs.
     pub fn set_badge(&mut self, badge: atelier_ui::sidebar_model::Badge, cx: &mut Context<Self>) {
         if self.badge.as_ref() != Some(&badge) {
@@ -231,13 +240,29 @@ impl AgentSession {
 
     /// As `start`, on `provider` for an agent that has providers: the one a session that resumes ran on, else (for a new
     /// session) the default.
-    #[allow(clippy::too_many_arguments)]
+    #[cfg(test)]
     pub fn start_on(
         key: SharedString,
         agent: Agent,
         project: Arc<dyn Project>,
         resume: Option<(SessionId, SharedString)>,
         provider: Option<crate::providers::Choice>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        Self::start_as(key, agent, project, resume, provider, None, window, cx)
+    }
+
+    /// As `start_on`, for a session that belongs to `bot` when one is named: `agent` is the bot's harness, and the agent is
+    /// told the bot's persona each time it is launched.
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_as(
+        key: SharedString,
+        agent: Agent,
+        project: Arc<dyn Project>,
+        resume: Option<(SessionId, SharedString)>,
+        provider: Option<crate::providers::Choice>,
+        bot: Option<atelier_bots::Bot>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -374,6 +399,7 @@ impl AgentSession {
             model: start_model,
             mode: start_mode,
             provider: agent_has_providers.then(|| provider.or_else(|| resume.is_none().then(|| crate::providers::default_choice(cx)))).flatten(),
+            bot: bot.map(crate::session_bot::SessionBot::new),
             handoff: None,
             task: None,
             task_told: false,
@@ -531,7 +557,9 @@ impl AgentSession {
         let this_open = self.live_open.fetch_add(1, Ordering::SeqCst) + 1;
         let (backend, project, sink) = (self.agent.backend.clone(), self.project.clone(), self.tracking_sink(this_open));
         let fork = self.native_fork().filter(|_| resume.is_none());
-        let mut request = OpenRequest { resume: resume.clone().or(fork.clone()), model: self.model.clone(), mode: self.mode, provider: None, fork: fork.is_some(), mcp_config: None };
+        // A bot's session tells its agent who it is at each launch, a resume too. An agent with no way to take it leaves it.
+        let persona = self.bot.as_ref().map(|bot| bot.persona());
+        let mut request = OpenRequest { resume: resume.clone().or(fork.clone()), model: self.model.clone(), mode: self.mode, provider: None, fork: fork.is_some(), mcp_config: None, append_system_prompt: persona };
         let (choice, secrets) = (self.provider.clone(), crate::providers::secrets(cx));
         // Only Claude Code reads an MCP config file.
         let hub = (backend.name() == "claude-code").then(|| cx.try_global::<crate::capability_hub::CapabilityHub>().cloned()).flatten();
@@ -639,6 +667,7 @@ impl AgentSession {
         }
         let turns = std::mem::take(&mut *self.finished.lock().unwrap_or_else(|p| p.into_inner()));
         let before = self.status.clone();
+        let mood_before = self.mood();
         for event in &events {
             if let Event::Thinking { block, .. } = event {
                 self.thinking_since.entry(*block).or_insert_with(Instant::now);
@@ -711,7 +740,9 @@ impl AgentSession {
         let working = self.conversation.working();
         self.composer.update(cx, |c, cx| c.set_running(working, cx));
         self.show_context(cx);
-        if self.status != before {
+        // A bot's face also changes between thinking and working, which the status does not tell: the session says so, and
+        // its row is drawn again.
+        if self.status != before || self.mood() != mood_before {
             cx.emit(SessionEvent::Changed);
         }
         cx.notify();

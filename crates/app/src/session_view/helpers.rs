@@ -750,6 +750,11 @@ pub(super) fn header(session: &Entity<AgentSession>, window: &mut Window, cx: &m
             agent,
         )
     };
+    // A session of a bot shows the bot's face where the agent's mark stands.
+    let agent = match crate::session_bot::header_face(session, cx) {
+        Some(face) => div().debug_selector(|| "panel-bot".into()).child(face).into_any_element(),
+        None => agent,
+    };
     let title = match &renaming {
         Some(input) => div()
             .flex_1()

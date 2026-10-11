@@ -14,6 +14,7 @@ mod history;
 mod lens;
 mod rail;
 mod restore;
+mod session_bot;
 mod structs;
 mod tree_menu;
 mod types;

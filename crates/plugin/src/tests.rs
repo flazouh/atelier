@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use atelier_ui::{IconName, ProviderGauge, menu::Lead};
-use gpui_kit::{AnyElement, App, Context, IntoElement, TestAppContext, div};
+use gpui_kit::{AnyElement, App, Context, IntoElement, TestAppContext, Window, div};
 
 use super::{AppHost, Host, Page, Plugin, PluginPage, PluginView, Registry, Vitals};
 
@@ -42,10 +42,12 @@ impl PluginPage for Plain {
     }
 }
 
-/// Stands for the app: it keeps the ids it was asked to open, and has one provider on its bar.
+/// Stands for the app: it keeps the ids it was asked to open and the bots it was asked to start a session as, and has
+/// one provider on its bar.
 #[derive(Clone, Default)]
 struct FakeApp {
     opened: Rc<RefCell<Vec<String>>>,
+    started_as: Rc<RefCell<Vec<String>>>,
 }
 
 impl AppHost for FakeApp {
@@ -55,6 +57,10 @@ impl AppHost for FakeApp {
 
     fn vitals(&self, _cx: &App) -> Vitals {
         Vitals { load: None, providers: vec![ProviderGauge::new("Claude", Lead::Monogram)] }
+    }
+
+    fn start_session_as(&self, bot: &str, _window: &mut Window, _cx: &mut App) {
+        self.started_as.borrow_mut().push(bot.to_string());
     }
 }
 
@@ -130,4 +136,23 @@ fn a_page_need_not_listen_for_its_view_coming_back(cx: &mut TestAppContext) {
     let page = cx.update(|cx| view("plain", 0).open(&host, cx));
     cx.update(|cx| page.in_front_again(cx));
     assert!(page.downcast::<Plain>().is_some());
+}
+
+/// A page that has only its host, to ask the app from a window.
+struct Asker(Host);
+
+impl gpui_kit::Render for Asker {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+#[gpui_kit::test]
+fn a_page_asks_the_app_for_a_session_of_a_bot_by_the_bots_id(cx: &mut TestAppContext) {
+    let app = FakeApp::default();
+    let host = Host::new(app.clone());
+    let (asker, cx) = cx.add_window_view(|_, _| Asker(host));
+    asker.update_in(cx, |asker, window, cx| asker.0.start_session_as("dot", window, cx));
+    assert_eq!(*app.started_as.borrow(), ["dot"]);
+    assert!(app.opened.borrow().is_empty(), "and asked for nothing else");
 }

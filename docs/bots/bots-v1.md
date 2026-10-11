@@ -226,3 +226,14 @@ These moves are refused:
 - A run **still needs** the bots of its steps that are not done and not skipped. A run that is stopped needs none.
 - A bot that a run still needs cannot be removed. Stop the run, or let it end, first.
 - A run that is done or stopped holds no bot. It stays as a record, and it shows the id of a bot that is gone.
+
+### Sessions of a bot
+
+A session may belong to a bot (`crates/app/src/session_bot`). A session started the old way has no bot.
+
+- The bot's profile has a "Start a session" button. The control socket takes `new_session` with a `bot` id.
+- The session runs on the bot's harness. The settings keep the bot's id with the session, so the next launch still knows it.
+- `Bot::persona` is the bot's name, role, job, voice and skills as text. Claude Code gets it added to its system prompt at each launch. The other harnesses have no such option, so they get nothing.
+- The session's row in the sidebar and its header show the bot's face. `mood_of` gives the mood from what the session does (`faces-v1.md`, section 3). The face on the row is 20 px and moves while the session works.
+- The tools a bot may use are not enforced yet.
+

@@ -58,7 +58,24 @@ pub fn start_shown_in(cx: &mut TestAppContext, dir: PathBuf, turns: Vec<Vec<Even
     start_with(cx, dir, Fake { turns: Mutex::new(turns), ..Fake::default() }, true)
 }
 
+/// A session that belongs to `bot`, new or resuming the past session `resume`, on an agent that plays `turns`.
+pub fn start_as<'a>(cx: &'a mut TestAppContext, bot: atelier_bots::Bot, resume: Option<&str>, turns: Vec<Vec<Event>>) -> (Entity<AgentSession>, Arc<Fake>, &'a mut VisualTestContext) {
+    let resume = resume.map(|id| (atelier_agents::session::SessionId::new(id), gpui_kit::SharedString::from("An old session")));
+    start_of(cx, crate::test_dirs::path(), Fake { turns: Mutex::new(turns), ..Fake::default() }, false, resume, Some(bot))
+}
+
 fn start_with(cx: &mut TestAppContext, dir: PathBuf, fake: Fake, shown: bool) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
+    start_of(cx, dir, fake, shown, None, None)
+}
+
+fn start_of(
+    cx: &mut TestAppContext,
+    dir: PathBuf,
+    fake: Fake,
+    shown: bool,
+    resume: Option<(atelier_agents::session::SessionId, gpui_kit::SharedString)>,
+    bot: Option<atelier_bots::Bot>,
+) -> (Entity<AgentSession>, Arc<Fake>, &mut VisualTestContext) {
     cx.update(|cx| {
         gpui_kit::init(cx);
         atelier_ui::init(cx);
@@ -72,7 +89,7 @@ fn start_with(cx: &mut TestAppContext, dir: PathBuf, fake: Fake, shown: bool) ->
     agent.backend = Arc::new(FakeBackend(fake.clone()));
     let mut made = None;
     let (_root, cx) = cx.add_window_view(|window, cx| {
-        let session = cx.new(|cx| AgentSession::start("k".into(), agent, project, None, window, cx));
+        let session = cx.new(|cx| AgentSession::start_as("k".into(), agent, project, resume, None, bot, window, cx));
         made = Some(session.clone());
         Root { _session: session, shown }
     });

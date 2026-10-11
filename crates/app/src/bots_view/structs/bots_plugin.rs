@@ -27,6 +27,6 @@ impl BotsPlugin {
 impl Plugin for BotsPlugin {
     fn register(&self, registry: &mut Registry) {
         let root = self.root.clone();
-        registry.add_view(PluginView::new("bots", IconName::Bot, "Bots", 90, move |_, cx| BotsPage::new(root.clone(), cx)));
+        registry.add_view(PluginView::new("bots", IconName::Bot, "Bots", 90, move |host, cx| BotsPage::new(root.clone(), host.clone(), cx)));
     }
 }

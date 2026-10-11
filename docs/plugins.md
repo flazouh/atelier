@@ -75,6 +75,7 @@ Build the two parts from `atelier_ui` components, and take every colour from the
 |---|---|
 | `host.open_view(id, cx)` | Brings the registered view `id` in front, at the next frame. Nothing happens for an id nobody registered. |
 | `host.vitals(cx)` | The numbers of the status bar, as the app last read them: the machine's load, and each provider's use of its plan. |
+| `host.start_session_as(bot, window, cx)` | Starts a session that belongs to the bot kept under the id `bot`, in the project in front, and brings the Sessions view in front with it open. Call it from a handler, which has the window. The app says why when none starts. |
 
 A page never takes a handle to the window or to the app's own state. When a plugin needs more from the app, the call
 is added to `Host` (and to `AppHost`, the trait the app implements behind it).
@@ -98,7 +99,8 @@ A plugin in its own crate also needs the crate in the app's `Cargo.toml`. That i
 
 The Bots view is the first plugin. It lives in `crates/app/src/bots_view` for now, and it has the shape a crate has.
 
-The plugin registers one view. It carries what the page needs to start (the folder the bots are kept in):
+The plugin registers one view. It carries what the page needs to start (the folder the bots are kept in), and the
+page keeps the host: its profile asks the app for a session of the bot with `host.start_session_as`.
 
 ```rust
 pub struct BotsPlugin {
@@ -108,7 +110,7 @@ pub struct BotsPlugin {
 impl Plugin for BotsPlugin {
     fn register(&self, registry: &mut Registry) {
         let root = self.root.clone();
-        registry.add_view(PluginView::new("bots", IconName::Bot, "Bots", 90, move |_, cx| BotsPage::new(root.clone(), cx)));
+        registry.add_view(PluginView::new("bots", IconName::Bot, "Bots", 90, move |host, cx| BotsPage::new(root.clone(), host.clone(), cx)));
     }
 }
 ```

@@ -9,7 +9,7 @@ pub(super) const ARRIVAL_KEPT: std::time::Duration = std::time::Duration::from_s
 
 /// What the session tells the shell.
 pub enum SessionEvent {
-    /// Its title, status or id changed: the sidebar and the tabs draw it again.
+    /// Its title, status or id changed, or the mood of its bot's face: the sidebar and the tabs draw it again.
     Changed,
     /// The reader asked to review a turn (`None` for the whole session) at a file.
     Review { turn: Option<usize>, path: Option<String> },

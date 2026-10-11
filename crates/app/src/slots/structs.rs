@@ -132,4 +132,10 @@ impl AppHost for Host {
         let vitals = self.vitals.read(cx);
         atelier_plugin::Vitals { load: vitals.load().cloned(), providers: vitals.providers().to_vec() }
     }
+
+    /// Once the handler that asked has returned, so the shell can be changed.
+    fn start_session_as(&self, bot: &str, window: &mut Window, cx: &mut App) {
+        let (shell, bot) = (self.shell.clone(), bot.to_string());
+        window.defer(cx, move |window, cx| drop(shell.update(cx, |shell, cx| shell.start_session_of_bot(&bot, window, cx))));
+    }
 }

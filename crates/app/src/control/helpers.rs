@@ -90,7 +90,12 @@ fn talk(stream: std::os::unix::net::UnixStream, calls: futures_channel::mpsc::Un
 fn handle(request: Request, shell: &mut Shell, window: &mut Window, cx: &mut Context<Shell>) -> Value {
     match request {
         Request::State => state(shell, cx),
-        Request::NewSession { agent } => {
+        Request::NewSession { agent: Some(_), bot: Some(_) } => json!({ "error": "name an agent or a bot, not both: a bot runs on its own harness" }),
+        Request::NewSession { bot: Some(bot), .. } => match shell.new_session_of_bot(&bot, window, cx) {
+            Ok(session) => json!({ "ok": true, "session": session.read(cx).key.as_ref(), "bot": bot }),
+            Err(why) => json!({ "error": why }),
+        },
+        Request::NewSession { agent, bot: None } => {
             let agent = match agent {
                 None => None,
                 Some(name) => match atelier_agents::registry::agents().into_iter().find(|a| a.name.eq_ignore_ascii_case(&name)) {
@@ -219,12 +224,15 @@ pub(crate) fn state(shell: &Shell, cx: &App) -> Value {
     json!({ "settings": shell.settings_section(cx), "unsaved": shell.unsaved(cx), "updates": { "available": updates, "state": shell.update_state_word(), "changelog_open": shell.changelog_shown() }, "projects": projects, "theme": { "name": theme.name.as_ref(), "appearance": format!("{:?}", theme.appearance) }, "view": shell.view().words(), "bots": bots })
 }
 
-/// One session: who the agent is, how it stands, and the rows its list shows.
+/// One session: who the agent is, the bot it belongs to (with the mood its face shows) when it has one, how it stands, and
+/// the rows its list shows.
 pub(super) fn session_json(s: &AgentSession, front: bool) -> Value {
     let rows: Vec<Value> = s.shown.iter().map(|row| row_json(s, *row)).collect();
     json!({
         "key": s.key.as_ref(),
         "agent": s.agent.name,
+        "bot": s.bot.as_ref().map(|bot| bot.id.to_string()),
+        "mood": s.mood().map(atelier_bot_face::Mood::name),
         "title": s.title.as_ref(),
         "status": format!("{:?}", s.status),
         "working": s.conversation.working(),
