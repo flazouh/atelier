@@ -8,7 +8,7 @@ use atelier_ui::{
     CodeBlock, CodeBlockStatus, DiffLine, preview_clamp::PREVIEW_ROWS, FONT_FAMILY, FileDiff, FileDiffStatus, Icon, IconName, Kbd, MONO_FONT_FAMILY,
     MessageBubble, MessageBubbleAlign, MessageBubbleCollapsible, MessageBubbleGroupSpacing, MessageBubbleVariant,
     PromptAction, PromptInput, PromptInputEvent, PromptModel, Select, Shimmer, Spinner, TextSize, Thinking,
-    ThinkingPhase, ThinkingStyle, Todo, TodoList,
+    ThinkingPhase, ThinkingStyle, Todo, TodoList, NavList, TextInput,
     CodeEditor, Decision, InlineHunk, InlineReview, StatusTone, TodoStatus, ToolApproval, ToolApprovalStatus, ToolCall, ToolStatus, Tone, message_bubble_group,
 };
 use atelier_agents::claude::{self, SparkState};
@@ -38,6 +38,7 @@ mod review_story;
 mod providers_story;
 mod sign_in_story;
 mod changelog_story;
+mod groups;
 mod usage_story;
 
 use gpui_kit::base::input::InputEvent;
@@ -238,6 +239,11 @@ struct Gallery {
     /// Where Tab starts: with nothing focused, the window's Tab action has no path to walk from.
     focus: gpui_kit::FocusHandle,
     story: Story,
+    /// The groups of the sidebar the reader has open.
+    open: Vec<groups::Group>,
+    /// The sidebar's search field: letters typed here list the stories that match, in place of the groups.
+    search: Entity<gpui_kit::component::input::InputState>,
+    _search: gpui_kit::Subscription,
     choice: Option<usize>,
     /// The Inline review story's buffer: both sides of every hunk, as real text.
     inline: Entity<gpui_kit::component::input::EditorState>,
@@ -365,9 +371,19 @@ impl Gallery {
         let review = cx.new(|cx| review_story::ReviewStory::new(window, cx));
         let pull_request = cx.new(|cx| pr_story::PrStory::new(window, cx));
         let merge = cx.new(|cx| merge_story::MergeStory::new(window, cx));
+        let search = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).placeholder("Search"));
+        // Each letter lists again; Enter opens the first story listed.
+        let _search = cx.subscribe_in(&search, window, |this, _, event: &InputEvent, window, cx| match event {
+            InputEvent::Change => cx.notify(),
+            InputEvent::PressEnter { .. } => this.open_first_found(window, cx),
+            InputEvent::Focus | InputEvent::Blur => {}
+        });
         let mut gallery =
             Self {
             story,
+            open: vec![story.group()],
+            search,
+            _search,
             choice: None,
             inline,
             inline_hunks: inline_fixture(),
@@ -489,48 +505,77 @@ impl Gallery {
         cx.notify();
     }
 
+    /// Shows a story, as a press on its row does, and opens its group so the row is in view when the search ends.
+    fn show(&mut self, story: Story, window: &mut Window, cx: &mut Context<Self>) {
+        self.story = story;
+        if !self.open.contains(&story.group()) {
+            self.open.push(story.group());
+        }
+        if story == Story::Editor {
+            self.editors.open(cx);
+        }
+        self.open_load(window, cx);
+        cx.notify();
+    }
+
+    /// Folds a group that is open, or opens one that is folded.
+    fn toggle_group(&mut self, group: groups::Group, cx: &mut Context<Self>) {
+        match self.open.iter().position(|open| *open == group) {
+            Some(at) => drop(self.open.remove(at)),
+            None => self.open.push(group),
+        }
+        cx.notify();
+    }
+
+    /// Enter in the search field: the first story listed opens, and the field empties.
+    fn open_first_found(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let query = self.search.read(cx).value().to_string();
+        let Some(story) = groups::found(query.trim()).first().copied().filter(|_| !query.trim().is_empty()) else {
+            return;
+        };
+        self.search.update(cx, |search, cx| search.set_value("", window, cx));
+        self.show(story, window, cx);
+    }
+
     fn sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let query = self.search.read(cx).value().to_string();
+        let listed = groups::listed(&query, &self.open);
+        let nothing = listed.iter().all(|group| group.is_empty());
+        let (picked, toggled) = (cx.entity().downgrade(), cx.entity().downgrade());
+        let list = NavList::new("stories-list")
+            .groups(listed)
+            .selected(self.story.title())
+            .on_pick(move |title, window, cx| {
+                if let Some(story) = Story::titled(title) {
+                    picked.update(cx, |gallery, cx| gallery.show(story, window, cx)).ok();
+                }
+            })
+            .on_toggle(move |name, _, cx| {
+                if let Some(group) = groups::Group::named(name) {
+                    toggled.update(cx, |gallery, cx| gallery.toggle_group(group, cx)).ok();
+                }
+            });
         div()
             .flex()
             .flex_col()
-            .w(px(220.))
+            .w(px(232.))
             .h_full()
-            .p(px(12.))
-            .gap(px(2.))
+            .px(px(10.))
+            .pb(px(10.))
             .bg(theme.card)
+            .child(div().px(px(10.)).pt(px(38.)).pb(px(12.)).text_size(TextSize::Sm.font_size()).font_weight(FontWeight::SEMIBOLD).child("atelier-ui"))
+            .child(div().pb(px(10.)).child(TextInput::new("stories-search", &self.search).left_icon(IconName::Search).debug_name("stories-search")))
+            // The list scrolls, so the search over it and the theme picker at the foot stay in view in a short window.
             .child(
                 div()
-                    .px(px(10.))
-                    .pt(px(28.))
-                    .pb(px(12.))
-                    .text_size(TextSize::Sm.font_size())
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("atelier-ui for atelier"),
+                    .id("stories")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .child(list)
+                    .when(nothing, |d| d.child(div().debug_selector(|| "stories-none".into()).px(px(10.)).py(px(6.)).text_size(TextSize::Sm.font_size()).text_color(theme.muted_foreground).child("No story matches."))),
             )
-            // The list scrolls, so the theme picker at the foot stays in view in a short window.
-            .child(div().id("stories").flex().flex_col().gap(px(2.)).flex_1().min_h_0().overflow_y_scroll().children(Story::ALL.into_iter().map(|story| {
-                let selected = story == self.story;
-                let hover = theme.muted_hover();
-                div()
-                    .id(story.title())
-                    .px(px(10.))
-                    .py(px(6.))
-                    .rounded(atelier_ui::theme::radius::lg())
-                    .cursor_pointer()
-                    .text_size(TextSize::Sm.font_size())
-                    .when(selected, |d| d.bg(theme.card_strong).font_weight(FontWeight::MEDIUM))
-                    .when(!selected, |d| d.text_color(theme.muted_foreground).hover(move |s| s.bg(hover)))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.story = story;
-                        if story == Story::Editor {
-                            this.editors.open(cx);
-                        }
-                        this.open_load(window, cx);
-                        cx.notify();
-                    }))
-                    .child(story.title())
-            })))
             .child(div().flex_none().pt(px(8.)).debug_selector(|| "theme-picker".into()).child(theme_picker(&theme)))
     }
 
