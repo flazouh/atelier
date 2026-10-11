@@ -3,7 +3,7 @@ use std::{fs, path::Path, process::Command, sync::Arc};
 
 use atelier_agents::{
     claude_code::{ClaudeLineMapper, LineMapper},
-    session::{Event, PermissionRequest, ToolCall, ToolId, ToolKind, ToolStatus},
+    session::{Event, PermissionRequest, ToolCall, ToolId, ToolKind, ToolOutput, ToolStatus},
 };
 use atelier_project::LocalProject;
 use tempfile::TempDir;
@@ -504,4 +504,163 @@ fn a_captured_run_that_writes_nothing_lists_nothing() {
         tracker.observe(repo.project.as_ref(), &event);
     }
     assert!(repo.files(tracker).is_empty(), "the write was denied, so the file never appeared");
+}
+
+/// A shell tool call, the way a stream gives it: the call starts with no input, then its whole input arrives.
+fn shell_call(tracker: &mut TurnTracker, project: &dyn atelier_project::Project, id: &str, command: &str) {
+    tracker.observe(project, &Event::ToolStarted(ToolCall {
+        id: ToolId::new(id),
+        name: "Bash".into(),
+        kind: ToolKind::Shell,
+        input: serde_json::Value::Null,
+        file: None,
+        parent: None,
+        status: ToolStatus::Running,
+    }));
+    tracker.observe(project, &Event::ToolInput { id: ToolId::new(id), input: serde_json::json!({ "command": command }), file: None });
+}
+
+fn outside_folder() -> (TempDir, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = |name: &str| dir.path().join(name).to_string_lossy().to_string();
+    let first = path("out.txt");
+    (dir, first)
+}
+
+#[test]
+fn a_file_a_shell_redirect_makes_beyond_the_project_is_listed_as_added() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (outside, out) = outside_folder();
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("echo hello > {out}"));
+    fs::write(&out, "hello\n").unwrap();
+    let files = repo.files(tracker);
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert_eq!((files[0].path.as_str(), &files[0].change, files[0].before.as_deref(), files[0].after.as_deref()), (out.as_str(), &Change::Added, None, Some("hello\n")));
+    assert!(files[0].exact);
+    assert_eq!(files[0].counts(), (1, 0), "one line added");
+    drop(outside);
+}
+
+#[test]
+fn a_file_a_shell_redirect_overwrites_beyond_the_project_keeps_the_text_it_had() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (_outside, out) = outside_folder();
+    fs::write(&out, "old\n").unwrap();
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("echo new > {out}"));
+    fs::write(&out, "new\n").unwrap();
+    let files = repo.files(tracker);
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert_eq!((&files[0].change, files[0].before.as_deref(), files[0].after.as_deref()), (&Change::Modified, Some("old\n"), Some("new\n")));
+}
+
+#[test]
+fn tee_and_an_append_make_files_beyond_the_project_too() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (outside, first) = outside_folder();
+    let second = outside.path().join("log.txt").to_string_lossy().to_string();
+    fs::write(&second, "one\n").unwrap();
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("echo a | tee {first} && echo two >> {second}"));
+    fs::write(&first, "a\n").unwrap();
+    fs::write(&second, "one\ntwo\n").unwrap();
+    let mut files = repo.files(tracker);
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    assert_eq!(files.len(), 2, "{files:?}");
+    let by = |path: &str| files.iter().find(|f| f.path == path).unwrap();
+    assert_eq!((&by(&first).change, by(&first).before.as_deref()), (&Change::Added, None));
+    assert_eq!((&by(&second).change, by(&second).before.as_deref()), (&Change::Modified, Some("one\n")));
+}
+
+#[test]
+fn a_shell_command_seen_after_it_ran_still_lists_the_file_it_wrote() {
+    // The baseline is read when the call's input is whole, and the command may already have run by then (a slow link).
+    // The file must not vanish because its text before is no longer known.
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (_outside, out) = outside_folder();
+    let mut tracker = repo.begin();
+    fs::write(&out, "hello\n").unwrap();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("echo hello > {out}"));
+    let files = repo.files(tracker);
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert_eq!((files[0].path.as_str(), files[0].after.as_deref(), files[0].before.as_deref(), files[0].exact), (out.as_str(), Some("hello\n"), None, false));
+}
+
+#[test]
+fn a_shell_command_that_failed_to_write_lists_nothing() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (_outside, out) = outside_folder();
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("false > {out}"));
+    assert!(repo.files(tracker).is_empty());
+}
+
+#[test]
+fn a_shell_command_that_writes_to_a_device_or_a_stream_lists_nothing() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", "make > /dev/null 2>&1; echo oops >&2");
+    assert!(repo.files(tracker).is_empty());
+}
+
+#[test]
+fn a_shell_write_inside_the_project_is_listed_once_by_its_relative_path() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("echo hello > {}", repo.abs("new.txt")));
+    repo.write("new.txt", "hello\n");
+    let files = repo.files(tracker);
+    assert_eq!(files.len(), 1, "{files:?}");
+    assert_eq!((files[0].path.as_str(), &files[0].change, files[0].exact), ("new.txt", &Change::Added, true));
+}
+
+#[test]
+fn a_shell_command_waiting_for_a_permission_has_its_file_read_before_the_user_answers() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (_outside, out) = outside_folder();
+    fs::write(&out, "old\n").unwrap();
+    let mut tracker = repo.begin();
+    let call = ToolCall {
+        id: ToolId::new("t1"),
+        name: "Bash".into(),
+        kind: ToolKind::Shell,
+        input: serde_json::json!({ "command": format!("echo new > {out}") }),
+        file: None,
+        parent: None,
+        status: ToolStatus::Pending,
+    };
+    let ask = PermissionRequest { id: atelier_agents::session::RequestId::new("r"), call, reason: None, choices: vec![] };
+    tracker.observe(repo.project.as_ref(), &Event::Permission(ask));
+    fs::write(&out, "new\n").unwrap();
+    let files = repo.files(tracker);
+    assert_eq!((files[0].before.as_deref(), files[0].after.as_deref()), (Some("old\n"), Some("new\n")));
+}
+
+fn errored(id: &str) -> Event {
+    Event::ToolFinished { id: ToolId::new(id), output: ToolOutput { text: "denied".into(), is_error: true, truncated: false, full_at: None } }
+}
+
+#[test]
+fn a_shell_command_that_failed_leaves_an_unchanged_file_out_of_the_list() {
+    // Denied by the user, or failed before it wrote: the file is as it was, and listing it would say the agent touched it.
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (_outside, out) = outside_folder();
+    fs::write(&out, "old\n").unwrap();
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("echo new > {out}"));
+    tracker.observe(repo.project.as_ref(), &errored("t1"));
+    assert!(repo.files(tracker).is_empty());
+}
+
+#[test]
+fn a_shell_command_that_failed_after_it_wrote_still_lists_the_file() {
+    let repo = Repo::with(&[("a.txt", "x\n")]);
+    let (_outside, out) = outside_folder();
+    let mut tracker = repo.begin();
+    shell_call(&mut tracker, repo.project.as_ref(), "t1", &format!("make > {out}"));
+    fs::write(&out, "partial log\n").unwrap();
+    tracker.observe(repo.project.as_ref(), &errored("t1"));
+    let files = repo.files(tracker);
+    assert_eq!((files.len(), &files[0].change), (1, &Change::Added));
 }
